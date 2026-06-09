@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="FluentA.API/FluentA.API.csproj" />
+  <Project Path="FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj" />
+  <Project Path="FluentA.Application/FluentA.Application.csproj" />
+  <Project Path="FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj" />
+  <Project Path="FluentA.Domain/FluentA.Domain.csproj" />
+  <Project Path="FluentA.Infrastructure/FluentA.Infrastructure.csproj" />
+</Solution>

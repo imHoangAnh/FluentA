@@ -1,12 +1,56 @@
-# Harness durable layer — each project instance generates its own data.
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+!src/frontend/.env.example
+*.local
+
+# Harness local state
 harness.db
 harness.db-wal
 harness.db-shm
+.agent-workflow/
+.spikes/
+history/
 
-# Rust build output for harness tooling.
-target/
+# Logs / temp runtime files
+logs/
+*.log
+*.out
+*.err
+*.pid
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node / frontend build cache
+node_modules/
 dist/
+dist-ssr/
+.vite/
+coverage/
 
-# Downloaded Harness CLI binary for installed project instances.
+# .NET build output
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+
+# Rust / generic build output
+target/
+
+# Downloaded Harness CLI binary for installed project instances
 scripts/bin/harness-cli
 scripts/bin/harness-cli.exe
