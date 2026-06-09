@@ -1,7 +1,9 @@
 using FluentA.Application.BoundedContexts.Auth;
+using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
 using FluentA.Infrastructure.Auth;
 using FluentA.Infrastructure.Persistence;
+using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,8 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
+        services.AddScoped<IVocabularyService, VocabularyService>();
         return services;
     }
 }

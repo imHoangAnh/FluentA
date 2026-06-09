@@ -1,8 +1,29 @@
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { useAuthStore } from './stores/authStore'
+
+function renderApp(initialEntry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      },
+    },
+  })
+  queryClient.setQueryData(['vocab', 'boards'], [])
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
 
 describe('FluentA auth app', () => {
   beforeEach(() => {
@@ -10,11 +31,7 @@ describe('FluentA auth app', () => {
   })
 
   it('renders login route', () => {
-    render(
-      <MemoryRouter initialEntries={['/login']}>
-        <App />
-      </MemoryRouter>,
-    )
+    renderApp('/login')
 
     expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
@@ -22,11 +39,7 @@ describe('FluentA auth app', () => {
   })
 
   it('protects the workspace route when anonymous', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <App />
-      </MemoryRouter>,
-    )
+    renderApp('/')
 
     expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
   })
@@ -43,13 +56,10 @@ describe('FluentA auth app', () => {
       },
     })
 
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <App />
-      </MemoryRouter>,
-    )
+    renderApp('/')
 
     expect(screen.getByText('learner@example.com')).toBeInTheDocument()
-    expect(screen.getByText(/Vocabulary and flashcards are queued/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Boards' })).toBeInTheDocument()
+    expect(screen.getByTestId('board-name-input')).toBeInTheDocument()
   })
 })
