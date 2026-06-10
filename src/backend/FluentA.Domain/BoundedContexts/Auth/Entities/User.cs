@@ -33,7 +33,7 @@ public sealed class User : BaseEntity, IAggregateRoot
             throw new ArgumentException("Password hash is required.", nameof(passwordHash));
         }
 
-        return new User(email, fullName, passwordHash, googleId: null, isEmailVerified: true);
+        return new User(email, fullName, passwordHash, googleId: null, isEmailVerified: false);
     }
 
     public static User CreateWithGoogle(string email, string fullName, string googleId)

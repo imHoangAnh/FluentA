@@ -5,6 +5,7 @@ import { GoogleCallbackPage } from './routes/auth/GoogleCallbackPage'
 import { WorkspacePage } from './routes/workspace/WorkspacePage'
 import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
+import { ReviewSettingsPage } from './routes/settings/ReviewSettingsPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
 
 export default function App() {
@@ -26,6 +27,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <FlashcardsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/review"
+        element={
+          <ProtectedRoute>
+            <ReviewSettingsPage />
           </ProtectedRoute>
         }
       />

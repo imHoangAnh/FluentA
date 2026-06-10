@@ -321,7 +321,7 @@ export function WorkspacePage() {
                 ))}
               </div>
 
-              {activePage ? <VocabTable boardId={activeBoard.id} page={activePage} /> : null}
+              {activePage ? <VocabTable boardId={activeBoard.id} page={activePage} boardLanguage={activeBoard.language} /> : null}
             </>
           ) : null}
         </section>

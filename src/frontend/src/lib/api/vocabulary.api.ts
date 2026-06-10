@@ -35,6 +35,12 @@ export type WordInput = {
   thesaurus?: string | null
   collocation?: string | null
   note?: string | null
+  customValues?: CustomValue[]
+}
+
+export type CustomValue = {
+  columnId: string
+  value?: string | null
 }
 
 export type Word = WordInput & {
@@ -42,6 +48,18 @@ export type Word = WordInput & {
   pageId: string
   createdAt: string
   updatedAt: string
+}
+
+export type CustomColumn = {
+  id: string
+  name: string
+  type: 'text' | 'number'
+  sortOrder: number
+}
+
+export type ColumnConfiguration = {
+  customColumns: CustomColumn[]
+  hiddenColumnKeys: string[]
 }
 
 export async function listBoards() {
@@ -97,6 +115,30 @@ export async function updateWord(boardId: string, wordId: string, input: WordInp
   return response.data.data!
 }
 
+export async function updateWordCell(boardId: string, wordId: string, columnKey: string, value: string) {
+  const response = await apiClient.patch<ApiEnvelope<Word>>(`/boards/${boardId}/words/${wordId}/cells`, { columnKey, value })
+  return response.data.data!
+}
+
 export async function deleteWord(boardId: string, wordId: string) {
   await apiClient.delete(`/boards/${boardId}/words/${wordId}`)
+}
+
+export async function getColumnConfiguration(boardId: string) {
+  const response = await apiClient.get<ApiEnvelope<ColumnConfiguration>>(`/boards/${boardId}/columns`)
+  return response.data.data!
+}
+
+export async function createCustomColumn(boardId: string, input: { name: string; type: 'text' | 'number' }) {
+  const response = await apiClient.post<ApiEnvelope<CustomColumn>>(`/boards/${boardId}/columns`, input)
+  return response.data.data!
+}
+
+export async function deleteCustomColumn(boardId: string, columnId: string) {
+  await apiClient.delete(`/boards/${boardId}/columns/${columnId}`)
+}
+
+export async function updateColumnVisibility(boardId: string, hiddenColumnKeys: string[]) {
+  const response = await apiClient.put<ApiEnvelope<ColumnConfiguration>>(`/boards/${boardId}/column-visibility`, { hiddenColumnKeys })
+  return response.data.data!
 }

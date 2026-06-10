@@ -13,7 +13,12 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
   await page.getByLabel('Full name').fill('SM2 Learner');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
+  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const registerPayload = await (await registerResponsePromise).json();
+  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+    data: { token: registerPayload.data.emailVerificationToken },
+  });
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
@@ -48,7 +53,9 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
   await expect(page.getByText('All Words SM-2 Review')).toBeVisible();
   await expect(page.getByText(/Every rating updates/)).toBeVisible();
 
+  await page.getByRole('button', { name: /Normal/ }).click();
   await page.getByTestId('start-review-session').click();
+  await expect(page.getByText('1 / 1')).toBeVisible();
   await page.keyboard.press('Space');
   await page.keyboard.press('2');
   await expect(page.getByTestId('review-summary')).toBeVisible();
@@ -66,6 +73,7 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
   await allWordsDeck.getByRole('link', { name: 'Study All Words' }).click();
   await page.getByRole('button', { name: /Shuffle/ }).click();
   await page.getByTestId('start-review-session').click();
+  await expect(page.getByText('1 / 1')).toBeVisible();
   await page.keyboard.press('Space');
   await page.keyboard.press('2');
   await expect(page.getByTestId('review-summary')).toBeVisible();

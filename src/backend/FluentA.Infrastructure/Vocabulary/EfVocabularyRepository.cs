@@ -72,6 +72,32 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<VocabCustomColumn>> ListCustomColumnsAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    {
+        return await (
+            from column in _dbContext.VocabCustomColumns
+            join board in _dbContext.Boards on column.BoardId equals board.Id
+            where column.BoardId == boardId && board.UserId == userId && board.DeletedAt == null
+            orderby column.SortOrder, column.CreatedAt
+            select column)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VocabCustomValue>> ListCustomValuesAsync(IEnumerable<Guid> wordIds, CancellationToken cancellationToken = default)
+    {
+        var ids = wordIds.Distinct().ToList();
+        return ids.Count == 0
+            ? []
+            : await _dbContext.VocabCustomValues.Where(value => ids.Contains(value.WordId)).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VocabColumnVisibility>> ListColumnVisibilityAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.VocabColumnVisibility
+            .Where(preference => preference.UserId == userId && preference.BoardId == boardId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Guid>> ListActiveDeckIdsAsync(Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.FlashcardDecks
@@ -103,6 +129,15 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         return (maxSortOrder ?? -1) + 1;
     }
 
+    public async Task<int> NextCustomColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
+    {
+        var maxSortOrder = await _dbContext.VocabCustomColumns
+            .Where(column => column.BoardId == boardId)
+            .Select(column => (int?)column.SortOrder)
+            .MaxAsync(cancellationToken);
+        return (maxSortOrder ?? -1) + 1;
+    }
+
     public async Task AddBoardWithDeckAsync(VocabBoard board, FlashcardDeck deck, CancellationToken cancellationToken = default)
     {
         await _dbContext.Boards.AddAsync(board, cancellationToken);
@@ -117,11 +152,54 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task AddWordAsync(VocabWord word, CancellationToken cancellationToken = default)
+    public async Task AddWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default)
     {
         await _dbContext.Words.AddAsync(word, cancellationToken);
+        if (customValues is { Count: > 0 })
+        {
+            await _dbContext.VocabCustomValues.AddRangeAsync(customValues, cancellationToken);
+        }
         await SynchronizeWordEventsAsync(word, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddCustomColumnAsync(VocabCustomColumn column, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.VocabCustomColumns.AddAsync(column, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ReplaceColumnVisibilityAsync(Guid userId, Guid boardId, IReadOnlyList<VocabColumnVisibility> preferences, CancellationToken cancellationToken = default)
+    {
+        var existing = await _dbContext.VocabColumnVisibility
+            .Where(preference => preference.UserId == userId && preference.BoardId == boardId)
+            .ToListAsync(cancellationToken);
+        _dbContext.VocabColumnVisibility.RemoveRange(existing);
+        await _dbContext.VocabColumnVisibility.AddRangeAsync(preferences, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeleteCustomColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
+    {
+        var column = await (
+            from candidate in _dbContext.VocabCustomColumns
+            join board in _dbContext.Boards on candidate.BoardId equals board.Id
+            where candidate.Id == columnId && candidate.BoardId == boardId && board.UserId == userId && board.DeletedAt == null
+            select candidate)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (column is null)
+        {
+            return false;
+        }
+
+        var key = $"custom:{column.Id}".ToLowerInvariant();
+        var preferences = await _dbContext.VocabColumnVisibility
+            .Where(preference => preference.BoardId == boardId && preference.ColumnKey == key)
+            .ToListAsync(cancellationToken);
+        _dbContext.VocabColumnVisibility.RemoveRange(preferences);
+        _dbContext.VocabCustomColumns.Remove(column);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task UpdateBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
@@ -145,11 +223,80 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateWordAsync(VocabWord word, CancellationToken cancellationToken = default)
+    public async Task UpdateWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default)
     {
         _dbContext.Words.Update(word);
+        if (customValues is not null)
+        {
+            var existing = await _dbContext.VocabCustomValues.Where(value => value.WordId == word.Id).ToListAsync(cancellationToken);
+            _dbContext.VocabCustomValues.RemoveRange(existing);
+            await _dbContext.VocabCustomValues.AddRangeAsync(customValues, cancellationToken);
+        }
         await SynchronizeWordEventsAsync(word, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateCustomValueAsync(Guid wordId, Guid columnId, VocabCustomValue? value, CancellationToken cancellationToken = default)
+    {
+        var existing = await _dbContext.VocabCustomValues
+            .SingleOrDefaultAsync(item => item.WordId == wordId && item.ColumnId == columnId, cancellationToken);
+        if (existing is not null)
+        {
+            _dbContext.VocabCustomValues.Remove(existing);
+        }
+        if (value is not null)
+        {
+            await _dbContext.VocabCustomValues.AddAsync(value, cancellationToken);
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateFixedCellAsync(VocabWord word, string columnKey, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var key = columnKey.ToLowerInvariant();
+        var wordQuery = _dbContext.Words.Where(item => item.Id == word.Id);
+        var cardQuery = _dbContext.FlashcardCards.Where(card => card.WordId == word.Id);
+        switch (key)
+        {
+            case "word":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Word, word.Word).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.Word, word.Word).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "meaningvn":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.MeaningVn, word.MeaningVn).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.MeaningVn, word.MeaningVn).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "meaningen":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.MeaningEn, word.MeaningEn).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.MeaningEn, word.MeaningEn).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "class":
+                var wordClass = word.Class;
+                var cardClass = word.Class.ToString().ToLowerInvariant();
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Class, wordClass).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.WordClass, cardClass).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "example":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Example, word.Example).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.Example, word.Example).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "thesaurus":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Thesaurus, word.Thesaurus).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.Thesaurus, word.Thesaurus).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "collocation":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Collocation, word.Collocation).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.Collocation, word.Collocation).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            case "note":
+                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Note, word.Note).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
+                await cardQuery.ExecuteUpdateAsync(setters => setters.SetProperty(card => card.Note, word.Note).SetProperty(card => card.UpdatedAt, word.UpdatedAt), cancellationToken);
+                break;
+            default:
+                throw new InvalidOperationException("Unsupported fixed vocabulary cell.");
+        }
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task SoftDeleteBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)

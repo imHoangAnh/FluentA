@@ -12,6 +12,12 @@ export type AuthPayload = {
   user: UserProfile
 }
 
+export type RegisterPayload = {
+  message: string
+  emailVerificationToken: string
+  emailVerificationUrl: string
+}
+
 export type ApiEnvelope<T> = {
   success: boolean
   data?: T
@@ -23,7 +29,12 @@ export type ApiEnvelope<T> = {
 }
 
 export async function registerAccount(input: { email: string; password: string; fullName: string }) {
-  const response = await apiClient.post<ApiEnvelope<{ message: string }>>('/auth/register', input)
+  const response = await apiClient.post<ApiEnvelope<RegisterPayload>>('/auth/register', input)
+  return response.data.data!
+}
+
+export async function verifyEmail(token: string) {
+  const response = await apiClient.post<ApiEnvelope<UserProfile>>('/auth/verify-email', { token })
   return response.data.data!
 }
 

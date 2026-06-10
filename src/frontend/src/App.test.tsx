@@ -16,6 +16,82 @@ function renderApp(initialEntry: string) {
   })
   queryClient.setQueryData(['vocab', 'boards'], [])
   queryClient.setQueryData(['flashcard', 'decks'], [])
+  queryClient.setQueryData(['flashcard', 'dashboard'], {
+    boardId: null,
+    boardName: null,
+    totalCards: 0,
+    totalReviews: 0,
+    streakDays: 0,
+    retentionRate: 0,
+    overdue: 0,
+    dueToday: 0,
+    newCards: 0,
+    forecast: [],
+  })
+  queryClient.setQueryData(['flashcard', 'settings'], { newCardsPerDay: 20, reviewCardsPerDay: 200 })
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+function renderAppWithDeck(initialEntry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      },
+    },
+  })
+  queryClient.setQueryData(['flashcard', 'decks'], [{
+    id: 'deck-1',
+    boardId: 'board-1',
+    boardName: 'HSK',
+    boardLanguage: 'zh',
+    pageId: 'page-1',
+    name: 'HSK - Unit 1',
+    type: 'PageDeck',
+    cards: [{
+      id: 'card-1',
+      wordId: 'word-1',
+      word: '你好',
+      wordClass: 'phrase',
+      meaningVn: 'xin chào',
+      meaningEn: 'ni hao',
+      example: '你好！',
+      interval: 0,
+      easeFactor: 2.5,
+      repetitions: 0,
+      nextReviewDate: null,
+      state: 'new',
+    }],
+  }])
+  queryClient.setQueryData(['flashcard', 'dashboard'], {
+    boardId: null,
+    boardName: null,
+    totalCards: 1,
+    totalReviews: 2,
+    streakDays: 2,
+    retentionRate: 100,
+    overdue: 1,
+    dueToday: 0,
+    newCards: 1,
+    forecast: [
+      { date: '2026-06-10', dueCount: 1 },
+      { date: '2026-06-11', dueCount: 0 },
+      { date: '2026-06-12', dueCount: 0 },
+      { date: '2026-06-13', dueCount: 0 },
+      { date: '2026-06-14', dueCount: 0 },
+      { date: '2026-06-15', dueCount: 0 },
+      { date: '2026-06-16', dueCount: 0 },
+    ],
+  })
+  queryClient.setQueryData(['flashcard', 'settings'], { newCardsPerDay: 20, reviewCardsPerDay: 200 })
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -87,5 +163,35 @@ describe('FluentA auth app', () => {
     renderApp('/flashcards/decks/deck-1/review')
 
     expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
+  })
+
+  it('renders protected review settings when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/settings/review')
+
+    expect(screen.getByRole('heading', { name: 'Shape your daily practice' })).toBeInTheDocument()
+    expect(screen.getByLabelText('New cards per day')).toHaveValue(20)
+    expect(screen.getByLabelText('Review cards per day')).toHaveValue(200)
+  })
+
+  it('adapts flashcard viewer labels to board language', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderAppWithDeck('/flashcards')
+
+    expect(screen.getByRole('heading', { name: 'Your synchronized decks' })).toBeInTheDocument()
+    expect(screen.getByText('Pinyin')).toBeInTheDocument()
+    expect(screen.getByText('ni hao')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-streak')).toHaveTextContent('2 days')
+    expect(screen.getByTestId('dashboard-retention')).toHaveTextContent('100%')
   })
 })

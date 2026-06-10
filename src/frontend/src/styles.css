@@ -560,6 +560,71 @@ a {
   color: var(--muted);
 }
 
+.word-panel__tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.column-settings {
+  position: relative;
+}
+
+.column-settings__panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(420px, 80vw);
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(26, 47, 52, 0.16);
+}
+
+.column-settings__panel h4 {
+  margin: 0 0 6px;
+}
+
+.column-settings__panel p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.column-settings__list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.column-settings__list label,
+.column-settings__custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.column-settings__custom {
+  justify-content: space-between;
+}
+
+.column-settings__custom small {
+  color: var(--muted);
+}
+
+.column-settings__create {
+  display: grid;
+  grid-template-columns: 1fr 100px auto;
+  gap: 8px;
+}
+
+.column-settings__create input,
+.column-settings__create select {
+  min-width: 0;
+}
+
 .word-table-wrap {
   overflow-x: auto;
   display: grid;
@@ -567,7 +632,7 @@ a {
 }
 
 .word-row {
-  min-width: 1420px;
+  min-width: max-content;
   display: grid;
   grid-template-columns: 150px 190px 220px 110px 240px 170px 170px 170px 96px;
   gap: 8px;
@@ -598,6 +663,43 @@ a {
 .word-row select:focus {
   outline: 3px solid rgba(15, 159, 143, 0.18);
   border-color: var(--teal);
+}
+
+.word-cell {
+  min-width: 0;
+  position: relative;
+}
+
+.word-cell__status,
+.word-cell__error {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.word-cell__status {
+  color: var(--muted);
+}
+
+.word-cell__error,
+.word-status--error {
+  color: #a53b32;
+}
+
+.word-cell__error button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #a53b32;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.word-cell--error input,
+.word-cell--error select {
+  border-color: #c75a50;
 }
 
 .word-action {
@@ -668,6 +770,63 @@ a {
 
 .flashcard-summary svg {
   color: var(--teal);
+}
+
+.flashcard-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(280px, 1.3fr);
+  gap: 14px;
+}
+
+.flashcard-dashboard article {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.flashcard-dashboard article:not(.flashcard-dashboard__forecast) {
+  display: grid;
+  gap: 7px;
+}
+
+.flashcard-dashboard svg {
+  color: var(--teal);
+}
+
+.flashcard-dashboard span,
+.flashcard-dashboard small {
+  color: var(--muted);
+}
+
+.flashcard-dashboard strong {
+  font-size: 28px;
+}
+
+.flashcard-dashboard__forecast > div {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(24px, 1fr));
+  align-items: end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.forecast-bar {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.forecast-bar span {
+  width: 100%;
+  max-width: 24px;
+  border-radius: 8px 8px 2px 2px;
+  background: linear-gradient(180deg, var(--gold), var(--teal));
+}
+
+.forecast-bar strong {
+  font-size: 13px;
 }
 
 .flashcard-status {
@@ -882,6 +1041,58 @@ a {
   margin: 28px 0 18px;
 }
 
+.settings-workspace {
+  max-width: 920px;
+}
+
+.settings-panel {
+  max-width: 680px;
+  margin: 48px auto;
+  padding: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.settings-panel h1 {
+  margin: 8px 0;
+  font-size: clamp(34px, 6vw, 54px);
+}
+
+.settings-panel p {
+  color: var(--muted);
+}
+
+.settings-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-form input {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  background: #ffffff;
+  font: inherit;
+}
+
+.settings-success {
+  color: var(--teal-dark) !important;
+  font-weight: 800;
+}
+
 .review-mode {
   min-height: 104px;
   display: grid;
@@ -1092,6 +1303,10 @@ a {
   .page-create,
   .board-edit,
   .flashcard-decks {
+    grid-template-columns: 1fr;
+  }
+
+  .flashcard-dashboard {
     grid-template-columns: 1fr;
   }
 

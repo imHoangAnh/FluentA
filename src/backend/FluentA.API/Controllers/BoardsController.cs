@@ -20,6 +20,7 @@ public sealed class BoardsController : ControllerBase
         _vocabulary = vocabulary;
     }
 
+    /// <summary>Lists vocabulary boards owned by the authenticated user.</summary>
     [HttpGet]
     public async Task<IActionResult> ListBoards(CancellationToken cancellationToken)
     {
@@ -27,6 +28,7 @@ public sealed class BoardsController : ControllerBase
         return Ok(ApiEnvelope<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!));
     }
 
+    /// <summary>Creates a vocabulary board with its synchronized All Words deck.</summary>
     [HttpPost]
     public async Task<IActionResult> CreateBoard(CreateBoardRequest request, CancellationToken cancellationToken)
     {
@@ -36,6 +38,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Returns one vocabulary board with its pages.</summary>
     [HttpGet("{boardId:guid}")]
     public async Task<IActionResult> GetBoard(Guid boardId, CancellationToken cancellationToken)
     {
@@ -43,6 +46,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Updates board metadata such as name, language, and sort order.</summary>
     [HttpPatch("{boardId:guid}")]
     public async Task<IActionResult> UpdateBoard(Guid boardId, UpdateBoardRequest request, CancellationToken cancellationToken)
     {
@@ -50,6 +54,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Soft-deletes a vocabulary board.</summary>
     [HttpDelete("{boardId:guid}")]
     public async Task<IActionResult> DeleteBoard(Guid boardId, CancellationToken cancellationToken)
     {
@@ -59,6 +64,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Lists pages inside a vocabulary board.</summary>
     [HttpGet("{boardId:guid}/pages")]
     public async Task<IActionResult> ListPages(Guid boardId, CancellationToken cancellationToken)
     {
@@ -66,6 +72,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<IReadOnlyList<PageDto>>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Creates a page and its synchronized Page Deck.</summary>
     [HttpPost("{boardId:guid}/pages")]
     public async Task<IActionResult> CreatePage(Guid boardId, CreatePageRequest request, CancellationToken cancellationToken)
     {
@@ -75,6 +82,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Updates page metadata.</summary>
     [HttpPatch("{boardId:guid}/pages/{pageId:guid}")]
     public async Task<IActionResult> UpdatePage(Guid boardId, Guid pageId, UpdatePageRequest request, CancellationToken cancellationToken)
     {
@@ -82,6 +90,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<PageDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Soft-deletes a page.</summary>
     [HttpDelete("{boardId:guid}/pages/{pageId:guid}")]
     public async Task<IActionResult> DeletePage(Guid boardId, Guid pageId, CancellationToken cancellationToken)
     {
@@ -91,6 +100,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Lists vocabulary words for a page.</summary>
     [HttpGet("{boardId:guid}/pages/{pageId:guid}/words")]
     public async Task<IActionResult> ListWords(Guid boardId, Guid pageId, CancellationToken cancellationToken)
     {
@@ -98,6 +108,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<IReadOnlyList<WordDto>>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Creates a vocabulary word and synchronized flashcards.</summary>
     [HttpPost("{boardId:guid}/pages/{pageId:guid}/words")]
     public async Task<IActionResult> CreateWord(Guid boardId, Guid pageId, WordRequest request, CancellationToken cancellationToken)
     {
@@ -107,6 +118,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Updates a full vocabulary word.</summary>
     [HttpPatch("{boardId:guid}/words/{wordId:guid}")]
     public async Task<IActionResult> UpdateWord(Guid boardId, Guid wordId, WordRequest request, CancellationToken cancellationToken)
     {
@@ -114,6 +126,15 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<WordDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
+    /// <summary>Updates one spreadsheet cell for a vocabulary word.</summary>
+    [HttpPatch("{boardId:guid}/words/{wordId:guid}/cells")]
+    public async Task<IActionResult> UpdateWordCell(Guid boardId, Guid wordId, UpdateWordCellRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.UpdateWordCellAsync(CurrentUserId(), boardId, wordId, request, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<WordDto>.Ok(result.Value!)) : ToErrorResult(result);
+    }
+
+    /// <summary>Soft-deletes a vocabulary word and synchronized cards.</summary>
     [HttpDelete("{boardId:guid}/words/{wordId:guid}")]
     public async Task<IActionResult> DeleteWord(Guid boardId, Guid wordId, CancellationToken cancellationToken)
     {
@@ -121,6 +142,42 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess
             ? Ok(ApiEnvelope<object>.Ok(new { message = "Word deleted." }))
             : ToErrorResult(result);
+    }
+
+    /// <summary>Returns custom column definitions and user visibility preferences.</summary>
+    [HttpGet("{boardId:guid}/columns")]
+    public async Task<IActionResult> GetColumnConfiguration(Guid boardId, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.GetColumnConfigurationAsync(CurrentUserId(), boardId, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<ColumnConfigurationDto>.Ok(result.Value!)) : ToErrorResult(result);
+    }
+
+    /// <summary>Creates a board-wide custom vocabulary column.</summary>
+    [HttpPost("{boardId:guid}/columns")]
+    public async Task<IActionResult> CreateCustomColumn(Guid boardId, CreateCustomColumnRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.CreateCustomColumnAsync(CurrentUserId(), boardId, request, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<CustomColumnDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Permanently deletes a custom column and its values.</summary>
+    [HttpDelete("{boardId:guid}/columns/{columnId:guid}")]
+    public async Task<IActionResult> DeleteCustomColumn(Guid boardId, Guid columnId, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.DeleteCustomColumnAsync(CurrentUserId(), boardId, columnId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<object>.Ok(new { message = "Custom column permanently deleted." }))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Updates the authenticated user's hidden columns for a board.</summary>
+    [HttpPut("{boardId:guid}/column-visibility")]
+    public async Task<IActionResult> UpdateColumnVisibility(Guid boardId, UpdateColumnVisibilityRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.UpdateColumnVisibilityAsync(CurrentUserId(), boardId, request, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<ColumnConfigurationDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     private Guid CurrentUserId()

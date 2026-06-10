@@ -3,8 +3,8 @@
 ## Product Boundary
 
 Vocabulary Board is the source of truth for FluentA language data. This
-contract covers board management, page management, and vocabulary-word CRUD.
-Column customization, TTS, real-time synchronization notifications, and
+contract covers board management, page management, vocabulary-word CRUD,
+board-wide column customization, and board-language semantic labels. TTS and
 spaced-repetition review behavior are separate stories.
 
 ## User Outcomes
@@ -16,6 +16,18 @@ spaced-repetition review behavior are separate stories.
   own boards.
 - A logged-in user can select a page and create, edit, list, and soft-delete
   vocabulary words in an inline table.
+- A logged-in user can add board-wide text and number custom columns, edit
+  typed custom values on every page, and permanently delete custom columns and
+  their values.
+- A logged-in user's hidden optional/custom columns are private per board.
+- Existing vocabulary cells autosave independently on blur or Tab. Failed
+  autosaves preserve the draft and show inline Retry.
+- Tab and Shift+Tab traverse visible editable cells, Escape cancels the current
+  cell draft, and Enter at the final visible cell moves into the persistent
+  blank row for continued entry.
+- Board language adapts semantic vocabulary labels. Chinese boards label the
+  existing secondary meaning field as Pinyin while keeping the same durable
+  `meaningEn` storage slot.
 - The protected app shell shows board and page management as the primary
   workspace.
 
@@ -62,13 +74,54 @@ All responses use the FluentA envelope.
 | `POST` | `/api/v1/boards/{boardId}/pages/{pageId}/words` | Create a word in a page. |
 | `PATCH` | `/api/v1/boards/{boardId}/words/{wordId}` | Update a word owned through the board. |
 | `DELETE` | `/api/v1/boards/{boardId}/words/{wordId}` | Soft-delete a word owned through the board. |
+| `GET` | `/api/v1/boards/{boardId}/columns` | Get board custom columns and the current user's hidden column keys. |
+| `POST` | `/api/v1/boards/{boardId}/columns` | Create a board-wide text or number custom column. |
+| `DELETE` | `/api/v1/boards/{boardId}/columns/{columnId}` | Permanently delete a custom column and all values. |
+| `PUT` | `/api/v1/boards/{boardId}/column-visibility` | Replace the current user's hidden optional/custom columns for the board. |
+| `PATCH` | `/api/v1/boards/{boardId}/words/{wordId}/cells` | Validate and update one owned fixed or custom vocabulary cell. |
 
 ## Validation And Error Rules
 
 - Board name is required and must be 1-120 characters.
 - Board language is required and must be a 2-8 character language code.
 - Page name is required and must be 1-120 characters.
-- Word, Vietnamese meaning, English meaning, class, and example are required.
+- Word, Vietnamese meaning, secondary meaning, class, and example are required.
 - Word class must be `noun`, `verb`, `adj`, `adv`, `phrase`, or `other`.
 - Validation failures return `422 VALIDATION_ERROR`.
 - Missing board/page/word ownership returns `404 VOCAB_NOT_FOUND`.
+- Custom-column names are required, unique per board ignoring case, and at
+  most 120 characters.
+- Custom text values are at most 4000 characters; number values must parse as
+  invariant decimal values.
+
+## Column Configuration Rules
+
+- Thesaurus, Collocation, and Note are optional fixed columns and may be hidden.
+- Required fixed columns remain visible.
+- Custom definitions are shared across every page in their board.
+- Visibility preferences are private to the current user and board.
+- Deleting a custom column permanently removes its typed values and matching
+  visibility preferences in the same database commit.
+- Custom values remain vocabulary-only and are not copied into flashcard
+  review content.
+
+## Spreadsheet Editing Rules
+
+- Cell updates load current durable word state and persist only the named
+  fixed/custom cell.
+- Unrelated cells may save concurrently without overwriting one another.
+- Fixed-cell updates synchronize only the corresponding flashcard content
+  while preserving scheduling metadata.
+- Successful client saves merge only the confirmed cell into cached words.
+- Same-cell saves are serialized; the newest queued draft wins.
+- Failed drafts remain visible with inline Retry and are never automatically
+  reverted.
+- Delete and Add actions are outside spreadsheet Tab traversal.
+
+## Multi-language Rules
+
+- Board language is stored as a 2-8 character code.
+- Known frontend language profiles are `en`, `zh`, `ja`, `ko`, and `fr`.
+- Chinese (`zh`) boards display the secondary meaning field as Pinyin in the
+  spreadsheet and blank-row entry flow.
+- Unknown language codes keep the default secondary label and remain editable.

@@ -1,3 +1,5 @@
+using Amazon;
+using Amazon.SimpleEmailV2;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Vocabulary;
@@ -33,6 +35,20 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
+        if (string.Equals(configuration["Authentication:Email:Provider"], "ses", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IAmazonSimpleEmailServiceV2>(_ =>
+            {
+                var region = configuration["Authentication:Email:Region"] ?? "us-east-1";
+                return new AmazonSimpleEmailServiceV2Client(RegionEndpoint.GetBySystemName(region));
+            });
+            services.AddSingleton<IEmailVerificationSender, SesEmailVerificationSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailVerificationSender, LocalEmailVerificationSender>();
+        }
+
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFlashcardRepository, EfFlashcardRepository>();
         services.AddScoped<IFlashcardService, FlashcardService>();

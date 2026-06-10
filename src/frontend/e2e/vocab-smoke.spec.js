@@ -7,7 +7,12 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('Full name').fill('Board Page Learner');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('SecurePass123');
+  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const registerPayload = await (await registerResponsePromise).json();
+  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+    data: { token: registerPayload.data.emailVerificationToken },
+  });
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
@@ -33,12 +38,13 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('New word class', { exact: true }).selectOption('verb');
   await page.getByLabel('New example', { exact: true }).fill('Mitigate the risk.');
   await page.getByTestId('create-word-button').click();
-  await expect(page.getByLabel('Word mitigate')).toBeVisible();
+  await expect(page.getByLabel('Word for mitigate')).toBeVisible();
 
-  await page.getByLabel('Word mitigate').fill('mitigation');
-  await page.getByLabel('Class for mitigate').selectOption('noun');
-  await page.getByLabel('Save mitigate').click();
-  await expect(page.getByLabel('Word mitigation')).toBeVisible();
+  await page.getByLabel('Word for mitigate').fill('mitigation');
+  await page.getByLabel('Word for mitigate').press('Tab');
+  await expect(page.getByLabel('Word for mitigation')).toBeVisible();
+  await page.getByLabel('Class for mitigation').selectOption('noun');
+  await page.getByLabel('Class for mitigation').press('Tab');
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByLabel('Delete mitigation').click();

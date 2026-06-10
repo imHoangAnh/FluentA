@@ -4,9 +4,10 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import type { FlashcardCard, ReviewRating } from '../../lib/api/flashcard.api'
+import { getLanguageProfile, selectSpeechVoice } from '../../lib/language'
 import { useAuthStore } from '../../stores/authStore'
 
-type StudyMode = 'normal' | 'shuffle'
+type StudyMode = 'spaced' | 'normal' | 'shuffle'
 type RatingLabel = 'Easy' | 'Good' | 'Hard' | 'Again'
 
 const ratings: { label: RatingLabel; key: string; value: ReviewRating }[] = [
@@ -30,7 +31,8 @@ function speakWord(word: string, language: string) {
 
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(word)
-  utterance.lang = language
+  utterance.lang = getLanguageProfile(language).speechLanguage
+  utterance.voice = selectSpeechVoice(window.speechSynthesis.getVoices(), language)
   window.speechSynthesis.speak(utterance)
 }
 
@@ -38,19 +40,23 @@ function Summary({
   deckName,
   counts,
   elapsedSeconds,
+  spaced,
 }: {
   deckName: string
   counts: Record<RatingLabel, number>
   elapsedSeconds: number
+  spaced: boolean
 }) {
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const minutes = Math.floor(elapsedSeconds / 60)
+  const seconds = elapsedSeconds % 60
 
   return (
     <section className="review-summary" data-testid="review-summary">
       <CheckCircle2 size={38} />
       <span className="preview-label">Session complete</span>
-      <h1>Nice work on {deckName}</h1>
-      <p>{total} cards reviewed in {elapsedSeconds} seconds.</p>
+      <h1>{spaced ? 'Great work! All cards reviewed for today.' : `Nice work on ${deckName}`}</h1>
+      <p>{total} cards reviewed in {minutes}:{seconds.toString().padStart(2, '0')} · {total ? Math.round(elapsedSeconds / total) : 0}s average per card.</p>
       <div className="review-summary__ratings">
         {ratings.map(({ label }) => (
           <div key={label}>
@@ -68,14 +74,17 @@ function Summary({
 export function ReviewSessionPage() {
   const { deckId = '' } = useParams()
   const logout = useAuthStore((state) => state.logout)
-  const [mode, setMode] = useState<StudyMode>('normal')
+  const [mode, setMode] = useState<StudyMode | null>(null)
   const [cards, setCards] = useState<FlashcardCard[] | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [dueDeck, setDueDeck] = useState<flashcardApi.DueDeck | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [counts, setCounts] = useState<Record<RatingLabel, number>>({ Easy: 0, Good: 0, Hard: 0, Again: 0 })
-  const [sessionId] = useState(() => crypto.randomUUID())
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
   const sessionStartedAt = useRef(0)
   const cardStartedAt = useRef(0)
 
@@ -85,7 +94,10 @@ export function ReviewSessionPage() {
     enabled: Boolean(deckId),
   })
 
+  const selectedMode = mode ?? (sessionQuery.data?.deckType === 'AllWords' ? 'spaced' : 'normal')
+
   const currentCard = cards?.[currentIndex] ?? null
+  const languageProfile = getLanguageProfile(sessionQuery.data?.boardLanguage)
 
   const reviewMutation = useMutation({
     mutationFn: flashcardApi.submitReview,
@@ -98,9 +110,32 @@ export function ReviewSessionPage() {
     }
   }, [cards, currentCard, sessionQuery.data?.boardLanguage])
 
-  function startSession() {
-    const source = sessionQuery.data?.cards ?? []
-    setCards(mode === 'shuffle' ? shuffleCards(source) : [...source])
+  async function startSession() {
+    setSessionError(null)
+    let source = sessionQuery.data?.cards ?? []
+    let createdSession: flashcardApi.ReviewSessionCreated
+    try {
+      createdSession = await flashcardApi.createReviewSession(deckId)
+    } catch {
+      setSessionError('Unable to start this review session. Try again.')
+      return
+    }
+
+    if (selectedMode === 'spaced') {
+      try {
+        const due = await flashcardApi.getDueDeck(deckId, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+        setDueDeck(due)
+        source = due.cards
+      } catch {
+        setSessionError('Unable to build your Spaced queue. Try again.')
+        return
+      }
+    } else {
+      setDueDeck(null)
+    }
+    sessionIdRef.current = createdSession.sessionId
+    setSessionId(createdSession.sessionId)
+    setCards(selectedMode === 'shuffle' ? shuffleCards(source) : [...source])
     setCurrentIndex(0)
     setRevealed(false)
     setCompleted(source.length === 0)
@@ -111,11 +146,12 @@ export function ReviewSessionPage() {
   }
 
   const rateCard = useCallback(async (label: RatingLabel, rating: ReviewRating) => {
-    if (!currentCard || !revealed || reviewMutation.isPending) return
+    const activeSessionId = sessionIdRef.current ?? sessionId
+    if (!currentCard || !revealed || !activeSessionId || reviewMutation.isPending) return
 
     try {
       await reviewMutation.mutateAsync({
-        sessionId,
+        sessionId: activeSessionId,
         cardId: currentCard.id,
         rating,
         timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
@@ -190,21 +226,27 @@ export function ReviewSessionPage() {
               : 'Choose an order. Ratings are recorded for your summary without changing spaced-repetition progress.'}
           </p>
           <div className="review-mode-options" role="group" aria-label="Study mode">
-            <button className={mode === 'normal' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setMode('normal')}>
+            {sessionQuery.data.deckType === 'AllWords' ? (
+              <button className={selectedMode === 'spaced' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setMode('spaced')}>
+                Spaced <small>Study overdue, due-today, then new cards within your daily limits.</small>
+              </button>
+            ) : null}
+            <button className={selectedMode === 'normal' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setMode('normal')}>
               Normal <small>Study cards in their saved order.</small>
             </button>
-            <button className={mode === 'shuffle' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setMode('shuffle')}>
+            <button className={selectedMode === 'shuffle' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setMode('shuffle')}>
               <Shuffle size={18} /> Shuffle <small>Mix the order for a fresh recall pass.</small>
             </button>
           </div>
-          <button className="primary-button review-start" type="button" onClick={startSession} data-testid="start-review-session">
-            Start {mode} session · {sessionQuery.data.cards.length} cards
+          <button className="primary-button review-start" type="button" onClick={() => void startSession()} data-testid="start-review-session">
+            Start {selectedMode} session · {sessionQuery.data.cards.length} cards
           </button>
+          {sessionError ? <p className="flashcard-status flashcard-status--error">{sessionError}</p> : null}
         </section>
       ) : null}
 
-      {completed && sessionQuery.data ? (
-        <Summary deckName={sessionQuery.data.deckName} counts={counts} elapsedSeconds={elapsedSeconds} />
+      {completed && sessionQuery.data && !(selectedMode === 'spaced' && cards?.length === 0) ? (
+        <Summary deckName={sessionQuery.data.deckName} counts={counts} elapsedSeconds={elapsedSeconds} spaced={selectedMode === 'spaced'} />
       ) : null}
 
       {cards && currentCard && !completed ? (
@@ -212,7 +254,7 @@ export function ReviewSessionPage() {
           <div className="review-progress">
             <div>
               <span className="preview-label">
-                {mode} · {sessionQuery.data?.deckType === 'AllWords' ? 'All Words' : 'Page Deck'}
+                {selectedMode} · {sessionQuery.data?.deckType === 'AllWords' ? 'All Words' : 'Page Deck'}
               </span>
               <strong>{currentIndex + 1} / {cards.length}</strong>
             </div>
@@ -231,7 +273,7 @@ export function ReviewSessionPage() {
             {revealed ? (
               <div className="review-card__answer" data-testid="review-answer">
                 <div><span>Vietnamese</span><strong>{currentCard.meaningVn}</strong></div>
-                <div><span>English</span><p>{currentCard.meaningEn}</p></div>
+                <div><span>{languageProfile.secondaryMeaningLabel}</span><p>{currentCard.meaningEn}</p></div>
                 <div><span>Example</span><p>{currentCard.example}</p></div>
                 {currentCard.thesaurus ? <div><span>Thesaurus</span><p>{currentCard.thesaurus}</p></div> : null}
                 {currentCard.collocation ? <div><span>Collocation</span><p>{currentCard.collocation}</p></div> : null}
@@ -260,6 +302,16 @@ export function ReviewSessionPage() {
             </div>
           ) : null}
           {reviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to record this rating. Try again.</p> : null}
+        </section>
+      ) : null}
+
+      {cards && cards.length === 0 && completed && selectedMode === 'spaced' ? (
+        <section className="review-summary" data-testid="all-done-today">
+          <CheckCircle2 size={38} />
+          <span className="preview-label">Spaced review complete</span>
+          <h1>Great work! All cards reviewed for today.</h1>
+          <p>{dueDeck ? `${dueDeck.newCards.remaining} new and ${dueDeck.reviews.remaining} review slots remain.` : 'Your due queue is clear.'}</p>
+          <Link className="primary-button review-summary__done" to="/flashcards">Done</Link>
         </section>
       ) : null}
     </main>

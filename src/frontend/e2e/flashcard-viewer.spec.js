@@ -11,7 +11,12 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   await page.getByLabel('Full name').fill('Flashcard Learner');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
+  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const registerPayload = await (await registerResponsePromise).json();
+  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+    data: { token: registerPayload.data.emailVerificationToken },
+  });
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
@@ -77,8 +82,12 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   const deleteVisibleMs = Date.now() - deleteStarted;
 
   const foreignEmail = `foreign-flashcards+${Date.now()}@example.com`;
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/register', {
+  const foreignRegister = await page.request.post('http://127.0.0.1:5000/api/v1/auth/register', {
     data: { email: foreignEmail, password, fullName: 'Foreign Learner' },
+  });
+  const foreignRegistration = await foreignRegister.json();
+  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+    data: { token: foreignRegistration.data.emailVerificationToken },
   });
   const foreignLogin = await page.request.post('http://127.0.0.1:5000/api/v1/auth/login', {
     data: { email: foreignEmail, password },

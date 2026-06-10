@@ -1,9 +1,10 @@
-import { ArrowLeft, BookOpen, CalendarClock, Layers, LogOut } from 'lucide-react'
+import { ArrowLeft, BookOpen, CalendarClock, Flame, Layers, LogOut, Settings, TrendingUp } from 'lucide-react'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import type { FlashcardDeck } from '../../lib/api/flashcard.api'
+import { getLanguageProfile } from '../../lib/language'
 import { useFlashcardSync } from '../../lib/realtime/useFlashcardSync'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -25,10 +26,16 @@ function displayReviewDate(value?: string | null) {
 export function FlashcardsPage() {
   const logout = useAuthStore((state) => state.logout)
   useFlashcardSync()
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
   const decksQuery = useQuery({
     queryKey: ['flashcard', 'decks'],
     queryFn: flashcardApi.listDecks,
+    refetchInterval: 1500,
+  })
+  const dashboardQuery = useQuery({
+    queryKey: ['flashcard', 'dashboard'],
+    queryFn: () => flashcardApi.getDashboard(timeZone),
     refetchInterval: 1500,
   })
   const boardGroups = useMemo(() => groupByBoard(decksQuery.data ?? []), [decksQuery.data])
@@ -36,6 +43,8 @@ export function FlashcardsPage() {
     () => (decksQuery.data ?? []).reduce((total, deck) => total + deck.cards.length, 0),
     [decksQuery.data],
   )
+  const dashboard = dashboardQuery.data
+  const maxForecast = Math.max(1, ...(dashboard?.forecast.map((point) => point.dueCount) ?? [0]))
 
   return (
     <main className="workspace flashcard-workspace">
@@ -47,6 +56,9 @@ export function FlashcardsPage() {
         <nav className="workspace-nav" aria-label="Workspace navigation">
           <Link className="ghost-button ghost-button--inline" to="/">
             <ArrowLeft size={17} /> Vocabulary
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/settings/review">
+            <Settings size={17} /> Review settings
           </Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />
@@ -66,6 +78,40 @@ export function FlashcardsPage() {
           <span>{cardCount} synchronized cards</span>
         </div>
       </section>
+
+      {dashboard ? (
+        <section className="flashcard-dashboard" aria-label="Flashcard dashboard">
+          <article data-testid="dashboard-streak">
+            <Flame size={20} />
+            <span>Streak</span>
+            <strong>{dashboard.streakDays} day{dashboard.streakDays === 1 ? '' : 's'}</strong>
+          </article>
+          <article data-testid="dashboard-retention">
+            <TrendingUp size={20} />
+            <span>Retention</span>
+            <strong>{dashboard.retentionRate}%</strong>
+          </article>
+          <article data-testid="dashboard-due">
+            <CalendarClock size={20} />
+            <span>Due today</span>
+            <strong>{dashboard.overdue + dashboard.dueToday}</strong>
+            <small>{dashboard.overdue} overdue · {dashboard.newCards} new</small>
+          </article>
+          <article className="flashcard-dashboard__forecast" data-testid="dashboard-forecast">
+            <span>7-day forecast</span>
+            <div>
+              {dashboard.forecast.map((point) => (
+                <div className="forecast-bar" key={point.date}>
+                  <span style={{ height: `${Math.max(8, (point.dueCount / maxForecast) * 58)}px` }} />
+                  <small>{new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(new Date(`${point.date}T00:00:00`))}</small>
+                  <strong>{point.dueCount}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
+      {dashboardQuery.isError ? <p className="flashcard-status flashcard-status--error">Unable to load dashboard stats.</p> : null}
 
       {decksQuery.isLoading ? <p className="flashcard-status">Loading flashcards...</p> : null}
       {decksQuery.isError ? <p className="flashcard-status flashcard-status--error">Unable to load flashcards.</p> : null}
@@ -119,7 +165,7 @@ export function FlashcardsPage() {
                         </div>
                         <dl>
                           <div><dt>Vietnamese</dt><dd>{card.meaningVn}</dd></div>
-                          <div><dt>English</dt><dd>{card.meaningEn}</dd></div>
+                          <div><dt>{getLanguageProfile(deck.boardLanguage).secondaryMeaningLabel}</dt><dd>{card.meaningEn}</dd></div>
                           <div><dt>Example</dt><dd>{card.example}</dd></div>
                         </dl>
                         <footer>

@@ -20,15 +20,27 @@ public sealed class AuthController : ControllerBase
         _auth = auth;
     }
 
+    /// <summary>Registers a password account and returns verification details.</summary>
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.RegisterAsync(request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<object>.Ok(new { message = result.Value }))
-            : ToErrorResult<string>(result);
+            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<RegisterResponse>.Ok(result.Value!))
+            : ToErrorResult<RegisterResponse>(result);
     }
 
+    /// <summary>Verifies a password account email address.</summary>
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail(VerifyEmailRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _auth.VerifyEmailAsync(request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!))
+            : ToErrorResult<UserProfileDto>(result);
+    }
+
+    /// <summary>Authenticates a verified password account.</summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
@@ -36,6 +48,7 @@ public sealed class AuthController : ControllerBase
         return AuthResult(result);
     }
 
+    /// <summary>Authenticates or links a user through Google OAuth.</summary>
     [HttpPost("google")]
     public async Task<IActionResult> Google(GoogleLoginRequest request, CancellationToken cancellationToken)
     {
@@ -43,6 +56,7 @@ public sealed class AuthController : ControllerBase
         return AuthResult(result);
     }
 
+    /// <summary>Rotates the refresh cookie and returns a new access token.</summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
     {
@@ -50,6 +64,7 @@ public sealed class AuthController : ControllerBase
         return AuthResult(result);
     }
 
+    /// <summary>Revokes the current refresh session and clears the refresh cookie.</summary>
     [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
@@ -61,6 +76,7 @@ public sealed class AuthController : ControllerBase
             : ToErrorResult<bool>(result);
     }
 
+    /// <summary>Returns the authenticated user's profile.</summary>
     [Authorize]
     [HttpGet("me")]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)

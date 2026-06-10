@@ -2,7 +2,11 @@ namespace FluentA.Application.BoundedContexts.Auth.DTOs;
 
 public sealed record RegisterRequest(string Email, string Password, string FullName);
 
+public sealed record RegisterResponse(string Message, string EmailVerificationToken, string EmailVerificationUrl);
+
 public sealed record LoginRequest(string Email, string Password);
+
+public sealed record VerifyEmailRequest(string Token);
 
 public sealed record GoogleLoginRequest(string Code, string? RedirectUri = null);
 

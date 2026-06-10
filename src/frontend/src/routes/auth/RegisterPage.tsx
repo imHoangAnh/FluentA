@@ -17,7 +17,7 @@ export function RegisterPage() {
   async function submit(event: FormEvent) {
     event.preventDefault()
     await register({ email, password, fullName })
-    setMessage('Account created. You can log in now.')
+    setMessage('Account created. Check your email to verify before logging in.')
     navigate('/login')
   }
 

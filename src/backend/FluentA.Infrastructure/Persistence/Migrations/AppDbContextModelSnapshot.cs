@@ -303,6 +303,45 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("flashcard_decks", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("NewCardsPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("new_cards_per_day");
+
+                    b.Property<int>("ReviewCardsPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_cards_per_day");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("review_settings", (string)null);
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", b =>
                 {
                     b.Property<Guid>("Id")
@@ -349,6 +388,148 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "SortOrder");
 
                     b.ToTable("vocab_boards", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabColumnVisibility", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BoardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("board_id");
+
+                    b.Property<string>("ColumnKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("column_key");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardId");
+
+                    b.HasIndex("UserId", "BoardId", "ColumnKey")
+                        .IsUnique();
+
+                    b.ToTable("vocab_column_visibility", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabCustomColumn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BoardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("board_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("BoardId", "SortOrder");
+
+                    b.ToTable("vocab_custom_columns", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabCustomValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ColumnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("column_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<decimal?>("NumberValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("number_value");
+
+                    b.Property<string>("TextValue")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("text_value");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("word_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ColumnId");
+
+                    b.HasIndex("WordId", "ColumnId")
+                        .IsUnique();
+
+                    b.ToTable("vocab_custom_values", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_vocab_custom_values_one_type", "(text_value IS NOT NULL AND number_value IS NULL) OR (text_value IS NULL AND number_value IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", b =>
@@ -481,6 +662,54 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("DeckId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabColumnVisibility", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
+                        .WithMany()
+                        .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabCustomColumn", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
+                        .WithMany()
+                        .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabCustomValue", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabCustomColumn", null)
+                        .WithMany()
+                        .HasForeignKey("ColumnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
+                        .WithMany()
+                        .HasForeignKey("WordId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:cross-browser": "playwright test --config=playwright.cross-browser.config.js",
+    "test:e2e:performance": "playwright test --config=playwright.performance.config.js"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.0",

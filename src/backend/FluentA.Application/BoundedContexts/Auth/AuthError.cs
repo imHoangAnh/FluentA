@@ -11,6 +11,12 @@ public sealed record AuthError(string Code, string Message, int StatusCode, obje
     public static AuthError InvalidCredentials() =>
         new("INVALID_CREDENTIALS", "Invalid email or password.", 401);
 
+    public static AuthError EmailNotVerified() =>
+        new("EMAIL_NOT_VERIFIED", "Please verify your email before logging in.", 403);
+
+    public static AuthError InvalidVerificationToken() =>
+        new("INVALID_VERIFICATION_TOKEN", "The email verification link is invalid or expired.", 401);
+
     public static AuthError Unauthorized() =>
         new("UNAUTHORIZED", "Missing or invalid authentication credentials.", 401);
 

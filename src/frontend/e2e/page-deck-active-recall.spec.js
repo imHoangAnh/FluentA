@@ -14,7 +14,12 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
   await page.getByLabel('Full name').fill('Active Recall Learner');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
+  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const registerPayload = await (await registerResponsePromise).json();
+  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+    data: { token: registerPayload.data.emailVerificationToken },
+  });
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
@@ -66,7 +71,11 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
   await page.getByRole('link', { name: 'Leave session' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
   await pageDeck.getByRole('link', { name: 'Study this Page Deck' }).click();
+  const sessionResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith('/api/v1/flashcards/sessions') && response.request().method() === 'POST'
+  );
   await page.getByTestId('start-review-session').click();
+  const sessionId = (await (await sessionResponsePromise).json()).data.sessionId;
   await expect(page.getByText('1 / 4')).toBeVisible();
   await expect(page.getByTestId('review-answer')).toBeHidden();
 
@@ -85,6 +94,15 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
   await expect(page.getByTestId('review-summary').getByText('Good')).toBeVisible();
   await expect(page.getByTestId('review-summary').getByText('Hard')).toBeVisible();
   await expect(page.getByTestId('review-summary').getByText('Again')).toBeVisible();
+
+  const sessionSummary = await page.request.get(`http://127.0.0.1:5000/api/v1/flashcards/sessions/${sessionId}/summary`, { headers });
+  expect(sessionSummary.status()).toBe(200);
+  const sessionSummaryPayload = (await sessionSummary.json()).data;
+  expect(sessionSummaryPayload.totalCardsReviewed).toBe(4);
+  expect(sessionSummaryPayload.easy).toBe(1);
+  expect(sessionSummaryPayload.good).toBe(1);
+  expect(sessionSummaryPayload.hard).toBe(1);
+  expect(sessionSummaryPayload.again).toBe(1);
 
   const decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
   const allWordsCard = decks.find((deck) => deck.type === 'AllWords').cards[0];

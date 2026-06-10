@@ -16,9 +16,13 @@ public sealed class AppDbContext : DbContext
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
     public DbSet<VocabWord> Words => Set<VocabWord>();
+    public DbSet<VocabCustomColumn> VocabCustomColumns => Set<VocabCustomColumn>();
+    public DbSet<VocabCustomValue> VocabCustomValues => Set<VocabCustomValue>();
+    public DbSet<VocabColumnVisibility> VocabColumnVisibility => Set<VocabColumnVisibility>();
     public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
     public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
     public DbSet<CardReview> CardReviews => Set<CardReview>();
+    public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

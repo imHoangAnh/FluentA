@@ -33,6 +33,36 @@ public sealed class VocabularyTests
     }
 
     [Fact]
+    public void BoardAndPage_UpdateAndSoftDelete()
+    {
+        var board = VocabBoard.Create(Guid.NewGuid(), "IELTS", "en");
+        var page = board.AddPage("Unit 1", 0);
+
+        board.Update(" HSK ", " ZH ", 4);
+        page.Update(" Lesson 2 ", 5);
+        page.SoftDelete();
+        board.SoftDelete();
+
+        Assert.Equal("HSK", board.Name);
+        Assert.Equal("zh", board.Language);
+        Assert.Equal(4, board.SortOrder);
+        Assert.NotNull(board.DeletedAt);
+        Assert.Equal("Lesson 2", page.Name);
+        Assert.Equal(5, page.SortOrder);
+        Assert.NotNull(page.DeletedAt);
+    }
+
+    [Fact]
+    public void BoardAndPage_RejectInvalidIdentityAndNames()
+    {
+        Assert.Throws<ArgumentException>(() => VocabBoard.Create(Guid.Empty, "IELTS", "en"));
+        Assert.Throws<ArgumentException>(() => VocabBoard.Create(Guid.NewGuid(), "", "en"));
+        Assert.Throws<ArgumentException>(() => VocabBoard.Create(Guid.NewGuid(), "IELTS", "e"));
+        Assert.Throws<ArgumentException>(() => VocabPage.Create(Guid.Empty, "Unit 1", 0));
+        Assert.Throws<ArgumentException>(() => VocabPage.Create(Guid.NewGuid(), "", 0));
+    }
+
+    [Fact]
     public void CreateDeck_NamesAllWordsAndPageDecks()
     {
         var userId = Guid.NewGuid();
@@ -48,6 +78,36 @@ public sealed class VocabularyTests
         Assert.Equal("IELTS - Unit 1", pageDeck.Name);
         Assert.Equal(DeckType.PageDeck, pageDeck.Type);
         Assert.Equal(pageId, pageDeck.PageId);
+    }
+
+    [Fact]
+    public void Deck_RenameSoftDeleteAndValidation()
+    {
+        var deck = FlashcardDeck.CreateAllWords(Guid.NewGuid(), Guid.NewGuid(), "IELTS");
+
+        deck.Rename(" HSK - All Words ");
+        deck.SoftDelete();
+
+        Assert.Equal("HSK - All Words", deck.Name);
+        Assert.NotNull(deck.DeletedAt);
+        Assert.Throws<ArgumentException>(() => deck.Rename(""));
+        Assert.Throws<ArgumentException>(() => FlashcardDeck.CreatePageDeck(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new string('x', 241), "Unit"));
+    }
+
+    [Fact]
+    public void CardReview_StoresResultAndValidatesInputs()
+    {
+        var reviewedAt = DateTime.UtcNow;
+        var review = CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Easy, 12, reviewedAt, 6, 2.6f);
+
+        Assert.Equal(ReviewRating.Easy, review.Rating);
+        Assert.Equal(12, review.TimeSpentSeconds);
+        Assert.Equal(reviewedAt, review.ReviewedAt);
+        Assert.Equal(6, review.IntervalAfter);
+        Assert.Equal(2.6f, review.EaseFactorAfter);
+        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.Empty, Guid.NewGuid(), ReviewRating.Good, 1, reviewedAt, 1, 2.5f));
+        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Good, -1, reviewedAt, 1, 2.5f));
+        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Good, 1, reviewedAt, 1, 0));
     }
 
     [Fact]
@@ -132,5 +192,53 @@ public sealed class VocabularyTests
         Assert.Equal(expectedEaseFactor, result.EaseFactor, precision: 2);
         Assert.Equal(expectedRepetitions, result.Repetitions);
         Assert.Equal(expectedState, result.State);
+    }
+
+    [Fact]
+    public void ReviewSettings_UsesDefaultsAndValidatesUpdates()
+    {
+        var settings = ReviewSettings.CreateDefault(Guid.NewGuid());
+
+        Assert.Equal(20, settings.NewCardsPerDay);
+        Assert.Equal(200, settings.ReviewCardsPerDay);
+
+        settings.Update(12, 80);
+        Assert.Equal(12, settings.NewCardsPerDay);
+        Assert.Equal(80, settings.ReviewCardsPerDay);
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(-1, 80));
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(12, 1001));
+    }
+
+    [Fact]
+    public void CustomColumnsAndValues_NormalizeAndPreserveTypes()
+    {
+        var boardId = Guid.NewGuid();
+        var wordId = Guid.NewGuid();
+        var textColumn = VocabCustomColumn.Create(boardId, " Register ", CustomColumnType.Text, 0);
+        var numberColumn = VocabCustomColumn.Create(boardId, "Priority", CustomColumnType.Number, 1);
+
+        var text = VocabCustomValue.CreateText(wordId, textColumn.Id, " formal ");
+        var number = VocabCustomValue.CreateNumber(wordId, numberColumn.Id, 3.5m);
+
+        Assert.Equal("Register", textColumn.Name);
+        Assert.Equal(CustomColumnType.Number, numberColumn.Type);
+        Assert.Equal("formal", text.TextValue);
+        Assert.Equal(3.5m, number.NumberValue);
+        Assert.Null(number.TextValue);
+    }
+
+    [Fact]
+    public void CustomColumnVisibilityAndValues_ValidateBoundaries()
+    {
+        var userId = Guid.NewGuid();
+        var boardId = Guid.NewGuid();
+        var hidden = VocabColumnVisibility.Create(userId, boardId, " Custom:ABC ");
+
+        Assert.Equal("custom:abc", hidden.ColumnKey);
+        Assert.Throws<ArgumentException>(() => VocabColumnVisibility.Create(Guid.Empty, boardId, "note"));
+        Assert.Throws<ArgumentException>(() => VocabColumnVisibility.Create(userId, boardId, ""));
+        Assert.Throws<ArgumentException>(() => VocabCustomColumn.Create(Guid.Empty, "Priority", CustomColumnType.Number, 0));
+        Assert.Throws<ArgumentException>(() => VocabCustomColumn.Create(boardId, "", CustomColumnType.Text, 0));
+        Assert.Throws<ArgumentException>(() => VocabCustomValue.CreateText(Guid.NewGuid(), Guid.NewGuid(), ""));
     }
 }
