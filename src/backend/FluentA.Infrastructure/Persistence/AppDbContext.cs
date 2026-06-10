@@ -15,7 +15,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
+    public DbSet<VocabWord> Words => Set<VocabWord>();
     public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
+    public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
+    public DbSet<CardReview> CardReviews => Set<CardReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

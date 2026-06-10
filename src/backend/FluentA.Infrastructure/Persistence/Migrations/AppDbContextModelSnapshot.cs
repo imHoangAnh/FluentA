@@ -83,6 +83,170 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("auth_users", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.CardReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("card_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<float>("EaseFactorAfter")
+                        .HasColumnType("real")
+                        .HasColumnName("ease_factor_after");
+
+                    b.Property<int>("IntervalAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_after");
+
+                    b.Property<string>("Rating")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("rating");
+
+                    b.Property<DateTime>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<int>("TimeSpentSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("time_spent_seconds");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("CardId", "ReviewedAt");
+
+                    b.ToTable("card_reviews", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Collocation")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("collocation");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DeckId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deck_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<float>("EaseFactor")
+                        .HasColumnType("real")
+                        .HasColumnName("ease_factor");
+
+                    b.Property<string>("Example")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("example");
+
+                    b.Property<int>("Interval")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval");
+
+                    b.Property<string>("MeaningEn")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("meaning_en");
+
+                    b.Property<string>("MeaningVn")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("meaning_vn");
+
+                    b.Property<DateTime?>("NextReviewDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_review_date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("note");
+
+                    b.Property<int>("Repetitions")
+                        .HasColumnType("integer")
+                        .HasColumnName("repetitions");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Thesaurus")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("thesaurus");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("word");
+
+                    b.Property<string>("WordClass")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("word_class");
+
+                    b.Property<Guid>("WordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("word_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WordId");
+
+                    b.HasIndex("DeckId", "WordId")
+                        .IsUnique();
+
+                    b.HasIndex("NextReviewDate", "State");
+
+                    b.ToTable("flashcard_cards", (string)null);
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", b =>
                 {
                     b.Property<Guid>("Id")
@@ -227,11 +391,113 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("vocab_pages", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Class")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("class");
+
+                    b.Property<string>("Collocation")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("collocation");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Example")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("example");
+
+                    b.Property<string>("MeaningEn")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("meaning_en");
+
+                    b.Property<string>("MeaningVn")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("meaning_vn");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("page_id");
+
+                    b.Property<string>("Thesaurus")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("thesaurus");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("word");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageId", "CreatedAt");
+
+                    b.ToTable("vocab_words", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.CardReview", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", null)
+                        .WithMany()
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", null)
+                        .WithMany()
+                        .HasForeignKey("DeckId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
                         .WithMany("Pages")
                         .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", null)
+                        .WithMany()
+                        .HasForeignKey("PageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

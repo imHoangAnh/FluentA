@@ -91,6 +91,38 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    [HttpGet("{boardId:guid}/pages/{pageId:guid}/words")]
+    public async Task<IActionResult> ListWords(Guid boardId, Guid pageId, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.ListWordsAsync(CurrentUserId(), boardId, pageId, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<IReadOnlyList<WordDto>>.Ok(result.Value!)) : ToErrorResult(result);
+    }
+
+    [HttpPost("{boardId:guid}/pages/{pageId:guid}/words")]
+    public async Task<IActionResult> CreateWord(Guid boardId, Guid pageId, WordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.CreateWordAsync(CurrentUserId(), boardId, pageId, request, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<WordDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    [HttpPatch("{boardId:guid}/words/{wordId:guid}")]
+    public async Task<IActionResult> UpdateWord(Guid boardId, Guid wordId, WordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.UpdateWordAsync(CurrentUserId(), boardId, wordId, request, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<WordDto>.Ok(result.Value!)) : ToErrorResult(result);
+    }
+
+    [HttpDelete("{boardId:guid}/words/{wordId:guid}")]
+    public async Task<IActionResult> DeleteWord(Guid boardId, Guid wordId, CancellationToken cancellationToken)
+    {
+        var result = await _vocabulary.DeleteWordAsync(CurrentUserId(), boardId, wordId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<object>.Ok(new { message = "Word deleted." }))
+            : ToErrorResult(result);
+    }
+
     private Guid CurrentUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

@@ -1,14 +1,17 @@
-import { BookOpen, FilePlus2, Languages, LogOut, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { BookOpen, FilePlus2, Languages, Layers, LogOut, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
 import { useAuthStore } from '../../stores/authStore'
+import { VocabTable } from '../../components/vocabulary/VocabTable'
+import { Link } from 'react-router-dom'
 
 export function WorkspacePage() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [boardName, setBoardName] = useState('')
   const [boardLanguage, setBoardLanguage] = useState('en')
   const [pageName, setPageName] = useState('')
@@ -39,6 +42,7 @@ export function WorkspacePage() {
     () => (activeBoard?.pages ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
     [activeBoard?.pages],
   )
+  const activePage = sortedPages.find((page) => page.id === selectedPageId) ?? sortedPages[0] ?? null
 
   const createBoard = useMutation({
     mutationFn: vocabularyApi.createBoard,
@@ -62,6 +66,7 @@ export function WorkspacePage() {
   const deleteBoard = useMutation({
     mutationFn: vocabularyApi.deleteBoard,
     onSuccess: async () => {
+      setSelectedPageId(null)
       setSelectedBoardId(null)
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
     },
@@ -125,9 +130,14 @@ export function WorkspacePage() {
           <span className="brand-mark brand-mark--small">FA</span>
           <strong>FluentA</strong>
         </div>
-        <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
-          <LogOut size={18} />
-        </button>
+        <nav className="workspace-nav" aria-label="Workspace navigation">
+          <Link className="ghost-button ghost-button--inline" to="/flashcards" data-testid="open-flashcards">
+            <Layers size={17} /> Flashcards
+          </Link>
+          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
+            <LogOut size={18} />
+          </button>
+        </nav>
       </header>
 
       <section className="vocab-layout">
@@ -172,7 +182,10 @@ export function WorkspacePage() {
                 className={board.id === activeBoardId ? 'board-list__item board-list__item--active' : 'board-list__item'}
                 key={board.id}
                 type="button"
-                onClick={() => setSelectedBoardId(board.id)}
+                onClick={() => {
+                  setSelectedBoardId(board.id)
+                  setSelectedPageId(null)
+                }}
               >
                 <BookOpen size={18} />
                 <span>{board.name}</span>
@@ -273,7 +286,15 @@ export function WorkspacePage() {
               <div className="page-list">
                 {sortedPages.map((page) => (
                   <article className="page-row" key={page.id}>
-                    <Pencil size={18} />
+                    <button
+                      className={page.id === activePage?.id ? 'page-select page-select--active' : 'page-select'}
+                      type="button"
+                      onClick={() => setSelectedPageId(page.id)}
+                      data-testid={`select-page-${page.id}`}
+                    >
+                      <Pencil size={18} />
+                      <span>{page.name}</span>
+                    </button>
                     <input
                       aria-label={`Rename ${page.name}`}
                       value={draftPageNames[page.id] ?? page.name}
@@ -299,6 +320,8 @@ export function WorkspacePage() {
                   </article>
                 ))}
               </div>
+
+              {activePage ? <VocabTable boardId={activeBoard.id} page={activePage} /> : null}
             </>
           ) : null}
         </section>

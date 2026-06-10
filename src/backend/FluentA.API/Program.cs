@@ -1,4 +1,6 @@
 using FluentA.API.Contracts;
+using FluentA.API.Hubs;
+using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.API.Middleware;
 using FluentA.Infrastructure;
 using FluentA.Infrastructure.Auth;
@@ -9,9 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 using var signingKeyProvider = new JwtSigningKeyProvider();
 builder.Services.AddSingleton(signingKeyProvider);
 builder.Services.AddFluentAInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluentAPolicy", policy =>
@@ -41,6 +45,17 @@ builder.Services
         };
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken)
+                    && context.HttpContext.Request.Path.StartsWithSegments("/hubs/sync"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            },
             OnChallenge = async context =>
             {
                 context.HandleResponse();
@@ -76,6 +91,7 @@ app.UseMiddleware<RequestLogMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<SyncHub>("/hubs/sync");
 
 app.Run();
 

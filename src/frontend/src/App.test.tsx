@@ -15,6 +15,7 @@ function renderApp(initialEntry: string) {
     },
   })
   queryClient.setQueryData(['vocab', 'boards'], [])
+  queryClient.setQueryData(['flashcard', 'decks'], [])
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -61,5 +62,30 @@ describe('FluentA auth app', () => {
     expect(screen.getByText('learner@example.com')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Boards' })).toBeInTheDocument()
     expect(screen.getByTestId('board-name-input')).toBeInTheDocument()
+  })
+
+  it('protects flashcards and renders its empty state when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: {
+        id: 'user-1',
+        email: 'learner@example.com',
+        fullName: 'FluentA Learner',
+        isEmailVerified: true,
+      },
+    })
+
+    renderApp('/flashcards')
+
+    expect(screen.getByRole('heading', { name: 'Your synchronized decks' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open vocabulary' })).toBeInTheDocument()
+  })
+
+  it('protects Page Deck review sessions when anonymous', () => {
+    renderApp('/flashcards/decks/deck-1/review')
+
+    expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
   })
 })
