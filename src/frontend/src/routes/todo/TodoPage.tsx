@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Home, LayoutGrid, List, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BarChart3, CalendarDays, CheckCircle2, Home, LayoutGrid, List, Loader2, Plus, Trash2 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -148,7 +148,13 @@ export function TodoPage() {
         </div>
         <nav className="workspace-nav" aria-label="Todo navigation">
           <Link className="ghost-button ghost-button--inline" to="/">
+            <BarChart3 size={17} /> Dashboard
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
             <Home size={17} /> Vocabulary
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/habits">
+            <CalendarDays size={17} /> Habits
           </Link>
         </nav>
       </header>

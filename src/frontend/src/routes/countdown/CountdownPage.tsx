@@ -1,4 +1,4 @@
-import { CalendarClock, Edit3, Home, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { BarChart3, CalendarClock, Edit3, Home, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -145,7 +145,13 @@ export function CountdownPage() {
         </div>
         <nav className="workspace-nav" aria-label="Countdown navigation">
           <Link className="ghost-button ghost-button--inline" to="/">
+            <BarChart3 size={17} /> Dashboard
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
             <Home size={17} /> Vocabulary
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/habits">
+            <CalendarClock size={17} /> Habits
           </Link>
         </nav>
       </header>

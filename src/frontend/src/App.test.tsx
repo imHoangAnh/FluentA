@@ -10,11 +10,24 @@ function todayInput() {
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
 }
 
+function currentMonth() {
+  return todayInput().slice(0, 7)
+}
+
+function currentTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 function shiftDate(dateValue: string, days: number) {
   const [year, month, day] = dateValue.split('-').map(Number)
   const date = new Date(year, month - 1, day)
   date.setDate(date.getDate() + days)
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+}
+
+function dayName(dateValue: string) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(year, month - 1, day).getDay()]
 }
 
 function currentWeek() {
@@ -54,6 +67,158 @@ function renderApp(initialEntry: string) {
   const [weekStart, weekEnd] = currentWeek()
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['countdown', 'events'], [])
+  queryClient.setQueryData(['habit', 'list', currentTimeZone()], [])
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+function renderAppWithDashboardData(initialEntry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      },
+    },
+  })
+  const today = todayInput()
+  const timeZone = currentTimeZone()
+  queryClient.setQueryData(['todo', 'items', today], [{
+    id: 'todo-1',
+    title: 'Plan speaking practice',
+    note: null,
+    date: today,
+    isCompleted: false,
+    sortOrder: 1,
+    isCarriedOver: false,
+    carriedOverFromDate: null,
+    createdAt: '2026-06-11T00:00:00Z',
+    updatedAt: '2026-06-11T00:00:00Z',
+  }])
+  queryClient.setQueryData(['habit', 'list', timeZone], [{
+    id: 'habit-1',
+    name: 'Read English',
+    description: '30 minutes',
+    color: '#22C55E',
+    icon: 'Book',
+    frequency: 'Daily',
+    customDays: [],
+    currentStreak: 4,
+    isScheduledToday: true,
+    isCheckedToday: false,
+    monthlyCompletionRate: 20,
+    createdAt: '2026-06-01T00:00:00Z',
+    updatedAt: '2026-06-01T00:00:00Z',
+  }])
+  queryClient.setQueryData(['countdown', 'events'], [{
+    id: 'countdown-1',
+    name: 'IELTS Exam',
+    targetDate: shiftDate(today, 10) + 'T09:00:00Z',
+    color: '#16A34A',
+    icon: 'Exam',
+    isCompleted: false,
+    createdAt: '2026-06-01T00:00:00Z',
+    updatedAt: '2026-06-01T00:00:00Z',
+  }])
+  queryClient.setQueryData(['flashcard', 'decks'], [{
+    id: 'deck-1',
+    boardId: 'board-1',
+    boardName: 'All Words',
+    boardLanguage: 'en',
+    pageId: null,
+    name: 'All Words',
+    type: 'AllWords',
+    cards: [{
+      id: 'card-1',
+      wordId: 'word-1',
+      word: 'hello',
+      wordClass: 'noun',
+      meaningVn: 'xin chao',
+      meaningEn: 'hello',
+      example: 'hello',
+      interval: 0,
+      easeFactor: 2.5,
+      repetitions: 0,
+      nextReviewDate: null,
+      state: 'new',
+    }],
+  }])
+  queryClient.setQueryData(['flashcard', 'dashboard'], {
+    boardId: null,
+    boardName: null,
+    totalCards: 1,
+    totalReviews: 12,
+    streakDays: 9,
+    retentionRate: 90,
+    overdue: 1,
+    dueToday: 1,
+    newCards: 1,
+    forecast: [],
+  })
+  queryClient.setQueryData(['vocab', 'boards'], [])
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+function renderAppWithHabit(initialEntry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      },
+    },
+  })
+  const today = todayInput()
+  const timeZone = currentTimeZone()
+  const habit = {
+    id: 'habit-1',
+    name: 'Read English',
+    description: '30 minutes',
+    color: '#22C55E',
+    icon: 'Book',
+    frequency: 'Custom',
+    customDays: [dayName(today)],
+    currentStreak: 3,
+    isScheduledToday: true,
+    isCheckedToday: true,
+    monthlyCompletionRate: 10,
+    createdAt: '2026-06-01T00:00:00Z',
+    updatedAt: '2026-06-01T00:00:00Z',
+  }
+  queryClient.setQueryData(['habit', 'list', timeZone], [habit])
+  queryClient.setQueryData(['habit', 'entries', habit.id, currentMonth(), timeZone], [{ habitId: habit.id, date: today, isCompleted: true }])
+  queryClient.setQueryData(['habit', 'entries', habit.id, shiftDate(currentMonth() + '-01', 32).slice(0, 7), timeZone], [])
+  queryClient.setQueryData(['habit', 'stats', habit.id, timeZone], {
+    habitId: habit.id,
+    name: habit.name,
+    description: habit.description,
+    color: habit.color,
+    icon: habit.icon,
+    frequency: habit.frequency,
+    customDays: habit.customDays,
+    currentStreak: 3,
+    longestStreak: 8,
+    last7DaysCompletionRate: 100,
+    completedLast7Days: 1,
+    scheduledLast7Days: 1,
+    last30DaysCompletionRate: 70,
+    completedLast30Days: 7,
+    scheduledLast30Days: 10,
+    asOfDate: today,
+  })
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -146,7 +311,7 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
   })
 
-  it('shows protected workspace when authenticated in memory', () => {
+  it('shows Dashboard Overview as the protected home when authenticated in memory', () => {
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
@@ -160,11 +325,54 @@ describe('FluentA auth app', () => {
 
     renderApp('/')
 
-    expect(screen.getByText('learner@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard Overview')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Good|Burning midnight oil/ })).toBeInTheDocument()
+    expect(screen.getByTestId('open-vocabulary')).toHaveAttribute('href', '/vocabulary')
+    expect(screen.getByTestId('open-flashcards')).toHaveAttribute('href', '/flashcards')
+    expect(screen.getByTestId('open-todo')).toHaveAttribute('href', '/todo')
+    expect(screen.getByTestId('open-habits')).toHaveAttribute('href', '/habits')
+    expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
+  })
+
+  it('keeps the vocabulary workspace available at /vocabulary', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: {
+        id: 'user-1',
+        email: 'learner@example.com',
+        fullName: 'FluentA Learner',
+        isEmailVerified: true,
+      },
+    })
+
+    renderApp('/vocabulary')
+
     expect(screen.getByRole('heading', { name: 'Boards' })).toBeInTheDocument()
     expect(screen.getByTestId('board-name-input')).toBeInTheDocument()
-    expect(screen.getByTestId('open-todo')).toHaveAttribute('href', '/todo')
-    expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
+    expect(screen.getByTestId('open-dashboard')).toHaveAttribute('href', '/')
+  })
+
+  it('renders cached Dashboard widgets across productivity domains', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: {
+        id: 'user-1',
+        email: 'learner@example.com',
+        fullName: 'FluentA Learner',
+        isEmailVerified: true,
+      },
+    })
+
+    renderAppWithDashboardData('/')
+
+    expect(screen.getByRole('heading', { name: '3 cards due' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Review Now' })).toHaveAttribute('href', '/flashcards/decks/deck-1/review')
+    expect(screen.getByTestId('dashboard-overview-streak')).toHaveTextContent('9 days')
+    expect(screen.getByLabelText('Check todo Plan speaking practice')).toBeInTheDocument()
+    expect(screen.getByLabelText('Check habit Read English')).toBeInTheDocument()
+    expect(screen.getByText(/IELTS Exam/)).toBeInTheDocument()
   })
 
   it('protects flashcards and renders its empty state when authenticated', () => {
@@ -183,7 +391,7 @@ describe('FluentA auth app', () => {
 
     expect(screen.getByRole('heading', { name: 'Your synchronized decks' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open vocabulary' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open vocabulary' })).toHaveAttribute('href', '/vocabulary')
   })
 
   it('protects Page Deck review sessions when anonymous', () => {
@@ -233,6 +441,71 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'Important dates' })).toBeInTheDocument()
     expect(screen.getByTestId('countdown-name-input')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No countdowns yet' })).toBeInTheDocument()
+  })
+
+  it('protects habits and renders its empty grid state when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/habits')
+
+    expect(screen.getByRole('heading', { name: 'Monthly rhythm' })).toBeInTheDocument()
+    expect(screen.getByTestId('habit-name-input')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No habits yet' })).toBeInTheDocument()
+  })
+
+  it('renders habit summaries and disables ineligible grid cells', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderAppWithHabit('/habits')
+
+    const today = todayInput()
+    expect(screen.getByRole('heading', { name: 'Read English' })).toBeInTheDocument()
+    expect(screen.getByText('3 days')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View stats for Read English' })).toHaveAttribute('href', '/habits/habit-1/stats')
+    expect(screen.getByTestId(`habit-cell-habit-1-${today}`)).toHaveTextContent('✓')
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(screen.getAllByTestId(/habit-cell-habit-1-/)[0]).toBeDisabled()
+  })
+
+  it('renders protected habit stats from backend-owned statistics', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderAppWithHabit('/habits/habit-1/stats')
+
+    expect(screen.getByRole('heading', { name: 'Read English' })).toBeInTheDocument()
+    expect(screen.getByText('Current streak')).toBeInTheDocument()
+    expect(screen.getByText('Longest streak')).toBeInTheDocument()
+    expect(screen.getByText('8 days')).toBeInTheDocument()
+    expect(screen.getByText('7/10 scheduled days complete')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to monthly grid' })).toHaveAttribute('href', '/habits')
+  })
+
+  it('requires a custom weekday before saving a custom habit', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/habits')
+
+    fireEvent.change(screen.getByTestId('habit-name-input'), { target: { value: 'Workout' } })
+    fireEvent.change(screen.getByTestId('habit-frequency-select'), { target: { value: 'Custom' } })
+    expect(screen.getByTestId('save-habit-button')).toBeDisabled()
+    fireEvent.click(screen.getByLabelText('Mon'))
+    expect(screen.getByTestId('save-habit-button')).not.toBeDisabled()
   })
 
   it('renders protected review settings when authenticated', () => {

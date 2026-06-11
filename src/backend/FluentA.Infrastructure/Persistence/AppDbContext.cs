@@ -4,6 +4,8 @@ using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
+using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
+using HabitEntryEntity = FluentA.Domain.BoundedContexts.Habit.Entities.HabitEntry;
 
 namespace FluentA.Infrastructure.Persistence;
 
@@ -25,6 +27,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
     public DbSet<CardReview> CardReviews => Set<CardReview>();
     public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
+    public DbSet<HabitEntity> Habits => Set<HabitEntity>();
+    public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
 

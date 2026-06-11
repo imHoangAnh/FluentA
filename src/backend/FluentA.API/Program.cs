@@ -1,6 +1,7 @@
 using FluentA.API.Contracts;
 using FluentA.API.Hubs;
 using FluentA.Application.BoundedContexts.Flashcards;
+using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.API.Middleware;
 using FluentA.Infrastructure;
@@ -18,6 +19,7 @@ builder.Services.AddSingleton(signingKeyProvider);
 builder.Services.AddFluentAInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>();
 builder.Services.AddScoped<ITodoSyncNotifier, SignalRTodoSyncNotifier>();
+builder.Services.AddScoped<IHabitSyncNotifier, SignalRHabitSyncNotifier>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluentAPolicy", policy =>

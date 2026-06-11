@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useTodoSync } from '../realtime/useTodoSync'
+import { useHabitSync } from '../realtime/useHabitSync'
 import { useAuthStore } from '../../stores/authStore'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -9,6 +10,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const loadMe = useAuthStore((state) => state.loadMe)
 
   useTodoSync()
+  useHabitSync()
 
   useEffect(() => {
     if (status === 'idle') {

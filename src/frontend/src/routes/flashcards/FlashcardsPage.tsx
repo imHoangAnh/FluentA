@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, CalendarClock, Flame, Layers, LogOut, Settings, TrendingUp } from 'lucide-react'
+import { ArrowLeft, BarChart3, BookOpen, CalendarClock, Flame, Layers, LogOut, Settings, TrendingUp } from 'lucide-react'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -55,6 +55,9 @@ export function FlashcardsPage() {
         </div>
         <nav className="workspace-nav" aria-label="Workspace navigation">
           <Link className="ghost-button ghost-button--inline" to="/">
+            <BarChart3 size={17} /> Dashboard
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
             <ArrowLeft size={17} /> Vocabulary
           </Link>
           <Link className="ghost-button ghost-button--inline" to="/settings/review">
@@ -120,7 +123,7 @@ export function FlashcardsPage() {
           <BookOpen size={28} />
           <h2>No decks yet</h2>
           <p>Create a vocabulary board and page, then add words to see synchronized cards here.</p>
-          <Link className="primary-button flashcard-empty__link" to="/">Open vocabulary</Link>
+          <Link className="primary-button flashcard-empty__link" to="/vocabulary">Open vocabulary</Link>
         </div>
       ) : null}
 
