@@ -14,6 +14,10 @@ stories.
 - A logged-in user can see only their own Todo tasks.
 - A logged-in user can view tasks for one selected day, defaulting to today.
 - A logged-in user can navigate between days.
+- A logged-in desktop user can switch to a Monday-Sunday Week view and navigate
+  between weeks.
+- A logged-in desktop user can reorder tasks within a day or move tasks between
+  days with a drag handle.
 - A logged-in user can create a task with a required title, optional note, and
   assigned date.
 - A logged-in user can toggle task completion without reloading the page.
@@ -66,12 +70,22 @@ All responses use the FluentA envelope.
 - The task's assigned date becomes today and `IsCarriedOver` becomes true.
 - A task already carried over today is not changed again.
 
+## Todo Week Planning Rules
+
+- Week view always shows seven columns from Monday through Sunday.
+- Selecting a week column changes the date used by the create-task form.
+- Desktop drag-and-drop persists the moved task and every affected source or
+  target column task with field-scoped `date` and `sortOrder` updates.
+- A failed layout update rolls the visible week back and refetches Todo data.
+- Mobile drag-and-drop is not part of the current contract.
+
 ## Todo Real-Time Rules
 
 - Todo completion changes publish `TodoItemChecked` to the authenticated user's
   SignalR group after durable persistence succeeds.
-- Clients receiving `TodoItemChecked` invalidate Todo and future Dashboard
-  queries.
+- Every authenticated app route listens for `TodoItemChecked`.
+- Clients receiving `TodoItemChecked` invalidate and refetch cached Todo and
+  future Dashboard queries, including while another protected route is visible.
 - Durable Todo correctness does not depend on connected clients or successful
   notification delivery.
 

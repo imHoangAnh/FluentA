@@ -25,8 +25,8 @@ export function useTodoSync() {
         .build()
 
       connection.on('TodoItemChecked', () => {
-        void queryClient.invalidateQueries({ queryKey: ['todo'] })
-        void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        void queryClient.invalidateQueries({ queryKey: ['todo'], refetchType: 'all' })
+        void queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       })
 
       await connection.start()

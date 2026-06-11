@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -8,6 +8,21 @@ import { useAuthStore } from './stores/authStore'
 function todayInput() {
   const date = new Date()
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+}
+
+function shiftDate(dateValue: string, days: number) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + days)
+  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+}
+
+function currentWeek() {
+  const today = todayInput()
+  const [year, month, day] = today.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const start = shiftDate(today, -((date.getDay() + 6) % 7))
+  return [start, shiftDate(start, 6)]
 }
 
 function renderApp(initialEntry: string) {
@@ -36,6 +51,8 @@ function renderApp(initialEntry: string) {
   })
   queryClient.setQueryData(['flashcard', 'settings'], { newCardsPerDay: 20, reviewCardsPerDay: 200 })
   queryClient.setQueryData(['todo', 'items', todayInput()], [])
+  const [weekStart, weekEnd] = currentWeek()
+  queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['countdown', 'events'], [])
 
   return render(
@@ -146,6 +163,8 @@ describe('FluentA auth app', () => {
     expect(screen.getByText('learner@example.com')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Boards' })).toBeInTheDocument()
     expect(screen.getByTestId('board-name-input')).toBeInTheDocument()
+    expect(screen.getByTestId('open-todo')).toHaveAttribute('href', '/todo')
+    expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
   })
 
   it('protects flashcards and renders its empty state when authenticated', () => {
@@ -185,6 +204,21 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'Daily plan' })).toBeInTheDocument()
     expect(screen.getByTestId('todo-title-input')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No tasks for this day' })).toBeInTheDocument()
+  })
+
+  it('renders the seven-day Todo week view when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    const { container } = renderApp('/todo')
+    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+
+    expect(screen.getByRole('heading', { name: 'Week plan' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Todo week' })).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid^="week-day-"]')).toHaveLength(7)
   })
 
   it('protects countdown and renders its empty state when authenticated', () => {

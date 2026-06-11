@@ -1,11 +1,14 @@
 import { type ReactNode, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useTodoSync } from '../realtime/useTodoSync'
 import { useAuthStore } from '../../stores/authStore'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const status = useAuthStore((state) => state.status)
   const user = useAuthStore((state) => state.user)
   const loadMe = useAuthStore((state) => state.loadMe)
+
+  useTodoSync()
 
   useEffect(() => {
     if (status === 'idle') {
