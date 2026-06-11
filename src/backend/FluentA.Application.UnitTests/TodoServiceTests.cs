@@ -74,6 +74,27 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
+    public async Task Update_DateAndSortOrder_PreserveUnrelatedFields()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var date = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var nextDate = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep"));
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+
+        var updated = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest(Date: nextDate, SortOrder: 4));
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal("Task", updated.Value!.Title);
+        Assert.Equal("keep", updated.Value.Note);
+        Assert.Equal(nextDate, updated.Value.Date);
+        Assert.Equal(4, updated.Value.SortOrder);
+        Assert.True(updated.Value.IsCompleted);
+    }
+
+    [Fact]
     public async Task Update_ReturnsNotFoundForForeignItem()
     {
         var repository = new FakeTodoRepository();

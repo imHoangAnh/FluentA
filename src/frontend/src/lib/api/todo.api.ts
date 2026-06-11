@@ -49,6 +49,10 @@ export async function updateTodo(id: string, input: UpdateTodoInput) {
   return response.data.data!
 }
 
+export async function updateTodoLayout(updates: Array<{ id: string; date: string; sortOrder: number }>) {
+  return Promise.all(updates.map(({ id, ...patch }) => updateTodo(id, patch)))
+}
+
 export async function deleteTodo(id: string) {
   await apiClient.delete(`/todos/${id}`)
 }

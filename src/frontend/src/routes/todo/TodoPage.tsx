@@ -1,9 +1,11 @@
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Home, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Home, LayoutGrid, List, Loader2, Plus, Trash2 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as todoApi from '../../lib/api/todo.api'
-import { useTodoSync } from '../../lib/realtime/useTodoSync'
+import { TodoWeekView } from './TodoWeekView'
+
+type TodoView = 'day' | 'week'
 
 function toDateInput(date: Date) {
   const year = date.getFullYear()
@@ -29,17 +31,39 @@ function formatDay(dateValue: string) {
   }).format(new Date(year, month - 1, day))
 }
 
+function weekStart(dateValue: string) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const offset = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - offset)
+  return toDateInput(date)
+}
+
+function weekDates(dateValue: string) {
+  const start = weekStart(dateValue)
+  return Array.from({ length: 7 }, (_, index) => shiftDate(start, index))
+}
+
 export function TodoPage() {
   const queryClient = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(() => toDateInput(new Date()))
+  const [view, setView] = useState<TodoView>('day')
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
 
-  useTodoSync()
+  const dates = useMemo(() => weekDates(selectedDate), [selectedDate])
+  const weekKey = ['todo', 'range', dates[0], dates[6]]
 
   const todosQuery = useQuery({
     queryKey: ['todo', 'items', selectedDate],
     queryFn: () => todoApi.listByDate(selectedDate),
+    enabled: view === 'day',
+  })
+
+  const weekQuery = useQuery({
+    queryKey: weekKey,
+    queryFn: () => todoApi.listByRange(dates[0], dates[6]),
+    enabled: view === 'week',
   })
 
   const todos = useMemo(
@@ -47,11 +71,13 @@ export function TodoPage() {
     [todosQuery.data],
   )
 
-  const openTasks = todos.filter((item) => !item.isCompleted)
-  const completedTasks = todos.filter((item) => item.isCompleted)
+  const weekTodos = useMemo(() => weekQuery.data ?? [], [weekQuery.data])
+  const visibleTodos = view === 'day' ? todos : weekTodos
+  const openTasks = visibleTodos.filter((item) => !item.isCompleted)
+  const completedTasks = visibleTodos.filter((item) => item.isCompleted)
 
-  const refresh = async (date = selectedDate) => {
-    await queryClient.invalidateQueries({ queryKey: ['todo', 'items', date] })
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['todo'] })
   }
 
   const createTodo = useMutation({
@@ -66,24 +92,37 @@ export function TodoPage() {
   const updateTodo = useMutation({
     mutationFn: (input: { id: string; patch: todoApi.UpdateTodoInput }) => todoApi.updateTodo(input.id, input.patch),
     onMutate: async (input) => {
-      const key = ['todo', 'items', selectedDate]
-      await queryClient.cancelQueries({ queryKey: key })
-      const previous = queryClient.getQueryData<todoApi.TodoItem[]>(key)
-      queryClient.setQueryData<todoApi.TodoItem[]>(key, (items = []) =>
+      await queryClient.cancelQueries({ queryKey: ['todo'] })
+      const previous = queryClient.getQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] })
+      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
         items.map((item) => item.id === input.id ? { ...item, ...input.patch } : item),
       )
-      return { previous, key }
+      return { previous }
     },
     onError: (_error, _input, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.key, context.previous)
+      for (const [key, value] of context?.previous ?? []) {
+        queryClient.setQueryData(key, value)
       }
     },
-    onSuccess: async (item) => {
-      await refresh(item.date)
-      if (item.date !== selectedDate) {
-        await refresh()
-      }
+    onSettled: async () => {
+      await refresh()
+    },
+  })
+
+  const updateLayout = useMutation({
+    mutationFn: (input: { items: todoApi.TodoItem[]; updates: Array<{ id: string; date: string; sortOrder: number }> }) =>
+      todoApi.updateTodoLayout(input.updates),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: weekKey })
+      const previous = queryClient.getQueryData<todoApi.TodoItem[]>(weekKey)
+      queryClient.setQueryData(weekKey, input.items)
+      return { previous }
+    },
+    onError: (_error, _input, context) => {
+      queryClient.setQueryData(weekKey, context?.previous)
+    },
+    onSettled: async () => {
+      await refresh()
     },
   })
 
@@ -118,7 +157,7 @@ export function TodoPage() {
         <div className="todo-hero">
           <div>
             <span className="preview-label">Todo List</span>
-            <h1>Daily plan</h1>
+            <h1>{view === 'day' ? 'Daily plan' : 'Week plan'}</h1>
             <p>{openTasks.length} open tasks · {completedTasks.length} completed</p>
           </div>
           <div className="todo-date-card">
@@ -133,14 +172,23 @@ export function TodoPage() {
           </div>
         </div>
 
+        <div className="todo-view-switch" aria-label="Todo view">
+          <button className={view === 'day' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'} type="button" onClick={() => setView('day')}>
+            <List size={16} /> Day
+          </button>
+          <button className={view === 'week' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'} type="button" onClick={() => setView('week')}>
+            <LayoutGrid size={16} /> Week
+          </button>
+        </div>
+
         <div className="todo-day-controls" aria-label="Todo day controls">
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, -1))}>
+          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, view === 'day' ? -1 : -7))}>
             <ArrowLeft size={17} /> Previous
           </button>
           <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate(toDateInput(new Date()))}>
             Today
           </button>
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, 1))}>
+          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, view === 'day' ? 1 : 7))}>
             Next <ArrowRight size={17} />
           </button>
         </div>
@@ -169,10 +217,11 @@ export function TodoPage() {
           </button>
         </form>
 
-        {todosQuery.isLoading ? <p className="flashcard-status">Loading tasks...</p> : null}
-        {todosQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load Todo tasks.</p> : null}
+        {view === 'day' && todosQuery.isLoading ? <p className="flashcard-status">Loading tasks...</p> : null}
+        {view === 'week' && weekQuery.isLoading ? <p className="flashcard-status">Loading week...</p> : null}
+        {(view === 'day' && todosQuery.isError) || (view === 'week' && weekQuery.isError) ? <p className="flashcard-status flashcard-status--error">Could not load Todo tasks.</p> : null}
 
-        {!todosQuery.isLoading && !todosQuery.isError ? (
+        {view === 'day' && !todosQuery.isLoading && !todosQuery.isError ? (
           <section className="todo-list" aria-label="Todo tasks">
             {todos.length === 0 ? (
               <div className="empty-panel todo-empty">
@@ -208,6 +257,18 @@ export function TodoPage() {
               </article>
             ))}
           </section>
+        ) : null}
+
+        {view === 'week' && !weekQuery.isLoading && !weekQuery.isError ? (
+          <TodoWeekView
+            dates={dates}
+            items={weekTodos}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            onLayoutChange={(items, updates) => updateLayout.mutate({ items, updates })}
+            onToggle={(item, isCompleted) => updateTodo.mutate({ id: item.id, patch: { isCompleted } })}
+            onDelete={(item) => deleteTodo.mutate(item.id)}
+          />
         ) : null}
       </section>
     </main>
