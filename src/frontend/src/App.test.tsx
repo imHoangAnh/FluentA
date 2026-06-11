@@ -68,6 +68,7 @@ function renderApp(initialEntry: string) {
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', currentTimeZone()], [])
+  queryClient.setQueryData(['journal', 'entries'], [])
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -332,6 +333,7 @@ describe('FluentA auth app', () => {
     expect(screen.getByTestId('open-todo')).toHaveAttribute('href', '/todo')
     expect(screen.getByTestId('open-habits')).toHaveAttribute('href', '/habits')
     expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
+    expect(screen.getByTestId('open-journal')).toHaveAttribute('href', '/journal')
   })
 
   it('keeps the vocabulary workspace available at /vocabulary', () => {
@@ -455,6 +457,22 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'Monthly rhythm' })).toBeInTheDocument()
     expect(screen.getByTestId('habit-name-input')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No habits yet' })).toBeInTheDocument()
+  })
+
+  it('protects journal and renders its foundation editor when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/journal')
+
+    expect(screen.getByRole('heading', { name: 'Language learning notes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No journal entries yet' })).toBeInTheDocument()
+    expect(screen.getByTestId('journal-title-input')).toBeInTheDocument()
+    expect(screen.getByTestId('journal-content-input')).toBeInTheDocument()
+    expect(screen.getByTestId('save-journal-button')).toBeDisabled()
   })
 
   it('renders habit summaries and disables ineligible grid cells', () => {

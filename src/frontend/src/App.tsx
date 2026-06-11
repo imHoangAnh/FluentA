@@ -11,6 +11,7 @@ import { TodoPage } from './routes/todo/TodoPage'
 import { CountdownPage } from './routes/countdown/CountdownPage'
 import { HabitPage } from './routes/habits/HabitPage'
 import { HabitStatsPage } from './routes/habits/HabitStatsPage'
+import { JournalPage } from './routes/journal/JournalPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
 
 export default function App() {
@@ -72,6 +73,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <HabitStatsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/journal"
+        element={
+          <ProtectedRoute>
+            <JournalPage />
           </ProtectedRoute>
         }
       />

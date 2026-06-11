@@ -4,6 +4,7 @@ using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Habit;
+using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
@@ -11,6 +12,7 @@ using FluentA.Infrastructure.Auth;
 using FluentA.Infrastructure.Countdown;
 using FluentA.Infrastructure.Flashcards;
 using FluentA.Infrastructure.Habit;
+using FluentA.Infrastructure.Journal;
 using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Todo;
 using FluentA.Infrastructure.Vocabulary;
@@ -66,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<ICountdownService, CountdownService>();
         services.AddScoped<IHabitRepository, EfHabitRepository>();
         services.AddScoped<IHabitService, HabitService>();
+        services.AddScoped<IJournalRepository, EfJournalRepository>();
+        services.AddScoped<IJournalService, JournalService>();
         return services;
     }
 }
