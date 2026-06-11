@@ -5,6 +5,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { useAuthStore } from './stores/authStore'
 
+function todayInput() {
+  const date = new Date()
+  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+}
+
 function renderApp(initialEntry: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -14,6 +19,7 @@ function renderApp(initialEntry: string) {
       },
     },
   })
+  queryClient.setQueryData(['todo', 'items', todayInput()], [])
   queryClient.setQueryData(['vocab', 'boards'], [])
   queryClient.setQueryData(['flashcard', 'decks'], [])
   queryClient.setQueryData(['flashcard', 'dashboard'], {
@@ -29,6 +35,8 @@ function renderApp(initialEntry: string) {
     forecast: [],
   })
   queryClient.setQueryData(['flashcard', 'settings'], { newCardsPerDay: 20, reviewCardsPerDay: 200 })
+  queryClient.setQueryData(['todo', 'items', todayInput()], [])
+  queryClient.setQueryData(['countdown', 'events'], [])
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -163,6 +171,34 @@ describe('FluentA auth app', () => {
     renderApp('/flashcards/decks/deck-1/review')
 
     expect(screen.getByRole('heading', { name: 'Login' })).toBeInTheDocument()
+  })
+
+  it('protects todo and renders its empty day state when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/todo')
+
+    expect(screen.getByRole('heading', { name: 'Daily plan' })).toBeInTheDocument()
+    expect(screen.getByTestId('todo-title-input')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No tasks for this day' })).toBeInTheDocument()
+  })
+
+  it('protects countdown and renders its empty state when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/countdown')
+
+    expect(screen.getByRole('heading', { name: 'Important dates' })).toBeInTheDocument()
+    expect(screen.getByTestId('countdown-name-input')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No countdowns yet' })).toBeInTheDocument()
   })
 
   it('renders protected review settings when authenticated', () => {

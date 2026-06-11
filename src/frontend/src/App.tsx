@@ -6,6 +6,8 @@ import { WorkspacePage } from './routes/workspace/WorkspacePage'
 import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
 import { ReviewSettingsPage } from './routes/settings/ReviewSettingsPage'
+import { TodoPage } from './routes/todo/TodoPage'
+import { CountdownPage } from './routes/countdown/CountdownPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
 
 export default function App() {
@@ -19,6 +21,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <WorkspacePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/todo"
+        element={
+          <ProtectedRoute>
+            <TodoPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/countdown"
+        element={
+          <ProtectedRoute>
+            <CountdownPage />
           </ProtectedRoute>
         }
       />

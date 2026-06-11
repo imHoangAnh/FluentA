@@ -1,12 +1,16 @@
 using Amazon;
 using Amazon.SimpleEmailV2;
 using FluentA.Application.BoundedContexts.Auth;
+using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Flashcards;
+using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
 using FluentA.Infrastructure.Auth;
+using FluentA.Infrastructure.Countdown;
 using FluentA.Infrastructure.Flashcards;
 using FluentA.Infrastructure.Persistence;
+using FluentA.Infrastructure.Todo;
 using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -54,6 +58,10 @@ public static class DependencyInjection
         services.AddScoped<IFlashcardService, FlashcardService>();
         services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
+        services.AddScoped<ITodoRepository, EfTodoRepository>();
+        services.AddScoped<ITodoService, TodoService>();
+        services.AddScoped<ICountdownRepository, EfCountdownRepository>();
+        services.AddScoped<ICountdownService, CountdownService>();
         return services;
     }
 }

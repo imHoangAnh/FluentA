@@ -1,6 +1,7 @@
 using FluentA.API.Contracts;
 using FluentA.API.Hubs;
 using FluentA.Application.BoundedContexts.Flashcards;
+using FluentA.Application.BoundedContexts.Todo;
 using FluentA.API.Middleware;
 using FluentA.Infrastructure;
 using FluentA.Infrastructure.Auth;
@@ -16,6 +17,7 @@ using var signingKeyProvider = new JwtSigningKeyProvider();
 builder.Services.AddSingleton(signingKeyProvider);
 builder.Services.AddFluentAInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>();
+builder.Services.AddScoped<ITodoSyncNotifier, SignalRTodoSyncNotifier>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluentAPolicy", policy =>

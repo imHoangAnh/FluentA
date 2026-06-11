@@ -1,5 +1,6 @@
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards;
+using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Events;
 
@@ -240,5 +241,38 @@ public sealed class VocabularyTests
         Assert.Throws<ArgumentException>(() => VocabCustomColumn.Create(Guid.Empty, "Priority", CustomColumnType.Number, 0));
         Assert.Throws<ArgumentException>(() => VocabCustomColumn.Create(boardId, "", CustomColumnType.Text, 0));
         Assert.Throws<ArgumentException>(() => VocabCustomValue.CreateText(Guid.NewGuid(), Guid.NewGuid(), ""));
+    }
+
+    [Fact]
+    public void TodoItem_ValidatesAndTracksLifecycle()
+    {
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+        var today = DateTime.UtcNow.Date;
+        var item = TodoItem.Create(Guid.NewGuid(), " Review IELTS ", yesterday, " Unit 3 ", 0);
+
+        item.Rename("Review HSK");
+        item.UpdateNote("tones");
+        item.SetCompleted(true, DateTime.UtcNow);
+        item.SetCompleted(false, DateTime.UtcNow);
+        var carried = item.CarryOver(today);
+        var repeated = item.CarryOver(today);
+
+        Assert.Equal("Review HSK", item.Title);
+        Assert.Equal("tones", item.Note);
+        Assert.False(item.IsCompleted);
+        Assert.True(carried);
+        Assert.False(repeated);
+        Assert.True(item.IsCarriedOver);
+        Assert.Equal(today, item.Date);
+        Assert.Equal(yesterday, item.OriginalDate);
+    }
+
+    [Fact]
+    public void TodoItem_RejectsInvalidInputs()
+    {
+        Assert.Throws<ArgumentException>(() => TodoItem.Create(Guid.Empty, "Task", DateTime.UtcNow, null));
+        Assert.Throws<ArgumentException>(() => TodoItem.Create(Guid.NewGuid(), "", DateTime.UtcNow, null));
+        Assert.Throws<ArgumentException>(() => TodoItem.Create(Guid.NewGuid(), "Task", DateTime.UtcNow, new string('x', 4001)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TodoItem.Create(Guid.NewGuid(), "Task", DateTime.UtcNow, null, -1));
     }
 }

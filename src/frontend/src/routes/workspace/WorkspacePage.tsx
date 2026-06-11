@@ -1,4 +1,4 @@
-import { BookOpen, FilePlus2, Languages, Layers, LogOut, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { BookOpen, CalendarClock, CheckSquare, FilePlus2, Languages, Layers, LogOut, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
@@ -133,6 +133,12 @@ export function WorkspacePage() {
         <nav className="workspace-nav" aria-label="Workspace navigation">
           <Link className="ghost-button ghost-button--inline" to="/flashcards" data-testid="open-flashcards">
             <Layers size={17} /> Flashcards
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/todo" data-testid="open-todo">
+            <CheckSquare size={17} /> Todo
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/countdown" data-testid="open-countdown">
+            <CalendarClock size={17} /> Countdown
           </Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />
