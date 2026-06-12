@@ -13,6 +13,7 @@ import { HabitPage } from './routes/habits/HabitPage'
 import { HabitStatsPage } from './routes/habits/HabitStatsPage'
 import { JournalPage } from './routes/journal/JournalPage'
 import { KanbanPage } from './routes/kanban/KanbanPage'
+import { PomodoroPage } from './routes/pomodoro/PomodoroPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
 
 export default function App() {
@@ -90,6 +91,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <KanbanPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pomodoro"
+        element={
+          <ProtectedRoute>
+            <PomodoroPage />
           </ProtectedRoute>
         }
       />

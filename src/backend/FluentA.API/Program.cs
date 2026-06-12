@@ -3,6 +3,7 @@ using FluentA.API.Hubs;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Kanban;
+using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.API.Middleware;
 using FluentA.Infrastructure;
@@ -22,6 +23,7 @@ builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>
 builder.Services.AddScoped<ITodoSyncNotifier, SignalRTodoSyncNotifier>();
 builder.Services.AddScoped<IHabitSyncNotifier, SignalRHabitSyncNotifier>();
 builder.Services.AddScoped<IKanbanSyncNotifier, SignalRKanbanSyncNotifier>();
+builder.Services.AddScoped<IPomodoroSyncNotifier, SignalRPomodoroSyncNotifier>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluentAPolicy", policy =>

@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useTodoSync } from '../realtime/useTodoSync'
 import { useHabitSync } from '../realtime/useHabitSync'
 import { useKanbanSync } from '../realtime/useKanbanSync'
+import { usePomodoroSync } from '../realtime/usePomodoroSync'
 import { useAuthStore } from '../../stores/authStore'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -13,6 +14,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   useTodoSync()
   useHabitSync()
   useKanbanSync()
+  usePomodoroSync()
 
   useEffect(() => {
     if (status === 'idle') {

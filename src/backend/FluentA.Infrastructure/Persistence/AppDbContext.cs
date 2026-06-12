@@ -2,6 +2,7 @@ using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
     public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();
     public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();
+    public DbSet<PomodoroConfig> PomodoroConfigs => Set<PomodoroConfig>();
+    public DbSet<PomodoroSession> PomodoroSessions => Set<PomodoroSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

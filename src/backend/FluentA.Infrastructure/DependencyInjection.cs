@@ -6,6 +6,7 @@ using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Kanban;
+using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
@@ -16,6 +17,7 @@ using FluentA.Infrastructure.Habit;
 using FluentA.Infrastructure.Journal;
 using FluentA.Infrastructure.Kanban;
 using FluentA.Infrastructure.Persistence;
+using FluentA.Infrastructure.Pomodoro;
 using FluentA.Infrastructure.Todo;
 using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +77,9 @@ public static class DependencyInjection
         services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<IKanbanRepository, EfKanbanRepository>();
         services.AddScoped<IKanbanService, KanbanService>();
+        services.AddScoped<IPomodoroRepository, EfPomodoroRepository>();
+        services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
+        services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
     }
 }

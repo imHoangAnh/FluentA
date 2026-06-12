@@ -3,6 +3,7 @@ using System;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FluentA.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260612032838_AddPomodoroConfigFoundation")]
+    partial class AddPomodoroConfigFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -737,69 +740,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("pomodoro_configs", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Pomodoro.Entities.PomodoroSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<Guid?>("LinkedTaskId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("linked_task_id");
-
-                    b.Property<string>("LinkedTaskSource")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("linked_task_source");
-
-                    b.Property<string>("Phase")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("phase");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("state");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "CompletedAt");
-
-                    b.ToTable("pomodoro_sessions", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Todo.Entities.TodoItem", b =>

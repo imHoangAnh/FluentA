@@ -70,6 +70,25 @@ function renderApp(initialEntry: string) {
   queryClient.setQueryData(['habit', 'list', currentTimeZone()], [])
   queryClient.setQueryData(['journal', 'entries'], [])
   queryClient.setQueryData(['kanban', 'boards'], [])
+  queryClient.setQueryData(['pomodoro', 'config'], {
+    id: 'pomodoro-config-1',
+    workMinutes: 25,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    longBreakAfter: 4,
+    createdAt: '2026-06-12T00:00:00Z',
+    updatedAt: '2026-06-12T00:00:00Z',
+  })
+  queryClient.setQueryData(['pomodoro', 'current'], {
+    state: 'Idle',
+    phase: 'Work',
+    remainingSeconds: 1500,
+    durationSeconds: 1500,
+    startedAt: null,
+    pausedAt: null,
+    linkedTaskId: null,
+    linkedTaskSource: null,
+  })
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -336,6 +355,7 @@ describe('FluentA auth app', () => {
     expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
     expect(screen.getByTestId('open-journal')).toHaveAttribute('href', '/journal')
     expect(screen.getByTestId('open-kanban')).toHaveAttribute('href', '/kanban')
+    expect(screen.getByTestId('open-pomodoro')).toHaveAttribute('href', '/pomodoro')
   })
 
   it('keeps the vocabulary workspace available at /vocabulary', () => {
@@ -490,6 +510,21 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'Kanban Board' })).toBeInTheDocument()
     expect(screen.getByTestId('kanban-board-name-input')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No Kanban boards yet' })).toBeInTheDocument()
+  })
+
+  it('protects pomodoro and renders current state with settings when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/pomodoro')
+
+    expect(screen.getByRole('heading', { name: 'Focus timer' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Idle' })).toBeInTheDocument()
+    expect(screen.getByTestId('pomodoro-current-time')).toHaveTextContent('25:00')
+    expect(screen.getByTestId('pomodoro-work-input')).toHaveValue(25)
   })
 
   it('renders habit summaries and disables ineligible grid cells', () => {

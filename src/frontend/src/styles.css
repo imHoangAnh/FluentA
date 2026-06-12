@@ -2980,6 +2980,109 @@ a {
   margin: 4px 0;
 }
 
+.pomodoro-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.pomodoro-hero,
+.pomodoro-timer-card,
+.pomodoro-config-form {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.pomodoro-hero {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 28px;
+}
+
+.pomodoro-hero h1 {
+  color: var(--ink);
+  font-size: clamp(34px, 6vw, 62px);
+  margin: 4px 0;
+}
+
+.pomodoro-hero p,
+.pomodoro-timer-card p {
+  color: var(--muted);
+  font-weight: 800;
+  margin: 0;
+}
+
+.pomodoro-hero svg,
+.pomodoro-timer-card svg {
+  color: var(--teal);
+}
+
+.pomodoro-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
+}
+
+.pomodoro-timer-card {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+}
+
+.pomodoro-timer-card h2 {
+  margin: 0;
+}
+
+.pomodoro-timer-card strong {
+  color: var(--teal-dark);
+  font-size: clamp(56px, 10vw, 96px);
+  line-height: 1;
+}
+
+.pomodoro-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pomodoro-config-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 24px;
+}
+
+.pomodoro-config-form h2,
+.pomodoro-config-form button,
+.pomodoro-config-form p {
+  grid-column: 1 / -1;
+}
+
+.pomodoro-config-form input {
+  width: 100%;
+}
+
+.pomodoro-timer-card select,
+.pomodoro-stopwatch {
+  width: 100%;
+}
+
+.pomodoro-stopwatch {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.pomodoro-stopwatch strong {
+  font-size: clamp(2.6rem, 8vw, 5rem);
+}
+
 @media (max-width: 880px) {
   .auth-shell,
   .workspace-hero,
@@ -2991,6 +3094,11 @@ a {
   .todo-create,
   .countdown-form,
   .habit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pomodoro-grid,
+  .pomodoro-config-form {
     grid-template-columns: 1fr;
   }
 
