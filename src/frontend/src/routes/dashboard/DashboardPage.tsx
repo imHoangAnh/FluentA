@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, CalendarClock, CheckSquare, Clock3, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2 } from 'lucide-react'
+import { BarChart3, Bell, BookOpen, CalendarClock, CheckSquare, Clock3, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -164,6 +164,9 @@ export function DashboardPage() {
           </Link>
           <Link className="ghost-button ghost-button--inline" to="/pomodoro" data-testid="open-pomodoro">
             <Clock3 size={17} /> Pomodoro
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/notifications" data-testid="open-notifications">
+            <Bell size={17} /> Notifications
           </Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />

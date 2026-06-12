@@ -28,6 +28,7 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     public DateTime TargetDate { get; private set; }
     public string? Color { get; private set; }
     public string? Icon { get; private set; }
+    public DateTime? AlertedAt { get; private set; }
     public bool IsCompleted => IsCompletedAt(DateTime.UtcNow);
 
     public static CountdownEvent Create(Guid userId, string name, DateTime targetDate, string? color = null, string? icon = null)
@@ -62,6 +63,12 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     public bool IsCompletedAt(DateTime utcNow)
     {
         return DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) >= TargetDate;
+    }
+
+    public void MarkAlerted(DateTime utcNow)
+    {
+        AlertedAt ??= NormalizeUtc(utcNow);
+        Touch();
     }
 
     public void SoftDelete()

@@ -34,6 +34,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public string? Icon { get; private set; }
     public HabitFrequency Frequency { get; private set; }
     public string? CustomDays { get; private set; }
+    public DateTime? LastReminderSentOn { get; private set; }
 
     public IReadOnlyList<DayOfWeek> ScheduledCustomDays => ParseCustomDays(CustomDays);
 
@@ -64,6 +65,12 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public bool IsScheduledOn(DateTime localDate)
     {
         return Frequency == HabitFrequency.Daily || ScheduledCustomDays.Contains(localDate.Date.DayOfWeek);
+    }
+
+    public void MarkReminderSent(DateTime date)
+    {
+        LastReminderSentOn = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        Touch();
     }
 
     public void SoftDelete()

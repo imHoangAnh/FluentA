@@ -2,6 +2,7 @@ using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
@@ -40,6 +41,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();
     public DbSet<PomodoroConfig> PomodoroConfigs => Set<PomodoroConfig>();
     public DbSet<PomodoroSession> PomodoroSessions => Set<PomodoroSession>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

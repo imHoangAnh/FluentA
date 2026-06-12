@@ -238,10 +238,13 @@ All responses use the FluentA envelope.
 - A dedicated `/api/v1/dashboard/overview` aggregation endpoint remains
   deferred until there is enough cross-domain read-model pressure to justify it.
 - Widget visibility settings for the Dashboard remain deferred.
-- Scheduled `TodoCarryOverJob` remains deferred until background-job
-  infrastructure is planned.
-- Habit reminders, per-habit reminder preferences, notification delivery, and
-  scheduled reminder jobs remain deferred until the background-jobs and
-  notifications epic.
+- PostgreSQL-backed Hangfire infrastructure registers `TodoCarryOverJob`,
+  `HabitReminderJob`, `CountdownAlertJob`, and `DatabaseCleanupJob` schedules.
+  Todo carry-over, daily unchecked-habit reminder queuing, one-time expired
+  countdown alerts, and 30-day product-record cleanup are implemented.
+- Reminder and countdown jobs persist delivery markers before retry completion,
+  preventing duplicate daily/event notifications.
+- External notification delivery and per-habit reminder preferences remain
+  deferred to the notifications epic.
 - Mobile drag-and-drop remains deferred; mobile users receive explicit date and
   ordering controls.

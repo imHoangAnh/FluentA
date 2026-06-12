@@ -14,6 +14,7 @@ import { HabitStatsPage } from './routes/habits/HabitStatsPage'
 import { JournalPage } from './routes/journal/JournalPage'
 import { KanbanPage } from './routes/kanban/KanbanPage'
 import { PomodoroPage } from './routes/pomodoro/PomodoroPage'
+import { NotificationsPage } from './routes/notifications/NotificationsPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
 
 export default function App() {
@@ -101,6 +102,10 @@ export default function App() {
             <PomodoroPage />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/notifications"
+        element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>}
       />
       <Route
         path="/settings/review"

@@ -10,6 +10,10 @@ using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
+using FluentA.Application.BackgroundJobs;
+using FluentA.Infrastructure.BackgroundJobs;
+using Hangfire;
+using Hangfire.PostgreSql;
 using FluentA.Infrastructure.Auth;
 using FluentA.Infrastructure.Countdown;
 using FluentA.Infrastructure.Flashcards;
@@ -40,6 +44,9 @@ public static class DependencyInjection
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(postgresConnection));
+        services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
+        services.AddHangfireServer();
+        services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
         services.TryAddSingleton<JwtSigningKeyProvider>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));

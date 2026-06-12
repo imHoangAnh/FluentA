@@ -20,6 +20,7 @@ public sealed class HabitConfiguration : IEntityTypeConfiguration<HabitEntity>
         builder.Property(habit => habit.Icon).HasColumnName("icon").HasMaxLength(16);
         builder.Property(habit => habit.Frequency).HasColumnName("frequency").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(habit => habit.CustomDays).HasColumnName("custom_days").HasMaxLength(120);
+        builder.Property(habit => habit.LastReminderSentOn).HasColumnName("last_reminder_sent_on").HasColumnType("date");
         builder.Property(habit => habit.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(habit => habit.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(habit => habit.DeletedAt).HasColumnName("deleted_at");

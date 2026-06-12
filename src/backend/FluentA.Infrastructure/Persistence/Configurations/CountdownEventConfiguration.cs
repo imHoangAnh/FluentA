@@ -18,6 +18,7 @@ public sealed class CountdownEventConfiguration : IEntityTypeConfiguration<Count
         builder.Property(countdownEvent => countdownEvent.TargetDate).HasColumnName("target_date").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(countdownEvent => countdownEvent.Color).HasColumnName("color").HasMaxLength(7);
         builder.Property(countdownEvent => countdownEvent.Icon).HasColumnName("icon").HasMaxLength(16);
+        builder.Property(countdownEvent => countdownEvent.AlertedAt).HasColumnName("alerted_at");
         builder.Property(countdownEvent => countdownEvent.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(countdownEvent => countdownEvent.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(countdownEvent => countdownEvent.DeletedAt).HasColumnName("deleted_at");
