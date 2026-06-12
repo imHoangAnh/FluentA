@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, CalendarClock, CheckSquare, Flame, Layers, LogOut, NotebookPen, Repeat2 } from 'lucide-react'
+import { BarChart3, BookOpen, CalendarClock, CheckSquare, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -7,6 +7,8 @@ import * as flashcardApi from '../../lib/api/flashcard.api'
 import * as habitApi from '../../lib/api/habit.api'
 import * as todoApi from '../../lib/api/todo.api'
 import { useAuthStore } from '../../stores/authStore'
+
+const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -53,6 +55,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 1000)
+    void preloadJournalEditor()
     return () => window.clearInterval(intervalId)
   }, [])
 
@@ -147,8 +150,17 @@ export function DashboardPage() {
           <Link className="ghost-button ghost-button--inline" to="/countdown" data-testid="open-countdown">
             <CalendarClock size={17} /> Countdown
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/journal" data-testid="open-journal">
+          <Link
+            className="ghost-button ghost-button--inline"
+            to="/journal"
+            data-testid="open-journal"
+            onFocus={preloadJournalEditor}
+            onMouseEnter={preloadJournalEditor}
+          >
             <NotebookPen size={17} /> Journal
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/kanban" data-testid="open-kanban">
+            <Columns3 size={17} /> Kanban
           </Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />

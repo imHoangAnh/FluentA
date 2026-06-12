@@ -392,6 +392,124 @@ a {
   margin-top: 16px;
 }
 
+.journal-search {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 10px;
+}
+
+.journal-search:focus-within {
+  border-color: var(--teal);
+  outline: 3px solid rgba(15, 159, 143, 0.18);
+}
+
+.journal-search svg {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.journal-search input {
+  border: 0;
+  color: var(--text);
+  flex: 1;
+  font: inherit;
+  min-height: 42px;
+  min-width: 0;
+  outline: 0;
+}
+
+.journal-search button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 5px;
+}
+
+.journal-calendar {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.journal-calendar > header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.journal-calendar > header button,
+.journal-calendar-day {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.journal-calendar > header button {
+  min-height: 32px;
+  min-width: 32px;
+}
+
+.journal-calendar-weekdays,
+.journal-calendar-grid {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.journal-calendar-weekdays span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.journal-calendar-day {
+  aspect-ratio: 1;
+  flex-direction: column;
+  font-weight: 900;
+  gap: 1px;
+  min-width: 0;
+  position: relative;
+}
+
+.journal-calendar-day--muted {
+  color: #a7b5b2;
+}
+
+.journal-calendar-day--has-entry {
+  border-color: rgba(15, 159, 143, 0.4);
+  background: #effdfa;
+}
+
+.journal-calendar-day--selected {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(15, 159, 143, 0.16);
+}
+
+.journal-calendar-day small {
+  background: var(--teal);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1;
+  min-width: 16px;
+  padding: 3px 5px;
+}
+
 .journal-entry-card {
   background: var(--surface-strong);
   border: 1px solid transparent;
@@ -420,6 +538,13 @@ a {
   line-height: 1.45;
 }
 
+.journal-entry-card mark {
+  background: #fff1a8;
+  border-radius: 2px;
+  color: inherit;
+  padding: 0 1px;
+}
+
 .journal-entry-card small {
   align-items: center;
   display: flex;
@@ -435,8 +560,7 @@ a {
   gap: 7px;
 }
 
-.journal-editor input,
-.journal-editor textarea {
+.journal-editor input {
   background: #ffffff;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -449,16 +573,121 @@ a {
   min-height: 44px;
 }
 
-.journal-editor textarea {
-  line-height: 1.6;
-  min-height: 360px;
-  resize: vertical;
-}
-
-.journal-editor input:focus,
-.journal-editor textarea:focus {
+.journal-editor input:focus {
   border-color: var(--teal);
   outline: 3px solid rgba(15, 159, 143, 0.18);
+}
+
+.journal-content-label {
+  min-width: 0;
+}
+
+.journal-rich-text-shell {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.journal-rich-text-shell:focus-within {
+  border-color: var(--teal);
+  outline: 3px solid rgba(15, 159, 143, 0.18);
+}
+
+.journal-rich-text-shell--disabled {
+  opacity: 0.65;
+}
+
+.journal-rich-text-shell--loading {
+  color: var(--muted);
+  min-height: 360px;
+  padding: 16px;
+}
+
+.journal-toolbar {
+  align-items: center;
+  background: var(--surface-strong);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+}
+
+.journal-toolbar-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 6px;
+}
+
+.journal-toolbar-button:hover,
+.journal-toolbar-button--active {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--teal);
+}
+
+.journal-toolbar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.journal-rich-text-content {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.7;
+  min-height: 360px;
+  outline: none;
+  padding: 16px;
+}
+
+.journal-rich-text-content > :first-child {
+  margin-top: 0;
+}
+
+.journal-rich-text-content > :last-child {
+  margin-bottom: 0;
+}
+
+.journal-rich-text-content h1,
+.journal-rich-text-content h2,
+.journal-rich-text-content h3 {
+  line-height: 1.2;
+}
+
+.journal-rich-text-content blockquote {
+  border-left: 3px solid var(--teal);
+  color: var(--muted);
+  margin-left: 0;
+  padding-left: 14px;
+}
+
+.journal-rich-text-content pre {
+  background: #17212b;
+  border-radius: 8px;
+  color: #e8f1f2;
+  overflow-x: auto;
+  padding: 14px;
+}
+
+.journal-rich-text-content mark {
+  background: #fff1a8;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.journal-rich-text-content a {
+  color: var(--teal);
+  text-decoration: underline;
 }
 
 .journal-editor footer small {
@@ -1943,6 +2172,319 @@ a {
 .todo-shell:has(.todo-week-grid) {
   max-width: 1500px;
   overflow-x: auto;
+}
+
+.kanban-workspace {
+  display: grid;
+  align-content: start;
+  background: var(--bg);
+}
+
+.kanban-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.kanban-hero,
+.kanban-board-tools {
+  align-items: center;
+  background: linear-gradient(135deg, #e8fbf6 0%, #fff7ed 100%);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  display: flex;
+  justify-content: space-between;
+  padding: 26px;
+}
+
+.kanban-hero h1 {
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: 1;
+  margin: 6px 0 8px;
+}
+
+.kanban-hero p,
+.kanban-board-tab span,
+.kanban-card p,
+.kanban-card footer,
+.kanban-column-empty {
+  color: var(--muted);
+}
+
+.kanban-hero > svg,
+.kanban-filters svg {
+  color: var(--teal);
+}
+
+.kanban-topbar,
+.kanban-column-form,
+.kanban-card-form,
+.kanban-filters,
+.kanban-edit-panel {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.kanban-topbar {
+  display: grid;
+  gap: 14px;
+}
+
+.kanban-create-board,
+.kanban-column-form,
+.kanban-card-form,
+.kanban-filters {
+  display: grid;
+  gap: 12px;
+}
+
+.kanban-create-board {
+  grid-template-columns: minmax(0, 1fr) 170px;
+}
+
+.kanban-column-form {
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.kanban-card-form {
+  grid-template-columns: minmax(0, 1.3fr) minmax(150px, 0.6fr) minmax(140px, 0.5fr) minmax(150px, 0.6fr);
+}
+
+.kanban-field-wide {
+  grid-column: span 2;
+}
+
+.kanban-create-board label,
+.kanban-column-form label,
+.kanban-card-form label,
+.kanban-edit-panel label {
+  color: var(--muted);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 7px;
+}
+
+.kanban-create-board input,
+.kanban-column-form input,
+.kanban-card-form input,
+.kanban-card-form select,
+.kanban-card-form textarea,
+.kanban-filters input,
+.kanban-filters select,
+.kanban-column header input,
+.kanban-edit-panel input,
+.kanban-edit-panel select,
+.kanban-edit-panel textarea {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  min-height: 42px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.kanban-card-form textarea,
+.kanban-edit-panel textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.kanban-create-board input:focus,
+.kanban-column-form input:focus,
+.kanban-card-form input:focus,
+.kanban-card-form select:focus,
+.kanban-card-form textarea:focus,
+.kanban-filters input:focus,
+.kanban-filters select:focus,
+.kanban-column header input:focus,
+.kanban-edit-panel input:focus,
+.kanban-edit-panel select:focus,
+.kanban-edit-panel textarea:focus {
+  border-color: var(--teal);
+  outline: 3px solid rgba(15, 159, 143, 0.18);
+}
+
+.kanban-board-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.kanban-board-tab {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.kanban-board-tab--active {
+  background: #effdfa;
+  border-color: var(--teal);
+}
+
+.kanban-empty {
+  min-height: 240px;
+}
+
+.kanban-board-tools {
+  background: #ffffff;
+  padding: 18px;
+}
+
+.kanban-board-tools h2,
+.kanban-edit-panel h2 {
+  margin: 4px 0 0;
+}
+
+.kanban-filters {
+  align-items: center;
+  grid-template-columns: auto minmax(180px, 1fr) minmax(140px, 0.45fr) minmax(150px, 0.45fr) minmax(150px, 0.45fr) auto;
+}
+
+.kanban-board {
+  display: grid;
+  gap: 14px;
+  grid-auto-columns: minmax(280px, 1fr);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.kanban-column {
+  align-content: start;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  display: grid;
+  gap: 12px;
+  min-height: 360px;
+  padding: 12px;
+}
+
+.kanban-column > header,
+.kanban-card header,
+.kanban-card footer,
+.kanban-card-actions,
+.kanban-edit-panel header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.kanban-column > header input {
+  font-weight: 900;
+}
+
+.kanban-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.kanban-column-empty {
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  font-weight: 800;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+}
+
+.kanban-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  cursor: grab;
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+}
+
+.kanban-card strong,
+.kanban-card p {
+  overflow-wrap: anywhere;
+}
+
+.kanban-card p {
+  line-height: 1.45;
+  margin: 0;
+}
+
+.kanban-priority,
+.kanban-card-tags small,
+.kanban-deadline {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+}
+
+.kanban-priority--low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.kanban-priority--medium {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.kanban-priority--high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.kanban-priority--critical,
+.kanban-deadline--overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.kanban-deadline {
+  align-items: center;
+  background: var(--surface-strong);
+  color: var(--muted);
+  display: inline-flex;
+  gap: 4px;
+}
+
+.kanban-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.kanban-card-tags small {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.kanban-card-actions {
+  justify-content: flex-start;
+}
+
+.kanban-card-actions .ghost-button {
+  min-height: 34px;
+}
+
+.kanban-edit-panel {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
 }
 
 .countdown-workspace {

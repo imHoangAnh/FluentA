@@ -71,7 +71,7 @@ test('Journal foundation CRUD, Unicode, ordering, and ownership smoke', async ({
   const privateEntry = entries.find((entry) => entry.title === 'Học tiếng Việt hôm nay');
   expect(privateEntry.learningDate).toBe(todayInput());
   const detailResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/journals/${privateEntry.id}`, { headers });
-  expect((await detailResponse.json()).data.content).toBe('Nội dung mới');
+  expect((await detailResponse.json()).data.content).toContain('Nội dung mới');
 
   const secondPage = await context.newPage();
   const second = await registerAndLogin(secondPage, 'journal-foreign');

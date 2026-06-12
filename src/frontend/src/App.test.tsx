@@ -69,6 +69,7 @@ function renderApp(initialEntry: string) {
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', currentTimeZone()], [])
   queryClient.setQueryData(['journal', 'entries'], [])
+  queryClient.setQueryData(['kanban', 'boards'], [])
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -334,6 +335,7 @@ describe('FluentA auth app', () => {
     expect(screen.getByTestId('open-habits')).toHaveAttribute('href', '/habits')
     expect(screen.getByTestId('open-countdown')).toHaveAttribute('href', '/countdown')
     expect(screen.getByTestId('open-journal')).toHaveAttribute('href', '/journal')
+    expect(screen.getByTestId('open-kanban')).toHaveAttribute('href', '/kanban')
   })
 
   it('keeps the vocabulary workspace available at /vocabulary', () => {
@@ -459,7 +461,7 @@ describe('FluentA auth app', () => {
     expect(screen.getByRole('heading', { name: 'No habits yet' })).toBeInTheDocument()
   })
 
-  it('protects journal and renders its foundation editor when authenticated', () => {
+  it('protects journal and renders its rich-text editor when authenticated', () => {
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
@@ -470,9 +472,24 @@ describe('FluentA auth app', () => {
 
     expect(screen.getByRole('heading', { name: 'Language learning notes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No journal entries yet' })).toBeInTheDocument()
+    expect(screen.getByTestId('journal-search-input')).toBeInTheDocument()
     expect(screen.getByTestId('journal-title-input')).toBeInTheDocument()
-    expect(screen.getByTestId('journal-content-input')).toBeInTheDocument()
+    expect(screen.getByText('Content')).toBeInTheDocument()
     expect(screen.getByTestId('save-journal-button')).toBeDisabled()
+  })
+
+  it('protects kanban and renders its empty board state when authenticated', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderApp('/kanban')
+
+    expect(screen.getByRole('heading', { name: 'Kanban Board' })).toBeInTheDocument()
+    expect(screen.getByTestId('kanban-board-name-input')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No Kanban boards yet' })).toBeInTheDocument()
   })
 
   it('renders habit summaries and disables ineligible grid cells', () => {

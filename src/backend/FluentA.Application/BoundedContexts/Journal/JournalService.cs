@@ -8,11 +8,16 @@ namespace FluentA.Application.BoundedContexts.Journal;
 public sealed class JournalService : IJournalService
 {
     private const string DateFormat = "yyyy-MM-dd";
+    private const string MonthFormat = "yyyy-MM";
+    private const int SearchQueryMaxLength = 100;
+    private const int SearchPreviewLength = 160;
     private readonly IJournalRepository _repository;
+    private readonly IJournalContentProcessor _contentProcessor;
 
-    public JournalService(IJournalRepository repository)
+    public JournalService(IJournalRepository repository, IJournalContentProcessor contentProcessor)
     {
         _repository = repository;
+        _contentProcessor = contentProcessor;
     }
 
     public async Task<OperationResult<IReadOnlyList<JournalEntrySummaryDto>>> ListAsync(
@@ -21,6 +26,45 @@ public sealed class JournalService : IJournalService
     {
         var entries = await _repository.ListAsync(userId, cancellationToken);
         return OperationResult<IReadOnlyList<JournalEntrySummaryDto>>.Success(entries.Select(ToSummaryDto).ToList());
+    }
+
+    public async Task<OperationResult<IReadOnlyList<JournalSearchResultDto>>> SearchAsync(
+        Guid userId,
+        string? query,
+        CancellationToken cancellationToken = default)
+    {
+        var cleanedQuery = query?.Trim() ?? string.Empty;
+        if (cleanedQuery.Length is < 1 or > SearchQueryMaxLength)
+        {
+            return OperationResult<IReadOnlyList<JournalSearchResultDto>>.Failure(
+                JournalError.Validation(new Dictionary<string, string[]>
+                {
+                    ["q"] = [$"Search query must contain between 1 and {SearchQueryMaxLength} characters."]
+                }));
+        }
+
+        var entries = await _repository.SearchAsync(userId, cleanedQuery, cancellationToken);
+        return OperationResult<IReadOnlyList<JournalSearchResultDto>>.Success(
+            entries.Select(entry => ToSearchDto(entry, cleanedQuery)).ToList());
+    }
+
+    public async Task<OperationResult<IReadOnlyList<JournalCalendarDayDto>>> CalendarAsync(
+        Guid userId,
+        string? month,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var monthStart = ParseMonth(month, errors);
+        if (errors.Count > 0)
+        {
+            return OperationResult<IReadOnlyList<JournalCalendarDayDto>>.Failure(JournalError.Validation(errors));
+        }
+
+        var monthEnd = monthStart.AddMonths(1);
+        var days = await _repository.CalendarAsync(userId, monthStart, monthEnd, cancellationToken);
+        return OperationResult<IReadOnlyList<JournalCalendarDayDto>>.Success(days
+            .Select(day => new JournalCalendarDayDto(day.Date.ToString(DateFormat, CultureInfo.InvariantCulture), day.Count))
+            .ToList());
     }
 
     public async Task<OperationResult<JournalEntryDto>> GetAsync(
@@ -45,7 +89,8 @@ public sealed class JournalService : IJournalService
             return OperationResult<JournalEntryDto>.Failure(JournalError.Validation(validation.Errors));
         }
 
-        var entry = JournalEntry.Create(userId, request.Title, request.Content, validation.LearningDate);
+        var content = _contentProcessor.Process(request.Content);
+        var entry = JournalEntry.Create(userId, request.Title, content.Html, content.PlainText, validation.LearningDate);
         await _repository.AddAsync(entry, cancellationToken);
         return OperationResult<JournalEntryDto>.Success(ToDto(entry));
     }
@@ -75,7 +120,8 @@ public sealed class JournalService : IJournalService
 
         if (request.Content is not null)
         {
-            entry.UpdateContent(request.Content);
+            var content = _contentProcessor.Process(request.Content);
+            entry.UpdateContent(content.Html, content.PlainText);
         }
 
         if (request.LearningDate is not null)
@@ -163,6 +209,18 @@ public sealed class JournalService : IJournalService
         return DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
     }
 
+    private static DateTime ParseMonth(string? value, Dictionary<string, string[]> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !DateTime.TryParseExact(value, MonthFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            errors["month"] = ["Month must be in YYYY-MM format."];
+            return DateTime.MinValue;
+        }
+
+        return DateTime.SpecifyKind(new DateTime(parsed.Year, parsed.Month, 1), DateTimeKind.Utc);
+    }
+
     private static void Merge(Dictionary<string, string[]> target, Dictionary<string, string[]> source)
     {
         foreach (var (key, value) in source)
@@ -189,6 +247,43 @@ public sealed class JournalService : IJournalService
             entry.Id,
             entry.Title,
             entry.Preview,
+            entry.LearningDate?.ToString(DateFormat, CultureInfo.InvariantCulture),
+            entry.CreatedAt,
+            entry.UpdatedAt);
+    }
+
+    private static JournalSearchResultDto ToSearchDto(JournalEntrySearchItem entry, string query)
+    {
+        var normalized = string.Join(' ', entry.PlainTextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var firstMatch = normalized.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        var start = firstMatch <= SearchPreviewLength / 3
+            ? 0
+            : Math.Max(0, firstMatch - (SearchPreviewLength / 3));
+        var length = Math.Min(SearchPreviewLength, normalized.Length - start);
+        var body = normalized.Substring(start, length);
+        var prefix = start > 0 ? "..." : string.Empty;
+        var suffix = start + length < normalized.Length ? "..." : string.Empty;
+        var preview = prefix + body + suffix;
+        var highlights = new List<JournalHighlightRangeDto>();
+        var searchFrom = 0;
+
+        while (searchFrom < body.Length)
+        {
+            var match = body.IndexOf(query, searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (match < 0)
+            {
+                break;
+            }
+
+            highlights.Add(new JournalHighlightRangeDto(prefix.Length + match, query.Length));
+            searchFrom = match + query.Length;
+        }
+
+        return new JournalSearchResultDto(
+            entry.Id,
+            entry.Title,
+            preview,
+            highlights,
             entry.LearningDate?.ToString(DateFormat, CultureInfo.InvariantCulture),
             entry.CreatedAt,
             entry.UpdatedAt);

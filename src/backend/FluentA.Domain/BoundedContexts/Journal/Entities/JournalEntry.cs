@@ -11,10 +11,11 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
     {
         Title = string.Empty;
         Content = string.Empty;
+        PlainTextContent = string.Empty;
         Preview = string.Empty;
     }
 
-    private JournalEntry(Guid userId, string title, string? content, DateTime? learningDate)
+    private JournalEntry(Guid userId, string title, string? content, string? plainTextContent, DateTime? learningDate)
     {
         if (userId == Guid.Empty)
         {
@@ -24,19 +25,26 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         UserId = userId;
         Title = CleanTitle(title);
         Content = CleanContent(content);
-        Preview = BuildPreview(Content);
+        PlainTextContent = CleanPlainTextContent(plainTextContent);
+        Preview = BuildPreview(PlainTextContent);
         LearningDate = NormalizeLearningDate(learningDate);
     }
 
     public Guid UserId { get; private set; }
     public string Title { get; private set; }
     public string Content { get; private set; }
+    public string PlainTextContent { get; private set; }
     public string Preview { get; private set; }
     public DateTime? LearningDate { get; private set; }
 
-    public static JournalEntry Create(Guid userId, string title, string? content = null, DateTime? learningDate = null)
+    public static JournalEntry Create(
+        Guid userId,
+        string title,
+        string? content = null,
+        string? plainTextContent = null,
+        DateTime? learningDate = null)
     {
-        return new JournalEntry(userId, title, content, learningDate);
+        return new JournalEntry(userId, title, content, plainTextContent, learningDate);
     }
 
     public void Rename(string title)
@@ -45,10 +53,11 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void UpdateContent(string? content)
+    public void UpdateContent(string? content, string? plainTextContent)
     {
         Content = CleanContent(content);
-        Preview = BuildPreview(Content);
+        PlainTextContent = CleanPlainTextContent(plainTextContent);
+        Preview = BuildPreview(PlainTextContent);
         Touch();
     }
 
@@ -86,6 +95,17 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         if (cleaned.Length > 100_000)
         {
             throw new ArgumentException("Journal content must be at most 100000 characters.", nameof(content));
+        }
+
+        return cleaned;
+    }
+
+    private static string CleanPlainTextContent(string? content)
+    {
+        var cleaned = content ?? string.Empty;
+        if (cleaned.Length > 100_000)
+        {
+            throw new ArgumentException("Journal plain text content must be at most 100000 characters.", nameof(content));
         }
 
         return cleaned;

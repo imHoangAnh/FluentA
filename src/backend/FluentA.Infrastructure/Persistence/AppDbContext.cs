@@ -1,6 +1,7 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
+using FluentA.Domain.BoundedContexts.Kanban.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +34,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
+    public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();
+    public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -16,6 +16,7 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
         builder.Property(entry => entry.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(entry => entry.Title).HasColumnName("title").HasMaxLength(240).IsRequired();
         builder.Property(entry => entry.Content).HasColumnName("content").HasColumnType("text").IsRequired();
+        builder.Property(entry => entry.PlainTextContent).HasColumnName("plain_text_content").HasColumnType("text").IsRequired();
         builder.Property(entry => entry.Preview).HasColumnName("preview").HasMaxLength(100).IsRequired();
         builder.Property(entry => entry.LearningDate).HasColumnName("learning_date").HasColumnType("date");
         builder.Property(entry => entry.CreatedAt).HasColumnName("created_at").IsRequired();

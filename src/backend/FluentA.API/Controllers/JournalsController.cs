@@ -30,6 +30,26 @@ public sealed class JournalsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Searches active owned journal entry plain-text content.</summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> Search([FromQuery(Name = "q")] string? query, CancellationToken cancellationToken)
+    {
+        var result = await _journals.SearchAsync(CurrentUserId(), query, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<IReadOnlyList<JournalSearchResultDto>>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Gets learning dates that have active owned journal entries in a month.</summary>
+    [HttpGet("calendar")]
+    public async Task<IActionResult> Calendar([FromQuery] string? month, CancellationToken cancellationToken)
+    {
+        var result = await _journals.CalendarAsync(CurrentUserId(), month, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<IReadOnlyList<JournalCalendarDayDto>>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Gets one active owned journal entry.</summary>
     [HttpGet("{journalId:guid}")]
     public async Task<IActionResult> Get(Guid journalId, CancellationToken cancellationToken)

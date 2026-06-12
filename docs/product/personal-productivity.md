@@ -5,9 +5,9 @@
 This contract covers the post-MVP personal productivity surface introduced by
 SPEC1 S1 and the current Habit Tracker work. It defines current Todo behavior,
 current Countdown behavior, the current Habit API plus monthly grid UI, and the
-Dashboard Overview authenticated home. Kanban, Pomodoro, Journal, scheduled
-jobs, notifications, widget visibility settings, and mobile drag-and-drop are
-separate future stories.
+Dashboard Overview authenticated home. Journal and Kanban have separate product
+contracts. Pomodoro, scheduled jobs, notifications, widget visibility settings,
+and mobile drag-and-drop are separate future stories.
 
 ## Dashboard Overview Outcomes
 

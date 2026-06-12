@@ -23,3 +23,16 @@ public sealed record JournalEntrySummaryDto(
     string? LearningDate,
     DateTime CreatedAt,
     DateTime UpdatedAt);
+
+public sealed record JournalHighlightRangeDto(int Start, int Length);
+
+public sealed record JournalSearchResultDto(
+    Guid Id,
+    string Title,
+    string Preview,
+    IReadOnlyList<JournalHighlightRangeDto> Highlights,
+    string? LearningDate,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record JournalCalendarDayDto(string Date, int Count);
