@@ -34,6 +34,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public string? Icon { get; private set; }
     public HabitFrequency Frequency { get; private set; }
     public string? CustomDays { get; private set; }
+    public bool ReminderEnabled { get; private set; } = true;
     public DateTime? LastReminderSentOn { get; private set; }
 
     public IReadOnlyList<DayOfWeek> ScheduledCustomDays => ParseCustomDays(CustomDays);
@@ -70,6 +71,12 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public void MarkReminderSent(DateTime date)
     {
         LastReminderSentOn = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        Touch();
+    }
+
+    public void SetReminderEnabled(bool enabled)
+    {
+        ReminderEnabled = enabled;
         Touch();
     }
 

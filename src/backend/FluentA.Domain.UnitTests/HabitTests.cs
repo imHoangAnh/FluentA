@@ -5,6 +5,17 @@ namespace FluentA.Domain.UnitTests;
 public sealed class HabitTests
 {
     [Fact]
+    public void Habit_ReminderCanBeDisabledAndReenabled()
+    {
+        var habit = Habit.Create(Guid.NewGuid(), "Read", null, null, null, HabitFrequency.Daily, null);
+
+        habit.SetReminderEnabled(false);
+        Assert.False(habit.ReminderEnabled);
+
+        habit.SetReminderEnabled(true);
+        Assert.True(habit.ReminderEnabled);
+    }
+    [Fact]
     public void Create_DailyHabit_CleansFieldsAndSchedulesEveryDay()
     {
         var habit = Habit.Create(Guid.NewGuid(), " Read English ", " 30 minutes ", "#22C55E", "book", HabitFrequency.Daily, null);

@@ -60,6 +60,7 @@ public sealed partial class HabitService : IHabitService
         }
 
         var habit = HabitEntity.Create(userId, request.Name, request.Description, request.Color, request.Icon, validation.Frequency, validation.CustomDays);
+        habit.SetReminderEnabled(request.ReminderEnabled);
         await _repository.AddAsync(habit, cancellationToken);
         return OperationResult<HabitDto>.Success(ToDto(habit, DateTime.UtcNow.Date, [], DateTime.UtcNow.Date, DateTime.UtcNow.Date));
     }
@@ -89,6 +90,10 @@ public sealed partial class HabitService : IHabitService
             validation.Icon,
             validation.Frequency,
             validation.CustomDays);
+        if (request.ReminderEnabled is not null)
+        {
+            habit.SetReminderEnabled(request.ReminderEnabled.Value);
+        }
 
         await _repository.UpdateAsync(habit, cancellationToken);
         return OperationResult<HabitDto>.Success(ToDto(habit, DateTime.UtcNow.Date, [], DateTime.UtcNow.Date, DateTime.UtcNow.Date));
@@ -362,6 +367,7 @@ public sealed partial class HabitService : IHabitService
             habit.Icon,
             habit.Frequency.ToString(),
             habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
+            habit.ReminderEnabled,
             CurrentStreak(habit, completedDates, localToday),
             isScheduledToday,
             completedDates.Contains(localToday),

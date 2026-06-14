@@ -6,7 +6,8 @@ public sealed record CreateHabitRequest(
     string? Color = null,
     string? Icon = null,
     string Frequency = "Daily",
-    IReadOnlyList<string>? CustomDays = null);
+    IReadOnlyList<string>? CustomDays = null,
+    bool ReminderEnabled = true);
 
 public sealed record UpdateHabitRequest(
     string? Name = null,
@@ -14,7 +15,8 @@ public sealed record UpdateHabitRequest(
     string? Color = null,
     string? Icon = null,
     string? Frequency = null,
-    IReadOnlyList<string>? CustomDays = null);
+    IReadOnlyList<string>? CustomDays = null,
+    bool? ReminderEnabled = null);
 
 public sealed record ToggleHabitEntryRequest(string Date, string TimeZoneId);
 
@@ -26,6 +28,7 @@ public sealed record HabitDto(
     string? Icon,
     string Frequency,
     IReadOnlyList<string> CustomDays,
+    bool ReminderEnabled,
     int CurrentStreak,
     bool IsScheduledToday,
     bool IsCheckedToday,

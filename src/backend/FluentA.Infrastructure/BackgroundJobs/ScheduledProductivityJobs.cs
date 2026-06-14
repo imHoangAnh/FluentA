@@ -37,6 +37,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
             .Select(entry => entry.HabitId);
         var habits = await _dbContext.Habits
             .Where(habit => habit.DeletedAt == null
+                && habit.ReminderEnabled
                 && habit.LastReminderSentOn != today
                 && !completedHabitIds.Contains(habit.Id))
             .ToListAsync(cancellationToken);
