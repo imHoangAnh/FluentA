@@ -11,6 +11,7 @@ export type Habit = {
   icon?: string | null
   frequency: HabitFrequency
   customDays: string[]
+  reminderEnabled: boolean
   currentStreak: number
   isScheduledToday: boolean
   isCheckedToday: boolean
@@ -53,6 +54,7 @@ export type CreateHabitInput = {
   icon?: string | null
   frequency: HabitFrequency
   customDays?: string[] | null
+  reminderEnabled?: boolean
 }
 
 export type UpdateHabitInput = Partial<CreateHabitInput>

@@ -1,241 +1,162 @@
-# repository-harness
+# FluentA
 
-Turn any software repo into an agent-ready workspace.
+FluentA is a personal learning and productivity web application. It combines
+vocabulary study and spaced-repetition flashcards with todos, habits,
+countdowns, journaling, Kanban boards, Pomodoro sessions, and an in-app
+notification inbox.
 
-`repository-harness` is a repository-level operating harness for Claude Code,
-Codex, Cursor, and other coding agents. It gives agents the missing project
-context they need before they change code: where to start, what the product
-contract says, how risky the work is, what proof is required, and which
-decisions future agents should inherit.
+The repository contains a React single-page application and an ASP.NET Core
+modular monolith. PostgreSQL is the durable system of record, Redis stores
+short-lived session and timer state, SignalR synchronizes active browser
+sessions, and Hangfire runs recurring productivity jobs.
 
-The app is what users touch. The harness is what agents touch.
+## Features
 
-## Why Star This Repo
+- Email/password authentication, email verification, refresh-token rotation,
+  logout revocation, and Google OAuth.
+- Vocabulary boards, pages, configurable columns, cell-level autosave, and
+  multilingual labels.
+- Automatically synchronized flashcard decks, SM-2 review scheduling, review
+  sessions, and learning dashboards.
+- Daily and weekly todos, scheduled habits and statistics, countdown events,
+  and dashboard widgets.
+- Rich-text journal entries with autosave, multilingual search, and a learning
+  date calendar.
+- Kanban boards with card movement and cross-tab synchronization.
+- Server-authoritative Pomodoro timers, task linking, session history, and
+  stopwatch behavior.
+- Durable notifications produced by scheduled jobs for habit reminders and
+  completed countdowns.
 
-Star this repo if you want practical, reusable patterns for making AI-assisted
-software development more reliable, inspectable, and easier for humans to steer.
+## Technology
 
-This project is exploring a simple idea:
+| Area | Stack |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, React Router |
+| Client data | TanStack Query, Zustand, Axios |
+| Backend | ASP.NET Core on .NET 10 |
+| Persistence | PostgreSQL 16, Entity Framework Core |
+| Ephemeral state | Redis 7 |
+| Realtime | SignalR |
+| Background work | Hangfire with PostgreSQL storage |
+| Testing | xUnit, Vitest, Playwright |
 
-> Coding agents do not only need better prompts. They need better repositories.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for component boundaries,
+data ownership, and runtime flows.
 
-## The Problem
-
-Most repos are built for humans reading code in a familiar codebase. Coding
-agents usually enter with only a chat prompt and a shallow snapshot of files.
-That leads to common failure modes:
-
-- The agent edits code before understanding product intent.
-- Important constraints live only in chat history or in someone's head.
-- Validation expectations are vague or discovered too late.
-- Architecture tradeoffs are repeated instead of inherited.
-- Large requests do not get broken into reviewable story-sized work.
-
-## The Harness Approach
-
-A repository starts to have a harness when it helps an agent answer practical
-engineering questions without relying only on chat history:
-
-- What should I read first?
-- What type of work is this?
-- Which product contract does it affect?
-- How risky is the change?
-- What proof will show the work is done?
-- What decision or lesson should future agents inherit?
-
-In this repo, those answers live in:
-
-- `AGENTS.md` — the stable agent shim with local project notes and Harness
-  doc links.
-- `docs/HARNESS.md` — the human-agent collaboration model.
-- `docs/FEATURE_INTAKE.md` — tiny, normal, and high-risk work classification.
-- `docs/ARCHITECTURE.md` — architecture discovery and boundary rules.
-- `docs/TEST_MATRIX.md` — behavior-to-proof validation expectations.
-- `docs/stories/` — story packets and backlog items.
-- `docs/decisions/` — durable decisions and tradeoffs.
-- `docs/templates/` — reusable spec, story, decision, and validation templates.
-
-OpenAI describes this shift as an agent-first world where humans steer and
-agents execute:
-
-https://openai.com/index/harness-engineering/
-
-## Install Harness Into A Project
-
-From a target project directory, run:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --yes
-```
-
-On Windows PowerShell, run:
-
-```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Yes
-```
-
-If the target already has `AGENTS.md`, `docs/`, or `scripts/`, choose one:
-
-```bash
-# Update an existing Harness repo without moving existing files
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --yes
-
-# Back up and replace AGENTS.md, docs/, and scripts/
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --override --yes
-```
-
-```powershell
-# Update an existing Harness repo without moving existing files
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Merge -Yes
-
-# Back up and replace AGENTS.md, docs/, and scripts/
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Override -Yes
-```
-
-Use `--merge` when a project already has Harness and you want to append newly
-added Harness files without moving the existing `AGENTS.md`, `docs/`, or
-`scripts/` paths into backup. Existing files stay untouched; only missing
-Harness files are created.
-
-For older Harness installs whose `AGENTS.md` still contains the full generated
-operating guide, refresh it into the small stable shim:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --refresh-agent-shim --yes
-```
-
-The refresh backs up the existing file. If it detects the old
-Harness-generated guide, it replaces it with the shim. If the file appears
-custom, it appends or updates a marked Harness block instead of overwriting the
-project's local instructions.
-
-If the project is driven with Claude Code, add `--claude`. Claude Code never
-auto-loads `AGENTS.md`, so without this the installed harness is invisible to
-fresh sessions. The flag installs (or refreshes) a `CLAUDE.md` whose marked
-Harness block `@`-imports `AGENTS.md` and `docs/FEATURE_INTAKE.md` into every
-session's context. An existing `CLAUDE.md` gets the block appended after a
-backup; plain installs without the flag never touch `CLAUDE.md`:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --claude --yes
-```
-
-Or install into a specific path:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --directory /path/to/project --yes
-```
-
-```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Directory C:\path\to\project -Yes
-```
-
-Use `--dry-run` on Bash or `-DryRun` on PowerShell to preview changes before
-writing files.
-
-The installer also downloads the prebuilt Harness CLI for the current platform,
-verifies its `.sha256` checksum, and installs it at
-`scripts/bin/harness-cli` on macOS/Linux or `scripts/bin/harness-cli.exe` on
-Windows. The Rust CLI is the main Harness tool and stable command path.
-
-Harness CLI release assets are published from tags by the
-`Harness CLI Release` GitHub Actions workflow. The installer expects each
-release to include `harness-cli-<platform>` and
-`harness-cli-<platform>.sha256` assets for macOS arm64, macOS x64, Linux x64,
-Linux arm64, and Windows x64. The Windows asset is
-`harness-cli-windows-x64.exe` plus `harness-cli-windows-x64.exe.sha256`.
-
-## Try The Flow
-
-The fastest way to understand the harness is to inspect the tiny demo:
-
-- `docs/demo/README.md`: shows how a simple product idea becomes product docs,
-  stories, validation expectations, and decisions before implementation starts.
-
-A typical flow looks like this:
+## Repository Layout
 
 ```text
-human intent or product spec
-  -> product contract
-  -> feature intake
-  -> story packet
-  -> validation expectations
-  -> implementation work
-  -> decision or lesson captured for future agents
+src/
+  backend/
+    FluentA.API/                 HTTP and SignalR interface
+    FluentA.Application/         Use cases and ports
+    FluentA.Domain/              Entities and business rules
+    FluentA.Infrastructure/      PostgreSQL, Redis, providers, jobs
+    FluentA.*.UnitTests/         Backend unit tests
+  frontend/
+    src/routes/                  Route-level feature UI
+    src/components/              Shared and feature components
+    src/lib/api/                 REST clients
+    src/lib/auth/                Authentication boundary
+    src/lib/realtime/            SignalR synchronization
+    e2e/                         Playwright scenarios
+docs/
+  product/                       Living product contracts
+  stories/                       Story scope and validation evidence
+  decisions/                     Architecture decision records
+scripts/                         Harness CLI and verification scripts
 ```
 
-Implementation prompts do not go straight to code. They first pass through
-feature intake, become story-sized work when needed, and then carry both product
-validation and harness maintenance expectations.
+## Local Development
 
-## Current State
+### Prerequisites
 
-This repository is in Harness v0.
+- .NET 10 SDK
+- Node.js and npm
+- Docker with Docker Compose
 
-There is no application implementation and no baked-in product specification
-yet. The current work is the reusable project harness: the file structure,
-agent operating model, feature intake process, story templates, and validation
-expectations that help humans and agents turn a future user-provided spec into
-implementation work.
+### Start dependencies
 
-## Product Sources
+From the repository root:
 
-No product contract is currently defined.
-
-When a user provides a project specification, add or reference it as the input
-spec for the first buildout, then derive smaller living artifacts from it:
-
-- `docs/product/`: current product contract files, created from the spec.
-- `docs/stories/`: story packets and backlog created from selected work.
-- `docs/TEST_MATRIX.md`: behavior-to-proof control panel.
-- `docs/decisions/`: durable decisions and tradeoffs.
-
-Do not keep a project-specific spec or product breakdown in this harness until
-a real project supplies one.
-
-## Repository Structure
-
-```text
-project/
-  AGENTS.md
-  README.md
-  docs/
-    HARNESS.md
-    FEATURE_INTAKE.md
-    ARCHITECTURE.md
-    TEST_MATRIX.md
-    HARNESS_BACKLOG.md
-    product/
-    stories/
-    decisions/
-    demo/
-    templates/
-  scripts/
-    README.md
+```powershell
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-## Contributing
+This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
 
-This project is early and benefits most from real-world agent failure cases,
-example harness installs, docs improvements, and reusable workflow patterns.
-See `CONTRIBUTING.md` for contribution ideas.
+### Apply database migrations
 
-Useful contributions include:
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update `
+  --project src/backend/FluentA.Infrastructure `
+  --startup-project src/backend/FluentA.API
+```
 
-- Show how the harness works in a real project.
-- Add missing templates or improve existing ones.
-- Propose validation patterns for different stacks.
-- Share failures where an agent made the wrong change because the repo lacked
-  context.
-- Compare harness behavior across Claude Code, Codex, Cursor, and other tools.
+### Start the API
 
-## Share
+```powershell
+dotnet run --project src/backend/FluentA.API --launch-profile http
+```
 
-If this idea resonates, please star the repo and share it with someone building
-with coding agents.
+The API listens at `http://localhost:5000`; REST endpoints use the
+`/api/v1` prefix and the authenticated SignalR hub is `/hubs/sync`.
 
-Short description:
+### Start the frontend
 
-> An agent-ready repo harness for Claude Code, Codex, Cursor, and other coding
-> agents: AGENTS.md, product contracts, story packets, validation matrix, and
-> decision records.
+```powershell
+Copy-Item src/frontend/.env.example src/frontend/.env.local
+npm --prefix src/frontend install
+npm --prefix src/frontend run dev
+```
+
+Open `http://localhost:5173`.
+
+The default local email provider writes verification delivery information to
+the API logs. Google login requires `VITE_GOOGLE_CLIENT_ID` in the frontend and
+matching server-side Google OAuth configuration. Keep provider secrets outside
+tracked files by using .NET user-secrets or environment variables.
+
+## Validation
+
+Run the backend suite:
+
+```powershell
+dotnet test src/backend/FluentA.slnx
+```
+
+Run frontend static checks and unit tests:
+
+```powershell
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+```
+
+With the local API, frontend, PostgreSQL, and Redis running, execute browser
+tests with:
+
+```powershell
+npm --prefix src/frontend run test:e2e
+```
+
+Additional cross-browser and performance suites are available as
+`test:e2e:cross-browser` and `test:e2e:performance`. The current story-level
+proof matrix is queried with:
+
+```powershell
+.\scripts\bin\harness-cli.exe query matrix
+```
+
+## Engineering Workflow
+
+This repository uses Harness to preserve product intent, risk classification,
+validation evidence, and architecture decisions across agent-assisted work.
+Before making changes, read `AGENTS.md`, `docs/HARNESS.md`,
+`docs/FEATURE_INTAKE.md`, `docs/ARCHITECTURE.md`, and
+`docs/CONTEXT_RULES.md`, then query the Harness matrix.
+
+Product behavior belongs in `docs/product/`, scoped work and evidence in
+`docs/stories/`, and durable architecture choices in `docs/decisions/`.

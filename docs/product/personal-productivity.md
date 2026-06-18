@@ -170,6 +170,8 @@ All responses use the FluentA envelope.
   today's scheduled/completed state, and monthly completion rate.
 - Habit rows display current streak, today's state, and selected-month
   completion rate.
+- Habit create/edit controls allow daily reminders to be enabled or disabled;
+  disabled habits are excluded from the scheduled reminder job.
 - A logged-in user can open `/habits/{id}/stats` from a Habit row to inspect
   current streak, longest streak, and last 7-day and 30-day completion rates.
 - The monthly grid remains horizontally scrollable on narrow screens instead of
@@ -237,7 +239,8 @@ All responses use the FluentA envelope.
 
 - A dedicated `/api/v1/dashboard/overview` aggregation endpoint remains
   deferred until there is enough cross-domain read-model pressure to justify it.
-- Widget visibility settings for the Dashboard remain deferred.
+- Dashboard widget visibility can be toggled from Dashboard settings and is
+  persisted in the current browser.
 - PostgreSQL-backed Hangfire infrastructure registers `TodoCarryOverJob`,
   `HabitReminderJob`, `CountdownAlertJob`, and `DatabaseCleanupJob` schedules.
   Todo carry-over, daily unchecked-habit reminder queuing, one-time expired

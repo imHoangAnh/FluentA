@@ -1,4 +1,4 @@
-import { BarChart3, Bell, BookOpen, CalendarClock, CheckSquare, Clock3, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2 } from 'lucide-react'
+import { BarChart3, Bell, BookOpen, CalendarClock, CheckSquare, Clock3, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2, Settings } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -9,6 +9,8 @@ import * as todoApi from '../../lib/api/todo.api'
 import { useAuthStore } from '../../stores/authStore'
 
 const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
+const widgetNames = ['flashcards', 'streak', 'todo', 'habits', 'countdown'] as const
+type WidgetName = typeof widgetNames[number]
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -49,6 +51,11 @@ export function DashboardPage() {
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const [now, setNow] = useState(() => new Date())
+  const [showSettings, setShowSettings] = useState(false)
+  const [visibleWidgets, setVisibleWidgets] = useState<Record<WidgetName, boolean>>(() => {
+    const saved = localStorage.getItem('dashboard-visible-widgets')
+    return saved ? JSON.parse(saved) : Object.fromEntries(widgetNames.map((name) => [name, true])) as Record<WidgetName, boolean>
+  })
   const today = useMemo(() => toDateInput(new Date()), [])
   const timeZoneId = useMemo(() => browserTimeZone(), [])
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'learner'
@@ -126,6 +133,13 @@ export function DashboardPage() {
   )
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueCards = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0) + (flashcardDashboard?.newCards ?? 0)
+  const toggleWidget = (name: WidgetName) => {
+    setVisibleWidgets((current) => {
+      const next = { ...current, [name]: !current[name] }
+      localStorage.setItem('dashboard-visible-widgets', JSON.stringify(next))
+      return next
+    })
+  }
 
   return (
     <main className="workspace dashboard-workspace">
@@ -168,6 +182,9 @@ export function DashboardPage() {
           <Link className="ghost-button ghost-button--inline" to="/notifications" data-testid="open-notifications">
             <Bell size={17} /> Notifications
           </Link>
+          <button className="icon-button" type="button" onClick={() => setShowSettings((current) => !current)} aria-label="Dashboard widget settings">
+            <Settings size={18} />
+          </button>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />
           </button>
@@ -185,7 +202,8 @@ export function DashboardPage() {
         </div>
 
         <section className="dashboard-grid" aria-label="Dashboard widgets">
-          <article className="dashboard-card dashboard-card--flashcards">
+          {showSettings ? <article className="dashboard-card dashboard-card--wide"><h2>Visible widgets</h2>{widgetNames.map((name) => <label key={name} className="dashboard-check-row"><input type="checkbox" checked={visibleWidgets[name]} onChange={() => toggleWidget(name)} />{name}</label>)}</article> : null}
+          <article className="dashboard-card dashboard-card--flashcards" hidden={!visibleWidgets.flashcards}>
             <header>
               <Layers size={20} />
               <div>
@@ -205,7 +223,7 @@ export function DashboardPage() {
             )}
           </article>
 
-          <article className="dashboard-card dashboard-card--streak" data-testid="dashboard-overview-streak">
+          <article className="dashboard-card dashboard-card--streak" data-testid="dashboard-overview-streak" hidden={!visibleWidgets.streak}>
             <header>
               <Flame size={20} />
               <div>
@@ -216,7 +234,7 @@ export function DashboardPage() {
             <p>{streakMessage(flashcardDashboard?.streakDays ?? 0)}</p>
           </article>
 
-          <article className="dashboard-card">
+          <article className="dashboard-card" hidden={!visibleWidgets.todo}>
             <header>
               <CheckSquare size={20} />
               <div>
@@ -245,7 +263,7 @@ export function DashboardPage() {
             </footer>
           </article>
 
-          <article className="dashboard-card">
+          <article className="dashboard-card" hidden={!visibleWidgets.habits}>
             <header>
               <Repeat2 size={20} />
               <div>
@@ -275,7 +293,7 @@ export function DashboardPage() {
             </footer>
           </article>
 
-          <article className="dashboard-card dashboard-card--wide">
+          <article className="dashboard-card dashboard-card--wide" hidden={!visibleWidgets.countdown}>
             <header>
               <CalendarClock size={20} />
               <div>

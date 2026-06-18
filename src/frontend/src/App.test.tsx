@@ -358,6 +358,19 @@ describe('FluentA auth app', () => {
     expect(screen.getByTestId('open-pomodoro')).toHaveAttribute('href', '/pomodoro')
   })
 
+  it('allows dashboard widgets to be hidden with persisted visibility settings', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+    renderAppWithDashboardData('/')
+    fireEvent.click(screen.getByLabelText('Dashboard widget settings'))
+    fireEvent.click(screen.getByLabelText('todo'))
+    expect(screen.queryByText('Todo Today')).not.toBeVisible()
+    expect(localStorage.getItem('dashboard-visible-widgets')).toContain('"todo":false')
+  })
+
   it('keeps the vocabulary workspace available at /vocabulary', () => {
     useAuthStore.setState({
       accessToken: 'memory-token',

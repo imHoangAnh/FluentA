@@ -224,6 +224,10 @@ a {
   padding: 18px;
 }
 
+.dashboard-card[hidden] {
+  display: none;
+}
+
 .dashboard-card--flashcards,
 .dashboard-card--wide {
   grid-column: span 2;

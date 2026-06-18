@@ -13,6 +13,7 @@ type HabitFormState = {
   icon: string
   frequency: habitApi.HabitFrequency
   customDays: string[]
+  reminderEnabled: boolean
 }
 
 function emptyForm(): HabitFormState {
@@ -23,6 +24,7 @@ function emptyForm(): HabitFormState {
     icon: '',
     frequency: 'Daily',
     customDays: [],
+    reminderEnabled: true,
   }
 }
 
@@ -102,6 +104,7 @@ function toPayload(form: HabitFormState) {
     icon: form.icon.trim() ? form.icon : null,
     frequency: form.frequency,
     customDays: form.frequency === 'Custom' ? form.customDays : null,
+    reminderEnabled: form.reminderEnabled,
   }
 }
 
@@ -202,6 +205,7 @@ export function HabitPage() {
       icon: habit.icon ?? '',
       frequency: habit.frequency,
       customDays: habit.customDays,
+      reminderEnabled: habit.reminderEnabled,
     })
   }
 
@@ -295,6 +299,14 @@ export function HabitPage() {
               <option value="Daily">Daily</option>
               <option value="Custom">Custom days</option>
             </select>
+          </label>
+          <label>
+            <input
+              checked={form.reminderEnabled}
+              type="checkbox"
+              onChange={(event) => setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))}
+            />
+            Daily reminder
           </label>
           <button className="primary-button" type="submit" disabled={isSaving || !canSubmit} data-testid="save-habit-button">
             {isSaving ? <Loader2 size={18} /> : editingId ? <Save size={18} /> : <Plus size={18} />}
