@@ -51,6 +51,5 @@ TestResults/
 # Rust / generic build output
 target/
 
-# Downloaded Harness CLI binary for installed project instances
-scripts/bin/harness-cli
-scripts/bin/harness-cli.exe
+# Scripts and Harness CLI
+scripts/

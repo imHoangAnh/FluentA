@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import { buildGoogleAuthUrl } from '../../lib/auth/google'
@@ -31,7 +31,7 @@ export function LoginPage() {
 
   return (
     <AuthShell mode="login">
-      <form style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} onSubmit={(event) => void submit(event)}>
+      <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} onSubmit={(event) => void submit(event)}>
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
         <TextField
           label="Password"
@@ -42,34 +42,26 @@ export function LoginPage() {
           value={password}
           onChange={setPassword}
         />
-        {error ? <p className="form-error" style={{ color: '#ef4444', fontSize: '14px', margin: 0 }}>{error}</p> : null}
-        {stubMessage ? <p className="form-note" style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>{stubMessage}</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
+        {stubMessage ? <p className="form-note">{stubMessage}</p> : null}
         
-        <button 
-          type="submit" 
-          style={{ width: '100%', backgroundColor: '#0d9488', color: '#fff', fontWeight: 600, padding: '12px', borderRadius: '9999px', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0f766e'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0d9488'}
-        >
+        <button className="primary-button" type="submit" style={{ marginTop: '8px', minHeight: '44px', borderRadius: '22px' }}>
           Continue
         </button>
       </form>
 
-      <div style={{ position: 'relative', margin: '32px 0', textAlign: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
-          <div style={{ width: '100%', borderTop: '1px solid #f1f5f9' }}></div>
-        </div>
-        <span style={{ position: 'relative', padding: '0 16px', backgroundColor: '#ffffff', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>or</span>
+      <div style={{ display: 'flex', alignItems: 'center', margin: '24px 0', color: '#a7b5b2', fontSize: '14px' }}>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#e2ecea' }}></div>
+        <span style={{ padding: '0 12px' }}>or</span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#e2ecea' }}></div>
       </div>
 
       <button 
         type="button" 
         onClick={startGoogleLogin}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '12px', borderRadius: '9999px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#334155', fontWeight: 500, cursor: 'pointer', transition: 'background-color 0.2s' }}
-        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '44px', borderRadius: '22px', border: '1px solid #e2ecea', backgroundColor: '#fff', color: '#1a2e2a', fontWeight: 600, cursor: 'pointer' }}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -78,14 +70,10 @@ export function LoginPage() {
         Continue with Google
       </button>
       
-      <div style={{ textAlign: 'center', marginTop: '32px' }}>
-        <a href="#" style={{ color: '#0d9488', fontSize: '14px', textDecoration: 'none', fontWeight: 500 }}
-           onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
-           onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
-        >
-          Forgot password?
-        </a>
+      <div style={{ textAlign: 'center', marginTop: '24px' }}>
+        <a href="#" style={{ color: '#0f9f8f', fontSize: '14px', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
       </div>
     </AuthShell>
   )
 }
+ 
