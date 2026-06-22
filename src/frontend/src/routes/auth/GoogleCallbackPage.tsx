@@ -28,7 +28,7 @@ export function GoogleCallbackPage() {
   }, [code, googleLogin, navigate, providerError])
 
   return (
-    <AuthShell>
+    <AuthShell mode="login">
       <div className="form-copy">
         <h2>Google sign-in</h2>
         <p>{authError ?? message}</p>

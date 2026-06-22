@@ -1,22 +1,18 @@
-import { BarChart3, BookOpen, CalendarClock, CheckSquare, FilePlus2, Languages, Layers, LogOut, NotebookPen, Pencil, Plus, Save, Trash2 } from 'lucide-react'
-import { type FormEvent, useMemo, useState } from 'react'
+import { LogOut } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
 import { useAuthStore } from '../../stores/authStore'
 import { VocabTable } from '../../components/vocabulary/VocabTable'
+import { ColumnSettings } from '../../components/vocabulary/ColumnSettings'
 import { Link } from 'react-router-dom'
+import './WorkspacePage.css'
 
 export function WorkspacePage() {
-  const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
-  const [boardName, setBoardName] = useState('')
-  const [boardLanguage, setBoardLanguage] = useState('en')
-  const [pageName, setPageName] = useState('')
-  const [draftBoards, setDraftBoards] = useState<Record<string, { name: string; language: string }>>({})
-  const [draftPageNames, setDraftPageNames] = useState<Record<string, string>>({})
 
   const boardsQuery = useQuery({
     queryKey: ['vocab', 'boards'],
@@ -33,7 +29,6 @@ export function WorkspacePage() {
   })
 
   const activeBoard = boardQuery.data
-  const activeBoardDraft = activeBoard ? (draftBoards[activeBoard.id] ?? activeBoard) : null
   const sortedBoards = useMemo(
     () => boards.toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
     [boards],
@@ -42,32 +37,14 @@ export function WorkspacePage() {
     () => (activeBoard?.pages ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
     [activeBoard?.pages],
   )
+  
+  // Try to use selectedPageId if it belongs to the active board, otherwise fallback to the first page of active board
   const activePage = sortedPages.find((page) => page.id === selectedPageId) ?? sortedPages[0] ?? null
 
   const createBoard = useMutation({
     mutationFn: vocabularyApi.createBoard,
     onSuccess: async (board) => {
       setSelectedBoardId(board.id)
-      setBoardName('')
-      setBoardLanguage('en')
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
-    },
-  })
-
-  const updateBoard = useMutation({
-    mutationFn: (input: { id: string; name: string; language: string; sortOrder?: number }) =>
-      vocabularyApi.updateBoard(input.id, input),
-    onSuccess: async (board) => {
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', board.id] })
-    },
-  })
-
-  const deleteBoard = useMutation({
-    mutationFn: vocabularyApi.deleteBoard,
-    onSuccess: async () => {
-      setSelectedPageId(null)
-      setSelectedBoardId(null)
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
     },
   })
@@ -75,271 +52,148 @@ export function WorkspacePage() {
   const createPage = useMutation({
     mutationFn: (input: { boardId: string; name: string }) => vocabularyApi.createPage(input.boardId, { name: input.name }),
     onSuccess: async () => {
-      setPageName('')
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', activeBoardId] })
     },
   })
-
-  const updatePage = useMutation({
-    mutationFn: (input: { boardId: string; pageId: string; name: string; sortOrder: number }) =>
-      vocabularyApi.updatePage(input.boardId, input.pageId, { name: input.name, sortOrder: input.sortOrder }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', activeBoardId] })
-    },
-  })
-
-  const deletePage = useMutation({
-    mutationFn: (input: { boardId: string; pageId: string }) => vocabularyApi.deletePage(input.boardId, input.pageId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', activeBoardId] })
-    },
-  })
-
-  function submitBoard(event: FormEvent) {
-    event.preventDefault()
-    createBoard.mutate({ name: boardName, language: boardLanguage })
-  }
-
-  function submitPage(event: FormEvent) {
-    event.preventDefault()
-    if (!activeBoardId) return
-    createPage.mutate({ boardId: activeBoardId, name: pageName })
-  }
-
-  function saveBoard() {
-    if (!activeBoard) return
-    updateBoard.mutate({
-      id: activeBoard.id,
-      name: activeBoardDraft?.name ?? activeBoard.name,
-      language: activeBoardDraft?.language ?? activeBoard.language,
-      sortOrder: activeBoard.sortOrder,
-    })
-  }
-
-  function renamePage(pageId: string, fallbackName: string, sortOrder: number) {
-    if (!activeBoardId) return
-    updatePage.mutate({ boardId: activeBoardId, pageId, name: draftPageNames[pageId] ?? fallbackName, sortOrder })
-  }
 
   return (
-    <main className="workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Workspace navigation">
-          <Link className="ghost-button ghost-button--inline" to="/" data-testid="open-dashboard">
-            <BarChart3 size={17} /> Dashboard
+    <main className="vw-layout">
+      {/* Left Sidebar */}
+      <aside className="vw-sidebar">
+        <div className="vw-sidebar-header">
+          <Link to="/" className="vw-back-btn" title="Back to Overview">
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>arrow_back</span>
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/flashcards" data-testid="open-flashcards">
-            <Layers size={17} /> Flashcards
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/todo" data-testid="open-todo">
-            <CheckSquare size={17} /> Todo
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/habits" data-testid="open-habits">
-            <CheckSquare size={17} /> Habits
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/countdown" data-testid="open-countdown">
-            <CalendarClock size={17} /> Countdown
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/journal" data-testid="open-journal">
-            <NotebookPen size={17} /> Journal
-          </Link>
-          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
-            <LogOut size={18} />
-          </button>
-        </nav>
-      </header>
-
-      <section className="vocab-layout">
-        <aside className="board-sidebar" aria-label="Vocabulary boards">
-          <div className="workspace-title">
-            <span className="preview-label">Vocabulary Board</span>
-            <h1>Boards</h1>
+          <div className="vw-logo-icon">
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>menu_book</span>
           </div>
+          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>FluentA</span>
+        </div>
 
-          <form className="compact-form" onSubmit={submitBoard}>
-            <label>
-              Name
-              <input
-                data-testid="board-name-input"
-                value={boardName}
-                onChange={(event) => setBoardName(event.target.value)}
-                placeholder="IELTS Vocabulary"
-              />
-            </label>
-            <label>
-              Language
-              <select
-                data-testid="board-language-select"
-                value={boardLanguage}
-                onChange={(event) => setBoardLanguage(event.target.value)}
-              >
-                <option value="en">English</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="fr">French</option>
-              </select>
-            </label>
-            <button className="primary-button" type="submit" disabled={createBoard.isPending} data-testid="create-board-button">
-              <Plus size={18} /> Create board
-            </button>
-          </form>
+        <div className="vw-boards-section">
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Boards</h3>
+          <button 
+            className="vw-icon-btn" 
+            style={{ border: 'none', width: '28px', height: '28px', color: '#0D9488' }} 
+            title="Create new board" 
+            onClick={() => {
+              const name = window.prompt("New board name:")
+              if (name) createBoard.mutate({ name, language: 'en' })
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+          </button>
+        </div>
 
-          <div className="board-list">
-            {sortedBoards.map((board) => (
-              <button
-                className={board.id === activeBoardId ? 'board-list__item board-list__item--active' : 'board-list__item'}
-                key={board.id}
-                type="button"
+        <div className="vw-boards-list">
+          {sortedBoards.map(board => (
+            <div key={board.id}>
+              <button 
+                className="vw-board-group-btn" 
                 onClick={() => {
-                  setSelectedBoardId(board.id)
-                  setSelectedPageId(null)
+                  if (selectedBoardId === board.id) {
+                    // Toggle off if already selected
+                    setSelectedBoardId(null)
+                  } else {
+                    setSelectedBoardId(board.id)
+                    setSelectedPageId(null) // Reset page selection on board change
+                  }
                 }}
               >
-                <BookOpen size={18} />
-                <span>{board.name}</span>
-                <small>{board.pageCount} pages</small>
+                <span 
+                  className="material-symbols-outlined" 
+                  style={{ 
+                    fontSize: '16px', 
+                    color: '#6d7a77', 
+                    transition: 'transform 0.2s', 
+                    transform: (selectedBoardId === board.id || activeBoardId === board.id) ? 'rotate(0deg)' : 'rotate(-90deg)' 
+                  }}
+                >
+                  expand_more
+                </span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {board.name}
+                </span>
               </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="board-main">
-          {boardsQuery.isLoading ? <p className="screen-status">Loading boards...</p> : null}
-
-          {!boardsQuery.isLoading && !activeBoard ? (
-            <div className="empty-panel">
-              <Languages size={28} />
-              <h2>Welcome, {user?.fullName ?? 'learner'}</h2>
-              <p>{user?.email}</p>
+              
+              {activeBoard?.id === board.id && (
+                <div className="vw-page-list">
+                  {sortedPages.map(page => (
+                    <button
+                      key={page.id}
+                      className={`vw-page-btn ${activePage?.id === page.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedBoardId(board.id)
+                        setSelectedPageId(page.id)
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px', opacity: 0.7 }}>description</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{page.name}</span>
+                    </button>
+                  ))}
+                  <button 
+                    className="vw-page-btn" 
+                    style={{ color: '#0D9488', fontSize: '13px' }} 
+                    onClick={() => {
+                      const name = window.prompt("New page name:")
+                      if (name) createPage.mutate({ boardId: board.id, name })
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span> Add Page
+                  </button>
+                </div>
+              )}
             </div>
-          ) : null}
+          ))}
+        </div>
+      </aside>
 
-          {activeBoard ? (
-            <>
-              <div className="board-toolbar">
-                <div>
-                  <span className="preview-label">{activeBoard.language}</span>
-                  <h2>{activeBoard.name}</h2>
-                </div>
-                <div className="toolbar-actions">
-                <button className="ghost-button ghost-button--inline" type="button" onClick={saveBoard} data-testid="save-board-button">
-                    <Save size={17} /> Save
-                  </button>
-                  <button
-                    className="icon-button icon-button--danger"
-                    type="button"
-                    aria-label="Delete board"
-                    onClick={() => deleteBoard.mutate(activeBoard.id)}
-                    data-testid="delete-board-button"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
+      {/* Main Content */}
+      <section className="vw-main">
+        <header className="vw-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6d7a77', fontSize: '14px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>home</span>
+            <span>/</span>
+            <span>Boards</span>
+            <span>/</span>
+            <span style={{ color: '#191c1e', fontWeight: 500 }}>{activePage?.name || 'Overview'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button className="vw-icon-btn" style={{ border: 'none' }} title="Notifications">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+            <button className="vw-icon-btn" style={{ border: 'none' }} title="Logout" onClick={() => void logout()}>
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+        
+        {activeBoard && activePage ? (
+          <>
+            <div className="vw-content-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#191c1e', margin: 0 }}>{activePage.name}</h2>
               </div>
-
-              <div className="board-edit">
-                <label>
-                  Board name
-                  <input
-                    value={activeBoardDraft?.name ?? activeBoard.name}
-                    onChange={(event) =>
-                      setDraftBoards((drafts) => ({
-                        ...drafts,
-                        [activeBoard.id]: {
-                          name: event.target.value,
-                          language: activeBoardDraft?.language ?? activeBoard.language,
-                        },
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Language
-                  <select
-                    value={activeBoardDraft?.language ?? activeBoard.language}
-                    onChange={(event) =>
-                      setDraftBoards((drafts) => ({
-                        ...drafts,
-                        [activeBoard.id]: {
-                          name: activeBoardDraft?.name ?? activeBoard.name,
-                          language: event.target.value,
-                        },
-                      }))
-                    }
-                  >
-                    <option value="en">English</option>
-                    <option value="zh">Chinese</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="fr">French</option>
-                  </select>
-                </label>
-              </div>
-
-              <form className="page-create" onSubmit={submitPage}>
-                <label>
-                  Page
-                  <input
-                    data-testid="page-name-input"
-                    value={pageName}
-                    onChange={(event) => setPageName(event.target.value)}
-                    placeholder="Unit 1 - Education"
-                  />
-                </label>
-                <button className="primary-button" type="submit" disabled={createPage.isPending} data-testid="create-page-button">
-                  <FilePlus2 size={18} /> Add page
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button className="vw-icon-btn" title="Toggle View">
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>grid_view</span>
                 </button>
-              </form>
-
-              <div className="page-list">
-                {sortedPages.map((page) => (
-                  <article className="page-row" key={page.id}>
-                    <button
-                      className={page.id === activePage?.id ? 'page-select page-select--active' : 'page-select'}
-                      type="button"
-                      onClick={() => setSelectedPageId(page.id)}
-                      data-testid={`select-page-${page.id}`}
-                    >
-                      <Pencil size={18} />
-                      <span>{page.name}</span>
-                    </button>
-                    <input
-                      aria-label={`Rename ${page.name}`}
-                      value={draftPageNames[page.id] ?? page.name}
-                      onChange={(event) => setDraftPageNames((drafts) => ({ ...drafts, [page.id]: event.target.value }))}
-                    />
-                    <button
-                      className="ghost-button ghost-button--inline"
-                      type="button"
-                      onClick={() => renamePage(page.id, page.name, page.sortOrder)}
-                      data-testid={`save-page-${page.id}`}
-                    >
-                      <Save size={16} /> Save
-                    </button>
-                    <button
-                      className="icon-button icon-button--danger"
-                      type="button"
-                      aria-label={`Delete ${page.name}`}
-                      onClick={() => deletePage.mutate({ boardId: activeBoard.id, pageId: page.id })}
-                      data-testid={`delete-page-${page.id}`}
-                    >
-                      <Trash2 size={17} />
-                    </button>
-                  </article>
-                ))}
+                <div style={{ height: '24px', width: '1px', backgroundColor: '#e0e3e5', margin: '0 4px' }}></div>
+                <ColumnSettings boardId={activeBoard.id} />
               </div>
+            </div>
 
-              {activePage ? <VocabTable boardId={activeBoard.id} page={activePage} boardLanguage={activeBoard.language} /> : null}
-            </>
-          ) : null}
-        </section>
+            <div className="vw-content-area">
+              <VocabTable boardId={activeBoard.id} page={activePage} boardLanguage={activeBoard.language} />
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6d7a77' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '48px', marginBottom: '16px' }}>menu_book</span>
+            <h2>Select a page to view vocabulary</h2>
+          </div>
+        )}
       </section>
     </main>
   )

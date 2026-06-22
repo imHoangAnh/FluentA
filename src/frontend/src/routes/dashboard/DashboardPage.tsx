@@ -1,16 +1,19 @@
-import { BarChart3, Bell, BookOpen, CalendarClock, CheckSquare, Clock3, Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2, Settings } from 'lucide-react'
+import { 
+  Bell, BookOpen, CalendarClock, CheckSquare, 
+  Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2, Settings, 
+  Search, CheckCircle2, Circle, HelpCircle, Globe, Timer, TrendingUp
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import * as countdownApi from '../../lib/api/countdown.api'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import * as habitApi from '../../lib/api/habit.api'
 import * as todoApi from '../../lib/api/todo.api'
 import { useAuthStore } from '../../stores/authStore'
+import './DashboardPage.css'
 
 const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
-const widgetNames = ['flashcards', 'streak', 'todo', 'habits', 'countdown'] as const
-type WidgetName = typeof widgetNames[number]
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -24,41 +27,32 @@ function toDateInput(date: Date) {
 }
 
 function greeting(hour: number, name: string) {
-  if (hour >= 5 && hour < 12) return `Good morning, ${name}!`
-  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}!`
-  if (hour >= 17 && hour < 21) return `Good evening, ${name}!`
-  return `Burning midnight oil, ${name}?`
-}
-
-function streakMessage(days: number) {
-  if (days >= 30) return "You're on fire!"
-  if (days >= 7) return 'Great streak!'
-  return 'Keep going!'
+  if (hour >= 5 && hour < 12) return `Good morning, ${name}! 👋`
+  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}! 👋`
+  if (hour >= 17 && hour < 21) return `Good evening, ${name}! 👋`
+  return `Burning midnight oil, ${name}? 🌙`
 }
 
 function remainingText(targetDate: string, now: Date) {
   const diff = new Date(targetDate).getTime() - now.getTime()
   if (diff <= 0) return 'Completed'
-
   const totalHours = Math.floor(diff / 3_600_000)
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
-  return `${days} days ${hours} hours`
+  if (days > 0) return `${days} days ${hours}h`
+  return `${hours} hours`
 }
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
+  const location = useLocation()
   const [now, setNow] = useState(() => new Date())
-  const [showSettings, setShowSettings] = useState(false)
-  const [visibleWidgets, setVisibleWidgets] = useState<Record<WidgetName, boolean>>(() => {
-    const saved = localStorage.getItem('dashboard-visible-widgets')
-    return saved ? JSON.parse(saved) : Object.fromEntries(widgetNames.map((name) => [name, true])) as Record<WidgetName, boolean>
-  })
+  
   const today = useMemo(() => toDateInput(new Date()), [])
   const timeZoneId = useMemo(() => browserTimeZone(), [])
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'learner'
+  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 1000)
@@ -66,261 +60,287 @@ export function DashboardPage() {
     return () => window.clearInterval(intervalId)
   }, [])
 
-  const todosQuery = useQuery({
-    queryKey: ['todo', 'items', today],
-    queryFn: () => todoApi.listByDate(today),
-  })
-
-  const habitsQuery = useQuery({
-    queryKey: ['habit', 'list', timeZoneId],
-    queryFn: () => habitApi.listHabits(timeZoneId),
-  })
-
-  const countdownsQuery = useQuery({
-    queryKey: ['countdown', 'events'],
-    queryFn: countdownApi.listCountdowns,
-  })
-
-  const flashcardDashboardQuery = useQuery({
-    queryKey: ['flashcard', 'dashboard'],
-    queryFn: () => flashcardApi.getDashboard(timeZoneId),
-  })
-
-  const decksQuery = useQuery({
-    queryKey: ['flashcard', 'decks'],
-    queryFn: flashcardApi.listDecks,
-  })
+  const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today) })
+  const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
+  const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
+  const flashcardDashboardQuery = useQuery({ queryKey: ['flashcard', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
+  const decksQuery = useQuery({ queryKey: ['flashcard', 'decks'], queryFn: flashcardApi.listDecks })
 
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['todo'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 
-  const habitToggle = useMutation({
-    mutationFn: (habit: habitApi.Habit) => habitApi.toggleHabitEntry(habit.id, today, timeZoneId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['habit'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-  })
+  const todos = useMemo(() => (todosQuery.data ?? []).toSorted((left, right) => Number(left.isCompleted) - Number(right.isCompleted) || left.sortOrder - right.sortOrder), [todosQuery.data])
+  const visibleTodos = todos.slice(0, 3)
 
-  const todos = useMemo(
-    () => (todosQuery.data ?? []).toSorted((left, right) => Number(left.isCompleted) - Number(right.isCompleted) || left.sortOrder - right.sortOrder),
-    [todosQuery.data],
-  )
-  const visibleTodos = todos.slice(0, 6)
-  const remainingTodos = todos.filter((todo) => !todo.isCompleted).length
-  const extraTodos = Math.max(0, todos.length - visibleTodos.length)
+  const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 2), [habitsQuery.data])
 
-  const habits = useMemo(
-    () => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 6),
-    [habitsQuery.data],
-  )
+  const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
 
-  const countdowns = useMemo(
-    () => (countdownsQuery.data ?? [])
-      .toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime())
-      .slice(0, 3),
-    [countdownsQuery.data],
-  )
-
-  const allWordsDeck = useMemo(
-    () => (decksQuery.data ?? []).find((deck) => deck.type === 'AllWords' && deck.cards.length > 0),
-    [decksQuery.data],
-  )
+  const allWordsDeck = useMemo(() => (decksQuery.data ?? []).find((deck) => deck.type === 'AllWords' && deck.cards.length > 0), [decksQuery.data])
+  
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueCards = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0) + (flashcardDashboard?.newCards ?? 0)
-  const toggleWidget = (name: WidgetName) => {
-    setVisibleWidgets((current) => {
-      const next = { ...current, [name]: !current[name] }
-      localStorage.setItem('dashboard-visible-widgets', JSON.stringify(next))
-      return next
-    })
-  }
+  const totalCards = dueCards > 0 ? dueCards + 20 : 100 // Mock total for ring
+  const ringPercentage = dueCards > 0 ? (dueCards / totalCards) * 251.2 : 0
 
   return (
-    <main className="workspace dashboard-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Dashboard navigation">
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary" data-testid="open-vocabulary">
-            <BookOpen size={17} /> Vocabulary
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/flashcards" data-testid="open-flashcards">
-            <Layers size={17} /> Flashcards
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/todo" data-testid="open-todo">
-            <CheckSquare size={17} /> Todo
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/habits" data-testid="open-habits">
-            <Repeat2 size={17} /> Habits
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/countdown" data-testid="open-countdown">
-            <CalendarClock size={17} /> Countdown
-          </Link>
-          <Link
-            className="ghost-button ghost-button--inline"
-            to="/journal"
-            data-testid="open-journal"
-            onFocus={preloadJournalEditor}
-            onMouseEnter={preloadJournalEditor}
-          >
-            <NotebookPen size={17} /> Journal
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/kanban" data-testid="open-kanban">
-            <Columns3 size={17} /> Kanban
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/pomodoro" data-testid="open-pomodoro">
-            <Clock3 size={17} /> Pomodoro
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/notifications" data-testid="open-notifications">
-            <Bell size={17} /> Notifications
-          </Link>
-          <button className="icon-button" type="button" onClick={() => setShowSettings((current) => !current)} aria-label="Dashboard widget settings">
-            <Settings size={18} />
-          </button>
-          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
-            <LogOut size={18} />
-          </button>
-        </nav>
-      </header>
-
-      <section className="dashboard-shell">
-        <div className="dashboard-hero">
-          <div>
-            <span className="preview-label">Dashboard Overview</span>
-            <h1>{greeting(now.getHours(), displayName)}</h1>
-            <p>{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}</p>
+    <div className="dashboard-layout">
+      {/* SideNavBar */}
+      <aside className="dashboard-sidebar">
+        <div className="dashboard-brand">
+          <div className="dashboard-brand-icon">
+            <Globe size={24} />
           </div>
-          <BarChart3 size={38} />
+          <div className="dashboard-brand-text">
+            <h1>FluentA</h1>
+            <p>Language Learning</p>
+          </div>
         </div>
 
-        <section className="dashboard-grid" aria-label="Dashboard widgets">
-          {showSettings ? <article className="dashboard-card dashboard-card--wide"><h2>Visible widgets</h2>{widgetNames.map((name) => <label key={name} className="dashboard-check-row"><input type="checkbox" checked={visibleWidgets[name]} onChange={() => toggleWidget(name)} />{name}</label>)}</article> : null}
-          <article className="dashboard-card dashboard-card--flashcards" hidden={!visibleWidgets.flashcards}>
-            <header>
-              <Layers size={20} />
-              <div>
-                <span>Flashcards</span>
-                <h2>{dueCards > 0 ? `${dueCards} cards due` : 'No cards due today'}</h2>
-              </div>
-            </header>
-            <p>{dueCards > 0 ? `${flashcardDashboard?.overdue ?? 0} overdue | ${flashcardDashboard?.dueToday ?? 0} due | ${flashcardDashboard?.newCards ?? 0} new` : 'Great work. Your review queue is clear.'}</p>
-            {allWordsDeck ? (
-              <Link className="primary-button" to={`/flashcards/decks/${allWordsDeck.id}/review`}>
-                Review Now
-              </Link>
-            ) : (
-              <Link className="primary-button" to="/flashcards">
-                Open Flashcards
-              </Link>
-            )}
-          </article>
+        <nav className="dashboard-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+            <Columns3 size={20} /> Today
+          </Link>
+          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
+            <BookOpen size={20} /> Vocabulary
+          </Link>
+          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
+            <Layers size={20} /> Review
+          </Link>
+          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
+            <CheckSquare size={20} /> Todo
+          </Link>
+          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
+            <Repeat2 size={20} /> Habits
+          </Link>
+          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+            <CalendarClock size={20} /> Countdowns
+          </Link>
+          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''} onMouseEnter={preloadJournalEditor}>
+            <NotebookPen size={20} /> Journal
+          </Link>
+        </nav>
 
-          <article className="dashboard-card dashboard-card--streak" data-testid="dashboard-overview-streak" hidden={!visibleWidgets.streak}>
-            <header>
-              <Flame size={20} />
-              <div>
-                <span>Streak</span>
-                <h2>{flashcardDashboard?.streakDays ?? 0} days</h2>
-              </div>
-            </header>
-            <p>{streakMessage(flashcardDashboard?.streakDays ?? 0)}</p>
-          </article>
-
-          <article className="dashboard-card" hidden={!visibleWidgets.todo}>
-            <header>
-              <CheckSquare size={20} />
-              <div>
-                <span>Todo Today</span>
-                <h2>{remainingTodos} remaining</h2>
-              </div>
-            </header>
-            <div className="dashboard-list">
-              {visibleTodos.length === 0 ? <p>No tasks for today.</p> : null}
-              {visibleTodos.map((todo) => (
-                <label className="dashboard-check-row" key={todo.id}>
-                  <input
-                    aria-label={`${todo.isCompleted ? 'Uncheck' : 'Check'} todo ${todo.title}`}
-                    checked={todo.isCompleted}
-                    disabled={todoToggle.isPending}
-                    type="checkbox"
-                    onChange={() => todoToggle.mutate(todo)}
-                  />
-                  <span>{todo.title}</span>
-                </label>
-              ))}
+        <div className="dashboard-user-section">
+          <div className="dashboard-user-card">
+            <img 
+              className="dashboard-user-avatar" 
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              alt="User" 
+            />
+            <div className="dashboard-user-info">
+              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
+              <p className="dashboard-user-level">Learner Profile</p>
             </div>
-            <footer>
-              {extraTodos > 0 ? <small>{extraTodos} more tasks...</small> : <small>Today is in view.</small>}
-              <Link to="/todo">View All -&gt;</Link>
-            </footer>
-          </article>
+          </div>
+          <div className="dashboard-user-links">
+            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="#"><HelpCircle size={16} /> Help</Link>
+            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
+          </div>
+        </div>
+      </aside>
 
-          <article className="dashboard-card" hidden={!visibleWidgets.habits}>
-            <header>
-              <Repeat2 size={20} />
-              <div>
-                <span>Habit Today</span>
-                <h2>{habits.length} scheduled</h2>
-              </div>
-            </header>
-            <div className="dashboard-list">
-              {habits.length === 0 ? <p>No habits scheduled today.</p> : null}
-              {habits.map((habit) => (
-                <label className="dashboard-check-row" key={habit.id}>
-                  <input
-                    aria-label={`${habit.isCheckedToday ? 'Uncheck' : 'Check'} habit ${habit.name}`}
-                    checked={habit.isCheckedToday}
-                    disabled={habitToggle.isPending}
-                    type="checkbox"
-                    onChange={() => habitToggle.mutate(habit)}
-                  />
-                  <span>{habit.name}</span>
-                  <small>{habit.currentStreak} day streak</small>
-                </label>
-              ))}
+      {/* Main Content Area */}
+      <main className="dashboard-main">
+        {/* TopAppBar */}
+        <header className="dashboard-header">
+          <div className="dashboard-search">
+            <Search size={20} color="#6d7a77" />
+            <input type="text" placeholder="Search vocabulary..." />
+          </div>
+          <div className="dashboard-header-actions">
+            <button className="dashboard-notification-btn">
+              <Bell size={24} />
+              <span className="dashboard-notification-dot"></span>
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard Canvas */}
+        <div className="dashboard-content">
+          {/* Welcome Header */}
+          <section className="dashboard-welcome">
+            <div className="dashboard-welcome-text">
+              <h2>{greeting(now.getHours(), displayName)}</h2>
+              <p>Today is <span>{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}</span></p>
             </div>
-            <footer>
-              <small>Scheduled days only.</small>
-              <Link to="/habits">Open Habits -&gt;</Link>
-            </footer>
-          </article>
-
-          <article className="dashboard-card dashboard-card--wide" hidden={!visibleWidgets.countdown}>
-            <header>
-              <CalendarClock size={20} />
-              <div>
-                <span>Countdown</span>
-                <h2>{countdowns.length > 0 ? 'Upcoming dates' : 'No countdowns yet'}</h2>
+            
+            <div className="dashboard-streak-card">
+              <div className="dashboard-streak-icon">
+                <Flame size={28} />
               </div>
-            </header>
-            <div className="dashboard-countdowns">
-              {countdowns.length === 0 ? <p>Create your first countdown to see it here.</p> : null}
-              {countdowns.map((countdown) => (
-                <div key={countdown.id}>
-                  <strong>{countdown.icon ? `${countdown.icon} ` : ''}{countdown.name}</strong>
-                  <span>{countdown.isCompleted ? 'Completed' : remainingText(countdown.targetDate, now)}</span>
+              <div className="dashboard-streak-info">
+                <p className="dashboard-streak-label">Current Streak</p>
+                <p className="dashboard-streak-value">{flashcardDashboard?.streakDays ?? 0} Days</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Bento Grid Section */}
+          <div className="dashboard-bento-grid">
+            {/* Review Queue Card */}
+            <div className="bento-card card-col-8">
+              <div className="bento-card-header">
+                <h3 className="bento-card-title">Review Queue</h3>
+              </div>
+              <div className="review-queue-content">
+                <div className="review-chart-container">
+                  <div className="review-chart">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#eceef0" strokeWidth="10"></circle>
+                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#0D9488" strokeDasharray="251.2" strokeDashoffset={251.2 - ringPercentage} strokeLinecap="round" strokeWidth="10"></circle>
+                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#6bd8cb" strokeDasharray="251.2" strokeDashoffset={251.2 - (ringPercentage * 0.4)} strokeLinecap="round" strokeWidth="10"></circle>
+                    </svg>
+                    <div className="review-chart-center">
+                      <span className="count">{dueCards}</span>
+                      <span className="label">DUE TODAY</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
+                <div className="review-stats">
+                  <div className="review-stat-row">
+                    <div className="review-stat-label"><div className="review-stat-dot bg-teal"></div> Review</div>
+                    <strong>{flashcardDashboard?.overdue ?? 0 + (flashcardDashboard?.dueToday ?? 0)}</strong>
+                  </div>
+                  <div className="review-stat-row">
+                    <div className="review-stat-label"><div className="review-stat-dot bg-light-teal"></div> Learning</div>
+                    <strong>{flashcardDashboard?.newCards ?? 0}</strong>
+                  </div>
+                </div>
+                {allWordsDeck ? (
+                  <Link to={`/flashcards/decks/${allWordsDeck.id}/review`} style={{textDecoration: 'none'}}>
+                    <button className="btn-primary">Start Review</button>
+                  </Link>
+                ) : (
+                  <Link to="/flashcards" style={{textDecoration: 'none'}}>
+                    <button className="btn-primary">Open Flashcards</button>
+                  </Link>
+                )}
+              </div>
             </div>
-            <footer>
-              <small>Nearest three events.</small>
-              <Link to="/countdown">Open Countdown -&gt;</Link>
-            </footer>
-          </article>
-        </section>
 
-        {todosQuery.isError || habitsQuery.isError || countdownsQuery.isError || flashcardDashboardQuery.isError || decksQuery.isError ? (
-          <p className="flashcard-status flashcard-status--error">Some dashboard data could not be loaded.</p>
-        ) : null}
-      </section>
-    </main>
+            {/* Daily To-Do */}
+            <div className="bento-card card-col-4">
+              <div className="bento-card-header">
+                <h3 className="bento-card-subtitle">Daily To-Do</h3>
+                <CheckSquare size={20} color="#0D9488" />
+              </div>
+              <ul className="todo-list">
+                {todos.length === 0 ? <p style={{fontSize: 14}}>No tasks for today.</p> : null}
+                {visibleTodos.map(todo => (
+                  <li key={todo.id} className={`todo-item ${todo.isCompleted ? 'completed' : ''}`} onClick={() => todoToggle.mutate(todo)}>
+                    {todo.isCompleted ? <CheckCircle2 size={18} color="#0D9488" /> : <Circle size={18} color="#6d7a77" />}
+                    <span>{todo.title}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link to="/todo" style={{textDecoration: 'none', marginTop: 'auto'}}>
+                 <button className="btn-outline" style={{ border: 'none', color: '#0D9488', width: 'auto', padding: 0 }}>View all tasks →</button>
+              </Link>
+            </div>
+
+            {/* Next Event */}
+            <div className="bento-card card-col-6">
+              <div className="bento-card-header">
+                <h3 className="bento-card-subtitle">Next Event</h3>
+                <Timer size={20} color="#0D9488" />
+              </div>
+              {countdowns.length > 0 ? (
+                <div className="next-event-content">
+                  <p className="next-event-time">{remainingText(countdowns[0].targetDate, now)}</p>
+                  <p className="next-event-label">{countdowns[0].name}</p>
+                </div>
+              ) : (
+                <div className="next-event-content">
+                  <p className="next-event-time">--:--</p>
+                  <p className="next-event-label">No upcoming events</p>
+                </div>
+              )}
+              <Link to="/countdown" style={{textDecoration: 'none', marginTop: 'auto'}}>
+                <button className="btn-outline">Open Countdowns</button>
+              </Link>
+            </div>
+
+            {/* Habit Tracker */}
+            <div className="bento-card card-col-6">
+              <div className="bento-card-header">
+                <h3 className="bento-card-subtitle">Habit Tracker</h3>
+                <TrendingUp size={20} color="#0D9488" />
+              </div>
+              <div className="habit-list">
+                {habits.length === 0 ? <p style={{fontSize: 14}}>No habits scheduled today.</p> : null}
+                {habits.map(habit => (
+                  <div className="habit-item" key={habit.id}>
+                    <div className="habit-item-header">
+                      <span>STREAK: {habit.currentStreak} DAYS</span>
+                      <span>{habit.isCheckedToday ? '100%' : '0%'}</span>
+                    </div>
+                    <div className="habit-progress-bar">
+                      <div className="habit-progress-fill" style={{ width: habit.isCheckedToday ? '100%' : '0%' }}></div>
+                    </div>
+                    <p className="habit-item-label">{habit.name}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Continue Learning Section */}
+          <section style={{marginTop: '16px'}}>
+            <div className="continue-learning-header" style={{marginBottom: '24px'}}>
+              <h3>Continue Learning</h3>
+              <Link to="/vocabulary">View All</Link>
+            </div>
+            
+            <div className="word-grid">
+              <div className="word-card">
+                <div className="word-card-header">
+                  <span className="word-type">Noun</span>
+                </div>
+                <h4>perro</h4>
+                <p className="word-example">"El perro corre en el parque."</p>
+                <div className="word-translation">
+                  <p>English: Dog</p>
+                </div>
+              </div>
+              
+              <div className="word-card">
+                <div className="word-card-header">
+                  <span className="word-type">Noun</span>
+                </div>
+                <h4>casa</h4>
+                <p className="word-example">"Mi casa es su casa."</p>
+                <div className="word-translation">
+                  <p>English: House</p>
+                </div>
+              </div>
+
+              <div className="word-card">
+                <div className="word-card-header">
+                  <span className="word-type">Noun</span>
+                </div>
+                <h4>agua</h4>
+                <p className="word-example">"Bebe un poco de agua."</p>
+                <div className="word-translation">
+                  <p>English: Water</p>
+                </div>
+              </div>
+
+              <Link to="/vocabulary" style={{textDecoration: 'none'}}>
+                <div className="add-word-card">
+                  <BookOpen size={36} color="#6d7a77" style={{marginBottom: 8}} />
+                  <p style={{color: '#191c1e'}}>Add New Words</p>
+                </div>
+              </Link>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
   )
 }
