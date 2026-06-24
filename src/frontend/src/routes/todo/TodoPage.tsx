@@ -1,8 +1,14 @@
-import { ArrowLeft, ArrowRight, BarChart3, CalendarDays, CheckCircle2, Home, LayoutGrid, List, Loader2, Plus, Trash2 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import '../dashboard/DashboardPage.css'
+import {
+  BookOpen, CalendarClock, CheckSquare, Columns3,
+  Globe, HelpCircle, Layers, LogOut, NotebookPen,
+  Repeat2, Settings, Kanban,
+} from 'lucide-react'
 import * as todoApi from '../../lib/api/todo.api'
+import { useAuthStore } from '../../stores/authStore'
 import { TodoWeekView } from './TodoWeekView'
 
 type TodoView = 'day' | 'week'
@@ -25,8 +31,8 @@ function formatDay(dateValue: string) {
   const [year, month, day] = dateValue.split('-').map(Number)
   return new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
-    month: 'long',
     day: 'numeric',
+    month: 'long',
     year: 'numeric',
   }).format(new Date(year, month - 1, day))
 }
@@ -46,10 +52,17 @@ function weekDates(dateValue: string) {
 
 export function TodoPage() {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const logout = useAuthStore((state) => state.logout)
+  const user = useAuthStore((state) => state.user)
+  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+
   const [selectedDate, setSelectedDate] = useState(() => toDateInput(new Date()))
   const [view, setView] = useState<TodoView>('day')
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
+  const [activeExpanded, setActiveExpanded] = useState(true)
+  const [completedExpanded, setCompletedExpanded] = useState(false)
 
   const dates = useMemo(() => weekDates(selectedDate), [selectedDate])
   const weekKey = ['todo', 'range', dates[0], dates[6]]
@@ -139,144 +152,358 @@ export function TodoPage() {
     createTodo.mutate({ title, date: selectedDate, note: note.trim() ? note : null })
   }
 
+  function handleMarkAllDone() {
+    for (const item of openTasks) {
+      updateTodo.mutate({ id: item.id, patch: { isCompleted: true } })
+    }
+  }
+
   return (
-    <main className="workspace todo-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
+    <div className="dashboard-layout">
+      {/* ── Left Sidebar Navigation ── */}
+      <aside className="dashboard-sidebar">
+        <div className="dashboard-brand">
+          <div className="dashboard-brand-icon">
+            <Globe size={24} />
+          </div>
+          <div className="dashboard-brand-text">
+            <h1>FluentA</h1>
+            <p>Language Learning</p>
+          </div>
         </div>
-        <nav className="workspace-nav" aria-label="Todo navigation">
-          <Link className="ghost-button ghost-button--inline" to="/">
-            <BarChart3 size={17} /> Dashboard
+
+        <nav className="dashboard-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+            <Columns3 size={20} /> Today
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
-            <Home size={17} /> Vocabulary
+          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
+            <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/habits">
-            <CalendarDays size={17} /> Habits
+          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
+            <Layers size={20} /> Review
+          </Link>
+          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
+            <CheckSquare size={20} /> Todo
+          </Link>
+          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
+            <Repeat2 size={20} /> Habits
+          </Link>
+          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+            <CalendarClock size={20} /> Countdowns
+          </Link>
+          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
+            <NotebookPen size={20} /> Journal
+          </Link>
+          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
+            <Kanban size={20} /> Kanban
           </Link>
         </nav>
-      </header>
 
-      <section className="todo-shell">
-        <div className="todo-hero">
-          <div>
-            <span className="preview-label">Todo List</span>
-            <h1>{view === 'day' ? 'Daily plan' : 'Week plan'}</h1>
-            <p>{openTasks.length} open tasks · {completedTasks.length} completed</p>
+        <div className="dashboard-user-section">
+          <div className="dashboard-user-card">
+            <img
+              className="dashboard-user-avatar"
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`}
+              alt="User"
+            />
+            <div className="dashboard-user-info">
+              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
+              <p className="dashboard-user-level">Learner Profile</p>
+            </div>
           </div>
-          <div className="todo-date-card">
-            <CalendarDays size={22} />
-            <strong>{formatDay(selectedDate)}</strong>
-            <input
-              aria-label="Selected todo date"
-              value={selectedDate}
-              type="date"
-              onChange={(event) => setSelectedDate(event.target.value)}
-            />
+          <div className="dashboard-user-links">
+            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="#"><HelpCircle size={16} /> Help</Link>
+            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
           </div>
         </div>
+      </aside>
 
-        <div className="todo-view-switch" aria-label="Todo view">
-          <button className={view === 'day' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'} type="button" onClick={() => setView('day')}>
-            <List size={16} /> Day
-          </button>
-          <button className={view === 'week' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'} type="button" onClick={() => setView('week')}>
-            <LayoutGrid size={16} /> Week
-          </button>
-        </div>
-
-        <div className="todo-day-controls" aria-label="Todo day controls">
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, view === 'day' ? -1 : -7))}>
-            <ArrowLeft size={17} /> Previous
-          </button>
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate(toDateInput(new Date()))}>
-            Today
-          </button>
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedDate((date) => shiftDate(date, view === 'day' ? 1 : 7))}>
-            Next <ArrowRight size={17} />
-          </button>
-        </div>
-
-        <form className="todo-create" onSubmit={submitTask}>
-          <label>
-            Task
-            <input
-              data-testid="todo-title-input"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Review IELTS Unit 3"
-            />
-          </label>
-          <label>
-            Note
-            <input
-              data-testid="todo-note-input"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="Optional details"
-            />
-          </label>
-          <button className="primary-button" type="submit" disabled={createTodo.isPending || !title.trim()} data-testid="create-todo-button">
-            {createTodo.isPending ? <Loader2 size={18} /> : <Plus size={18} />} Add task
-          </button>
-        </form>
-
-        {view === 'day' && todosQuery.isLoading ? <p className="flashcard-status">Loading tasks...</p> : null}
-        {view === 'week' && weekQuery.isLoading ? <p className="flashcard-status">Loading week...</p> : null}
-        {(view === 'day' && todosQuery.isError) || (view === 'week' && weekQuery.isError) ? <p className="flashcard-status flashcard-status--error">Could not load Todo tasks.</p> : null}
-
-        {view === 'day' && !todosQuery.isLoading && !todosQuery.isError ? (
-          <section className="todo-list" aria-label="Todo tasks">
-            {todos.length === 0 ? (
-              <div className="empty-panel todo-empty">
-                <CheckCircle2 size={28} />
-                <h2>No tasks for this day</h2>
-                <p>Add one small task and give the day a handle.</p>
+      {/* ── Main Content Area ── */}
+      <main className="dashboard-main">
+        <div className="todo-content-v2">
+          {/* Hero Header */}
+          <div className="todo-hero-v2">
+            <div className="todo-hero-v2__info">
+              <h2 className="todo-hero-v2__title">TODO LIST</h2>
+            </div>
+            <div className="todo-hero-v2__date-card">
+              <div className="todo-hero-v2__date-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
               </div>
-            ) : null}
+              <div>
+                <p className="todo-hero-v2__date-label">{formatDay(selectedDate)}</p>
+                <input
+                  className="todo-hero-v2__date-input"
+                  aria-label="Selected todo date"
+                  value={selectedDate}
+                  type="date"
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
 
-            {todos.map((item) => (
-              <article className={item.isCompleted ? 'todo-item todo-item--completed' : 'todo-item'} key={item.id}>
-                <label className="todo-check">
+          {/* View Switch */}
+          <div className="todo-view-switch" aria-label="Todo view">
+            <button
+              className={view === 'day' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'}
+              type="button"
+              onClick={() => setView('day')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+              </svg>
+              Day
+            </button>
+            <button
+              className={view === 'week' ? 'todo-view-switch__button todo-view-switch__button--active' : 'todo-view-switch__button'}
+              type="button"
+              onClick={() => setView('week')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Week
+            </button>
+          </div>
+
+
+
+          {/* New Task Form */}
+          <div className="todo-bento-grid">
+            <form className="todo-create-v2" onSubmit={submitTask}>
+              <h3 className="todo-create-v2__title">New Task</h3>
+              <div className="todo-create-v2__fields">
+                <div className="todo-create-v2__field todo-create-v2__field--primary">
+                  <label className="todo-create-v2__label">Task Name</label>
                   <input
-                    aria-label={`Complete ${item.title}`}
-                    checked={item.isCompleted}
-                    type="checkbox"
-                    onChange={(event) => updateTodo.mutate({ id: item.id, patch: { isCompleted: event.target.checked } })}
+                    className="todo-create-v2__input"
+                    data-testid="todo-title-input"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="e.g. Review IELTS Unit 3"
                   />
-                  <span>{item.title}</span>
-                </label>
-                {item.note ? <p>{item.note}</p> : null}
-                <footer>
-                  {item.isCarriedOver && item.originalDate ? <span className="todo-badge">Carried over from {item.originalDate}</span> : null}
-                  <button
-                    className="icon-button icon-button--danger"
-                    type="button"
-                    aria-label={`Delete ${item.title}`}
-                    onClick={() => deleteTodo.mutate(item.id)}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </footer>
-              </article>
-            ))}
-          </section>
-        ) : null}
+                </div>
+                <div className="todo-create-v2__field">
+                  <label className="todo-create-v2__label">Note (Optional)</label>
+                  <input
+                    className="todo-create-v2__input"
+                    data-testid="todo-note-input"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Details..."
+                  />
+                </div>
+              </div>
+              <button className="todo-create-v2__submit" type="submit" disabled={createTodo.isPending || !title.trim()} data-testid="create-todo-button">
+                {createTodo.isPending ? (
+                  <svg className="todo-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                )}
+                Add task
+              </button>
+            </form>
+          </div>
 
-        {view === 'week' && !weekQuery.isLoading && !weekQuery.isError ? (
-          <TodoWeekView
-            dates={dates}
-            items={weekTodos}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            onLayoutChange={(items, updates) => updateLayout.mutate({ items, updates })}
-            onToggle={(item, isCompleted) => updateTodo.mutate({ id: item.id, patch: { isCompleted } })}
-            onDelete={(item) => deleteTodo.mutate(item.id)}
-          />
-        ) : null}
-      </section>
-    </main>
+          {/* Loading / Error States */}
+          {view === 'day' && todosQuery.isLoading ? <p className="flashcard-status">Loading tasks...</p> : null}
+          {view === 'week' && weekQuery.isLoading ? <p className="flashcard-status">Loading week...</p> : null}
+          {(view === 'day' && todosQuery.isError) || (view === 'week' && weekQuery.isError) ? <p className="flashcard-status flashcard-status--error">Could not load Todo tasks.</p> : null}
+
+          {/* Day View — Task List */}
+          {view === 'day' && !todosQuery.isLoading && !todosQuery.isError ? (
+            <section className="todo-tasks-v2" aria-label="Todo tasks">
+              {todos.length === 0 ? (
+                <div className="empty-panel todo-empty">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <h2>No tasks for this day</h2>
+                  <p>Add one small task and give the day a handle.</p>
+                </div>
+              ) : null}
+
+              {/* ── Active Tasks (Collapsible) ── */}
+              {openTasks.length > 0 && (
+                <div className="todo-section-v2">
+                  <button
+                    className="todo-section-v2__toggle"
+                    type="button"
+                    onClick={() => setActiveExpanded((prev) => !prev)}
+                    aria-expanded={activeExpanded}
+                  >
+                    <svg
+                      className={`todo-section-v2__chevron${activeExpanded ? ' todo-section-v2__chevron--open' : ''}`}
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <h4 className="todo-section-v2__heading">
+                      Active Tasks
+                      <span className="todo-tasks-v2__count">{openTasks.length}</span>
+                    </h4>
+                    <button
+                      className="todo-tasks-v2__mark-all"
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleMarkAllDone() }}
+                    >
+                      Mark all as done
+                    </button>
+                  </button>
+
+                  {activeExpanded && (
+                    <div className="todo-section-v2__list">
+                      {openTasks.map((item) => (
+                        <article className="todo-card-v2" key={item.id}>
+                          {item.isCarriedOver && <div className="todo-card-v2__carried-bar" />}
+                          <div className="todo-card-v2__checkbox">
+                            <input
+                              aria-label={`Complete ${item.title}`}
+                              checked={item.isCompleted}
+                              type="checkbox"
+                              onChange={(event) => updateTodo.mutate({ id: item.id, patch: { isCompleted: event.target.checked } })}
+                            />
+                          </div>
+                          <div className="todo-card-v2__body">
+                            <div className="todo-card-v2__title-row">
+                              <h5 className="todo-card-v2__title">{item.title}</h5>
+                              {item.isCarriedOver && item.originalDate ? (
+                                <span className="todo-card-v2__badge todo-card-v2__badge--carried">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="1 4 1 10 7 10" />
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                  </svg>
+                                  Carried over from {item.originalDate}
+                                </span>
+                              ) : null}
+                            </div>
+                            {item.note ? <p className="todo-card-v2__note">{item.note}</p> : null}
+                          </div>
+                          <div className="todo-card-v2__actions">
+                            <button
+                              className="todo-card-v2__action todo-card-v2__action--delete"
+                              type="button"
+                              aria-label={`Delete ${item.title}`}
+                              onClick={() => deleteTodo.mutate(item.id)}
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Completed Tasks (Collapsible) ── */}
+              {completedTasks.length > 0 && (
+                <div className="todo-section-v2 todo-section-v2--completed">
+                  <button
+                    className="todo-section-v2__toggle"
+                    type="button"
+                    onClick={() => setCompletedExpanded((prev) => !prev)}
+                    aria-expanded={completedExpanded}
+                  >
+                    <svg
+                      className={`todo-section-v2__chevron${completedExpanded ? ' todo-section-v2__chevron--open' : ''}`}
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <h4 className="todo-section-v2__heading">
+                      Completed
+                      <span className="todo-tasks-v2__count">{completedTasks.length}</span>
+                    </h4>
+                  </button>
+
+                  {completedExpanded && (
+                    <div className="todo-section-v2__list">
+                      {completedTasks.map((item) => (
+                        <article className="todo-card-v2 todo-card-v2--completed" key={item.id}>
+                          <div className="todo-card-v2__checkbox">
+                            <input
+                              aria-label={`Uncomplete ${item.title}`}
+                              checked={item.isCompleted}
+                              type="checkbox"
+                              onChange={(event) => updateTodo.mutate({ id: item.id, patch: { isCompleted: event.target.checked } })}
+                            />
+                          </div>
+                          <div className="todo-card-v2__body">
+                            <h5 className="todo-card-v2__title todo-card-v2__title--done">{item.title}</h5>
+                            {item.note ? <p className="todo-card-v2__note">{item.note}</p> : null}
+                          </div>
+                          <div className="todo-card-v2__actions">
+                            <button
+                              className="todo-card-v2__action todo-card-v2__action--delete"
+                              type="button"
+                              aria-label={`Delete ${item.title}`}
+                              onClick={() => deleteTodo.mutate(item.id)}
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          {/* Week View */}
+          {view === 'week' && !weekQuery.isLoading && !weekQuery.isError ? (
+            <TodoWeekView
+              dates={dates}
+              items={weekTodos}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              onLayoutChange={(items, updates) => updateLayout.mutate({ items, updates })}
+              onToggle={(item, isCompleted) => updateTodo.mutate({ id: item.id, patch: { isCompleted } })}
+              onDelete={(item) => deleteTodo.mutate(item.id)}
+            />
+          ) : null}
+        </div>
+      </main>
+    </div>
   )
 }

@@ -20,6 +20,7 @@
 9. [API Contract](#9-api-contract)
 10. [Development Setup](#10-development-setup)
 11. [Definition of Done](#11-definition-of-done)
+12. [Next Feature Plan — Email Verification OTP & Password Recovery](#12-next-feature-plan--email-verification-otp--password-recovery)
 
 ---
 
@@ -1422,3 +1423,150 @@ A feature is considered **done** when all of the following are true:
 *This specification covers the FluentA MVP: Authentication, Vocabulary Board, and Flash Card + Spaced Repetition. Together these three features implement the complete core learning loop and can be shipped as a functional, standalone product.*
 
 *Next features to spec after MVP ship: Dashboard Overview, Todo List, Habit Tracker.*
+
+---
+
+## 12. Next Feature Plan — Email Verification OTP & Password Recovery
+
+**Planning status:** Epic map ready for approval
+
+**Mode:** High-risk feature
+
+**Source of truth:** `history/auth-email-verification-password-recovery/CONTEXT.md`
+
+### 12.1 Desired Outcomes
+
+- A password-account user registers, receives a six-digit OTP through Gmail SMTP, enters it on FluentA, and verifies the email successfully.
+- An eligible user submits a registered Gmail address, receives a single-use reset link, enters a new password on FluentA, and is redirected to Login after success.
+- Existing email/password login, token refresh, logout, protected routes, and Google OAuth continue to work.
+
+### 12.2 Locked Product Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Verification delivery | Gmail SMTP sends a six-digit OTP; Google Authenticator is excluded |
+| OTP lifetime | 10 minutes from issuance |
+| OTP resend | Available after 60 seconds; a replacement invalidates the previous OTP |
+| OTP attempts | Five incorrect submissions invalidate the OTP |
+| Reset link lifetime | 30 minutes from issuance |
+| Reset link reuse | Single-use; invalid immediately after the password is saved |
+| Unknown email | Forgot Password explicitly warns that the account does not exist |
+| Existing sessions | Password reset does not revoke other active sessions |
+| Successful reset | Redirect the completing browser to `/login` |
+
+### 12.3 Current-State Delta
+
+The current implementation creates unverified password users but verifies them with a signed JWT link delivered through local/AWS SES providers. Registration redirects directly to Login, and there are no Forgot Password or Reset Password routes. This plan replaces password-account verification links with OTP entry, replaces SES production delivery with Gmail SMTP, and adds a stateful single-use recovery flow.
+
+### 12.4 Proposed Architecture
+
+```text
+Register
+  -> create unverified user
+  -> issue protected OTP challenge in Redis
+  -> Gmail SMTP sends OTP
+  -> /verify-email receives email + OTP
+  -> atomic validate/attempt/consume
+  -> mark user verified
+
+Forgot Password
+  -> require an existing eligible account email
+  -> issue protected reset challenge in Redis
+  -> Gmail SMTP sends high-entropy reset URL
+  -> /reset-password validates token + new password
+  -> update BCrypt password + atomically consume token
+  -> redirect browser to /login
+```
+
+Security invariants:
+
+- Generate OTPs and reset tokens with cryptographically secure randomness.
+- Never log or persist raw OTPs, reset tokens, SMTP credentials, passwords, or Google client secrets.
+- Protect the six-digit OTP with a server-side keyed hash and store only protected challenge material.
+- Make OTP replacement, attempt counting, and reset-token consumption atomic under concurrent requests.
+- Preserve current password validation, API envelopes, refresh rotation, and unverified-login gating.
+
+### 12.5 Planned Public Surface
+
+The exact request/response fields are finalized during current-story preparation, but planning expects these capabilities:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Create an unverified user and send the first OTP |
+| `POST` | `/api/v1/auth/verify-email` | Verify an email with email address plus OTP |
+| `POST` | `/api/v1/auth/resend-verification-otp` | Send a replacement OTP after cooldown |
+| `POST` | `/api/v1/auth/forgot-password` | Validate account eligibility and send a reset link |
+| `POST` | `/api/v1/auth/reset-password` | Consume a reset token and save a new password |
+
+| Route | User Experience |
+|---|---|
+| `/register` | Register, then continue to OTP verification |
+| `/verify-email` | Six-digit OTP entry, expiry feedback, resend countdown, and success path |
+| `/forgot-password` | Registered-email form with explicit unknown-account warning |
+| `/reset-password?token=...` | New-password and confirmation form with invalid/expired/used-link states |
+| `/login` | Receives the successful-reset redirect and exposes the Forgot Password entry point |
+
+### 12.6 Epic Map
+
+| Epic | Capability / Risk Area | Stories | Exit Evidence |
+|---|---|---|---|
+| E1 — Safe email-challenge foundation | Gmail delivery, local testing, protected transient state, secret hygiene | SPIKE-AUTH-MAIL-001, US-AUTH-OTP-001 | Gmail/local smoke, Redis atomicity proof, no raw secrets |
+| E2 — Registration email verification | Complete registration-to-verified journey | US-AUTH-OTP-002 | OTP success, expiry, resend, old-code rejection, five-attempt invalidation |
+| E3 — Password recovery | Complete forgot-to-reset-to-login journey | US-AUTH-RESET-001 | Existing/unknown account behavior, expiry, tamper, single-use, password login |
+| E4 — Auth release hardening | Regression, provider configuration, docs, decisions, Harness proof | US-AUTH-SEC-001 | Auth suite, provider smoke, secret scan, current contracts and matrix |
+
+### 12.7 Ordered Story Queue
+
+1. **SPIKE-AUTH-MAIL-001:** Prove Gmail SMTP authentication, deterministic local delivery, protected Redis challenge operations, and the secret-removal/rotation path.
+2. **US-AUTH-OTP-001:** Build the reusable challenge and email-delivery foundation after spike acceptance.
+3. **US-AUTH-OTP-002:** Deliver the full registration OTP journey across API and browser.
+4. **US-AUTH-RESET-001:** Deliver the full password-recovery journey after resolving OAuth-only account eligibility.
+5. **US-AUTH-SEC-001:** Run release regression, provider smoke, secret checks, and reconcile product/decision/Harness records.
+
+Only the approved current story is prepared for validation and execution; later stories remain queued until their dependencies pass.
+
+### 12.8 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Gmail SMTP account policy or credential failure | Live non-production delivery smoke using secrets outside tracked files |
+| OTP brute force or race windows | Attempt-limit, cooldown, replacement, expiry, and concurrent Redis tests |
+| Reset-token replay/account takeover | High-entropy token, protected storage, tamper/expiry/single-use/concurrent consume tests |
+| Intentional account enumeration | Exact unknown-email error and endpoint throttling proof |
+| Existing sessions remain active after reset | Explicit regression documenting the accepted D6 behavior |
+| OAuth-only user has no password | Product decision required before US-AUTH-RESET-001 |
+| Existing secret exposure | Remove the tracked secret, rotate it externally, and scan tracked configuration/diff |
+| Auth regressions | Existing registration/login/refresh/logout/Google tests plus focused Playwright flows |
+
+### 12.9 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- auth-email-verification.spec.js auth-password-recovery.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Validation must also include focused real-Redis concurrency checks and a Gmail SMTP smoke in a credentialed non-production environment. Commands are refined when the current story packet is prepared.
+
+### 12.10 Scope Boundaries
+
+Out of scope:
+
+- Google Authenticator or authenticator-app TOTP.
+- Passwordless or magic-link login.
+- Revoking all existing sessions after password reset.
+- Hiding whether a Forgot Password email exists.
+- Changing Google OAuth login behavior except secret hygiene and regression proof.
+- Preparing implementation beads before feasibility validation accepts the current story.
+
+### 12.11 Approval Gate And First Work
+
+The first work item is **SPIKE-AUTH-MAIL-001** because Gmail authentication policy, Redis atomic operations, deterministic test delivery, OAuth-only recovery behavior, and secret rotation are feasibility gates for all implementation stories.
+
+Approve this epic map before Planning prepares the current spike/story pack. Implementation starts only after feasibility validation passes and receives a separate execution approval.

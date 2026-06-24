@@ -1,7 +1,12 @@
-import { ArrowRight, BarChart3, BookOpen, CalendarDays, CheckSquare, Columns3, Edit3, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react'
+import { 
+  Bell, BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle, Layers, 
+  LogOut, NotebookPen, Repeat2, Settings, CalendarDays, ChevronRight, 
+  Search, Trash2, X, Kanban, Filter, Plus, ArrowDown, AlertCircle
+} from 'lucide-react'
 import { type DragEvent, type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuthStore } from '../../stores/authStore'
 import * as kanbanApi from '../../lib/api/kanban.api'
 
 const priorities = ['Low', 'Medium', 'High', 'Critical'] as const
@@ -48,10 +53,14 @@ function emptyCardForm(columnId = '') {
 
 export function KanbanPage() {
   const queryClient = useQueryClient()
+  const logout = useAuthStore((state) => state.logout)
+  const user = useAuthStore((state) => state.user)
+  const location = useLocation()
+  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+
   const [boardName, setBoardName] = useState('')
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null)
   const [columnName, setColumnName] = useState('')
-  const [cardForm, setCardForm] = useState(() => emptyCardForm())
   const [editingCard, setEditingCard] = useState<kanbanApi.KanbanCard | null>(null)
   const [editForm, setEditForm] = useState(() => emptyCardForm())
   const [filters, setFilters] = useState({ search: '', tag: '', priority: '', deadline: '' })
@@ -77,9 +86,6 @@ export function KanbanPage() {
     () => (board?.columns ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt)),
     [board?.columns],
   )
-  const allCards = useMemo(() => columns.flatMap((column) => column.cards), [columns])
-  const tagOptions = useMemo(() => Array.from(new Set(allCards.flatMap((card) => card.tags))).toSorted(), [allCards])
-  const selectedCardColumnId = cardForm.columnId || columns[0]?.id || ''
   const visibleColumns = useMemo(
     () => columns.map((column) => ({
       ...column,
@@ -140,7 +146,6 @@ export function KanbanPage() {
   const createCard = useMutation({
     mutationFn: (input: kanbanApi.CreateKanbanCardInput) => kanbanApi.createCard(selectedBoardId!, input),
     onSuccess: async () => {
-      setCardForm(emptyCardForm(columns[0]?.id ?? ''))
       await refresh()
     },
   })
@@ -175,19 +180,6 @@ export function KanbanPage() {
     createColumn.mutate({ boardId: selectedBoardId, name: columnName })
   }
 
-  function submitCard(event: FormEvent) {
-    event.preventDefault()
-    if (!cardForm.title.trim() || !selectedCardColumnId) return
-    createCard.mutate({
-      columnId: selectedCardColumnId,
-      title: cardForm.title,
-      description: cardForm.description || null,
-      priority: cardForm.priority,
-      deadline: cardForm.deadline || null,
-      tags: splitTags(cardForm.tags),
-    })
-  }
-
   function openEditor(card: kanbanApi.KanbanCard) {
     setEditingCard(card)
     setEditForm({
@@ -203,6 +195,21 @@ export function KanbanPage() {
   function submitEdit(event: FormEvent) {
     event.preventDefault()
     if (!editingCard || !editForm.title.trim()) return
+
+    if (editingCard.id === 'new') {
+      createCard.mutate({
+        columnId: editForm.columnId,
+        title: editForm.title,
+        description: editForm.description || null,
+        priority: editForm.priority,
+        deadline: editForm.deadline || null,
+        tags: splitTags(editForm.tags),
+      }, {
+        onSuccess: () => setEditingCard(null)
+      })
+      return
+    }
+
     updateCard.mutate({
       id: editingCard.id,
       patch: {
@@ -224,245 +231,300 @@ export function KanbanPage() {
   }
 
   return (
-    <main className="workspace kanban-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
+    <div className="dashboard-layout">
+      {/* SideNavBar */}
+      <aside className="dashboard-sidebar">
+        <div className="dashboard-brand">
+          <div className="dashboard-brand-icon">
+            <Globe size={24} />
+          </div>
+          <div className="dashboard-brand-text">
+            <h1>FluentA</h1>
+            <p>Language Learning</p>
+          </div>
         </div>
-        <nav className="workspace-nav" aria-label="Kanban navigation">
-          <Link className="ghost-button ghost-button--inline" to="/">
-            <BarChart3 size={17} /> Dashboard
+
+        <nav className="dashboard-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+            <Columns3 size={20} /> Today
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
-            <BookOpen size={17} /> Vocabulary
+          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
+            <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/todo">
-            <CheckSquare size={17} /> Todo
+          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
+            <Layers size={20} /> Review
+          </Link>
+          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
+            <CheckSquare size={20} /> Todo
+          </Link>
+          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
+            <Repeat2 size={20} /> Habits
+          </Link>
+          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+            <CalendarClock size={20} /> Countdowns
+          </Link>
+          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
+            <NotebookPen size={20} /> Journal
+          </Link>
+          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
+            <Kanban size={20} /> Kanban
           </Link>
         </nav>
-      </header>
 
-      <section className="kanban-shell">
-        <div className="kanban-hero">
-          <div>
-            <span className="preview-label">Project Management</span>
-            <h1>Kanban Board</h1>
-            <p>{boards.length} boards · {allCards.length} cards in the active board</p>
+        <div className="dashboard-user-section">
+          <div className="dashboard-user-card">
+            <img 
+              className="dashboard-user-avatar" 
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              alt="User" 
+            />
+            <div className="dashboard-user-info">
+              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
+              <p className="dashboard-user-level">Learner Profile</p>
+            </div>
           </div>
-          <Columns3 size={38} />
+          <div className="dashboard-user-links">
+            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="#"><HelpCircle size={16} /> Help</Link>
+            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
+          </div>
         </div>
+      </aside>
 
-        <section className="kanban-topbar">
-          <form className="kanban-create-board" onSubmit={submitBoard}>
-            <label>
-              Board name
-              <input data-testid="kanban-board-name-input" value={boardName} onChange={(event) => setBoardName(event.target.value)} placeholder="Q3 language sprint" />
-            </label>
-            <button className="primary-button" type="submit" disabled={!boardName.trim() || createBoard.isPending}>
-              {createBoard.isPending ? <Loader2 size={18} /> : <Plus size={18} />} Create board
+      <main className="dashboard-main kanban-main-wrapper" style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* TopAppBar */}
+        <header className="kanban-header">
+          <div className="kanban-search-wrapper">
+            <Search size={20} className="kanban-search-icon" />
+            <input 
+              className="kanban-search-input" 
+              placeholder="Search projects, tasks, or words..." 
+              value={filters.search} 
+              onChange={(event) => setFilters({ ...filters, search: event.target.value })} 
+              data-testid="kanban-search-input" 
+            />
+          </div>
+          <div className="kanban-header-actions">
+            <button className="dashboard-notification-btn">
+              <Bell size={24} />
+              <span className="dashboard-notification-dot"></span>
             </button>
-          </form>
+            <button className="kanban-help-btn">
+              <HelpCircle size={24} />
+            </button>
+          </div>
+        </header>
 
-          <div className="kanban-board-list" aria-label="Kanban boards">
-            {boardsQuery.isLoading ? <p>Loading boards...</p> : null}
+        {/* Content Canvas */}
+        <div className="kanban-content">
+          {/* Project Header */}
+          <section className="kanban-project-header">
+            <div className="kanban-project-title-area">
+              <nav className="kanban-breadcrumbs">
+                <a href="#">Projects</a>
+                <ChevronRight size={14} />
+                <span>{board?.name || 'Loading...'}</span>
+              </nav>
+              <h2>{board?.name || 'Study Projects'}</h2>
+            </div>
+            
+            <div className="kanban-project-actions">
+              <div className="kanban-avatars">
+                <div className="kanban-avatar">
+                  <img src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} alt="User" />
+                </div>
+                <div className="kanban-avatar-count">+3</div>
+              </div>
+              <button className="kanban-action-btn">
+                <Filter size={18} /> Filter
+              </button>
+              <button className="kanban-action-btn" onClick={() => board && deleteBoard.mutate(board.id)}>
+                <Trash2 size={18} /> Delete Board
+              </button>
+            </div>
+          </section>
+
+          {/* Project Selection Tabs */}
+          <div className="kanban-board-tabs">
+            {boardsQuery.isLoading ? <span style={{ padding: '0 0 12px' }}>Loading boards...</span> : null}
             {boards.map((item) => (
               <button
-                className={item.id === selectedBoardId ? 'kanban-board-tab kanban-board-tab--active' : 'kanban-board-tab'}
                 key={item.id}
-                type="button"
+                className={`kanban-tab ${item.id === selectedBoardId ? 'kanban-tab--active' : ''}`}
                 onClick={() => setActiveBoardId(item.id)}
               >
-                <strong>{item.name}</strong>
-                <span>{item.cardCount} cards</span>
+                {item.name}
               </button>
             ))}
-          </div>
-        </section>
-
-        {!board && !boardsQuery.isLoading ? (
-          <div className="empty-panel kanban-empty">
-            <Columns3 size={30} />
-            <h2>No Kanban boards yet</h2>
-            <p>Create a board and FluentA will set up To Do, In Progress, and Done for you.</p>
-          </div>
-        ) : null}
-
-        {board ? (
-          <>
-            <section className="kanban-board-tools">
-              <div>
-                <span className="preview-label">Active board</span>
-                <h2>{board.name}</h2>
-              </div>
-              <button className="icon-button icon-button--danger" type="button" aria-label={`Delete board ${board.name}`} onClick={() => deleteBoard.mutate(board.id)}>
-                <Trash2 size={17} />
-              </button>
-            </section>
-
-            <form className="kanban-column-form" onSubmit={submitColumn}>
-              <label>
-                New column
-                <input data-testid="kanban-column-name-input" value={columnName} onChange={(event) => setColumnName(event.target.value)} placeholder="Blocked" />
-              </label>
-              <button className="ghost-button ghost-button--inline" type="submit" disabled={!columnName.trim() || createColumn.isPending}>
-                <Plus size={17} /> Add column
-              </button>
+            
+            {/* New Board form replacing the "New Project" button directly */}
+            <form className="kanban-new-board-form" onSubmit={submitBoard}>
+              <Plus size={16} />
+              <input 
+                value={boardName} 
+                onChange={(event) => setBoardName(event.target.value)} 
+                placeholder="New Project" 
+                data-testid="kanban-board-name-input" 
+                className="kanban-new-board-input"
+              />
             </form>
+          </div>
 
-            <form className="kanban-card-form" onSubmit={submitCard}>
-              <label>
-                Card title
-                <input data-testid="kanban-card-title-input" value={cardForm.title} onChange={(event) => setCardForm({ ...cardForm, title: event.target.value })} placeholder="Draft lesson plan" />
-              </label>
-              <label>
-                Column
-                <select data-testid="kanban-card-column-select" value={selectedCardColumnId} onChange={(event) => setCardForm({ ...cardForm, columnId: event.target.value })}>
-                  {columns.map((column) => <option value={column.id} key={column.id}>{column.name}</option>)}
-                </select>
-              </label>
-              <label>
-                Priority
-                <select data-testid="kanban-card-priority-select" value={cardForm.priority} onChange={(event) => setCardForm({ ...cardForm, priority: event.target.value })}>
-                  {priorities.map((priority) => <option value={priority} key={priority}>{priority}</option>)}
-                </select>
-              </label>
-              <label>
-                Deadline
-                <input data-testid="kanban-card-deadline-input" type="date" value={cardForm.deadline} onChange={(event) => setCardForm({ ...cardForm, deadline: event.target.value })} />
-              </label>
-              <label className="kanban-field-wide">
-                Description
-                <textarea data-testid="kanban-card-description-input" value={cardForm.description} onChange={(event) => setCardForm({ ...cardForm, description: event.target.value })} placeholder="Optional details" />
-              </label>
-              <label>
-                Tags
-                <input data-testid="kanban-card-tags-input" value={cardForm.tags} onChange={(event) => setCardForm({ ...cardForm, tags: event.target.value })} placeholder="Study, Project" />
-              </label>
-              <button className="primary-button" type="submit" disabled={!cardForm.title.trim() || !selectedCardColumnId || createCard.isPending}>
-                <Plus size={18} /> Add card
-              </button>
-            </form>
+          {/* Kanban Board Container */}
+          <div className="kanban-board-container" aria-label="Kanban board">
+            {!board && !boardsQuery.isLoading ? (
+               <div className="empty-panel kanban-empty">
+                 <Columns3 size={30} />
+                 <h2>No Kanban boards yet</h2>
+                 <p>Create a board and FluentA will set up To Do, In Progress, and Done for you.</p>
+               </div>
+            ) : null}
 
-            <section className="kanban-filters" aria-label="Kanban filters">
-              <Search size={18} />
-              <input data-testid="kanban-search-input" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search card title" />
-              <select aria-label="Filter by tag" value={filters.tag} onChange={(event) => setFilters({ ...filters, tag: event.target.value })}>
-                <option value="">All tags</option>
-                {tagOptions.map((tag) => <option value={tag} key={tag}>{tag}</option>)}
-              </select>
-              <select aria-label="Filter by priority" value={filters.priority} onChange={(event) => setFilters({ ...filters, priority: event.target.value })}>
-                <option value="">All priorities</option>
-                {priorities.map((priority) => <option value={priority} key={priority}>{priority}</option>)}
-              </select>
-              <select aria-label="Filter by deadline" value={filters.deadline} onChange={(event) => setFilters({ ...filters, deadline: event.target.value })}>
-                <option value="">All deadlines</option>
-                <option value="has">Has deadline</option>
-                <option value="overdue">Overdue</option>
-                <option value="week">This week</option>
-              </select>
-              <Filter size={18} />
-            </section>
+            {board ? (
+              <div className="kanban-columns-scroll">
+                {visibleColumns.map((column) => (
+                  <div 
+                    className="kanban-column-modern" 
+                    key={column.id} 
+                    data-testid={`kanban-column-${column.name}`}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleDrop(event, column.id)}
+                  >
+                    <div className="kanban-column-header">
+                      <div className="kanban-column-title">
+                        <input
+                          aria-label={`Rename column ${column.name}`}
+                          defaultValue={column.name}
+                          onBlur={(event) => {
+                            if (event.target.value.trim() && event.target.value.trim() !== column.name) {
+                              updateColumn.mutate({ boardId: board.id, columnId: column.id, patch: { name: event.target.value } })
+                            }
+                          }}
+                        />
+                        <span className="kanban-column-count">{column.cards.length}</span>
+                      </div>
+                      <button className="kanban-column-menu" onClick={() => deleteColumn.mutate({ boardId: board.id, columnId: column.id })}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
 
-            {message ? <p className="flashcard-status flashcard-status--error">{message}</p> : null}
-
-            <section className="kanban-board" aria-label="Kanban board">
-              {visibleColumns.map((column) => (
-                <article
-                  className="kanban-column"
-                  key={column.id}
-                  data-testid={`kanban-column-${column.name}`}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => handleDrop(event, column.id)}
-                >
-                  <header>
-                    <input
-                      aria-label={`Rename column ${column.name}`}
-                      defaultValue={column.name}
-                      onBlur={(event) => {
-                        if (event.target.value.trim() && event.target.value.trim() !== column.name) {
-                          updateColumn.mutate({ boardId: board.id, columnId: column.id, patch: { name: event.target.value } })
-                        }
-                      }}
-                    />
-                    <button className="icon-button icon-button--danger" type="button" aria-label={`Delete column ${column.name}`} onClick={() => deleteColumn.mutate({ boardId: board.id, columnId: column.id })}>
-                      <Trash2 size={16} />
-                    </button>
-                  </header>
-                  <div className="kanban-card-list">
-                    {column.cards.length === 0 ? <p className="kanban-column-empty">No visible cards</p> : null}
-                    {column.cards.map((card) => (
-                      <article className="kanban-card" key={card.id} draggable onDragStart={() => setDraggedCardId(card.id)} data-testid={`kanban-card-${card.title}`}>
-                        <header>
-                          <strong>{card.title}</strong>
-                          <span className={`kanban-priority kanban-priority--${card.priority.toLowerCase()}`}>{card.priority}</span>
-                        </header>
-                        {card.description ? <p>{card.description}</p> : null}
-                        <footer>
-                          {card.deadline ? <span className={deadlineState(card.deadline) === 'overdue' ? 'kanban-deadline kanban-deadline--overdue' : 'kanban-deadline'}><CalendarDays size={13} /> {deadlineState(card.deadline) === 'overdue' ? `Overdue ${card.deadline}` : card.deadline}</span> : <span>No deadline</span>}
-                          <div className="kanban-card-tags">{card.tags.map((tag) => <small key={tag}>{tag}</small>)}</div>
-                        </footer>
-                        <div className="kanban-card-actions">
-                          <button type="button" className="ghost-button ghost-button--inline" onClick={() => openEditor(card)}>
-                            <Edit3 size={15} /> Edit
-                          </button>
-                          <button type="button" className="ghost-button ghost-button--inline" onClick={() => {
-                            const currentIndex = columns.findIndex((candidate) => candidate.id === card.columnId)
-                            const target = columns[Math.min(columns.length - 1, currentIndex + 1)]
-                            if (target) moveCard.mutate({ id: card.id, columnId: target.id, sortOrder: target.cards.length })
-                          }}>
-                            Move <ArrowRight size={15} />
-                          </button>
-                          <button type="button" className="icon-button icon-button--danger" aria-label={`Delete card ${card.title}`} onClick={() => deleteCard.mutate(card.id)}>
-                            <Trash2 size={15} />
-                          </button>
+                    <div className="kanban-cards-list">
+                      {column.cards.map((card) => (
+                        <div 
+                          className="kanban-card-modern group" 
+                          key={card.id} 
+                          draggable 
+                          onDragStart={() => setDraggedCardId(card.id)} 
+                          data-testid={`kanban-card-${card.title}`}
+                          onClick={() => openEditor(card)}
+                        >
+                          <div className="kanban-card-tags-row">
+                            <span className="kanban-tag">{card.tags[0] || 'Task'}</span>
+                            <span className={`kanban-priority kanban-priority--${card.priority.toLowerCase()}`}>
+                              {card.priority === 'High' || card.priority === 'Critical' ? <AlertCircle size={12}/> : <ArrowDown size={12}/>}
+                              {card.priority}
+                            </span>
+                          </div>
+                          <h4 className="kanban-card-title">{card.title}</h4>
+                          <div className="kanban-card-footer">
+                            {card.deadline ? (
+                              <div className="kanban-card-date">
+                                <CalendarDays size={16} />
+                                <span>{deadlineState(card.deadline) === 'overdue' ? `Overdue ${card.deadline}` : card.deadline}</span>
+                              </div>
+                            ) : <div></div>}
+                            <div className="kanban-card-avatar">
+                               <img src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} alt="User" />
+                            </div>
+                          </div>
                         </div>
-                      </article>
-                    ))}
+                      ))}
+                      
+                      <button 
+                        className="kanban-add-card-btn" 
+                        onClick={() => {
+                          setEditingCard({ id: 'new', columnId: column.id, title: '', description: null, priority: 'Medium', deadline: null, tags: [], sortOrder: column.cards.length, createdAt: new Date().toISOString() } as unknown as kanbanApi.KanbanCard)
+                          setEditForm(emptyCardForm(column.id))
+                        }}
+                      >
+                        <Plus size={18} /> Add Card
+                      </button>
+                    </div>
                   </div>
-                </article>
-              ))}
-            </section>
+                ))}
 
-            {editingCard ? (
-              <form className="kanban-edit-panel" onSubmit={submitEdit} aria-label="Edit Kanban card">
-                <header>
-                  <div>
-                    <span className="preview-label">Card detail</span>
-                    <h2>Edit card</h2>
-                  </div>
-                  <button type="button" className="ghost-button ghost-button--inline" onClick={() => setEditingCard(null)}>Close</button>
-                </header>
+                {/* Add new column form */}
+                <form className="kanban-new-column-form" onSubmit={submitColumn}>
+                  <input 
+                    value={columnName} 
+                    onChange={(event) => setColumnName(event.target.value)} 
+                    placeholder="New column..." 
+                    data-testid="kanban-column-name-input" 
+                  />
+                  <button type="submit" disabled={!columnName.trim() || createColumn.isPending}>
+                    <Plus size={16} />
+                  </button>
+                </form>
+
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Modal for editing/creating card */}
+        {editingCard ? (
+          <div className="kanban-modal-overlay">
+            <form className="kanban-modal-content" onSubmit={submitEdit} aria-label="Edit Kanban card">
+              <header className="kanban-modal-header">
+                <div>
+                  <span className="kanban-modal-label">Card detail</span>
+                  <h2>{editingCard.id === 'new' ? 'Create card' : 'Edit card'}</h2>
+                </div>
+                <button type="button" className="kanban-modal-close" onClick={() => setEditingCard(null)}><X size={20} /></button>
+              </header>
+              <div className="kanban-modal-body">
                 <label>
                   Title
-                  <input data-testid="kanban-edit-title-input" value={editForm.title} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} />
+                  <input data-testid="kanban-edit-title-input" value={editForm.title} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} autoFocus />
                 </label>
                 <label>
                   Description
                   <textarea value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} />
                 </label>
-                <label>
-                  Priority
-                  <select value={editForm.priority} onChange={(event) => setEditForm({ ...editForm, priority: event.target.value })}>
-                    {priorities.map((priority) => <option value={priority} key={priority}>{priority}</option>)}
-                  </select>
-                </label>
-                <label>
-                  Deadline
-                  <input type="date" value={editForm.deadline} onChange={(event) => setEditForm({ ...editForm, deadline: event.target.value })} />
-                </label>
+                <div className="kanban-modal-row">
+                  <label>
+                    Priority
+                    <select value={editForm.priority} onChange={(event) => setEditForm({ ...editForm, priority: event.target.value })}>
+                      {priorities.map((priority) => <option value={priority} key={priority}>{priority}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Deadline
+                    <input type="date" value={editForm.deadline} onChange={(event) => setEditForm({ ...editForm, deadline: event.target.value })} />
+                  </label>
+                </div>
                 <label>
                   Tags
-                  <input value={editForm.tags} onChange={(event) => setEditForm({ ...editForm, tags: event.target.value })} />
+                  <input value={editForm.tags} onChange={(event) => setEditForm({ ...editForm, tags: event.target.value })} placeholder="Comma separated" />
                 </label>
-                <button className="primary-button" type="submit" disabled={!editForm.title.trim() || updateCard.isPending}>Save card</button>
-              </form>
-            ) : null}
-          </>
+              </div>
+              <footer className="kanban-modal-footer">
+                {editingCard.id !== 'new' && (
+                  <button type="button" className="kanban-danger-btn" onClick={() => { deleteCard.mutate(editingCard.id); setEditingCard(null); }}>
+                    <Trash2 size={16} /> Delete
+                  </button>
+                )}
+                <div style={{flex: 1}}></div>
+                <button type="button" className="kanban-secondary-btn" onClick={() => setEditingCard(null)}>Cancel</button>
+                <button type="submit" className="kanban-primary-btn" disabled={!editForm.title.trim() || updateCard.isPending || (editingCard.id === 'new' && createCard.isPending)}>Save card</button>
+              </footer>
+            </form>
+          </div>
         ) : null}
 
-        {boardQuery.isError || boardsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load Kanban data.</p> : null}
-      </section>
-    </main>
+        {message ? <p className="flashcard-status flashcard-status--error" style={{ position: 'absolute', bottom: '20px', right: '20px' }}>{message}</p> : null}
+        {(boardQuery.isError || boardsQuery.isError) ? <p className="flashcard-status flashcard-status--error" style={{ position: 'absolute', bottom: '20px', right: '20px' }}>Could not load Kanban data.</p> : null}
+      </main>
+    </div>
   )
 }

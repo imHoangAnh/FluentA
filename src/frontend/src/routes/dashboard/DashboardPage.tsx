@@ -1,7 +1,7 @@
 import { 
   Bell, BookOpen, CalendarClock, CheckSquare, 
-  Columns3, Flame, Layers, LogOut, NotebookPen, Repeat2, Settings, 
-  Search, CheckCircle2, Circle, HelpCircle, Globe, Timer, TrendingUp
+  Columns3, Flame, Globe, HelpCircle, Layers, LogOut, NotebookPen, Repeat2, Settings, 
+  Search, CheckCircle2, Circle, Kanban, Timer, TrendingUp
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -122,6 +122,9 @@ export function DashboardPage() {
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''} onMouseEnter={preloadJournalEditor}>
             <NotebookPen size={20} /> Journal
+          </Link>
+          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
+            <Kanban size={20} /> Kanban
           </Link>
         </nav>
 

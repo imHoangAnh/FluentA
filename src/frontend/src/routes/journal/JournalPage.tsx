@@ -1,7 +1,12 @@
-import { BarChart3, BookOpen, CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, NotebookPen, Save, Search, Trash2, X } from 'lucide-react'
+import { 
+  Bell, BookOpen, CalendarClock, CheckSquare, 
+  Columns3, Globe, HelpCircle, Layers, LogOut, NotebookPen, Repeat2, Settings, 
+  CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3, Kanban 
+} from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuthStore } from '../../stores/authStore'
 import * as journalApi from '../../lib/api/journal.api'
 
 const JournalRichTextEditor = lazy(() =>
@@ -69,6 +74,11 @@ function HighlightedPreview({ entry }: { entry: journalApi.JournalEntrySummary |
 
 export function JournalPage() {
   const queryClient = useQueryClient()
+  const logout = useAuthStore((state) => state.logout)
+  const user = useAuthStore((state) => state.user)
+  const location = useLocation()
+  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -249,111 +259,167 @@ export function JournalPage() {
     createEntry.mutate({ title, content, learningDate: learningDate || null })
   }
 
+  const textContent = useMemo(() => {
+    const div = document.createElement('div')
+    div.innerHTML = content
+    return div.textContent || ''
+  }, [content])
+  const wordCount = useMemo(() => textContent.trim() ? textContent.trim().split(/\s+/).length : 0, [textContent])
+  const charCount = textContent.length
+
+  const showEmptyState = !selectedId && !title && !content && !isOpening;
+
   return (
-    <main className="workspace journal-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
+    <div className="dashboard-layout">
+      {/* SideNavBar */}
+      <aside className="dashboard-sidebar">
+        <div className="dashboard-brand">
+          <div className="dashboard-brand-icon">
+            <Globe size={24} />
+          </div>
+          <div className="dashboard-brand-text">
+            <h1>FluentA</h1>
+            <p>Language Learning</p>
+          </div>
         </div>
-        <nav className="workspace-nav" aria-label="Journal navigation">
-          <Link className="ghost-button ghost-button--inline" to="/">
-            <BarChart3 size={17} /> Dashboard
+
+        <nav className="dashboard-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+            <Columns3 size={20} /> Today
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
-            <BookOpen size={17} /> Vocabulary
+          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
+            <BookOpen size={20} /> Vocabulary
+          </Link>
+          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
+            <Layers size={20} /> Review
+          </Link>
+          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
+            <CheckSquare size={20} /> Todo
+          </Link>
+          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
+            <Repeat2 size={20} /> Habits
+          </Link>
+          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+            <CalendarClock size={20} /> Countdowns
+          </Link>
+          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
+            <NotebookPen size={20} /> Journal
+          </Link>
+          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
+            <Kanban size={20} /> Kanban
           </Link>
         </nav>
+
+        <div className="dashboard-user-section">
+          <div className="dashboard-user-card">
+            <img 
+              className="dashboard-user-avatar" 
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              alt="User" 
+            />
+            <div className="dashboard-user-info">
+              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
+              <p className="dashboard-user-level">Learner Profile</p>
+            </div>
+          </div>
+          <div className="dashboard-user-links">
+            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="#"><HelpCircle size={16} /> Help</Link>
+            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
+          </div>
+        </div>
+      </aside>
+
+      <main className="dashboard-main" style={{ padding: '32px', height: '100vh', overflow: 'hidden' }}>
+        <div className="journal-page" style={{ marginLeft: 0, padding: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <header className="journal-header">
+        <div>
+          <h2>My Journal</h2>
+        </div>
+        <div className="journal-header-actions">
+          <label className="journal-search">
+            <Search size={17} />
+            <span className="sr-only">Search journal content</span>
+            <input
+              aria-label="Search journal content"
+              data-testid="journal-search-input"
+              maxLength={100}
+              placeholder="Search journal..."
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {searchQuery ? (
+              <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
+                <X size={16} />
+              </button>
+            ) : null}
+          </label>
+          <Link to="/notifications" aria-label="Notifications">
+            <Bell size={20} />
+          </Link>
+        </div>
       </header>
 
-      <section className="journal-shell">
-        <div className="journal-hero">
-          <div>
-            <span className="preview-label">Journal Pages</span>
-            <h1>Language learning notes</h1>
-            <p>Shape language-learning notes with rich text and calm, automatic saving.</p>
-          </div>
-          <NotebookPen size={38} />
-        </div>
-
-        <div className="journal-layout">
-          <aside className="journal-list-panel">
+      <div className="journal-content">
+        <div className="journal-sidebar">
+          <section className="journal-calendar-card" aria-label="Learning date calendar">
             <header>
-              <div>
-                <span className="preview-label">Entries</span>
-                <h2>{entries.length} journal {entries.length === 1 ? 'entry' : 'entries'}</h2>
-              </div>
-              <button className="icon-button" type="button" aria-label="New journal entry" onClick={clearEditor}>
-                <FilePlus2 size={18} />
-              </button>
-            </header>
-
-            <section className="journal-calendar" aria-label="Learning date calendar">
-              <header>
+              <strong>{monthLabel(calendarMonth)}</strong>
+              <div style={{ display: 'flex', gap: '4px' }}>
                 <button aria-label="Previous calendar month" type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, -1))}>
                   <ChevronLeft size={16} />
                 </button>
-                <strong>{monthLabel(calendarMonth)}</strong>
                 <button aria-label="Next calendar month" type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, 1))}>
                   <ChevronRight size={16} />
                 </button>
-              </header>
-              <div className="journal-calendar-weekdays" aria-hidden="true">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <span key={day}>{day}</span>)}
               </div>
-              <div className="journal-calendar-grid">
-                {calendarDates.map((day) => {
-                  const count = calendarCounts.get(day.value) ?? 0
-                  const isSelected = learningDate === day.value
-                  return (
-                    <button
-                      aria-label={`${day.value}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
-                      className={[
-                        'journal-calendar-day',
-                        day.isCurrentMonth ? '' : 'journal-calendar-day--muted',
-                        count > 0 ? 'journal-calendar-day--has-entry' : '',
-                        isSelected ? 'journal-calendar-day--selected' : '',
-                      ].filter(Boolean).join(' ')}
-                      data-testid={`journal-calendar-day-${day.value}`}
-                      key={day.value}
-                      type="button"
-                      onClick={() => openCalendarDate(day.value)}
-                    >
-                      <span>{day.date.getDate()}</span>
-                      {count > 0 ? <small>{count}</small> : null}
-                    </button>
-                  )
-                })}
-              </div>
-              {calendarQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load calendar dates.</p> : null}
-            </section>
+            </header>
+            <div className="journal-calendar-weekdays" aria-hidden="true">
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => <span key={i}>{day}</span>)}
+            </div>
+            <div className="journal-calendar-grid">
+              {calendarDates.map((day) => {
+                const count = calendarCounts.get(day.value) ?? 0
+                const isSelected = learningDate === day.value
+                return (
+                  <button
+                    aria-label={`${day.value}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
+                    className={[
+                      'journal-calendar-day',
+                      day.isCurrentMonth ? '' : 'journal-calendar-day--muted',
+                      count > 0 ? 'journal-calendar-day--has-entry' : '',
+                      isSelected ? 'journal-calendar-day--selected' : '',
+                    ].filter(Boolean).join(' ')}
+                    data-testid={`journal-calendar-day-${day.value}`}
+                    key={day.value}
+                    type="button"
+                    onClick={() => openCalendarDate(day.value)}
+                  >
+                    {day.date.getDate()}
+                    {count > 0 ? <small>{count}</small> : null}
+                  </button>
+                )
+              })}
+            </div>
+            {calendarQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load calendar dates.</p> : null}
+          </section>
 
-            <label className="journal-search">
-              <Search size={17} />
-              <span className="sr-only">Search journal content</span>
-              <input
-                aria-label="Search journal content"
-                data-testid="journal-search-input"
-                maxLength={100}
-                placeholder="Search journal content..."
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-              {searchQuery ? (
-                <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
-                  <X size={16} />
-                </button>
-              ) : null}
-            </label>
+          <section className="journal-entries-card">
+            <div className="journal-entries-card-header">
+              <h3>Recent Entries</h3>
+              <button type="button" aria-label="New journal entry" onClick={clearEditor}>
+                New Entry
+              </button>
+            </div>
 
             {isListLoading ? <p className="flashcard-status">{isSearching ? 'Searching journal entries...' : 'Loading journal entries...'}</p> : null}
             {isListError ? <p className="flashcard-status flashcard-status--error">Could not load journal entries.</p> : null}
             {!isListLoading && !isListError && entries.length === 0 ? (
-              <div className="empty-panel journal-empty">
-                {isSearching ? <Search size={28} /> : <NotebookPen size={28} />}
-                <h2>{isSearching ? 'No matching entries' : 'No journal entries yet'}</h2>
-                <p>{isSearching ? `No content matches "${debouncedSearchQuery}".` : "Write one thought from today's language practice."}</p>
+              <div className="journal-empty">
+                <p style={{ color: 'var(--muted)', fontSize: '14px', textAlign: 'center' }}>
+                  {isSearching ? `No content matches "${debouncedSearchQuery}".` : "No entries found."}
+                </p>
               </div>
             ) : null}
 
@@ -366,39 +432,62 @@ export function JournalPage() {
                   onClick={() => void openEntry(entry)}
                   aria-label={`Open journal ${entry.title}`}
                 >
+                  <div className="journal-entry-card-top">
+                    <span className="journal-entry-badge">{entry.learningDate ? 'LEARNING' : 'NOTE'}</span>
+                    <span className="journal-entry-date">{formatDate(entry.createdAt)}</span>
+                  </div>
                   <strong>{entry.title}</strong>
-                  <span>{formatDate(entry.createdAt)}</span>
                   <p><HighlightedPreview entry={entry} /></p>
-                  {entry.learningDate ? <small><CalendarDays size={14} /> Learning date {entry.learningDate}</small> : null}
                 </button>
               ))}
             </div>
-          </aside>
+          </section>
+        </div>
 
-          <form className="journal-editor" onSubmit={submitEntry}>
-            <header>
-              <div>
-                <span className="preview-label">{selectedId ? 'Edit entry' : 'New entry'}</span>
-                <h2>{selectedId ? 'Keep shaping this note' : 'Capture a learning moment'}</h2>
-              </div>
+        <form className="journal-editor-card" onSubmit={submitEntry}>
+          <div className="journal-editor-toolbar">
+            <div className="journal-editor-toolbar-left">
               {selectedId ? (
                 <button
-                  className="icon-button icon-button--danger"
+                  className="journal-toolbar-button"
                   type="button"
                   aria-label={`Delete journal ${title}`}
                   disabled={deleteEntry.isPending}
                   onClick={() => {
                     if (window.confirm(`Delete "${title}"?`)) deleteEntry.mutate(selectedId)
                   }}
+                  title="Delete entry"
                 >
                   <Trash2 size={18} />
                 </button>
               ) : null}
-            </header>
+            </div>
+            <div className="journal-editor-toolbar-right">
+              <button className="primary-button" style={{ minHeight: '36px', padding: '0 16px', margin: 0, width: 'auto' }} type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
+                {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId ? saveStatus === 'error' ? 'Retry' : 'Save' : 'Create'}
+              </button>
+            </div>
+          </div>
 
-            <label>
-              Title
+          <div className="journal-editor-body">
+            <div className="journal-editor-inner">
+              <div className="journal-date-display">
+                <CalendarDays size={18} />
+                <input
+                  data-testid="journal-learning-date-input"
+                  disabled={isOpening}
+                  value={learningDate}
+                  type="date"
+                  onChange={(event) => {
+                    setLearningDate(event.target.value)
+                    markChanged()
+                  }}
+                  aria-label="Learning date"
+                />
+              </div>
+
               <input
+                className="journal-title-input"
                 data-testid="journal-title-input"
                 disabled={isOpening}
                 value={title}
@@ -407,26 +496,9 @@ export function JournalPage() {
                   setTitle(event.target.value)
                   markChanged()
                 }}
-                placeholder="What did you learn today?"
+                placeholder="What did you feel today?"
               />
-            </label>
 
-            <label>
-              Learning date
-              <input
-                data-testid="journal-learning-date-input"
-                disabled={isOpening}
-                value={learningDate}
-                type="date"
-                onChange={(event) => {
-                  setLearningDate(event.target.value)
-                  markChanged()
-                }}
-              />
-            </label>
-
-            <label className="journal-content-label">
-              Content
               <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
                 <JournalRichTextEditor
                   disabled={isOpening}
@@ -437,33 +509,60 @@ export function JournalPage() {
                   }}
                 />
               </Suspense>
-            </label>
+            </div>
+          </div>
 
-            <footer>
-              <small data-testid="journal-save-status">
-                {selectedId
-                  ? saveStatus === 'saving'
-                    ? 'Saving...'
-                    : saveStatus === 'saved'
-                      ? 'Saved'
-                      : saveStatus === 'error'
-                        ? 'Save failed'
-                        : isDirty
-                          ? 'Unsaved changes'
-                          : 'Saved'
-                  : `${content.length.toLocaleString()} / 100,000 HTML characters`}
-              </small>
-              <button className="primary-button" type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
-                {isSaving || isOpening ? <Loader2 size={18} /> : <Save size={18} />} {selectedId ? saveStatus === 'error' ? 'Retry save' : 'Save changes' : 'Create entry'}
+          <footer className="journal-editor-footer">
+            <div className="journal-editor-stats">
+              <span><strong>{wordCount}</strong> words</span>
+              <span><strong>{charCount}</strong> characters</span>
+            </div>
+            <small data-testid="journal-save-status">
+              {selectedId
+                ? saveStatus === 'saving'
+                  ? 'Saving...'
+                  : saveStatus === 'saved'
+                    ? 'Saved'
+                    : saveStatus === 'error'
+                      ? 'Save failed'
+                      : isDirty
+                        ? 'Unsaved changes'
+                        : 'Saved'
+                : `${charCount.toLocaleString()} / 100,000 characters`}
+            </small>
+          </footer>
+
+          {showEmptyState && (
+            <div className="journal-empty-overlay" id="empty-state">
+              <div className="journal-empty-icon">
+                <Edit3 size={40} />
+              </div>
+              <h3>Your journey is waiting</h3>
+              <p>Write your first thought from today's language practice to track your growth over time.</p>
+              <button 
+                type="button"
+                className="primary-button" 
+                style={{ width: 'auto', padding: '0 24px', margin: 0 }}
+                onClick={() => {
+                  setTitle('New Entry');
+                  document.querySelector<HTMLInputElement>('.journal-title-input')?.focus();
+                }}
+              >
+                <FilePlus2 size={18} />
+                Create First Entry
               </button>
-            </footer>
+            </div>
+          )}
 
-            {openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError ? (
-              <p className="flashcard-status flashcard-status--error">The journal entry could not be saved.</p>
-            ) : null}
-          </form>
+          {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
+            <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', background: 'var(--error)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 100 }}>
+              The journal entry could not be saved.
+            </div>
+          )}
+        </form>
+      </div>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   )
 }

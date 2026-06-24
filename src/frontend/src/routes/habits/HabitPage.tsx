@@ -1,7 +1,12 @@
-import { ArrowLeft, ArrowRight, BarChart3, CalendarCheck, Edit3, Home, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { 
+  BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle, Layers, 
+  LogOut, NotebookPen, Repeat2, Settings, Kanban, Plus, 
+  ChevronLeft, ChevronRight, Edit3, Trash2, X
+} from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuthStore } from '../../stores/authStore'
 import * as habitApi from '../../lib/api/habit.api'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -115,6 +120,33 @@ export function HabitPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => toMonthInput(new Date()))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<HabitFormState>(emptyForm)
+  const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
+  const location = useLocation()
+  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+
+  const weekDates = useMemo(() => {
+    const todayDate = new Date()
+    const currentDayOfWeek = todayDate.getDay() // 0 is Sunday
+    const monday = new Date(todayDate)
+    const diff = todayDate.getDate() - currentDayOfWeek + (currentDayOfWeek === 0 ? -6 : 1)
+    monday.setDate(diff)
+    
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      return {
+        date: d,
+        dateStr: toDateInput(d),
+        dayName: weekdays[d.getDay()].slice(0, 3),
+        dayNum: d.getDate(),
+        isToday: toDateInput(d) === today
+      }
+    })
+  }, [today])
 
   const dates = useMemo(() => monthDates(selectedMonth), [selectedMonth])
 
@@ -127,6 +159,8 @@ export function HabitPage() {
     () => (habitsQuery.data ?? []).toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.name.localeCompare(right.name)),
     [habitsQuery.data],
   )
+  
+  const selectedHabit = useMemo(() => habits.find(h => h.id === selectedHabitId) || habits[0], [habits, selectedHabitId])
 
   const entryQueries = useQueries({
     queries: habits.map((habit) => ({
@@ -225,228 +259,308 @@ export function HabitPage() {
   }
 
   return (
-    <main className="workspace habit-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
+    <div className="dashboard-layout">
+      {/* SideNavBar exactly like KanbanPage/JournalPage */}
+      <aside className="dashboard-sidebar">
+        <div className="dashboard-brand">
+          <div className="dashboard-brand-icon">
+            <Globe size={24} />
+          </div>
+          <div className="dashboard-brand-text">
+            <h1>FluentA</h1>
+            <p>Language Learning</p>
+          </div>
         </div>
-        <nav className="workspace-nav" aria-label="Habit navigation">
-          <Link className="ghost-button ghost-button--inline" to="/">
-            <BarChart3 size={17} /> Dashboard
+
+        <nav className="dashboard-nav">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
+            <Columns3 size={20} /> Today
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
-            <Home size={17} /> Vocabulary
+          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
+            <BookOpen size={20} /> Vocabulary
+          </Link>
+          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
+            <Layers size={20} /> Review
+          </Link>
+          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
+            <CheckSquare size={20} /> Todo
+          </Link>
+          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
+            <Repeat2 size={20} /> Habits
+          </Link>
+          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+            <CalendarClock size={20} /> Countdowns
+          </Link>
+          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
+            <NotebookPen size={20} /> Journal
+          </Link>
+          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
+            <Kanban size={20} /> Kanban
           </Link>
         </nav>
-      </header>
 
-      <section className="habit-shell">
-        <div className="habit-hero">
-          <div>
-            <span className="preview-label">Habit Tracker</span>
-            <h1>Monthly rhythm</h1>
-            <p>{habits.length} habits · {formatMonth(selectedMonth)} · {timeZoneId}</p>
+        <div className="dashboard-user-section">
+          <div className="dashboard-user-card">
+            <img 
+              className="dashboard-user-avatar" 
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              alt="User" 
+            />
+            <div className="dashboard-user-info">
+              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
+              <p className="dashboard-user-level">Learner Profile</p>
+            </div>
           </div>
-          <CalendarCheck size={34} />
+          <div className="dashboard-user-links">
+            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="#"><HelpCircle size={16} /> Help</Link>
+            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
+          </div>
         </div>
+      </aside>
 
-        <form className="habit-form" onSubmit={submitHabit}>
-          <label>
-            Habit
-            <input
-              data-testid="habit-name-input"
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Read English"
-            />
-          </label>
-          <label>
-            Description
-            <input
-              data-testid="habit-description-input"
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="30 minutes after breakfast"
-            />
-          </label>
-          <label>
-            Color
-            <input
-              aria-label="Habit color"
-              className="habit-color-input"
-              type="color"
-              value={form.color}
-              onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))}
-            />
-          </label>
-          <label>
-            Icon
-            <input
-              data-testid="habit-icon-input"
-              value={form.icon}
-              onChange={(event) => setForm((current) => ({ ...current, icon: event.target.value }))}
-              placeholder="Book"
-            />
-          </label>
-          <label>
-            Frequency
-            <select
-              data-testid="habit-frequency-select"
-              value={form.frequency}
-              onChange={(event) => setForm((current) => ({ ...current, frequency: event.target.value as habitApi.HabitFrequency }))}
-            >
-              <option value="Daily">Daily</option>
-              <option value="Custom">Custom days</option>
-            </select>
-          </label>
-          <label>
-            <input
-              checked={form.reminderEnabled}
-              type="checkbox"
-              onChange={(event) => setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))}
-            />
-            Daily reminder
-          </label>
-          <button className="primary-button" type="submit" disabled={isSaving || !canSubmit} data-testid="save-habit-button">
-            {isSaving ? <Loader2 size={18} /> : editingId ? <Save size={18} /> : <Plus size={18} />}
-            {editingId ? 'Save habit' : 'Add habit'}
-          </button>
-          {editingId ? (
-            <button className="ghost-button ghost-button--inline" type="button" onClick={resetForm}>
-              Cancel
-            </button>
-          ) : null}
-
-          {form.frequency === 'Custom' ? (
-            <fieldset className="habit-weekdays">
-              <legend>Scheduled days</legend>
-              {weekdays.map((day) => (
-                <label key={day}>
-                  <input
-                    checked={form.customDays.includes(day)}
-                    type="checkbox"
-                    onChange={() => toggleCustomDay(day)}
-                  />
-                  {day.slice(0, 3)}
-                </label>
+      <main className="dashboard-main habit-tracker-main">
+        {/* LEFT: HABIT LIST */}
+        <div className="habit-tracker-sidebar">
+          {/* Top Header */}
+          <header className="habit-tracker-header">
+            <div className="habit-tracker-header-title">
+              <h2>Habit Tracker</h2>
+            </div>
+            <div className="habit-tracker-header-actions">
+              <button onClick={() => { resetForm(); setShowForm(true); }}><Plus size={24} /></button>
+            </div>
+          </header>
+          
+          {/* Weekly Tracker Bar */}
+          <div className="habit-tracker-week">
+            <div className="habit-tracker-week-grid">
+              {weekDates.map(({dateStr, dayName, dayNum, isToday}) => (
+                <div key={dateStr} className="habit-tracker-week-day">
+                  <p className={isToday ? 'active' : ''}>{dayName}</p>
+                  <div className={`habit-tracker-week-date ${isToday ? 'active' : ''}`}>
+                    {dayNum}
+                  </div>
+                </div>
               ))}
-            </fieldset>
-          ) : null}
-        </form>
+            </div>
+          </div>
 
-        <div className="habit-month-controls" aria-label="Habit month controls">
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedMonth((month) => shiftMonth(month, -1))}>
-            <ArrowLeft size={17} /> Previous
-          </button>
-          <strong>{formatMonth(selectedMonth)}</strong>
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedMonth(toMonthInput(new Date()))}>
-            This month
-          </button>
-          <button className="ghost-button ghost-button--inline" type="button" onClick={() => setSelectedMonth((month) => shiftMonth(month, 1))}>
-            Next <ArrowRight size={17} />
-          </button>
-        </div>
-
-        {habitsQuery.isLoading ? <p className="flashcard-status">Loading habits...</p> : null}
-        {habitsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load habits.</p> : null}
-
-        {!habitsQuery.isLoading && !habitsQuery.isError ? (
-          <section className="habit-grid-panel" aria-label="Habit monthly grid">
-            {habits.length === 0 ? (
-              <div className="empty-panel habit-empty">
-                <CalendarCheck size={28} />
-                <h2>No habits yet</h2>
-                <p>Add one recurring study habit and start making the month visible.</p>
+          {/* Habit List Scrollable */}
+          <div className="habit-tracker-list">
+            {habitsQuery.isLoading ? <p className="habit-tracker-loading">Loading habits...</p> : null}
+            {habits.length === 0 && !habitsQuery.isLoading ? (
+              <div className="habit-tracker-empty">
+                <CalendarClock size={40} />
+                <p>No habits yet. Let's build a new one!</p>
               </div>
             ) : null}
 
-            {habits.length > 0 ? (
-              <div className="habit-grid-wrap">
-                <div className="habit-grid" style={{ gridTemplateColumns: `minmax(220px, 260px) repeat(${dates.length}, minmax(42px, 1fr))` }}>
-                  <div className="habit-grid__corner">Habit</div>
-                  {dates.map((date) => (
-                    <div className={date === today ? 'habit-grid__day habit-grid__day--today' : 'habit-grid__day'} key={date}>
-                      <span>{dayOfWeek(date).slice(0, 3)}</span>
-                      <strong>{dayNumber(date)}</strong>
+            {habits.map(habit => {
+              const isSelected = selectedHabit?.id === habit.id
+              const completedDates = entriesByHabit.get(habit.id) ?? new Set<string>()
+              const isCompletedToday = completedDates.has(today)
+              
+              return (
+                <div 
+                  key={habit.id}
+                  onClick={() => setSelectedHabitId(habit.id)}
+                  className={`habit-list-card ${isSelected ? 'active' : ''}`}
+                >
+                  <div className="habit-list-card-content">
+                    <div className="habit-list-card-icon" style={{ backgroundColor: `${habit.color}20` || '#e2e8f0' }}>
+                      {habit.icon || '📌'}
                     </div>
-                  ))}
+                    <div className="habit-list-card-info">
+                      <p className="habit-list-card-name">{habit.name}</p>
+                      <div className="habit-list-card-streak">
+                        <span><CalendarClock size={14} /> {habit.currentStreak} Days Streak</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Quick toggle for today */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); toggleEntry.mutate({ habitId: habit.id, date: today }) }}
+                    className={`habit-list-card-toggle ${isCompletedToday ? 'completed' : ''}`}
+                  >
+                    <CheckSquare size={16} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
-                  {habits.map((habit) => {
-                    const completedDates = entriesByHabit.get(habit.id) ?? new Set<string>()
-                    const rate = completionRate(habit, dates, completedDates)
+        {/* RIGHT: HABIT DETAILS/INSIGHTS */}
+        <div className="habit-tracker-details">
+          {selectedHabit ? (
+            <div className="habit-tracker-details-inner">
+              {/* Selected Habit Header */}
+              <div className="habit-details-header">
+                <div className="habit-details-title-area">
+                  <div className="habit-details-icon" style={{ backgroundColor: `${selectedHabit.color}20` || '#e2e8f0' }}>
+                    {selectedHabit.icon || '📌'}
+                  </div>
+                  <div className="habit-details-text">
+                    <h3>{selectedHabit.name}</h3>
+                    <p>
+                      <span className="habit-color-dot" style={{ backgroundColor: selectedHabit.color || '#e2e8f0' }}></span>
+                      {scheduleText(selectedHabit)}
+                    </p>
+                  </div>
+                </div>
+                <div className="habit-details-actions">
+                  <button onClick={() => { editHabit(selectedHabit); setShowForm(true); }}><Edit3 size={20} /></button>
+                  <button className="danger" onClick={() => confirmDelete(selectedHabit)}><Trash2 size={20} /></button>
+                </div>
+              </div>
+
+              {/* Stats Bento Grid */}
+              <div className="habit-stats-grid">
+                <div className="habit-stat-card">
+                  <div className="habit-stat-label">
+                    <CheckSquare size={18} className="icon-primary" />
+                    <span>Total Check-ins</span>
+                  </div>
+                  <p className="habit-stat-value">{entriesByHabit.get(selectedHabit.id)?.size || 0} <span>Days</span></p>
+                </div>
+                
+                <div className="habit-stat-card">
+                  <div className="habit-stat-label">
+                    <Repeat2 size={18} className="icon-primary" />
+                    <span>Check-in Rate</span>
+                  </div>
+                  <p className="habit-stat-value">{completionRate(selectedHabit, dates, entriesByHabit.get(selectedHabit.id) ?? new Set())} <span>%</span></p>
+                </div>
+                
+                <div className="habit-stat-card">
+                  <div className="habit-stat-label">
+                    <CalendarClock size={18} className="icon-orange" />
+                    <span>Current Streak</span>
+                  </div>
+                  <p className="habit-stat-value">{selectedHabit.currentStreak} <span>Days</span></p>
+                </div>
+
+                <div className="habit-stat-card">
+                  <div className="habit-stat-label">
+                    <Layers size={18} className="icon-purple" />
+                    <span>Best Streak</span>
+                  </div>
+                  <p className="habit-stat-value">{Math.max(selectedHabit.currentStreak, 0)} <span>Days</span></p>
+                </div>
+              </div>
+
+              {/* Monthly Calendar Grid */}
+              <div className="habit-calendar-card">
+                <div className="habit-calendar-header">
+                  <button onClick={() => setSelectedMonth(m => shiftMonth(m, -1))}><ChevronLeft size={20} /></button>
+                  <h4>{formatMonth(selectedMonth)}</h4>
+                  <button onClick={() => setSelectedMonth(m => shiftMonth(m, 1))}><ChevronRight size={20} /></button>
+                </div>
+                <div className="habit-calendar-grid">
+                  {/* Days Header */}
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => <div key={i} className="habit-calendar-day-header">{d}</div>)}
+                  
+                  {/* Grid filler for first day of month */}
+                  {Array.from({ length: (parseMonth(selectedMonth).getDay() + 6) % 7 }).map((_, i) => <div key={`empty-${i}`} />)}
+                  
+                  {/* Days */}
+                  {dates.map(date => {
+                    const isCompleted = (entriesByHabit.get(selectedHabit.id) ?? new Set()).has(date)
+                    const isScheduledDay = isScheduled(selectedHabit, date)
+                    const isFuture = date > today
                     return (
-                      <div className="habit-grid__row" role="row" key={habit.id}>
-                        <article className="habit-card">
-                          <span className="habit-card__color" style={{ backgroundColor: habit.color ?? '#22C55E' }} />
-                          <div>
-                            <span className="preview-label">{habit.icon || scheduleText(habit)}</span>
-                            <h2>{habit.name}</h2>
-                            {habit.description ? <p>{habit.description}</p> : null}
-                          </div>
-                          <dl>
-                            <div>
-                              <dt>Streak</dt>
-                              <dd>{habit.currentStreak} days</dd>
-                            </div>
-                            <div>
-                              <dt>Month</dt>
-                              <dd>{rate}%</dd>
-                            </div>
-                            <div>
-                              <dt>Today</dt>
-                              <dd>{habit.isScheduledToday ? (habit.isCheckedToday ? 'Done' : 'Open') : 'Rest'}</dd>
-                            </div>
-                          </dl>
-                          <footer>
-                            <Link className="ghost-button ghost-button--inline" to={`/habits/${habit.id}/stats`} aria-label={`View stats for ${habit.name}`}>
-                              <BarChart3 size={16} /> Stats
-                            </Link>
-                            <button className="ghost-button ghost-button--inline" type="button" onClick={() => editHabit(habit)} aria-label={`Edit ${habit.name}`}>
-                              <Edit3 size={16} /> Edit
-                            </button>
-                            <button className="icon-button icon-button--danger" type="button" onClick={() => confirmDelete(habit)} aria-label={`Delete ${habit.name}`}>
-                              <Trash2 size={17} />
-                            </button>
-                          </footer>
-                        </article>
-
-                        {dates.map((date) => {
-                          const scheduled = isScheduled(habit, date)
-                          const future = date > today
-                          const completed = completedDates.has(date)
-                          const disabled = !scheduled || future || toggleEntry.isPending
-                          const label = `${completed ? 'Uncheck' : 'Check'} ${habit.name} on ${date}`
-                          return (
-                            <button
-                              aria-label={label}
-                              className={[
-                                'habit-cell',
-                                scheduled ? 'habit-cell--scheduled' : 'habit-cell--unscheduled',
-                                completed ? 'habit-cell--completed' : '',
-                                future ? 'habit-cell--future' : '',
-                              ].filter(Boolean).join(' ')}
-                              data-testid={`habit-cell-${habit.id}-${date}`}
-                              disabled={disabled}
-                              key={date}
-                              style={completed ? { backgroundColor: habit.color ?? '#22C55E' } : undefined}
-                              type="button"
-                              onClick={() => toggleEntry.mutate({ habitId: habit.id, date })}
-                              title={!scheduled ? 'Not scheduled' : future ? 'Future dates cannot be toggled' : label}
-                            >
-                              <span>{completed ? '✓' : scheduled ? '' : '·'}</span>
-                            </button>
-                          )
-                        })}
+                      <div key={date} className="habit-calendar-day-cell">
+                        <button
+                          onClick={() => toggleEntry.mutate({ habitId: selectedHabit.id, date })}
+                          disabled={!isScheduledDay || isFuture}
+                          className={`habit-calendar-day-btn ${isCompleted ? 'completed' : ''} ${date === today ? 'today' : ''} ${!isScheduledDay || isFuture ? 'disabled' : ''}`}
+                          style={isCompleted ? { backgroundColor: selectedHabit.color ?? undefined, color: '#fff' } : undefined}
+                        >
+                          {dayNumber(date)}
+                        </button>
                       </div>
                     )
                   })}
                 </div>
               </div>
-            ) : null}
-          </section>
-        ) : null}
-      </section>
-    </main>
+            </div>
+          ) : (
+            <div className="habit-tracker-empty-state">
+              <CalendarClock size={80} />
+              <p>Select a habit to view your progress</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Habit Form Modal */}
+        {showForm && (
+          <div className="habit-modal-overlay">
+            <div className="habit-modal">
+              <div className="habit-modal-header">
+                <h3>{editingId ? 'Edit Habit' : 'New Habit'}</h3>
+                <button onClick={() => { setShowForm(false); resetForm(); }}><X size={24} /></button>
+              </div>
+              
+              <form onSubmit={(e) => { submitHabit(e); setShowForm(false); }} className="habit-modal-form">
+                <label>
+                  Habit Name
+                  <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Read a book" />
+                </label>
+                
+                <label>
+                  Description
+                  <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="30 minutes every day" />
+                </label>
+
+                <div className="habit-modal-form-row">
+                  <label>
+                    Icon (Emoji)
+                    <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="📖" />
+                  </label>
+                  <label>
+                    Color
+                    <div className="habit-color-picker">
+                      <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+                    </div>
+                  </label>
+                </div>
+                
+                <label>
+                  Frequency
+                  <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}>
+                    <option value="Daily">Every day</option>
+                    <option value="Custom">Custom days</option>
+                  </select>
+                </label>
+                
+                {form.frequency === 'Custom' && (
+                  <div className="habit-weekdays-toggle">
+                    {weekdays.map(day => (
+                      <button 
+                        type="button"
+                        key={day} 
+                        onClick={() => toggleCustomDay(day)}
+                        className={form.customDays.includes(day) ? 'active' : ''}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="habit-modal-footer">
+                  <button type="button" className="habit-btn-cancel" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
+                  <button type="submit" className="habit-btn-submit" disabled={!canSubmit || isSaving}>
+                    {editingId ? 'Save Changes' : 'Create Habit'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
   )
 }
