@@ -5,7 +5,7 @@ import '../dashboard/DashboardPage.css'
 import {
   BookOpen, CalendarClock, CheckSquare, Columns3,
   Globe, HelpCircle, Layers, LogOut, NotebookPen,
-  Repeat2, Settings, Kanban,
+  Repeat2, Settings, Kanban, Timer,
 } from 'lucide-react'
 import * as todoApi from '../../lib/api/todo.api'
 import { useAuthStore } from '../../stores/authStore'
@@ -196,6 +196,9 @@ export function TodoPage() {
           </Link>
           <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
             <Kanban size={20} /> Kanban
+          </Link>
+          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
+            <Timer size={20} /> Pomodoro
           </Link>
         </nav>
 

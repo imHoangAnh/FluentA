@@ -126,6 +126,9 @@ export function DashboardPage() {
           <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
             <Kanban size={20} /> Kanban
           </Link>
+          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
+            <Timer size={20} /> Pomodoro
+          </Link>
         </nav>
 
         <div className="dashboard-user-section">

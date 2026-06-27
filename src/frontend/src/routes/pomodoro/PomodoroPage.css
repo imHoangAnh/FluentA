@@ -1,0 +1,456 @@
+.pomodoro-main {
+  background-color: var(--bg);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.pomodoro-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--border);
+  background-color: rgba(243, 246, 245, 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.pomodoro-header-title h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--teal);
+  margin: 0;
+}
+
+.pomodoro-header-actions .notification-icon {
+  position: relative;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.pomodoro-header-actions .notification-icon:hover {
+  color: var(--teal);
+}
+
+.notification-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+}
+
+.pomodoro-workspace-canvas {
+  flex-grow: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.pomodoro-grid-container {
+  max-width: 1152px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+.pomodoro-left-column {
+  grid-column: span 12;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .pomodoro-left-column {
+    grid-column: span 8;
+  }
+}
+
+.pomodoro-glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.pomodoro-timer-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 40px;
+  overflow: hidden;
+}
+
+.pomodoro-timer-badge {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--teal);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(13, 148, 136, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
+}
+
+.badge-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pomodoro-ring-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.pomodoro-ring-svg {
+  width: 256px;
+  height: 256px;
+}
+
+.ring-bg {
+  fill: transparent;
+  stroke: var(--border);
+  stroke-width: 8;
+}
+
+.ring-progress {
+  fill: transparent;
+  stroke: var(--teal);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.35s;
+  stroke-dasharray: 753.98;
+}
+
+.pomodoro-ring-text {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timer-display {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--teal);
+  letter-spacing: -0.02em;
+}
+
+.timer-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 8px;
+}
+
+.pomodoro-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.control-btn.secondary {
+  width: 48px;
+  height: 48px;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.control-btn.secondary:hover {
+  background-color: var(--surface-strong);
+}
+
+.control-btn.primary {
+  width: 80px;
+  height: 80px;
+  background-color: var(--teal);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.control-btn.primary:hover {
+  background-color: #0b7a70;
+  transform: scale(0.95);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pomodoro-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .pomodoro-lower-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.icon-primary {
+  color: var(--teal);
+}
+
+.icon-secondary {
+  color: var(--muted);
+}
+
+.pomodoro-task-card p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 16px 0;
+}
+
+.select-wrapper select {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+
+.select-wrapper select:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.1);
+}
+
+.linked-status {
+  font-size: 12px;
+  color: var(--teal);
+  margin-top: 8px;
+}
+
+.pomodoro-stopwatch-card {
+  background: linear-gradient(to bottom right, #ffffff, var(--bg));
+}
+
+.stopwatch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stopwatch-time {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-stopwatch {
+  padding: 8px 16px;
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-stopwatch:hover {
+  background-color: var(--surface-strong);
+}
+
+.stopwatch-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.stopwatch-actions button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lap-list {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pomodoro-right-column {
+  grid-column: span 12;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .pomodoro-right-column {
+    grid-column: span 4;
+  }
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: rgba(13, 148, 136, 0.1);
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.setting-label label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setting-label span {
+  font-size: 12px;
+  color: var(--teal);
+}
+
+.setting-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--teal);
+}
+
+.settings-footer {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.save-btn {
+  padding: 12px;
+  background-color: var(--teal);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-message {
+  font-size: 13px;
+  color: var(--teal);
+  margin: 0;
+  text-align: center;
+}

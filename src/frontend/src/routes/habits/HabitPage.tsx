@@ -1,7 +1,7 @@
 import { 
   BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle, Layers, 
   LogOut, NotebookPen, Repeat2, Settings, Kanban, Plus, 
-  ChevronLeft, ChevronRight, Edit3, Trash2, X
+  ChevronLeft, ChevronRight, Edit3, Trash2, X, Timer
 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -296,6 +296,9 @@ export function HabitPage() {
           </Link>
           <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
             <Kanban size={20} /> Kanban
+          </Link>
+          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
+            <Timer size={20} /> Pomodoro
           </Link>
         </nav>
 
