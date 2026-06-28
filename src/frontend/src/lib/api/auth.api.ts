@@ -14,8 +14,28 @@ export type AuthPayload = {
 
 export type RegisterPayload = {
   message: string
-  emailVerificationToken: string
-  emailVerificationUrl: string
+  email: string
+  verificationExpiresAtUtc: string
+  resendAvailableAtUtc: string
+  developmentOtp?: string | null
+}
+
+export type ResendVerificationPayload = {
+  message: string
+  email: string
+  verificationExpiresAtUtc: string
+  resendAvailableAtUtc: string
+  developmentOtp?: string | null
+}
+
+export type ForgotPasswordPayload = {
+  message: string
+  accountExists: boolean
+  developmentResetUrl?: string | null
+}
+
+export type MessagePayload = {
+  message: string
 }
 
 export type ApiEnvelope<T> = {
@@ -33,8 +53,13 @@ export async function registerAccount(input: { email: string; password: string; 
   return response.data.data!
 }
 
-export async function verifyEmail(token: string) {
-  const response = await apiClient.post<ApiEnvelope<UserProfile>>('/auth/verify-email', { token })
+export async function verifyEmail(input: { email: string; otp: string }) {
+  const response = await apiClient.post<ApiEnvelope<UserProfile>>('/auth/verify-email', input)
+  return response.data.data!
+}
+
+export async function resendVerificationOtp(input: { email: string }) {
+  const response = await apiClient.post<ApiEnvelope<ResendVerificationPayload>>('/auth/resend-verification-otp', input)
   return response.data.data!
 }
 
@@ -59,5 +84,15 @@ export async function logout() {
 
 export async function me() {
   const response = await apiClient.get<ApiEnvelope<UserProfile>>('/auth/me')
+  return response.data.data!
+}
+
+export async function forgotPassword(input: { email: string }) {
+  const response = await apiClient.post<ApiEnvelope<ForgotPasswordPayload>>('/auth/forgot-password', input)
+  return response.data.data!
+}
+
+export async function resetPassword(input: { token: string; password: string; confirmPassword: string }) {
+  const response = await apiClient.post<ApiEnvelope<MessagePayload>>('/auth/reset-password', input)
   return response.data.data!
 }

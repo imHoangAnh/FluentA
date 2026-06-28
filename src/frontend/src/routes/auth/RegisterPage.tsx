@@ -12,12 +12,31 @@ export function RegisterPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    await register({ email, password, fullName })
-    setMessage('Account created. Check your email to verify before logging in.')
-    navigate('/login')
+    setError(null)
+    setMessage(null)
+    setIsSubmitting(true)
+
+    try {
+      const payload = await register({ email, password, fullName })
+      setMessage(payload.message)
+      navigate(`/verify-email?email=${encodeURIComponent(payload.email)}`, {
+        state: {
+          email: payload.email,
+          developmentOtp: payload.developmentOtp ?? null,
+          resendAvailableAtUtc: payload.resendAvailableAtUtc,
+          verificationExpiresAtUtc: payload.verificationExpiresAtUtc,
+        },
+      })
+    } catch (submissionError) {
+      setError(authApiError(submissionError))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function startGoogleLogin() {
@@ -45,14 +64,16 @@ export function RegisterPage() {
           onChange={setPassword}
         />
         {message ? <p className="form-note" style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>{message}</p> : null}
+        {error ? <p className="form-error" style={{ margin: 0 }}>{error}</p> : null}
         
         <button 
           type="submit" 
+          disabled={isSubmitting}
           style={{ width: '100%', backgroundColor: '#0d9488', color: '#fff', fontWeight: 600, padding: '12px', borderRadius: '9999px', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0f766e'}
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0d9488'}
         >
-          Continue
+          {isSubmitting ? 'Creating account...' : 'Continue'}
         </button>
       </form>
 
@@ -80,4 +101,13 @@ export function RegisterPage() {
       </button>
     </AuthShell>
   )
+}
+
+function authApiError(error: unknown) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
+    return response?.data?.error?.message ?? 'Something went wrong.'
+  }
+
+  return 'Something went wrong.'
 }

@@ -20,7 +20,7 @@ public sealed class AuthController : ControllerBase
         _auth = auth;
     }
 
-    /// <summary>Registers a password account and returns verification details.</summary>
+    /// <summary>Registers a password account and returns OTP verification details.</summary>
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
@@ -30,7 +30,7 @@ public sealed class AuthController : ControllerBase
             : ToErrorResult<RegisterResponse>(result);
     }
 
-    /// <summary>Verifies a password account email address.</summary>
+    /// <summary>Verifies a password account email address from an OTP.</summary>
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail(VerifyEmailRequest request, CancellationToken cancellationToken)
     {
@@ -38,6 +38,16 @@ public sealed class AuthController : ControllerBase
         return result.IsSuccess
             ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!))
             : ToErrorResult<UserProfileDto>(result);
+    }
+
+    /// <summary>Resends a replacement verification OTP.</summary>
+    [HttpPost("resend-verification-otp")]
+    public async Task<IActionResult> ResendVerificationOtp(ResendVerificationOtpRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _auth.ResendVerificationOtpAsync(request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<ResendVerificationOtpResponse>.Ok(result.Value!))
+            : ToErrorResult<ResendVerificationOtpResponse>(result);
     }
 
     /// <summary>Authenticates a verified password account.</summary>
@@ -54,6 +64,26 @@ public sealed class AuthController : ControllerBase
     {
         var result = await _auth.GoogleLoginAsync(request, cancellationToken);
         return AuthResult(result);
+    }
+
+    /// <summary>Starts a password reset flow for a password-capable account.</summary>
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _auth.ForgotPasswordAsync(request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<ForgotPasswordResponse>.Ok(result.Value!))
+            : ToErrorResult<ForgotPasswordResponse>(result);
+    }
+
+    /// <summary>Consumes a single-use password reset link.</summary>
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _auth.ResetPasswordAsync(request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<BasicMessageResponse>.Ok(result.Value!))
+            : ToErrorResult<BasicMessageResponse>(result);
     }
 
     /// <summary>Rotates the refresh cookie and returns a new access token.</summary>

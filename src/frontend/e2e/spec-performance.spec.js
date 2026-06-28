@@ -18,7 +18,7 @@ async function registerAndLogin(request) {
   const registerPayload = await registerResponse.json()
 
   const verifyResponse = await request.post(`${apiBaseUrl}/api/v1/auth/verify-email`, {
-    data: { token: registerPayload.data.emailVerificationToken },
+    data: { email, otp: registerPayload.data.developmentOtp },
   })
   expect(verifyResponse.status()).toBe(200)
 

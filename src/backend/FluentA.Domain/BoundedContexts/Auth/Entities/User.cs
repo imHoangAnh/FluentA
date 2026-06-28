@@ -58,6 +58,17 @@ public sealed class User : BaseEntity, IAggregateRoot
         UpdatedAt = loggedInAt;
     }
 
+    public void UpdatePassword(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+        {
+            throw new ArgumentException("Password hash is required.", nameof(passwordHash));
+        }
+
+        PasswordHash = passwordHash;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void LinkGoogleAccount(string googleId, string fullName)
     {
         if (string.IsNullOrWhiteSpace(googleId))

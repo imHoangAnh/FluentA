@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import { buildGoogleAuthUrl } from '../../lib/auth/google'
@@ -7,11 +7,15 @@ import { useAuthStore } from '../../stores/authStore'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const login = useAuthStore((state) => state.login)
   const error = useAuthStore((state) => state.error)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [stubMessage, setStubMessage] = useState<string | null>(null)
+  const notice = typeof location.state === 'object' && location.state && 'notice' in location.state
+    ? (location.state as { notice?: string }).notice ?? null
+    : null
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -43,8 +47,8 @@ export function LoginPage() {
           onChange={setPassword}
         />
         {error ? <p className="form-error">{error}</p> : null}
+        {notice ? <p className="form-note">{notice}</p> : null}
         {stubMessage ? <p className="form-note">{stubMessage}</p> : null}
-        
         <button className="primary-button" type="submit" style={{ marginTop: '8px', minHeight: '44px', borderRadius: '22px' }}>
           Continue
         </button>
@@ -56,8 +60,8 @@ export function LoginPage() {
         <div style={{ flex: 1, height: '1px', backgroundColor: '#e2ecea' }}></div>
       </div>
 
-      <button 
-        type="button" 
+      <button
+        type="button"
         onClick={startGoogleLogin}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '44px', borderRadius: '22px', border: '1px solid #e2ecea', backgroundColor: '#fff', color: '#1a2e2a', fontWeight: 600, cursor: 'pointer' }}
       >
@@ -69,11 +73,11 @@ export function LoginPage() {
         </svg>
         Continue with Google
       </button>
-      
+
       <div style={{ textAlign: 'center', marginTop: '24px' }}>
-        <a href="#" style={{ color: '#0f9f8f', fontSize: '14px', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
+        <Link to="/forgot-password" style={{ color: '#0f9f8f', fontSize: '14px', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</Link>
       </div>
     </AuthShell>
   )
 }
- 
+

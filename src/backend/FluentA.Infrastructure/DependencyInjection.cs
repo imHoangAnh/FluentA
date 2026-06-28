@@ -1,5 +1,3 @@
-using Amazon;
-using Amazon.SimpleEmailV2;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Flashcards;
@@ -51,21 +49,17 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
         services.AddSingleton<IRefreshTokenStore, RedisRefreshTokenStore>();
+        services.AddSingleton<IAccountChallengeStore, RedisAccountChallengeStore>();
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
-        if (string.Equals(configuration["Authentication:Email:Provider"], "ses", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(configuration["Authentication:Email:Provider"], "gmail-smtp", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddSingleton<IAmazonSimpleEmailServiceV2>(_ =>
-            {
-                var region = configuration["Authentication:Email:Region"] ?? "us-east-1";
-                return new AmazonSimpleEmailServiceV2Client(RegionEndpoint.GetBySystemName(region));
-            });
-            services.AddSingleton<IEmailVerificationSender, SesEmailVerificationSender>();
+            services.AddSingleton<IAccountEmailSender, GmailSmtpAccountEmailSender>();
         }
         else
         {
-            services.AddSingleton<IEmailVerificationSender, LocalEmailVerificationSender>();
+            services.AddSingleton<IAccountEmailSender, LocalAccountEmailSender>();
         }
 
         services.AddScoped<IAuthService, AuthService>();

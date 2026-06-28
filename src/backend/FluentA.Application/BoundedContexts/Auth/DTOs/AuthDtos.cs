@@ -2,11 +2,36 @@ namespace FluentA.Application.BoundedContexts.Auth.DTOs;
 
 public sealed record RegisterRequest(string Email, string Password, string FullName);
 
-public sealed record RegisterResponse(string Message, string EmailVerificationToken, string EmailVerificationUrl);
+public sealed record RegisterResponse(
+    string Message,
+    string Email,
+    DateTime VerificationExpiresAtUtc,
+    DateTime ResendAvailableAtUtc,
+    string? DevelopmentOtp = null);
 
 public sealed record LoginRequest(string Email, string Password);
 
-public sealed record VerifyEmailRequest(string Token);
+public sealed record VerifyEmailRequest(string? Email = null, string? Otp = null);
+
+public sealed record ResendVerificationOtpRequest(string Email);
+
+public sealed record ResendVerificationOtpResponse(
+    string Message,
+    string Email,
+    DateTime VerificationExpiresAtUtc,
+    DateTime ResendAvailableAtUtc,
+    string? DevelopmentOtp = null);
+
+public sealed record ForgotPasswordRequest(string Email);
+
+public sealed record ForgotPasswordResponse(
+    string Message,
+    bool AccountExists,
+    string? DevelopmentResetUrl = null);
+
+public sealed record ResetPasswordRequest(string Token, string Password, string ConfirmPassword);
+
+public sealed record BasicMessageResponse(string Message);
 
 public sealed record GoogleLoginRequest(string Code, string? RedirectUri = null);
 

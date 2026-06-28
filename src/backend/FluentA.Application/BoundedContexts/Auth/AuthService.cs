@@ -9,26 +9,29 @@ namespace FluentA.Application.BoundedContexts.Auth;
 public sealed partial class AuthService : IAuthService
 {
     private readonly IUserRepository _users;
+    private readonly IAccountChallengeStore _challengeStore;
     private readonly IRefreshTokenStore _refreshTokens;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
     private readonly IGoogleOAuthClient _googleOAuthClient;
-    private readonly IEmailVerificationSender _emailVerificationSender;
+    private readonly IAccountEmailSender _accountEmailSender;
 
     public AuthService(
         IUserRepository users,
+        IAccountChallengeStore challengeStore,
         IRefreshTokenStore refreshTokens,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IGoogleOAuthClient googleOAuthClient,
-        IEmailVerificationSender emailVerificationSender)
+        IAccountEmailSender accountEmailSender)
     {
         _users = users;
+        _challengeStore = challengeStore;
         _refreshTokens = refreshTokens;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _googleOAuthClient = googleOAuthClient;
-        _emailVerificationSender = emailVerificationSender;
+        _accountEmailSender = accountEmailSender;
     }
 
     public async Task<OperationResult<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -47,47 +50,188 @@ public sealed partial class AuthService : IAuthService
 
         var user = User.CreateWithPassword(normalizedEmail, request.FullName, _passwordHasher.Hash(request.Password));
         await _users.AddAsync(user, cancellationToken);
-        var token = _tokenService.CreateEmailVerificationToken(ToProfile(user));
-        var verificationUrl = $"/verify-email?token={Uri.EscapeDataString(token)}";
-        await _emailVerificationSender.SendVerificationEmailAsync(
-            new EmailVerificationMessage(
+        var challenge = await _challengeStore.IssueVerificationAsync(user.Id, user.Email, cancellationToken);
+        var delivery = await _accountEmailSender.SendVerificationOtpAsync(
+            new VerificationOtpEmailMessage(
                 user.Email,
                 user.FullName,
-                verificationUrl),
+                challenge.Otp,
+                challenge.ExpiresAtUtc),
             cancellationToken);
 
         return OperationResult<RegisterResponse>.Success(new RegisterResponse(
-            "Registration successful. Please verify your email.",
-            token,
-            verificationUrl));
+            "Registration successful. Enter the verification code we sent to your email.",
+            user.Email,
+            challenge.ExpiresAtUtc,
+            challenge.ResendAvailableAtUtc,
+            delivery.DevelopmentOtp));
     }
 
     public async Task<OperationResult<UserProfileDto>> VerifyEmailAsync(VerifyEmailRequest request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Token))
+        var errors = new Dictionary<string, string[]>();
+        if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
         {
-            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(new Dictionary<string, string[]>
+            errors["email"] = ["Email must be a valid email address."];
+        }
+
+        if (!OtpPattern().IsMatch(request.Otp ?? string.Empty))
+        {
+            errors["otp"] = ["Verification code must be six digits."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
+        }
+
+        var email = request.Email!;
+        var otp = request.Otp!;
+        var normalizedEmail = User.NormalizeEmail(email);
+        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (user is null)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp());
+        }
+
+        var challengeResult = await _challengeStore.VerifyVerificationOtpAsync(normalizedEmail, otp, cancellationToken);
+        if (challengeResult.Status is not VerificationChallengeVerifyStatus.Verified)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp());
+        }
+
+        if (!user.IsEmailVerified)
+        {
+            user.MarkEmailVerified();
+            await _users.UpdateAsync(user, cancellationToken);
+        }
+
+        return OperationResult<UserProfileDto>.Success(ToProfile(user));
+    }
+
+    public async Task<OperationResult<ResendVerificationOtpResponse>> ResendVerificationOtpAsync(ResendVerificationOtpRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
+        {
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]>
             {
-                ["token"] = ["Email verification token is required."]
+                ["email"] = ["Email must be a valid email address."]
             }));
         }
 
-        var userId = _tokenService.ReadEmailVerificationUserId(request.Token);
-        if (!userId.HasValue)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationToken());
-        }
-
-        var user = await _users.GetByIdAsync(userId.Value, cancellationToken);
+        var normalizedEmail = User.NormalizeEmail(request.Email!);
+        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (user is null)
         {
-            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationToken());
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.InvalidVerificationOtp());
         }
 
-        user.MarkEmailVerified();
+        if (user.IsEmailVerified)
+        {
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.EmailAlreadyVerified());
+        }
+
+        var resend = await _challengeStore.ResendVerificationAsync(user.Id, normalizedEmail, cancellationToken);
+        if (!resend.IsSuccess)
+        {
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.VerificationOtpCooldown(resend.ResendAvailableAtUtc));
+        }
+
+        var delivery = await _accountEmailSender.SendVerificationOtpAsync(
+            new VerificationOtpEmailMessage(
+                user.Email,
+                user.FullName,
+                resend.Otp!,
+                resend.ExpiresAtUtc),
+            cancellationToken);
+
+        return OperationResult<ResendVerificationOtpResponse>.Success(new ResendVerificationOtpResponse(
+            "A new verification code has been sent.",
+            user.Email,
+            resend.ExpiresAtUtc,
+            resend.ResendAvailableAtUtc,
+            delivery.DevelopmentOtp));
+    }
+
+    public async Task<OperationResult<ForgotPasswordResponse>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
+        {
+            return OperationResult<ForgotPasswordResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]>
+            {
+                ["email"] = ["Email must be a valid email address."]
+            }));
+        }
+
+        var normalizedEmail = User.NormalizeEmail(request.Email!);
+        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (user is null)
+        {
+            return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(
+                "No FluentA account exists for this email.",
+                AccountExists: false));
+        }
+
+        if (user.PasswordHash is null)
+        {
+            return OperationResult<ForgotPasswordResponse>.Failure(AuthError.PasswordResetNotAvailable());
+        }
+
+        var challenge = await _challengeStore.IssuePasswordResetAsync(user.Id, user.Email, cancellationToken);
+        var resetUrl = $"/reset-password?token={Uri.EscapeDataString(challenge.Token)}";
+        var delivery = await _accountEmailSender.SendPasswordResetAsync(
+            new PasswordResetEmailMessage(
+                user.Email,
+                user.FullName,
+                resetUrl,
+                challenge.ExpiresAtUtc),
+            cancellationToken);
+
+        return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(
+            "Password reset instructions have been sent to your email.",
+            AccountExists: true,
+            delivery.DevelopmentResetUrl));
+    }
+
+    public async Task<OperationResult<BasicMessageResponse>> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            errors["token"] = ["Password reset token is required."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+        {
+            errors["password"] = ["Password must be at least 8 characters."];
+        }
+
+        if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+        {
+            errors["confirmPassword"] = ["Password confirmation must match."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return OperationResult<BasicMessageResponse>.Failure(AuthError.Validation(errors));
+        }
+
+        var challenge = await _challengeStore.ConsumePasswordResetAsync(request.Token, cancellationToken);
+        if (challenge.Status is not PasswordResetChallengeConsumeStatus.Consumed || !challenge.UserId.HasValue)
+        {
+            return OperationResult<BasicMessageResponse>.Failure(AuthError.InvalidPasswordResetToken());
+        }
+
+        var user = await _users.GetByIdAsync(challenge.UserId.Value, cancellationToken);
+        if (user is null || user.PasswordHash is null)
+        {
+            return OperationResult<BasicMessageResponse>.Failure(AuthError.InvalidPasswordResetToken());
+        }
+
+        user.UpdatePassword(_passwordHasher.Hash(request.Password));
         await _users.UpdateAsync(user, cancellationToken);
 
-        return OperationResult<UserProfileDto>.Success(ToProfile(user));
+        return OperationResult<BasicMessageResponse>.Success(new BasicMessageResponse("Password reset successful. Please log in with your new password."));
     }
 
     public async Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -227,4 +371,7 @@ public sealed partial class AuthService : IAuthService
 
     [GeneratedRegex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex EmailPattern();
+
+    [GeneratedRegex("^\\d{6}$", RegexOptions.Compiled)]
+    private static partial Regex OtpPattern();
 }

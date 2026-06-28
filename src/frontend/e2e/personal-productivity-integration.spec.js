@@ -20,7 +20,7 @@ async function registerAndLogin(page) {
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { token: registerPayload.data.emailVerificationToken },
+    data: { email, otp: registerPayload.data.developmentOtp },
   });
 
   await page.getByLabel('Email').fill(email);

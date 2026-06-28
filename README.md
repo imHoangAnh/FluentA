@@ -112,12 +112,42 @@ npm --prefix src/frontend install
 npm --prefix src/frontend run dev
 ```
 
-Open `http://localhost:5173`.
+Open `http://127.0.0.1:5173`.
 
-The default local email provider writes verification delivery information to
-the API logs. Google login requires `VITE_GOOGLE_CLIENT_ID` in the frontend and
-matching server-side Google OAuth configuration. Keep provider secrets outside
-tracked files by using .NET user-secrets or environment variables.
+Use `127.0.0.1` consistently for browser testing instead of mixing it with
+`localhost`. The auth flow uses an HttpOnly refresh cookie plus
+`withCredentials`, so keeping the same host across frontend URLs, callback
+URLs, and email links makes local behavior match production more closely.
+
+### Production-like local auth setup
+
+The tracked development config keeps `Authentication:Email:Provider=local` so
+the repo runs without mail credentials. For a production-like login and email
+verification flow, keep the frontend on `http://127.0.0.1:5173` and supply
+real mail secrets through .NET user-secrets:
+
+```powershell
+dotnet user-secrets --project src/backend/FluentA.API init
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:ChallengeKey" "<long-random-secret>"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Provider" "gmail-smtp"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:FromAddress" "<your-gmail@gmail.com>"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:FromName" "FluentA"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:BaseUrl" "http://127.0.0.1:5173"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Smtp:Host" "smtp.gmail.com"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Smtp:Port" "587"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Smtp:Username" "<your-gmail@gmail.com>"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Smtp:Password" "<gmail-app-password>"
+dotnet user-secrets --project src/backend/FluentA.API set "Authentication:Email:Smtp:EnableSsl" "true"
+```
+
+Use a Gmail App Password, not the normal account password. The Gmail account
+must have 2-step verification enabled before App Passwords are available.
+`Authentication:ChallengeKey` must also stay outside tracked files; otherwise
+OTP and reset challenges become invalid after an API restart.
+
+Google login requires `VITE_GOOGLE_CLIENT_ID` in the frontend and matching
+server-side Google OAuth configuration. Keep provider secrets outside tracked
+files by using .NET user-secrets or environment variables.
 
 ## Validation
 

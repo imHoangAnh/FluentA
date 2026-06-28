@@ -15,7 +15,7 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { token: registerPayload.data.emailVerificationToken },
+    data: { email, otp: registerPayload.data.developmentOtp },
   });
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
@@ -87,7 +87,7 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   });
   const foreignRegistration = await foreignRegister.json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { token: foreignRegistration.data.emailVerificationToken },
+    data: { email: foreignEmail, otp: foreignRegistration.data.developmentOtp },
   });
   const foreignLogin = await page.request.post('http://127.0.0.1:5000/api/v1/auth/login', {
     data: { email: foreignEmail, password },

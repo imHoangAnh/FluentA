@@ -11,7 +11,7 @@ current Harness story matrix. Status values:
 
 | SPEC Story | SPEC Scope | Current Status | Harness Evidence |
 | --- | --- | --- | --- |
-| US-001 | Email registration, verification email | Done | `US-AUTH-001` plus `US-AUTH-003` implement registration, duplicate email, validation, local verification token/link, and verification proof. |
+| US-001 | Email registration, verification email | Done | `US-AUTH-001`, `US-AUTH-003`, and Feature 12 auth challenge implementation cover registration, duplicate email, Gmail/local OTP delivery, verification, resend cooldown, and password recovery flow. |
 | US-002 | Google OAuth login | Done | `US-AUTH-002` covers server-side Google OAuth flow, durable users, and provider/config errors. |
 | US-003 | Email/password login | Done | `US-AUTH-001` plus `US-AUTH-003` cover credential login and `EMAIL_NOT_VERIFIED` rejection. |
 | US-004 | Token refresh/logout/current user | Done | `US-AUTH-001` and `US-AUTH-002` cover in-memory access token, HttpOnly refresh cookie, Redis refresh rotation, `/me`, logout, and stale-token rejection. |

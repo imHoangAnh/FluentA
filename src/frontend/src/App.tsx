@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from './routes/auth/LoginPage'
 import { RegisterPage } from './routes/auth/RegisterPage'
 import { GoogleCallbackPage } from './routes/auth/GoogleCallbackPage'
+import { VerifyEmailPage } from './routes/auth/VerifyEmailPage'
+import { ForgotPasswordPage } from './routes/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from './routes/auth/ResetPasswordPage'
 import { DashboardPage } from './routes/dashboard/DashboardPage'
 import { WorkspacePage } from './routes/workspace/WorkspacePage'
 import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
@@ -22,6 +25,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
       <Route
         path="/"

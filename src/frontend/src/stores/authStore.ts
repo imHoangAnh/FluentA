@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { configureAuthTransport } from '../lib/api/client'
 import * as authApi from '../lib/api/auth.api'
-import type { UserProfile } from '../lib/api/auth.api'
+import type { RegisterPayload, UserProfile } from '../lib/api/auth.api'
 
 type AuthStatus = 'idle' | 'checking' | 'authenticated' | 'anonymous'
 
@@ -11,7 +11,7 @@ type AuthState = {
   status: AuthStatus
   error: string | null
   setAccessToken: (token: string | null) => void
-  register: (input: { email: string; password: string; fullName: string }) => Promise<void>
+  register: (input: { email: string; password: string; fullName: string }) => Promise<RegisterPayload>
   login: (input: { email: string; password: string }) => Promise<void>
   googleLogin: (input: { code: string; redirectUri: string }) => Promise<void>
   refresh: () => Promise<string | null>
@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAccessToken: (token) => set({ accessToken: token }),
   register: async (input) => {
     set({ error: null })
-    await authApi.registerAccount(input)
+    return authApi.registerAccount(input)
   },
   login: async (input) => {
     set({ status: 'checking', error: null })

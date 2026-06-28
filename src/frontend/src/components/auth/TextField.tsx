@@ -1,3 +1,4 @@
+import type { HTMLAttributes } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useId, useState } from 'react'
 
@@ -6,13 +7,14 @@ type TextFieldProps = {
   name: string
   type?: string
   autoComplete?: string
+  inputMode?: HTMLAttributes<HTMLInputElement>['inputMode']
   value: string
   onChange: (value: string) => void
   placeholder?: string
   required?: boolean
 }
 
-export function TextField({ label, name, type = 'text', autoComplete, value, onChange, placeholder, required = true }: TextFieldProps) {
+export function TextField({ label, name, type = 'text', autoComplete, inputMode, value, onChange, placeholder, required = true }: TextFieldProps) {
   const id = useId()
   const [showPassword, setShowPassword] = useState(false)
   const isPassword = type === 'password'
@@ -26,6 +28,7 @@ export function TextField({ label, name, type = 'text', autoComplete, value, onC
           name={name}
           type={isPassword && showPassword ? 'text' : type}
           autoComplete={autoComplete}
+          inputMode={inputMode}
           value={value}
           placeholder={placeholder}
           required={required}
