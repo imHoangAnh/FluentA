@@ -14,7 +14,7 @@ public interface IFlashcardService
         Guid userId,
         CreatePracticeSessionSummaryRequest request,
         CancellationToken cancellationToken = default);
-    /// <summary>Creates a server-side review session for a deck.</summary>
+    /// <summary>Creates a server-side review session for one board.</summary>
     Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,
         CreateReviewSessionRequest request,
@@ -24,6 +24,13 @@ public interface IFlashcardService
         Guid userId,
         Guid sessionId,
         CancellationToken cancellationToken = default);
+    /// <summary>Returns the user's global practice settings.</summary>
+    Task<PracticeSettingsDto> GetPracticeSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
+    /// <summary>Updates the user's global practice settings.</summary>
+    Task<OperationResult<PracticeSettingsDto>> UpdatePracticeSettingsAsync(
+        Guid userId,
+        UpdatePracticeSettingsRequest request,
+        CancellationToken cancellationToken = default);
     /// <summary>Returns the user's global review settings.</summary>
     Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
     /// <summary>Updates the user's global review settings.</summary>
@@ -31,19 +38,13 @@ public interface IFlashcardService
         Guid userId,
         UpdateReviewSettingsRequest request,
         CancellationToken cancellationToken = default);
-    /// <summary>Builds the due-card queue for a deck and time zone.</summary>
-    Task<OperationResult<DueDeckDto>> GetDueDeckAsync(
-        Guid userId,
-        Guid deckId,
-        string? timeZoneId,
-        CancellationToken cancellationToken = default);
     /// <summary>Returns dashboard metrics for all boards or one board.</summary>
     Task<OperationResult<FlashcardDashboardDto>> GetDashboardAsync(
         Guid userId,
         Guid? boardId,
         string? timeZoneId,
         CancellationToken cancellationToken = default);
-    /// <summary>Records a card review rating and returns the scheduling result.</summary>
+    /// <summary>Records a review answer and returns the scheduling result.</summary>
     Task<OperationResult<ReviewResultDto>> SubmitReviewAsync(
         Guid userId,
         SubmitReviewRequest request,

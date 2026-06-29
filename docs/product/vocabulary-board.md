@@ -43,15 +43,16 @@ spaced-repetition review behavior are separate stories.
 
 ## Flashcard Deck Sync Rules
 
-- Creating a board creates one `All Words Deck` for that board.
 - Creating a page creates one `Page Deck` named `[BoardName] - [PageName]`.
-- Creating a word creates one card in its Page Deck and one card in the
-  board's All Words Deck in the same database transaction.
-- Updating a word synchronizes both cards' copied content without resetting
-  scheduling metadata.
-- Deleting a word hard-deletes both synchronized cards and all associated
-  review history while the source word remains soft-deleted.
+- Creating a word creates one card in its Page Deck in the same database
+  transaction.
+- Updating a word synchronizes that page-deck card's copied content without
+  resetting learning metadata.
+- Deleting a word hard-deletes the synchronized page-deck card, its review
+  history, and any dedicated review-state row while the source word remains
+  soft-deleted.
 - Deleting a page or board also removes affected cards and review history.
+- No `All Words` deck is created anywhere in the current product model.
 - SignalR notification and the read-only Flashcards viewer are separate
   dependent stories.
 
@@ -62,7 +63,7 @@ All responses use the FluentA envelope.
 | Method | Endpoint | Behavior |
 | --- | --- | --- |
 | `GET` | `/api/v1/boards` | List the current user's boards with page counts. |
-| `POST` | `/api/v1/boards` | Create a board and its All Words deck. |
+| `POST` | `/api/v1/boards` | Create a board. |
 | `GET` | `/api/v1/boards/{boardId}` | Get one board with pages. |
 | `PATCH` | `/api/v1/boards/{boardId}` | Update board name, language, or sort order. |
 | `DELETE` | `/api/v1/boards/{boardId}` | Soft-delete a board. |

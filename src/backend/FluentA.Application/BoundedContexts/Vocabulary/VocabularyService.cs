@@ -33,8 +33,7 @@ public sealed class VocabularyService : IVocabularyService
 
         var sortOrder = await _repository.NextBoardSortOrderAsync(userId, cancellationToken);
         var board = VocabBoard.Create(userId, request.Name, request.Language, sortOrder);
-        var deck = FlashcardDeck.CreateAllWords(userId, board.Id, board.Name);
-        await _repository.AddBoardWithDeckAsync(board, deck, cancellationToken);
+        await _repository.AddBoardAsync(board, cancellationToken);
 
         return OperationResult<BoardDetailDto>.Success(ToDetail(board));
     }

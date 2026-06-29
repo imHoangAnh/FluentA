@@ -47,17 +47,7 @@ public sealed class FlashcardsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Returns due cards for an All Words spaced-review deck.</summary>
-    [HttpGet("decks/{deckId:guid}/due")]
-    public async Task<IActionResult> GetDueDeck(Guid deckId, [FromQuery] string? timeZoneId, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.GetDueDeckAsync(CurrentUserId(), deckId, timeZoneId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<DueDeckDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Creates a server-side review session.</summary>
+    /// <summary>Creates a server-side board review session.</summary>
     [HttpPost("sessions")]
     public async Task<IActionResult> CreateReviewSession(CreateReviewSessionRequest request, CancellationToken cancellationToken)
     {
@@ -98,6 +88,24 @@ public sealed class FlashcardsController : ControllerBase
     }
 
     /// <summary>Returns the authenticated user's review settings.</summary>
+    [HttpGet("practice-settings")]
+    public async Task<IActionResult> GetPracticeSettings(CancellationToken cancellationToken)
+    {
+        var settings = await _flashcards.GetPracticeSettingsAsync(CurrentUserId(), cancellationToken);
+        return Ok(ApiEnvelope<PracticeSettingsDto>.Ok(settings));
+    }
+
+    /// <summary>Updates the authenticated user's practice settings.</summary>
+    [HttpPut("practice-settings")]
+    public async Task<IActionResult> UpdatePracticeSettings(UpdatePracticeSettingsRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _flashcards.UpdatePracticeSettingsAsync(CurrentUserId(), request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<PracticeSettingsDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Returns the authenticated user's review settings.</summary>
     [HttpGet("settings")]
     public async Task<IActionResult> GetReviewSettings(CancellationToken cancellationToken)
     {
@@ -115,7 +123,7 @@ public sealed class FlashcardsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Records a review rating for a card in a review session.</summary>
+    /// <summary>Records a review answer for a card in a review session.</summary>
     [HttpPost("review")]
     public async Task<IActionResult> SubmitReview(SubmitReviewRequest request, CancellationToken cancellationToken)
     {

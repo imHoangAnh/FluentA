@@ -103,8 +103,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         return await _dbContext.FlashcardDecks
             .Where(deck => deck.BoardId == boardId
                 && deck.DeletedAt == null
-                && (deck.Type == DeckType.AllWords || deck.PageId == pageId))
-            .OrderBy(deck => deck.Type)
+                && deck.PageId == pageId)
             .Select(deck => deck.Id)
             .ToListAsync(cancellationToken);
     }
@@ -138,10 +137,9 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         return (maxSortOrder ?? -1) + 1;
     }
 
-    public async Task AddBoardWithDeckAsync(VocabBoard board, FlashcardDeck deck, CancellationToken cancellationToken = default)
+    public async Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
     {
         await _dbContext.Boards.AddAsync(board, cancellationToken);
-        await _dbContext.FlashcardDecks.AddAsync(deck, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -204,10 +202,6 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
 
     public async Task UpdateBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
     {
-        var allWordsDeck = await _dbContext.FlashcardDecks
-            .FirstOrDefaultAsync(deck => deck.BoardId == board.Id && deck.Type == DeckType.AllWords && deck.DeletedAt == null, cancellationToken);
-        allWordsDeck?.Rename($"{board.Name} - All Words");
-
         _dbContext.Boards.Update(board);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -321,6 +315,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         }
 
         await RemoveCardsForWordsAsync(words.Select(word => word.Id), cancellationToken);
+        await RemoveReviewStatesForWordsAsync(words.Select(word => word.Id), cancellationToken);
 
         var decks = await _dbContext.FlashcardDecks
             .Where(deck => deck.BoardId == board.Id && deck.DeletedAt == null)
@@ -350,6 +345,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         }
 
         await RemoveCardsForWordsAsync(words.Select(word => word.Id), cancellationToken);
+        await RemoveReviewStatesForWordsAsync(words.Select(word => word.Id), cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -358,6 +354,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
     {
         word.SoftDelete();
         await SynchronizeWordEventsAsync(word, cancellationToken);
+        await RemoveReviewStatesForWordsAsync([word.Id], cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -392,12 +389,12 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         var decks = await _dbContext.FlashcardDecks
             .Where(deck => deck.BoardId == boardId
                 && deck.DeletedAt == null
-                && (deck.Type == DeckType.AllWords || deck.PageId == word.PageId))
+                && deck.PageId == word.PageId)
             .ToListAsync(cancellationToken);
 
-        if (decks.Count != 2)
+        if (decks.Count != 1)
         {
-            throw new InvalidOperationException("An active word requires exactly one Page Deck and one All Words Deck.");
+            throw new InvalidOperationException("An active word requires exactly one synchronized page deck.");
         }
 
         await _dbContext.FlashcardCards.AddRangeAsync(
@@ -417,9 +414,9 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             return;
         }
 
-        if (cards.Count != 2)
+        if (cards.Count != 1)
         {
-            throw new InvalidOperationException("An active word must have exactly two synchronized cards.");
+            throw new InvalidOperationException("An active word must have exactly one synchronized page-deck card.");
         }
 
         foreach (var card in cards)
@@ -440,5 +437,19 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             .Where(card => ids.Contains(card.WordId))
             .ToListAsync(cancellationToken);
         _dbContext.FlashcardCards.RemoveRange(cards);
+    }
+
+    private async Task RemoveReviewStatesForWordsAsync(IEnumerable<Guid> wordIds, CancellationToken cancellationToken)
+    {
+        var ids = wordIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var states = await _dbContext.WordReviewStates
+            .Where(state => ids.Contains(state.WordId))
+            .ToListAsync(cancellationToken);
+        _dbContext.WordReviewStates.RemoveRange(states);
     }
 }

@@ -4,44 +4,41 @@ namespace FluentA.Domain.BoundedContexts.Flashcards.Entities;
 
 public sealed class ReviewSettings : BaseEntity
 {
-    public const int DefaultNewCardsPerDay = 20;
-    public const int DefaultReviewCardsPerDay = 200;
+    public const int DefaultDailyLimit = 300;
     public const int MaximumDailyLimit = 1000;
 
     private ReviewSettings()
     {
     }
 
-    private ReviewSettings(Guid userId, int newCardsPerDay, int reviewCardsPerDay)
+    private ReviewSettings(Guid userId, int dailyLimit, bool recapAfterAnswer)
     {
         if (userId == Guid.Empty)
         {
             throw new ArgumentException("User id is required.", nameof(userId));
         }
 
-        ValidateLimit(newCardsPerDay, nameof(newCardsPerDay));
-        ValidateLimit(reviewCardsPerDay, nameof(reviewCardsPerDay));
+        ValidateLimit(dailyLimit, nameof(dailyLimit));
         UserId = userId;
-        NewCardsPerDay = newCardsPerDay;
-        ReviewCardsPerDay = reviewCardsPerDay;
+        DailyLimit = dailyLimit;
+        RecapAfterAnswer = recapAfterAnswer;
     }
 
     public Guid UserId { get; private set; }
-    public int NewCardsPerDay { get; private set; }
-    public int ReviewCardsPerDay { get; private set; }
+    public int DailyLimit { get; private set; }
+    public bool RecapAfterAnswer { get; private set; }
 
     public static ReviewSettings CreateDefault(Guid userId) =>
-        new(userId, DefaultNewCardsPerDay, DefaultReviewCardsPerDay);
+        new(userId, DefaultDailyLimit, true);
 
-    public static ReviewSettings Create(Guid userId, int newCardsPerDay, int reviewCardsPerDay) =>
-        new(userId, newCardsPerDay, reviewCardsPerDay);
+    public static ReviewSettings Create(Guid userId, int dailyLimit, bool recapAfterAnswer) =>
+        new(userId, dailyLimit, recapAfterAnswer);
 
-    public void Update(int newCardsPerDay, int reviewCardsPerDay)
+    public void Update(int dailyLimit, bool recapAfterAnswer)
     {
-        ValidateLimit(newCardsPerDay, nameof(newCardsPerDay));
-        ValidateLimit(reviewCardsPerDay, nameof(reviewCardsPerDay));
-        NewCardsPerDay = newCardsPerDay;
-        ReviewCardsPerDay = reviewCardsPerDay;
+        ValidateLimit(dailyLimit, nameof(dailyLimit));
+        DailyLimit = dailyLimit;
+        RecapAfterAnswer = recapAfterAnswer;
         UpdatedAt = DateTime.UtcNow;
     }
 

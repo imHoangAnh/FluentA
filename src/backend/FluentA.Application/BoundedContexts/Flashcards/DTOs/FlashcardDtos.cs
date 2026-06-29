@@ -35,21 +35,41 @@ public sealed record DeckSessionDto(
     string BoardLanguage,
     IReadOnlyList<FlashcardCardDto> Cards);
 
-public sealed record CreateReviewSessionRequest(Guid DeckId);
-
 public sealed record CreatePracticeSessionSummaryRequest(
     Guid DeckId,
     string Mode,
     int TotalCards,
     int CorrectCards,
-    int WrongCards);
+    int WrongCards,
+    string TimeZoneId);
+
+public sealed record ReviewSessionWordDto(
+    Guid CardId,
+    Guid WordId,
+    string Word,
+    string WordClass,
+    string MeaningVn,
+    string MeaningEn,
+    string Example,
+    string? Thesaurus,
+    string? Collocation,
+    string? Note,
+    string Mode);
+
+public sealed record CreateReviewSessionRequest(
+    Guid BoardId,
+    string OrderType,
+    string Mode,
+    string TimeZoneId);
 
 public sealed record ReviewSessionCreatedDto(
     Guid SessionId,
-    Guid DeckId,
-    string DeckName,
-    string DeckType,
-    int TotalCards);
+    Guid BoardId,
+    string BoardName,
+    string OrderType,
+    string Mode,
+    int TotalWords,
+    IReadOnlyList<ReviewSessionWordDto> Words);
 
 public sealed record PracticeSessionSummaryDto(
     Guid Id,
@@ -60,6 +80,10 @@ public sealed record PracticeSessionSummaryDto(
     int CorrectCards,
     int WrongCards,
     DateTime CompletedAt);
+
+public sealed record PracticeSettingsDto(IReadOnlyList<string> ModeSequence);
+
+public sealed record UpdatePracticeSettingsRequest(IReadOnlyList<string> ModeSequence);
 
 public enum PracticeSessionSummarySaveStatus
 {
@@ -85,24 +109,9 @@ public sealed record ReviewSessionSummaryDto(
     int AgainPercent,
     int AverageTimeSpentSeconds);
 
-public sealed record ReviewSettingsDto(int NewCardsPerDay, int ReviewCardsPerDay);
+public sealed record ReviewSettingsDto(int DailyLimit, bool RecapAfterAnswer);
 
-public sealed record UpdateReviewSettingsRequest(int NewCardsPerDay, int ReviewCardsPerDay);
-
-public sealed record DueAllowanceDto(int Limit, int Consumed, int Remaining);
-
-public sealed record DueCountsDto(int Overdue, int DueToday, int NewCards, int Total);
-
-public sealed record DueDeckDto(
-    Guid DeckId,
-    Guid BoardId,
-    string DeckName,
-    string BoardLanguage,
-    ReviewSettingsDto Settings,
-    DueAllowanceDto NewCards,
-    DueAllowanceDto Reviews,
-    DueCountsDto Counts,
-    IReadOnlyList<FlashcardCardDto> Cards);
+public sealed record UpdateReviewSettingsRequest(int DailyLimit, bool RecapAfterAnswer);
 
 public sealed record DashboardForecastPointDto(string Date, int DueCount);
 
@@ -121,7 +130,7 @@ public sealed record FlashcardDashboardDto(
 public sealed record SubmitReviewRequest(
     Guid SessionId,
     Guid CardId,
-    int Rating,
+    bool Correct,
     int TimeSpentSeconds,
     string TimeZoneId);
 

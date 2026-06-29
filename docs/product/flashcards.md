@@ -2,43 +2,132 @@
 
 ## Product Boundary
 
-This contract currently covers durable vocabulary-to-card synchronization,
-review-history persistence, authenticated real-time synchronization
-notifications, the read-only deck viewer, Page Deck Active Recall, All Words
-SM-2 review, global daily limits, Spaced due queues, board-language
-presentation/TTS, and flashcard dashboard statistics.
+This document describes the current shipped flashcard and learning behavior in
+the repository. The approved end-state redesign contract lives in
+`docs/product/learning-workflows.md`. Until all E17 stories are complete, this
+file must reflect the implementation truth instead of the final target shape.
+
+## Current Redesign Status
+
+- Legacy `All Words` decks are removed from synchronization, reads, and
+  shipped learning flows.
+- Every vocabulary page now synchronizes to exactly one Page Deck.
+- Dedicated SRS ownership lives in `word_review_states`, linked to
+  `VocabWord`.
+- Practice completion creates or resets dedicated review state for the words in
+  the completed page-deck session.
+- Review submissions read and update dedicated review state instead of mutating
+  scheduling fields on `flashcard_cards`.
+- Protected navigation now exposes distinct `Flashcard`, `Practice`, and
+  `Review` entry points.
+- `/flashcards` is the dedicated Flashcard landing page, `/flashcards/practice`
+  is the dedicated Practice landing page, and `/flashcards/review` is the only
+  shipped review engine.
 
 ## Synchronization Rules
 
-- Every active vocabulary word has exactly two cards: one in its Page Deck and
-  one in its board's All Words Deck.
-- Word creation and card creation succeed or fail in one database transaction.
-- Word updates synchronize copied card content while preserving interval, ease
-  factor, repetitions, next review date, and card state.
-- Word deletion soft-deletes the vocabulary word and hard-deletes both cards
-  plus every associated `CardReview`.
-- Page and board deletion remove all affected cards and review history.
-- Existing active words are backfilled when the synchronization migration is
-  applied.
+- Every active vocabulary word has exactly one active synchronized card in its
+  owning page deck.
+- Word create and synchronized card create succeed or fail in one database
+  transaction.
+- Word updates synchronize copied card content.
+- Word deletion soft-deletes the vocabulary word and hard-deletes the
+  synchronized card, its `CardReview` history, and any related
+  `word_review_states` row.
+- Page and board deletion remove all affected synchronized cards, review
+  history, and word review state.
+- Existing active words were backfilled to page-deck-only cards by
+  `20260629102903_PurgeLegacyAllWordsDecks`.
 
 ## Card Content
 
 Cards copy the word, class, Vietnamese meaning, secondary meaning, example,
 thesaurus, collocation, and note from their source vocabulary word.
 
-## Scheduling Defaults
+## Dedicated Review State
 
-- New cards start in `New` state.
-- Interval and repetitions start at `0`.
-- Ease factor starts at `2.5`.
-- Next review date starts empty.
+- `word_review_states` stores interval, ease factor, repetitions,
+  `next_review_date`, and state for one vocabulary word.
+- New vocabulary words do not create review state automatically.
+- Completing Practice for a page deck creates missing review-state rows as
+  `Learning` with interval `1`, repetitions `1`, ease factor `2.5`, and next
+  review due tomorrow in the learner-local timezone.
+- Re-practicing a word resets the existing row back to that same `Learning`
+  baseline.
+- Review answers apply SM-2 updates to the review-state row and persist a
+  matching `CardReview` snapshot.
 
-## Data Integrity
+## Flashcard Surface
 
-- A deck cannot contain duplicate cards for the same vocabulary word.
-- `CardReview` records belong to one card and are deleted with that card.
-- Card-to-word linkage is a soft reference so the source word can remain
-  soft-deleted after synchronized cards are removed.
+- `GET /api/v1/flashcards/decks` returns only active Page Decks owned by the
+  authenticated user, grouped by vocabulary board.
+- The `/flashcards` page is the dedicated Flashcard entry surface and shows
+  only page decks grouped by vocabulary board.
+- Each non-empty page deck exposes:
+  - `Open Flashcards`
+  - `Practice this Page Deck`
+- Opening Flashcards routes to the one-card read-only viewer for that exact
+  page deck.
+- The viewer stays owner-scoped, flips one card at a time, and offers
+  `Finish` plus `Let's practice` on the final card.
+
+## Practice Surface
+
+- Practice starts from the dedicated `/flashcards/practice` landing page and
+  stays scoped to one selected Page Deck.
+- `GET /api/v1/flashcards/decks/{deckId}/cards` returns only owned active page
+  decks and their cards.
+- Practice order can be `Sequential` or `Shuffle`.
+- Practice mode sequence is global, unique, and stored in
+  `practice_settings`.
+- Practice supports Dictation, Meaning -> Word, and Pronunciation in the
+  configured order, then always finishes each word with a recap step.
+- Wrong answers keep the learner on the current step until correct or reveal.
+- Reveal/skip completes that step, marks the word wrong for the session, and
+  advances through the remaining workflow.
+- `POST /api/v1/flashcards/practice-sessions` accepts only an owned active page
+  deck, validates totals and timezone, stores the practice summary, and
+  creates/resets dedicated review state for all words in the completed deck.
+- Leaving Practice before completion persists no review-state changes because
+  the batch write only happens at summary submission.
+
+## Review Surface
+
+- Review starts from the dedicated `/flashcards/review` route and requires one
+  owned vocabulary board.
+- `POST /api/v1/flashcards/sessions` creates a server-side session for an owned
+  board, selected order type, selected mode, and valid timezone id.
+- The created review session returns only due words for that board, plus the
+  resolved per-word mode list for the session.
+- `POST /api/v1/flashcards/review` accepts only an owned active card in the
+  live session plus a valid timezone id.
+- Review requires existing dedicated review state for the card's source word.
+  In practice, that state is seeded by completed Practice.
+- Review updates the dedicated review-state row and inserts one `CardReview`
+  snapshot immediately per answer.
+- Review scoring is automatic: correct maps to SM-2 `Good`, wrong maps to
+  SM-2 `Again`.
+- Review no longer uses Page Deck session summaries or manual rating buttons.
+
+## Dashboard And Settings
+
+- `GET /api/v1/flashcards/dashboard?timeZoneId=...` returns overall stats for
+  the authenticated learner.
+- `GET /api/v1/flashcards/dashboard/{boardId}?timeZoneId=...` returns stats
+  scoped to one owned board and `404`s for missing or foreign boards.
+- Dashboard totals derive from page decks plus dedicated review-state rows so
+  each vocabulary word is counted once.
+- Overdue, due-today, and forecast values come from `word_review_states`.
+- New-card count is the number of synchronized page-deck words without review
+  state.
+- Retention rate is still based on persisted `CardReview` ratings.
+- The protected review-settings page now stores separate Practice and Review
+  settings.
+- Practice settings persist the global mode sequence.
+- Review settings persist `dailyLimit` and `recapAfterAnswer`.
+- When a board has more due words than `dailyLimit`, the oldest due words stay
+  in-session and the overflow due dates are moved to tomorrow when the review
+  session starts.
 
 ## Real-Time Synchronization
 
@@ -46,132 +135,14 @@ thesaurus, collocation, and note from their source vocabulary word.
 - JWT query-string authentication is accepted only for the synchronization hub
   path.
 - Word create and update publish `VocabWordSaved` with `wordId` and `pageId`.
-- Word create, update, and delete publish `FlashcardDeckUpdated` once for each
-  affected Page Deck and All Words Deck.
+- Word create, update, and delete publish `FlashcardDeckUpdated` for the
+  affected page deck.
 - Events are scoped to the authenticated user and are sent only after the
-  durable vocabulary/card commit succeeds.
-- Durable card correctness does not depend on connected clients or successful
-  notification delivery.
+  durable vocabulary and flashcard commit succeeds.
 
-## Read-Only Viewer
+## Approved End State
 
-- Authenticated learners open `/flashcards` from the vocabulary workspace.
-- `GET /api/v1/flashcards/decks` returns only active decks and cards owned by
-  the authenticated user, including each deck's board language.
-- Decks are grouped by vocabulary board and identify Page Deck versus All Words
-  Deck.
-- Cards display synchronized vocabulary content and current scheduling status.
-- Card labels adapt to board language. Chinese boards show the secondary
-  meaning field as Pinyin.
-- The viewer invalidates its deck query on `FlashcardDeckUpdated`.
-- A 1.5-second refresh fallback covers initial SignalR connection and reconnect
-  windows so vocabulary changes remain visible within three seconds.
-
-## Page Deck Active Recall
-
-- Authenticated learners can start a study session from a non-empty Page Deck.
-- `GET /api/v1/flashcards/decks/{deckId}/cards` returns only an owned, active
-  Page Deck or All Words Deck and its cards.
-- Sessions support Normal or Shuffle order, front/answer reveal, best-effort
-  automatic and manual TTS that follows board language, progress, and mouse or
-  keyboard controls.
-- `POST /api/v1/flashcards/sessions` accepts an owned active deck and returns
-  a server-generated `sessionId` used by review submissions.
-- Space reveals the answer. Keys 1, 2, 3, and 4 record Easy, Good, Hard, and
-  Again respectively after reveal.
-- `POST /api/v1/flashcards/review` accepts only an owned, active card and
-  records one `CardReview`.
-- Page Deck ratings snapshot but never change interval, ease factor,
-  repetitions, next review date, or card state.
-- Completed sessions show an immediate rating summary, and
-  `GET /api/v1/flashcards/sessions/{sessionId}/summary` returns the durable
-  count and percentage summary from review history for that authenticated user.
-- Session order and in-progress UI state remain route-local.
-
-## Multi-language Presentation
-
-- Review sessions use the board language returned by the deck/session APIs.
-- TTS maps known board language codes to browser-friendly speech tags:
-  `en-US`, `zh-CN`, `ja-JP`, `ko-KR`, and `fr-FR`.
-- Browser voice selection prefers exact speech-language matches, then
-  base-language matches, then falls back to utterance language only.
-- Chinese boards show the secondary card answer as Pinyin in both the
-  read-only deck viewer and review answer.
-
-## All Words SM-2 Review
-
-- Learners can start Spaced, Normal, or Shuffle sessions from a non-empty All
-  Words Deck. Spaced is the default.
-- Every All Words rating updates scheduling, including Normal and Shuffle.
-- The server validates the browser timezone and calculates the next review from
-  the learner-local review date.
-- Again and Hard reset interval to `1` and repetitions to `0`. Good and Easy
-  use the deterministic SM-2 progression and ease-factor formula from the
-  accepted review contract.
-- Resulting card state is Learning below 7 days, Review from 7 through 20 days,
-  and Mature from 21 days.
-- The card schedule update and matching `CardReview` snapshot commit together.
-- A successful All Words commit publishes `FlashcardDeckUpdated` afterward so
-  the deck viewer refreshes its visible schedule.
-
-## Global Daily Planning
-
-- Learners configure global new-card and review-card limits on the protected
-  review-settings page.
-- Missing settings rows use defaults of 20 new cards and 200 review cards.
-- Daily limits apply across every All Words deck, not separately per board.
-- Every distinct All Words card consumes at most one allowance slot per
-  learner-local day, including reviews completed in Normal or Shuffle.
-- A card consumes a new-card slot when its first-ever review occurs that day;
-  otherwise it consumes a review-card slot.
-- `GET /api/v1/flashcards/decks/{deckId}/due` accepts only an owned active All
-  Words deck and returns overdue cards first, due-today cards second, and new
-  cards third within remaining allowances.
-- The server validates the browser timezone and derives local-day UTC bounds.
-- Completed Spaced sessions show the immediate daily-completion summary.
-
-## Practice Modes
-
-- Every non-empty Page Deck and All Words deck exposes a separate Practice
-  entry that opens `/flashcards/decks/{deckId}/practice`.
-- Practice setup reuses `GET /api/v1/flashcards/decks/{deckId}/cards` and
-  always uses every active card in the selected deck; it does not use the All
-  Words due queue or daily limits.
-- Practice supports three modes: Dictation, Meaning -> Word, and
-  Pronunciation.
-- Dictation plays the target word through browser speech synthesis and hides
-  word, class, and meaning hints.
-- Meaning -> Word shows both `meaningVn` and `meaningEn`; the learner must
-  type `card.word`.
-- Pronunciation plays the target word through browser speech synthesis, uses
-  browser speech recognition where supported, and compares the normalized
-  transcript to `card.word`.
-- Typed answers and pronunciation transcripts use exact normalized matching:
-  trim surrounding whitespace and ignore case, but require exact spelling.
-- Wrong submissions keep the learner on the same card for retry.
-- Reveal or skip shows the answer, marks the card wrong for the session
-  summary, and advances.
-- Practice completion shows total cards, correct cards, and wrong cards.
-- `POST /api/v1/flashcards/practice-sessions` accepts only an owned, active
-  deck and persists summary-only history: mode, deck id, total cards, correct
-  cards, wrong cards, and completion time.
-- Practice summary writes never change interval, ease factor, repetitions,
-  next review date, card state, review history, or dashboard scheduling data.
-- Browsers without speech-recognition support show a clear unsupported state
-  for Pronunciation while leaving the other practice modes available.
-
-## Flashcard Dashboard
-
-- Authenticated learners see dashboard stats on `/flashcards`.
-- `GET /api/v1/flashcards/dashboard?timeZoneId=...` returns overall stats for
-  the authenticated learner.
-- `GET /api/v1/flashcards/dashboard/{boardId}?timeZoneId=...` returns stats
-  scoped to one owned board and returns `404` for missing or foreign boards.
-- Invalid timezone IDs return `422 VALIDATION_ERROR`.
-- Total cards, overdue count, due-today count, new-card count, and the 7-day
-  forecast use All Words cards only so each vocabulary word is counted once.
-- Streak counts consecutive learner-local days with at least one card review,
-  ending today when today has activity or yesterday when today has not started.
-- Retention rate is the percentage of reviews rated Good or Easy.
-- The forecast returns seven learner-local dates starting today with scheduled
-  review counts for each date.
+- The shipped split into separate `Flashcard`, `Practice`, and board-scoped
+  `Review` workflows is defined in `docs/product/learning-workflows.md`.
+- Story-by-story redesign progress and proof live under
+  `docs/stories/epics/E17-learning-redesign/`.

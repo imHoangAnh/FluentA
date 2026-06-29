@@ -3,6 +3,7 @@ using System;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FluentA.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260629120436_AddPracticeSettings")]
+    partial class AddPracticeSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -462,17 +465,17 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int>("DailyLimit")
-                        .HasColumnType("integer")
-                        .HasColumnName("daily_limit");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<bool>("RecapAfterAnswer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("recap_after_answer");
+                    b.Property<int>("NewCardsPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("new_cards_per_day");
+
+                    b.Property<int>("ReviewCardsPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_cards_per_day");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")

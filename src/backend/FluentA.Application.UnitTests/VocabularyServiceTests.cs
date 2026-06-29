@@ -9,7 +9,7 @@ namespace FluentA.Application.UnitTests;
 public sealed class VocabularyServiceTests
 {
     [Fact]
-    public async Task CreateBoard_CreatesAllWordsDeck()
+    public async Task CreateBoard_DoesNotCreateDeckUntilPagesExist()
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
@@ -19,9 +19,7 @@ public sealed class VocabularyServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("IELTS Vocabulary", result.Value!.Name);
-        Assert.Single(repository.Decks);
-        Assert.Equal(DeckType.AllWords, repository.Decks[0].Type);
-        Assert.Equal(result.Value.Id, repository.Decks[0].BoardId);
+        Assert.Empty(repository.Decks);
     }
 
     [Fact]
@@ -36,9 +34,9 @@ public sealed class VocabularyServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Unit 1 - Education", result.Value!.Name);
-        Assert.Equal(2, repository.Decks.Count);
-        Assert.Equal(DeckType.PageDeck, repository.Decks[1].Type);
-        Assert.Equal(result.Value.Id, repository.Decks[1].PageId);
+        Assert.Single(repository.Decks);
+        Assert.Equal(DeckType.PageDeck, repository.Decks[0].Type);
+        Assert.Equal(result.Value.Id, repository.Decks[0].PageId);
     }
 
     [Fact]
@@ -108,7 +106,7 @@ public sealed class VocabularyServiceTests
         Assert.DoesNotContain(repository.Words, word => word.DeletedAt is null);
         Assert.Equal(2, notifier.SavedWords.Count);
         Assert.Equal(3, notifier.UpdatedDeckGroups.Count);
-        Assert.All(notifier.UpdatedDeckGroups, update => Assert.Equal(2, update.DeckIds.Count));
+        Assert.All(notifier.UpdatedDeckGroups, update => Assert.Single(update.DeckIds));
     }
 
     [Fact]
@@ -325,7 +323,7 @@ public sealed class VocabularyServiceTests
             return Task.FromResult<IReadOnlyList<Guid>>(Decks
                 .Where(deck => deck.BoardId == boardId
                     && deck.DeletedAt is null
-                    && (deck.Type == DeckType.AllWords || deck.PageId == pageId))
+                    && deck.PageId == pageId)
                 .Select(deck => deck.Id)
                 .ToList());
         }
@@ -343,10 +341,9 @@ public sealed class VocabularyServiceTests
         public Task<int> NextCustomColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default) =>
             Task.FromResult(Columns.Count(column => column.BoardId == boardId));
 
-        public Task AddBoardWithDeckAsync(VocabBoard board, FlashcardDeck deck, CancellationToken cancellationToken = default)
+        public Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
         {
             _boards.Add(board);
-            Decks.Add(deck);
             return Task.CompletedTask;
         }
 

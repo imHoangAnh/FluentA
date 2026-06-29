@@ -7,7 +7,7 @@ public interface IVocabularyService
 {
     /// <summary>Lists vocabulary board summaries for a user.</summary>
     Task<OperationResult<IReadOnlyList<BoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default);
-    /// <summary>Creates a vocabulary board and its All Words deck.</summary>
+    /// <summary>Creates a vocabulary board without creating any deck until pages exist.</summary>
     Task<OperationResult<BoardDetailDto>> CreateBoardAsync(Guid userId, CreateBoardRequest request, CancellationToken cancellationToken = default);
     /// <summary>Returns one vocabulary board with pages.</summary>
     Task<OperationResult<BoardDetailDto>> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);

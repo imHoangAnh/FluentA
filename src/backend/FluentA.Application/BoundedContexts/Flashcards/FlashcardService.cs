@@ -7,12 +7,10 @@ namespace FluentA.Application.BoundedContexts.Flashcards;
 public sealed class FlashcardService : IFlashcardService
 {
     private readonly IFlashcardRepository _repository;
-    private readonly IFlashcardSyncNotifier _flashcardSyncNotifier;
 
     public FlashcardService(IFlashcardRepository repository, IFlashcardSyncNotifier? flashcardSyncNotifier = null)
     {
         _repository = repository;
-        _flashcardSyncNotifier = flashcardSyncNotifier ?? NullFlashcardSyncNotifier.Instance;
     }
 
     public Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -67,6 +65,11 @@ public sealed class FlashcardService : IFlashcardService
             errors["summary"] = ["Correct cards plus wrong cards must equal total cards."];
         }
 
+        if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
+        {
+            errors["timeZoneId"] = ["A valid browser timezone id is required."];
+        }
+
         if (errors.Count > 0)
         {
             return OperationResult<PracticeSessionSummaryDto>.Failure(FlashcardError.Validation(errors));
@@ -79,6 +82,8 @@ public sealed class FlashcardService : IFlashcardService
             request.TotalCards,
             request.CorrectCards,
             request.WrongCards,
+            timeZone!,
+            DateTime.UtcNow,
             cancellationToken);
 
         return result.Status switch
@@ -101,17 +106,39 @@ public sealed class FlashcardService : IFlashcardService
         CreateReviewSessionRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.DeckId == Guid.Empty)
+        var errors = new Dictionary<string, string[]>();
+        if (request.BoardId == Guid.Empty)
         {
-            return OperationResult<ReviewSessionCreatedDto>.Failure(FlashcardError.Validation(new Dictionary<string, string[]>
-            {
-                ["deckId"] = ["Deck id is required."]
-            }));
+            errors["boardId"] = ["Board id is required."];
+        }
+
+        if (!IsAllowedOrderType(request.OrderType))
+        {
+            errors["orderType"] = ["Order type must be sequential or shuffle."];
+        }
+
+        if (!IsAllowedReviewMode(request.Mode))
+        {
+            errors["mode"] = ["Mode must be dictation, pronunciation, meaningToWord, or random."];
+        }
+
+        if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
+        {
+            errors["timeZoneId"] = ["A valid browser timezone id is required."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return OperationResult<ReviewSessionCreatedDto>.Failure(FlashcardError.Validation(errors));
         }
 
         var session = await _repository.CreateReviewSessionAsync(
             userId,
-            request.DeckId,
+            request.BoardId,
+            request.OrderType,
+            request.Mode,
+            timeZone!,
+            DateTime.UtcNow,
             Guid.NewGuid(),
             cancellationToken);
 
@@ -139,6 +166,26 @@ public sealed class FlashcardService : IFlashcardService
             : OperationResult<ReviewSessionSummaryDto>.Success(summary);
     }
 
+    public Task<PracticeSettingsDto> GetPracticeSettingsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _repository.GetPracticeSettingsAsync(userId, cancellationToken);
+
+    public async Task<OperationResult<PracticeSettingsDto>> UpdatePracticeSettingsAsync(
+        Guid userId,
+        UpdatePracticeSettingsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = ValidatePracticeSettings(request);
+        if (errors.Count > 0)
+        {
+            return OperationResult<PracticeSettingsDto>.Failure(FlashcardError.Validation(errors));
+        }
+
+        return OperationResult<PracticeSettingsDto>.Success(await _repository.UpdatePracticeSettingsAsync(
+            userId,
+            request.ModeSequence,
+            cancellationToken));
+    }
+
     public Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default) =>
         _repository.GetReviewSettingsAsync(userId, cancellationToken);
 
@@ -155,29 +202,9 @@ public sealed class FlashcardService : IFlashcardService
 
         return OperationResult<ReviewSettingsDto>.Success(await _repository.UpdateReviewSettingsAsync(
             userId,
-            request.NewCardsPerDay,
-            request.ReviewCardsPerDay,
+            request.DailyLimit,
+            request.RecapAfterAnswer,
             cancellationToken));
-    }
-
-    public async Task<OperationResult<DueDeckDto>> GetDueDeckAsync(
-        Guid userId,
-        Guid deckId,
-        string? timeZoneId,
-        CancellationToken cancellationToken = default)
-    {
-        if (!ReviewTime.TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            return OperationResult<DueDeckDto>.Failure(FlashcardError.Validation(new Dictionary<string, string[]>
-            {
-                ["timeZoneId"] = ["A valid browser timezone id is required."]
-            }));
-        }
-
-        var dueDeck = await _repository.GetDueDeckAsync(userId, deckId, timeZone!, DateTime.UtcNow, cancellationToken);
-        return dueDeck is null
-            ? OperationResult<DueDeckDto>.Failure(FlashcardError.DeckOrCardNotFound())
-            : OperationResult<DueDeckDto>.Success(dueDeck);
     }
 
     public async Task<OperationResult<FlashcardDashboardDto>> GetDashboardAsync(
@@ -216,11 +243,6 @@ public sealed class FlashcardService : IFlashcardService
             errors["cardId"] = ["Card id is required."];
         }
 
-        if (!Enum.IsDefined(typeof(ReviewRating), request.Rating))
-        {
-            errors["rating"] = ["Rating must be 0 (Again), 1 (Hard), 2 (Good), or 3 (Easy)."];
-        }
-
         if (request.TimeSpentSeconds is < 0 or > 86400)
         {
             errors["timeSpentSeconds"] = ["Time spent must be between 0 and 86400 seconds."];
@@ -240,7 +262,7 @@ public sealed class FlashcardService : IFlashcardService
             userId,
             request.SessionId,
             request.CardId,
-            (ReviewRating)request.Rating,
+            request.Correct,
             request.TimeSpentSeconds,
             timeZone!,
             cancellationToken);
@@ -250,25 +272,50 @@ public sealed class FlashcardService : IFlashcardService
             return OperationResult<ReviewResultDto>.Failure(FlashcardError.DeckOrCardNotFound());
         }
 
-        if (result.DeckType == DeckType.AllWords.ToString())
-        {
-            await _flashcardSyncNotifier.DecksUpdatedAsync(userId, result.BoardId, [result.DeckId], cancellationToken);
-        }
-
         return OperationResult<ReviewResultDto>.Success(result);
     }
 
     private static Dictionary<string, string[]> ValidateSettings(UpdateReviewSettingsRequest request)
     {
         var errors = new Dictionary<string, string[]>();
-        if (request.NewCardsPerDay is < 0 or > ReviewSettings.MaximumDailyLimit)
+        if (request.DailyLimit is < 0 or > ReviewSettings.MaximumDailyLimit)
         {
-            errors["newCardsPerDay"] = [$"New cards per day must be between 0 and {ReviewSettings.MaximumDailyLimit}."];
+            errors["dailyLimit"] = [$"Daily limit must be between 0 and {ReviewSettings.MaximumDailyLimit}."];
         }
 
-        if (request.ReviewCardsPerDay is < 0 or > ReviewSettings.MaximumDailyLimit)
+        return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidatePracticeSettings(UpdatePracticeSettingsRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.ModeSequence is null || request.ModeSequence.Count == 0)
         {
-            errors["reviewCardsPerDay"] = [$"Review cards per day must be between 0 and {ReviewSettings.MaximumDailyLimit}."];
+            errors["modeSequence"] = ["Mode sequence must include at least one practice mode."];
+            return errors;
+        }
+
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "dictation",
+            "meaningToWord",
+            "pronunciation",
+        };
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var mode in request.ModeSequence)
+        {
+            var value = mode?.Trim() ?? string.Empty;
+            if (!allowed.Contains(value))
+            {
+                errors["modeSequence"] = ["Mode sequence entries must be dictation, meaningToWord, or pronunciation."];
+                return errors;
+            }
+
+            if (!seen.Add(value))
+            {
+                errors["modeSequence"] = ["Mode sequence entries must be unique."];
+                return errors;
+            }
         }
 
         return errors;
@@ -291,4 +338,10 @@ public sealed class FlashcardService : IFlashcardService
         mode = value;
         return true;
     }
+
+    private static bool IsAllowedOrderType(string? value) =>
+        value is "sequential" or "shuffle";
+
+    private static bool IsAllowedReviewMode(string? value) =>
+        value is "dictation" or "pronunciation" or "meaningToWord" or "random";
 }

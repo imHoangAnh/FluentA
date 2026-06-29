@@ -29,8 +29,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<VocabColumnVisibility> VocabColumnVisibility => Set<VocabColumnVisibility>();
     public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
     public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
+    public DbSet<WordReviewState> WordReviewStates => Set<WordReviewState>();
     public DbSet<CardReview> CardReviews => Set<CardReview>();
     public DbSet<PracticeSessionSummary> PracticeSessionSummaries => Set<PracticeSessionSummary>();
+    public DbSet<PracticeSettings> PracticeSettings => Set<PracticeSettings>();
     public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();

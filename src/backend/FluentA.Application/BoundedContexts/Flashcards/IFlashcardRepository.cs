@@ -14,20 +14,29 @@ public interface IFlashcardRepository
         int totalCards,
         int correctCards,
         int wrongCards,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
         CancellationToken cancellationToken = default);
-    Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(Guid userId, Guid deckId, Guid sessionId, CancellationToken cancellationToken = default);
+    Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
+        Guid userId,
+        Guid boardId,
+        string orderType,
+        string mode,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        Guid sessionId,
+        CancellationToken cancellationToken = default);
     Task<ReviewSessionSummaryDto?> GetReviewSessionSummaryAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default);
+    Task<PracticeSettingsDto> GetPracticeSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<PracticeSettingsDto> UpdatePracticeSettingsAsync(
+        Guid userId,
+        IReadOnlyList<string> modeSequence,
+        CancellationToken cancellationToken = default);
     Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<ReviewSettingsDto> UpdateReviewSettingsAsync(
         Guid userId,
-        int newCardsPerDay,
-        int reviewCardsPerDay,
-        CancellationToken cancellationToken = default);
-    Task<DueDeckDto?> GetDueDeckAsync(
-        Guid userId,
-        Guid deckId,
-        TimeZoneInfo timeZone,
-        DateTime utcNow,
+        int dailyLimit,
+        bool recapAfterAnswer,
         CancellationToken cancellationToken = default);
     Task<FlashcardDashboardDto?> GetDashboardAsync(
         Guid userId,
@@ -39,7 +48,7 @@ public interface IFlashcardRepository
         Guid userId,
         Guid sessionId,
         Guid cardId,
-        ReviewRating rating,
+        bool correct,
         int timeSpentSeconds,
         TimeZoneInfo timeZone,
         CancellationToken cancellationToken = default);

@@ -28,7 +28,7 @@ public sealed class BoardsController : ControllerBase
         return Ok(ApiEnvelope<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!));
     }
 
-    /// <summary>Creates a vocabulary board with its synchronized All Words deck.</summary>
+    /// <summary>Creates a vocabulary board; synchronized page decks are created as pages are added.</summary>
     [HttpPost]
     public async Task<IActionResult> CreateBoard(CreateBoardRequest request, CancellationToken cancellationToken)
     {

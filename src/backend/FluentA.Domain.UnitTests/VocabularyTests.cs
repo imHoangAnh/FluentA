@@ -64,18 +64,14 @@ public sealed class VocabularyTests
     }
 
     [Fact]
-    public void CreateDeck_NamesAllWordsAndPageDecks()
+    public void CreateDeck_NamesPageDecks()
     {
         var userId = Guid.NewGuid();
         var boardId = Guid.NewGuid();
         var pageId = Guid.NewGuid();
 
-        var allWords = FlashcardDeck.CreateAllWords(userId, boardId, "IELTS");
         var pageDeck = FlashcardDeck.CreatePageDeck(userId, boardId, pageId, "IELTS", "Unit 1");
 
-        Assert.Equal("IELTS - All Words", allWords.Name);
-        Assert.Equal(DeckType.AllWords, allWords.Type);
-        Assert.Null(allWords.PageId);
         Assert.Equal("IELTS - Unit 1", pageDeck.Name);
         Assert.Equal(DeckType.PageDeck, pageDeck.Type);
         Assert.Equal(pageId, pageDeck.PageId);
@@ -84,12 +80,12 @@ public sealed class VocabularyTests
     [Fact]
     public void Deck_RenameSoftDeleteAndValidation()
     {
-        var deck = FlashcardDeck.CreateAllWords(Guid.NewGuid(), Guid.NewGuid(), "IELTS");
+        var deck = FlashcardDeck.CreatePageDeck(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "IELTS", "Unit 1");
 
-        deck.Rename(" HSK - All Words ");
+        deck.Rename(" HSK - Lesson 2 ");
         deck.SoftDelete();
 
-        Assert.Equal("HSK - All Words", deck.Name);
+        Assert.Equal("HSK - Lesson 2", deck.Name);
         Assert.NotNull(deck.DeletedAt);
         Assert.Throws<ArgumentException>(() => deck.Rename(""));
         Assert.Throws<ArgumentException>(() => FlashcardDeck.CreatePageDeck(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new string('x', 241), "Unit"));
@@ -200,14 +196,36 @@ public sealed class VocabularyTests
     {
         var settings = ReviewSettings.CreateDefault(Guid.NewGuid());
 
-        Assert.Equal(20, settings.NewCardsPerDay);
-        Assert.Equal(200, settings.ReviewCardsPerDay);
+        Assert.Equal(300, settings.DailyLimit);
+        Assert.True(settings.RecapAfterAnswer);
 
-        settings.Update(12, 80);
-        Assert.Equal(12, settings.NewCardsPerDay);
-        Assert.Equal(80, settings.ReviewCardsPerDay);
-        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(-1, 80));
-        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(12, 1001));
+        settings.Update(120, false);
+        Assert.Equal(120, settings.DailyLimit);
+        Assert.False(settings.RecapAfterAnswer);
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(-1, false));
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(1001, true));
+    }
+
+    [Fact]
+    public void WordReviewState_CreatesAndResetsLearningState()
+    {
+        var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
+        var state = WordReviewState.CreateLearning(Guid.NewGuid(), nextReviewDate);
+
+        Assert.Equal(1, state.Interval);
+        Assert.Equal(2.5f, state.EaseFactor);
+        Assert.Equal(1, state.Repetitions);
+        Assert.Equal(nextReviewDate, state.NextReviewDate);
+        Assert.Equal(CardState.Learning, state.State);
+
+        var resetDate = nextReviewDate.AddDays(2);
+        state.ResetToLearning(resetDate);
+
+        Assert.Equal(1, state.Interval);
+        Assert.Equal(2.5f, state.EaseFactor);
+        Assert.Equal(1, state.Repetitions);
+        Assert.Equal(resetDate, state.NextReviewDate);
+        Assert.Equal(CardState.Learning, state.State);
     }
 
     [Fact]

@@ -22,6 +22,7 @@
 11. [Definition of Done](#11-definition-of-done)
 12. [Next Feature Plan — Email Verification OTP & Password Recovery](#12-next-feature-plan--email-verification-otp--password-recovery)
 13. [Feature Plan —  Practice Modes](#13-next-feature-plan--flashcard-practice-modes)
+14. [Next Feature Plan — Flashcard, Practice, And Review Redesign](#14-next-feature-plan--flashcard-practice-and-review-redesign)
 
 ---
 
@@ -1742,3 +1743,295 @@ git diff --check
 Planning may split or refine commands by story, but release proof must cover
 practice mode correctness, no SM-2 mutation, practice summary persistence,
 speech unsupported-state handling, and regression of existing review sessions.
+
+---
+
+## 14. Next Feature Plan — Flashcard, Practice, And Review Redesign
+
+**Planning status:** Product decisions locked for implementation planning
+
+**Mode:** High-risk learning-domain redesign
+
+**Supersedes:** the old Flashcard-as-review-engine role, All Words deck review,
+and the Section 13 practice-only interpretation where practice never affects
+SRS. Feature 13 practice modes remain reusable UI/interaction building blocks.
+
+**Source of truth:** `history/flashcard-practice-review-redesign/CONTEXT.md`
+
+### 14.1 Desired Outcomes
+
+- FluentA has three top-level learning menus: **Flashcard**, **Practice**, and
+  **Review**.
+- Flashcard becomes a read-only page-deck viewer. It no longer owns review
+  scheduling.
+- Practice is the first-learning workflow. It reuses the implemented Feature 13
+  mode interactions, adds `Sequential` and `Shuffle` order settings, and marks
+  practiced words into SRS only after the full practice session is completed.
+- Review is the SRS workflow. It reviews due words from a selected vocabulary
+  board, not from an All Words flashcard deck.
+- All Words decks are removed from the product model. Flashcard sync creates
+  only one deck per vocabulary page.
+- SRS state moves into a dedicated review table linked to vocabulary words.
+
+### 14.2 Locked Product Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Top-level menus | Navigation exposes separate `Flashcard`, `Practice`, and `Review` menu items. |
+| Naming | The first-learning flow is named `Practice`, not `Learn`. |
+| Feature 13 reuse | Existing Dictation, Meaning -> Word, and Pronunciation interactions are reused for Practice and Review. |
+| Order setting | Practice and Review support `Sequential` and `Shuffle`. Sequential uses the selected ordered set; Shuffle randomizes within that set. |
+| Flashcard deck model | All Words decks are removed. Each vocabulary page syncs to exactly one page deck. |
+| Old SRS migration | Existing All Words SRS data does not need to be preserved; destructive migration is acceptable. |
+| Review storage | SRS state is stored in a dedicated review table linked to vocabulary words, not on `VocabWord` and not on `FlashcardCard`. |
+| Review record creation | The review/SRS record is created only after a Practice session completes for the word. |
+| Initial SRS state | A newly practiced word enters `Learning` with next review due tomorrow. |
+| Re-practice behavior | Practicing a word that already has SRS state resets that existing SRS record to `Learning`, due tomorrow. |
+| Delete behavior | Deleting a word, page, or board hard-deletes related SRS review records. |
+| Practice selection | Practice menu uses a Board -> Page Deck tree. Practice runs on the selected page deck. |
+| Practice card set | Practice includes all cards in the selected page deck, including words that already have SRS state. |
+| Practice order | Practice `Sequential` follows current deck/card creation order; `Shuffle` randomizes that order. |
+| Practice mode setting | Practice uses a global user setting that stores the selected unique mode sequence. The setting applies to every Practice session. |
+| Practice mode selection | The global Practice mode sequence must include at least one unique mode from Dictation, Meaning -> Word, and Pronunciation. |
+| Practice default sequence | When the user has not changed the setting, Practice defaults to Dictation -> Meaning -> Word -> Pronunciation. |
+| Practice workflow | Each word runs the globally configured Practice mode sequence, then Flashcard recap, then Next word. |
+| Practice wrong answers | A wrong answer stays on the current step until the learner answers correctly or uses skip/reveal. |
+| Practice skip/reveal | Skip/reveal completes the current step and still allows the word to be marked learned when the full session finishes. |
+| Practice persistence | UI tracks completion per word, but backend creates/updates SRS records in one batch only when the whole practice session/deck finishes. |
+| Practice abandonment | If the learner leaves Practice before finishing the full session, no SRS progress is persisted. |
+| Practice recap | Practice always shows flashcard recap after the configured mode sequence. Recap is not reorderable and cannot be disabled in Practice. |
+| Practice and Review settings split | Practice mode settings do not affect Review. Review mode selection remains per session. |
+| Review selection | Review menu selects a vocabulary board. The review queue is built from words in that board's pages. |
+| Review unit | Product language and UI say `word`, not `card`. The reviewed unit is the word from vocabulary pages. |
+| Review queue | Review includes words whose SRS next review date is due today or overdue within the selected board. |
+| Review limit | Global user setting defaults to `300 words/day`. |
+| Limit overflow | When due words exceed the daily limit, Review selects the oldest due words first and immediately moves the overflow due dates to tomorrow when the session starts. |
+| Review sequential order | Review `Sequential` sorts by oldest `nextReviewDate` first, then creation order. |
+| Review shuffle order | Review `Shuffle` first applies the oldest-due limit set, then shuffles within that set. |
+| Review mode selection | Each Review session asks the learner to choose `Dictation`, `Pronunciation`, `Meaning -> Word`, or `Random`. |
+| Review random mode | Random assigns one of the three modes per word while still respecting the selected order type. |
+| Review scoring | Review uses automatic correct/wrong results from the selected mode; it does not show Easy/Good/Hard/Again buttons. |
+| SRS mapping | MVP maps correct to `Good` and wrong to `Again` in the existing SM-2 calculation until the SRS algorithm is improved later. |
+| Review wrong answer UX | A wrong Review answer records the wrong result, shows answer/recap, and moves to the next word. |
+| Review persistence | Review persists each word immediately after it is answered. Abandoning a session keeps already-reviewed word updates. |
+| Review recap setting | `Recap after answer` is a global user setting. If enabled, correct and wrong answers show recap before Next. If disabled, correct answers can move quickly; wrong answers still show answer/recap. |
+| Flashcard menu | Flashcard shows only the page-deck list initially. It does not show all words in the list view. |
+| Flashcard viewer | Selecting a deck opens a one-card-at-a-time viewer with click-to-flip and manual Next/Previous controls. |
+| Flashcard final actions | On the final card, the viewer shows `Finish` and `Let's practice`. `Let's practice` redirects to Practice for that exact page deck. |
+| Flashcard front | Front shows `word`, `class`, and `meaningEn` when present. |
+| Flashcard back | Back shows `meaningVn`, `example`, and `thesaurus` when present. Empty fields are hidden. |
+
+### 14.3 New Product Navigation
+
+The learning area is split into three top-level menus:
+
+| Menu | Primary job |
+|---|---|
+| `Flashcard` | Read-only card browsing for page decks synced from vocabulary pages. |
+| `Practice` | First-learning and re-practice workflow for one selected page deck. |
+| `Review` | SRS review workflow for due words in one selected vocabulary board. |
+
+This split replaces the current mixed Flashcards page where deck browsing,
+practice, dashboard, and All Words review live together.
+
+### 14.4 Flashcard Workflow
+
+1. Learner opens **Flashcard**.
+2. The page lists page decks grouped by vocabulary board/page. The visible deck
+   title is the corresponding page name.
+3. The list does not render every word/card inline.
+4. Learner selects one page deck.
+5. The viewer opens immediately on the first card.
+6. Viewer shows one card at a time.
+7. Clicking the card flips front/back.
+8. Learner uses Next/Previous manually.
+9. On the final card, learner chooses:
+   - `Finish`: leave or close the viewer.
+   - `Let's practice`: redirect to Practice for that page deck.
+
+Card display:
+
+| Side | Fields |
+|---|---|
+| Front | `word`, `class`, optional `meaningEn` |
+| Back | `meaningVn`, `example`, optional `thesaurus` |
+
+Optional fields are hidden when empty.
+
+### 14.5 Practice Workflow
+
+Practice is the first-learning workflow and can also be used to reset an
+already-learned word back into Learning.
+
+1. Learner opens **Practice**.
+2. Learner selects a board, then a page deck.
+3. Learner chooses order type:
+   - `Sequential`: current deck/card creation order.
+   - `Shuffle`: randomized order.
+4. Practice includes every card in the selected page deck.
+5. For each word, the learner must complete the global Practice mode sequence.
+   The default sequence is:
+   - Dictation: listen, then type the word.
+   - Meaning -> Word: view meanings, then type the word.
+   - Pronunciation: speak the word and match the transcript.
+6. The learner may configure the global Practice mode sequence to include any
+   non-empty unique subset of the three modes in any order. Examples:
+   - Dictation -> Meaning -> Word
+   - Dictation -> Pronunciation
+   - Meaning -> Word -> Dictation -> Pronunciation
+7. After the configured mode sequence, Practice always shows flashcard recap
+   before moving on.
+8. Wrong answers keep the learner on the current step until a correct answer or
+   skip/reveal.
+9. Skip/reveal completes the current step.
+10. UI tracks completion per word.
+11. Backend creates or resets SRS records only after the entire practice session
+   finishes.
+12. If the learner abandons the session before finishing, no SRS state changes
+    are saved.
+
+SRS result after full Practice completion:
+
+| Word condition | Result |
+|---|---|
+| No existing review record | Create review record as `Learning`, due tomorrow. |
+| Existing review record | Reset existing record to `Learning`, due tomorrow. |
+
+### 14.6 Review Workflow
+
+Review is the only SRS workflow.
+
+1. Learner opens **Review**.
+2. Learner selects one vocabulary board.
+3. Learner chooses order type:
+   - `Sequential`
+   - `Shuffle`
+4. Learner chooses review mode:
+   - `Dictation`
+   - `Pronunciation`
+   - `Meaning -> Word`
+   - `Random`
+5. System builds a due-word queue from the selected board's pages.
+6. Queue includes words with review records whose `nextReviewDate` is due today
+   or overdue.
+7. Global review limit defaults to `300 words/day`.
+8. If due words exceed the daily limit:
+   - Select oldest due words first up to the limit.
+   - Immediately move overflow words to tomorrow.
+   - Review session uses only the selected queue.
+9. Each answer is automatically evaluated as correct or wrong by the mode.
+10. Correct maps to SM-2 `Good`; wrong maps to SM-2 `Again`.
+11. Each answered word persists immediately.
+12. Wrong answers show answer/recap and move to the next word.
+13. Correct answer recap follows the global `recap after answer` setting.
+
+Random mode keeps the selected word order and randomizes only the mode assigned
+to each word.
+
+### 14.7 Data Model Expectations
+
+The new Review storage should be independent of Flashcard cards.
+
+Expected review/SRS state fields:
+
+| Field | Purpose |
+|---|---|
+| `id` | Review state id. |
+| `userId` | Owner for fast ownership scoping. |
+| `wordId` | Linked `VocabWord`. |
+| `boardId` | Denormalized board scope for queue building, or queryable through page/board relation if planning rejects denormalization. |
+| `state` | `Learning`, `Review`, or `Mature`. |
+| `interval` | Current interval in days. |
+| `easeFactor` | Current SM-2 ease factor. |
+| `repetitions` | Current successful repetition count. |
+| `nextReviewDate` | UTC date/time used for due queue. |
+| `lastReviewedAt` | Last Review completion timestamp. |
+| `createdAt` / `updatedAt` | Standard audit timestamps. |
+
+Creation and deletion rules:
+
+- New `VocabWord` creation does not create review state.
+- Full Practice completion creates review state.
+- Re-practice resets the existing review state.
+- Word/page/board deletion hard-deletes related review state.
+- Destructive migration from existing All Words review storage is acceptable.
+
+### 14.8 API Expectations
+
+Exact DTO names can be finalized during implementation planning. The public
+capabilities must support:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `GET` | `/api/v1/flashcards/decks` | Return only page decks synced from vocabulary pages. No All Words decks. |
+| `GET` | `/api/v1/flashcards/decks/{deckId}/cards` | Return cards for one owned active page deck for Flashcard and Practice. |
+| `POST` | `/api/v1/practice/sessions/complete` | Batch create/reset review state for all words in a completed Practice session. |
+| `GET` | `/api/v1/practice/settings` | Return the global Practice mode sequence. |
+| `PUT` | `/api/v1/practice/settings` | Update the global Practice mode sequence. |
+| `GET` | `/api/v1/review/settings` | Return global review limit and recap-after-answer setting. |
+| `PUT` | `/api/v1/review/settings` | Update global review limit and recap-after-answer setting. |
+| `POST` | `/api/v1/review/sessions/start` | Build a board due queue, apply daily limit, and move overflow due words to tomorrow. |
+| `POST` | `/api/v1/review/answers` | Persist one reviewed word result immediately using correct/wrong mapping. |
+
+All endpoints are authenticated and owner-scoped. Foreign words, deleted words,
+deleted pages, deleted boards, and inconsistent board/deck references must be
+rejected.
+
+### 14.9 Scope Boundaries
+
+Out of scope:
+
+- Preserving existing All Words review history.
+- Keeping All Words decks in the product model.
+- Improving the SRS algorithm beyond correct = Good and wrong = Again.
+- AI pronunciation scoring or external speech providers.
+- Per-attempt answer storage for Practice steps.
+- Saving partial Practice progress when the session is abandoned.
+- Per-session Practice mode override. Practice mode sequence is global in MVP.
+- Review by individual page deck. Review is board-level.
+- Mobile-native speech integrations.
+
+### 14.10 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| All Words deck removal breaks vocabulary sync | Migration and tests prove each page has one synced page deck and no All Words deck is returned. |
+| SRS moves to wrong owner or wrong word | Backend ownership tests reject foreign board, page, word, and deck references. |
+| Practice creates partial SRS state | Tests prove abandoned Practice does not create or update review records. |
+| Practice completion writes too early | Tests prove SRS records are batch-created/reset only at full session completion. |
+| Practice setting invalid sequence | API and UI tests reject empty mode sequences, unknown modes, and duplicate modes. |
+| Practice mode customization regresses default flow | Tests prove the default remains Dictation -> Meaning -> Word -> Pronunciation and a custom subset/order is honored. |
+| Review overflow changes too many words | Integration proof shows oldest due words are selected and overflow due dates move to tomorrow at session start. |
+| Review abandonment loses completed answers | Tests prove each answered word persists immediately even if the session is not completed. |
+| Review mode/order conflict | Tests prove Random mode randomizes mode per word while Sequential/Shuffle still controls word order. |
+| Flashcard no longer acts as review | Playwright proof covers read-only card browsing, click-to-flip, final Finish/Let's practice actions, and redirect to Practice. |
+| Existing Feature 13 regression | Reused dictation, meaning-to-word, and pronunciation interactions remain covered in Practice and Review flows. |
+
+### 14.11 Proposed Story Queue
+
+1. **US-LR-001:** Introduce new navigation split: Flashcard, Practice, Review.
+2. **US-LR-002:** Remove All Words deck behavior and migrate flashcard sync to page-deck-only.
+3. **US-LR-003:** Add dedicated word review/SRS state storage and destructive migration path.
+4. **US-LR-004:** Rebuild Flashcard as read-only page-deck viewer with one-card flow and Let's practice redirect.
+5. **US-LR-005:** Build Practice board -> page deck selection, sequential/shuffle ordering, global configurable mode sequence, recap, and batch SRS completion.
+6. **US-LR-006:** Build Review board selection, global settings, due queue start, overflow rescheduling, mode selection, and immediate per-word persistence.
+7. **US-LR-007:** Run release regression for vocabulary sync, Feature 13 interactions, SM-2 mapping, dashboard impacts, and browser speech fallbacks.
+
+### 14.12 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- flashcard-viewer.spec.js practice-workflow.spec.js review-workflow.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split proof by story. Release proof must cover destructive
+migration behavior, no All Words deck leakage, dedicated review storage,
+Practice batch semantics, Review overflow semantics, and preservation of the
+implemented speech/text practice interactions.

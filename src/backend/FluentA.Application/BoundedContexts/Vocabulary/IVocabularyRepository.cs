@@ -16,7 +16,7 @@ public interface IVocabularyRepository
     Task<IReadOnlyList<Guid>> ListActiveDeckIdsAsync(Guid boardId, Guid pageId, CancellationToken cancellationToken = default);
     Task<int> NextBoardSortOrderAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<int> NextPageSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default);
-    Task AddBoardWithDeckAsync(VocabBoard board, FlashcardDeck deck, CancellationToken cancellationToken = default);
+    Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default);
     Task AddPageWithDeckAsync(VocabPage page, FlashcardDeck deck, CancellationToken cancellationToken = default);
     Task AddWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default);
     Task AddCustomColumnAsync(VocabCustomColumn column, CancellationToken cancellationToken = default);

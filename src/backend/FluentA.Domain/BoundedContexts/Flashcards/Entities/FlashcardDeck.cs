@@ -24,11 +24,6 @@ public sealed class FlashcardDeck : BaseEntity
     public string Name { get; private set; }
     public DeckType Type { get; private set; }
 
-    public static FlashcardDeck CreateAllWords(Guid userId, Guid boardId, string boardName)
-    {
-        return new FlashcardDeck(userId, boardId, pageId: null, $"{boardName} - All Words", DeckType.AllWords);
-    }
-
     public static FlashcardDeck CreatePageDeck(Guid userId, Guid boardId, Guid pageId, string boardName, string pageName)
     {
         return new FlashcardDeck(userId, boardId, pageId, $"{boardName} - {pageName}", DeckType.PageDeck);
