@@ -5,23 +5,61 @@ import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import { useAuthStore } from '../../stores/authStore'
 
+const practiceModes: flashcardApi.PracticeMode[] = ['dictation', 'meaningToWord', 'pronunciation']
+
 export function ReviewSettingsPage() {
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<flashcardApi.ReviewSettings | null>(null)
-  const settingsQuery = useQuery({ queryKey: ['flashcard', 'settings'], queryFn: flashcardApi.getReviewSettings })
-  const settings = draft ?? settingsQuery.data ?? { newCardsPerDay: 20, reviewCardsPerDay: 200 }
-  const updateSettings = useMutation({
+  const [practiceDraft, setPracticeDraft] = useState<flashcardApi.PracticeSettings | null>(null)
+  const [reviewDraft, setReviewDraft] = useState<flashcardApi.ReviewSettings | null>(null)
+
+  const practiceSettingsQuery = useQuery({ queryKey: ['flashcard', 'practice-settings'], queryFn: flashcardApi.getPracticeSettings })
+  const reviewSettingsQuery = useQuery({ queryKey: ['flashcard', 'settings'], queryFn: flashcardApi.getReviewSettings })
+
+  const practiceSettings = practiceDraft ?? practiceSettingsQuery.data ?? { modeSequence: practiceModes }
+  const reviewSettings = reviewDraft ?? reviewSettingsQuery.data ?? { dailyLimit: 300, recapAfterAnswer: true }
+
+  const updatePracticeSettings = useMutation({
+    mutationFn: flashcardApi.updatePracticeSettings,
+    onSuccess: (settings) => {
+      queryClient.setQueryData(['flashcard', 'practice-settings'], settings)
+    },
+  })
+  const updateReviewSettings = useMutation({
     mutationFn: flashcardApi.updateReviewSettings,
-    onSuccess: async (settings) => {
+    onSuccess: (settings) => {
       queryClient.setQueryData(['flashcard', 'settings'], settings)
-      await queryClient.invalidateQueries({ queryKey: ['flashcard', 'decks'] })
     },
   })
 
-  function submit(event: FormEvent) {
+  function moveMode(mode: flashcardApi.PracticeMode, direction: -1 | 1) {
+    const index = practiceSettings.modeSequence.indexOf(mode)
+    const target = index + direction
+    if (index < 0 || target < 0 || target >= practiceSettings.modeSequence.length) return
+    const next = [...practiceSettings.modeSequence]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setPracticeDraft({ modeSequence: next })
+  }
+
+  function toggleMode(mode: flashcardApi.PracticeMode) {
+    const selected = practiceSettings.modeSequence.includes(mode)
+    if (selected && practiceSettings.modeSequence.length === 1) return
+    if (selected) {
+      setPracticeDraft({ modeSequence: practiceSettings.modeSequence.filter((item) => item !== mode) })
+      return
+    }
+
+    setPracticeDraft({ modeSequence: [...practiceSettings.modeSequence, mode] })
+  }
+
+  function submitPractice(event: FormEvent) {
     event.preventDefault()
-    updateSettings.mutate(settings)
+    updatePracticeSettings.mutate(practiceSettings)
+  }
+
+  function submitReview(event: FormEvent) {
+    event.preventDefault()
+    updateReviewSettings.mutate(reviewSettings)
   }
 
   return (
@@ -38,22 +76,54 @@ export function ReviewSettingsPage() {
       </header>
 
       <section className="settings-panel">
-        <span className="preview-label">Review settings</span>
-        <h1>Shape your daily practice</h1>
-        <p>These limits apply globally across every All Words Spaced session.</p>
-        <form className="settings-form" onSubmit={submit}>
-          <label>
-            New cards per day
-            <input type="number" min="0" max="1000" value={settings.newCardsPerDay} onChange={(event) => setDraft({ ...settings, newCardsPerDay: Number(event.target.value) })} />
-          </label>
-          <label>
-            Review cards per day
-            <input type="number" min="0" max="1000" value={settings.reviewCardsPerDay} onChange={(event) => setDraft({ ...settings, reviewCardsPerDay: Number(event.target.value) })} />
-          </label>
-          <button className="primary-button" type="submit" disabled={updateSettings.isPending}><Save size={17} /> Save review settings</button>
+        <span className="preview-label">Practice settings</span>
+        <h1>Choose the global practice mode sequence</h1>
+        <p>Practice always finishes each word with a flashcard recap. Only the modes below are configurable.</p>
+        <form className="settings-form" onSubmit={submitPractice}>
+          <div className="review-mode-options" role="group" aria-label="Practice mode sequence">
+            {practiceModes.map((mode) => {
+              const active = practiceSettings.modeSequence.includes(mode)
+              return (
+                <button key={mode} className={active ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => toggleMode(mode)}>
+                  {mode === 'meaningToWord' ? 'Meaning -> Word' : mode}
+                </button>
+              )
+            })}
+          </div>
+          <div className="settings-form">
+            {practiceSettings.modeSequence.map((mode, index) => (
+              <div key={mode} className="flashcard-board__heading">
+                <strong>{index + 1}. {mode === 'meaningToWord' ? 'Meaning -> Word' : mode}</strong>
+                <div className="deck-actions">
+                  <button className="secondary-button" type="button" onClick={() => moveMode(mode, -1)}>Up</button>
+                  <button className="secondary-button" type="button" onClick={() => moveMode(mode, 1)}>Down</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button className="primary-button" type="submit" disabled={updatePracticeSettings.isPending}><Save size={17} /> Save practice settings</button>
         </form>
-        {updateSettings.isSuccess ? <p className="settings-success">Review settings saved.</p> : null}
-        {settingsQuery.isError || updateSettings.isError ? <p className="flashcard-status flashcard-status--error">Unable to save review settings.</p> : null}
+        {updatePracticeSettings.isSuccess ? <p className="settings-success">Practice settings saved.</p> : null}
+        {practiceSettingsQuery.isError || updatePracticeSettings.isError ? <p className="flashcard-status flashcard-status--error">Unable to save practice settings.</p> : null}
+      </section>
+
+      <section className="settings-panel">
+        <span className="preview-label">Review settings</span>
+        <h1>Shape the board review queue</h1>
+        <p>Review uses one daily due-word limit and an optional answer recap after each correct response.</p>
+        <form className="settings-form" onSubmit={submitReview}>
+          <label>
+            Daily limit
+            <input type="number" min="0" max="1000" value={reviewSettings.dailyLimit} onChange={(event) => setReviewDraft({ ...reviewSettings, dailyLimit: Number(event.target.value) })} />
+          </label>
+          <label>
+            <input type="checkbox" checked={reviewSettings.recapAfterAnswer} onChange={(event) => setReviewDraft({ ...reviewSettings, recapAfterAnswer: event.target.checked })} />
+            Recap after each correct answer
+          </label>
+          <button className="primary-button" type="submit" disabled={updateReviewSettings.isPending}><Save size={17} /> Save review settings</button>
+        </form>
+        {updateReviewSettings.isSuccess ? <p className="settings-success">Review settings saved.</p> : null}
+        {reviewSettingsQuery.isError || updateReviewSettings.isError ? <p className="flashcard-status flashcard-status--error">Unable to save review settings.</p> : null}
       </section>
     </main>
   )

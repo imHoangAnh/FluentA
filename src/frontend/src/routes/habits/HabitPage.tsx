@@ -6,6 +6,7 @@ import {
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import * as habitApi from '../../lib/api/habit.api'
 
@@ -279,9 +280,7 @@ export function HabitPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

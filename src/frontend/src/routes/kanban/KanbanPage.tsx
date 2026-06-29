@@ -1,11 +1,12 @@
-import { 
-  Bell, BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle, Layers, 
-  LogOut, NotebookPen, Repeat2, Settings, CalendarDays, ChevronRight, 
+import {
+  Bell, BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle,
+  LogOut, NotebookPen, Repeat2, Settings, CalendarDays, ChevronRight,
   Search, Trash2, X, Kanban, Filter, Plus, ArrowDown, AlertCircle, Timer
 } from 'lucide-react'
 import { type DragEvent, type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import * as kanbanApi from '../../lib/api/kanban.api'
 
@@ -251,9 +252,7 @@ export function KanbanPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

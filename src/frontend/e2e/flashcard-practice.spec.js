@@ -67,7 +67,7 @@ function scheduleSnapshot(deck) {
     .sort((left, right) => left.word.localeCompare(right.word));
 }
 
-test('practice modes persist summary-only results without mutating schedules', async ({ page }) => {
+test('practice modes persist summaries and reset dedicated review state', async ({ page }) => {
   await page.addInitScript(() => {
     window.__practiceTranscripts = [];
     window.speechSynthesis.speak = () => undefined;
@@ -111,21 +111,16 @@ test('practice modes persist summary-only results without mutating schedules', a
 
   const decksBefore = await listDecks(page, headers);
   const pageDeckBefore = decksBefore.find((deck) => deck.name === 'Practice Board - Practice Page');
-  const allWordsDeckBefore = decksBefore.find((deck) => deck.name === 'Practice Board - All Words');
 
   expect(pageDeckBefore).toBeTruthy();
-  expect(allWordsDeckBefore).toBeTruthy();
 
   const pageDeckScheduleBefore = scheduleSnapshot(pageDeckBefore);
-  const allWordsScheduleBefore = scheduleSnapshot(allWordsDeckBefore);
 
   await page.goto('http://127.0.0.1:5173/flashcards');
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
 
   const pageDeckCard = page.locator('article.flashcard-deck').filter({ hasText: 'Practice Board - Practice Page' });
-  const allWordsDeckCard = page.locator('article.flashcard-deck').filter({ hasText: 'Practice Board - All Words' });
   await expect(pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' })).toBeVisible();
-  await expect(allWordsDeckCard.getByRole('link', { name: 'Practice All Words' })).toBeVisible();
 
   const dictationSummaryResponsePromise = page.waitForResponse((response) =>
     response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
@@ -158,8 +153,23 @@ test('practice modes persist summary-only results without mutating schedules', a
   await page.getByRole('link', { name: 'Done' }).click();
 
   const decksAfterPagePractice = await listDecks(page, headers);
-  expect(scheduleSnapshot(decksAfterPagePractice.find((deck) => deck.name === 'Practice Board - Practice Page'))).toEqual(pageDeckScheduleBefore);
-  expect(scheduleSnapshot(decksAfterPagePractice.find((deck) => deck.name === 'Practice Board - All Words'))).toEqual(allWordsScheduleBefore);
+  const afterPagePractice = scheduleSnapshot(decksAfterPagePractice.find((deck) => deck.name === 'Practice Board - Practice Page'));
+  expect(afterPagePractice).not.toEqual(pageDeckScheduleBefore);
+  expect(afterPagePractice).toEqual([
+    expect.objectContaining({
+      word: 'mitigate',
+      interval: 1,
+      repetitions: 1,
+      state: 'learning',
+    }),
+    expect.objectContaining({
+      word: 'nuance',
+      interval: 1,
+      repetitions: 1,
+      state: 'learning',
+    }),
+  ]);
+  expect(afterPagePractice.every((card) => typeof card.nextReviewDate === 'string' && card.nextReviewDate)).toBe(true);
 
   await page.evaluate(() => {
     window.__practiceTranscripts = ['mitigate'];
@@ -168,7 +178,7 @@ test('practice modes persist summary-only results without mutating schedules', a
   const pronunciationSummaryResponsePromise = page.waitForResponse((response) =>
     response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
 
-  await allWordsDeckCard.getByRole('link', { name: 'Practice All Words' }).click();
+  await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
   await page.getByTestId('practice-mode-pronunciation').click();
   await page.getByRole('button', { name: 'Start Pronunciation practice' }).click();
   await page.getByRole('button', { name: 'Start listening' }).click();
@@ -184,8 +194,8 @@ test('practice modes persist summary-only results without mutating schedules', a
   expect(pronunciationSummaryPayload.correctCards).toBe(1);
   expect(pronunciationSummaryPayload.wrongCards).toBe(1);
 
-  const decksAfterAllWordsPractice = await listDecks(page, headers);
-  expect(scheduleSnapshot(decksAfterAllWordsPractice.find((deck) => deck.name === 'Practice Board - All Words'))).toEqual(allWordsScheduleBefore);
+  const decksAfterPronunciationPractice = await listDecks(page, headers);
+  expect(scheduleSnapshot(decksAfterPronunciationPractice.find((deck) => deck.name === 'Practice Board - Practice Page'))).toEqual(afterPagePractice);
 
   const inconsistentSummary = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
     headers,
@@ -195,6 +205,7 @@ test('practice modes persist summary-only results without mutating schedules', a
       totalCards: 3,
       correctCards: 1,
       wrongCards: 1,
+      timeZoneId: 'UTC',
     },
   });
   expect(inconsistentSummary.status()).toBe(422);
@@ -212,6 +223,7 @@ test('practice modes persist summary-only results without mutating schedules', a
       totalCards: 1,
       correctCards: 1,
       wrongCards: 0,
+      timeZoneId: 'UTC',
     },
   });
   expect(foreignSummary.status()).toBe(404);

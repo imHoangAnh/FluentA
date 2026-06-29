@@ -56,7 +56,8 @@ function createQueryClient() {
     newCards: 0,
     forecast: [],
   })
-  queryClient.setQueryData(['flashcard', 'settings'], { newCardsPerDay: 20, reviewCardsPerDay: 200 })
+  queryClient.setQueryData(['flashcard', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
+  queryClient.setQueryData(['flashcard', 'practice-settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
@@ -117,11 +118,11 @@ function renderAppWithDashboardData(initialEntry: string) {
   queryClient.setQueryData(['flashcard', 'decks'], [{
     id: 'deck-1',
     boardId: 'board-1',
-    boardName: 'All Words',
+    boardName: 'IELTS',
     boardLanguage: 'en',
-    pageId: null,
-    name: 'All Words',
-    type: 'AllWords',
+    pageId: 'page-1',
+    name: 'IELTS - Unit 1',
+    type: 'PageDeck',
     cards: [{
       id: 'card-1',
       wordId: 'word-1',
@@ -267,7 +268,9 @@ describe('FluentA app routes', () => {
 
     expect(screen.getByRole('heading', { name: /Good|Burning midnight oil/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Vocabulary' })).toHaveAttribute('href', '/vocabulary')
-    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/flashcards')
+    expect(screen.getByRole('link', { name: 'Flashcard' })).toHaveAttribute('href', '/flashcards')
+    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/flashcards/practice')
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/flashcards/review')
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdown')
@@ -290,7 +293,7 @@ describe('FluentA app routes', () => {
 
     renderAppWithDashboardData('/')
 
-    expect(screen.getByRole('link', { name: 'Start Review' })).toHaveAttribute('href', '/flashcards/decks/deck-1/review')
+    expect(screen.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/flashcards/review')
     expect(screen.getByText('Plan speaking practice')).toBeInTheDocument()
     expect(screen.getByText('Read English')).toBeInTheDocument()
     expect(screen.getByText(/IELTS Exam/)).toBeInTheDocument()
@@ -305,7 +308,7 @@ describe('FluentA app routes', () => {
 
     renderApp('/flashcards')
 
-    expect(screen.getByRole('heading', { name: 'Your synchronized decks' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your page decks' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open vocabulary' })).toHaveAttribute('href', '/vocabulary')
   })
@@ -326,15 +329,45 @@ describe('FluentA app routes', () => {
     const { unmount } = renderAppWithDeck('/flashcards')
 
     expect(screen.getByRole('link', { name: 'Practice this Page Deck' })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
+    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/decks/deck-1')
 
     unmount()
     renderAppWithDeck('/flashcards/decks/deck-1/practice')
 
     expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
-    expect(screen.getByTestId('practice-mode-dictation')).toBeInTheDocument()
-    expect(screen.getByTestId('practice-mode-meaningToWord')).toBeInTheDocument()
-    expect(screen.getByTestId('practice-mode-pronunciation')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Start Dictation practice' })).toBeInTheDocument()
+    expect(screen.getByText('dictation')).toBeInTheDocument()
+    expect(screen.getByText('Meaning -> Word')).toBeInTheDocument()
+    expect(screen.getByText('pronunciation')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start practice' })).toBeInTheDocument()
+  })
+
+  it('renders the dedicated practice entry route with practice-first copy', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderAppWithDeck('/flashcards/practice')
+
+    expect(screen.getByRole('heading', { name: 'Choose a page deck to practice' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Practice this Page Deck' })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
+    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/decks/deck-1')
+  })
+
+  it('renders the one-card flashcard viewer route from cached data', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    renderAppWithDeck('/flashcards/decks/deck-1')
+
+    expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
+    expect(screen.getByText('1 / 1')).toBeInTheDocument()
+    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
   })
 
   it('renders protected review settings from cached data', () => {
@@ -346,8 +379,9 @@ describe('FluentA app routes', () => {
 
     renderApp('/settings/review')
 
-    expect(screen.getByRole('heading', { name: 'Shape your daily practice' })).toBeInTheDocument()
-    expect(screen.getByLabelText('New cards per day')).toHaveValue(20)
-    expect(screen.getByLabelText('Review cards per day')).toHaveValue(200)
+    expect(screen.getByRole('heading', { name: 'Choose the global practice mode sequence' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shape the board review queue' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Daily limit')).toHaveValue(300)
+    expect(screen.getByLabelText('Recap after each correct answer')).toBeChecked()
   })
 })

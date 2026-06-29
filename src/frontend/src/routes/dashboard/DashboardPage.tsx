@@ -1,6 +1,6 @@
-import { 
-  Bell, BookOpen, CalendarClock, CheckSquare, 
-  Columns3, Flame, Globe, HelpCircle, Layers, LogOut, NotebookPen, Repeat2, Settings, 
+import {
+  Bell, BookOpen, CalendarClock, CheckSquare,
+  Columns3, Flame, Globe, HelpCircle, LogOut, NotebookPen, Repeat2, Settings,
   Search, CheckCircle2, Circle, Kanban, Timer, TrendingUp
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,6 +10,7 @@ import * as countdownApi from '../../lib/api/countdown.api'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import * as habitApi from '../../lib/api/habit.api'
 import * as todoApi from '../../lib/api/todo.api'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import './DashboardPage.css'
 
@@ -64,8 +65,6 @@ export function DashboardPage() {
   const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
   const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
   const flashcardDashboardQuery = useQuery({ queryKey: ['flashcard', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
-  const decksQuery = useQuery({ queryKey: ['flashcard', 'decks'], queryFn: flashcardApi.listDecks })
-
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
     onSuccess: async () => {
@@ -80,8 +79,6 @@ export function DashboardPage() {
 
   const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
 
-  const allWordsDeck = useMemo(() => (decksQuery.data ?? []).find((deck) => deck.type === 'AllWords' && deck.cards.length > 0), [decksQuery.data])
-  
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueCards = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0) + (flashcardDashboard?.newCards ?? 0)
   const totalCards = dueCards > 0 ? dueCards + 20 : 100 // Mock total for ring
@@ -108,9 +105,7 @@ export function DashboardPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>
@@ -218,15 +213,9 @@ export function DashboardPage() {
                     <strong>{flashcardDashboard?.newCards ?? 0}</strong>
                   </div>
                 </div>
-                {allWordsDeck ? (
-                  <Link to={`/flashcards/decks/${allWordsDeck.id}/review`} style={{textDecoration: 'none'}}>
-                    <button className="btn-primary">Start Review</button>
-                  </Link>
-                ) : (
-                  <Link to="/flashcards" style={{textDecoration: 'none'}}>
-                    <button className="btn-primary">Open Flashcards</button>
-                  </Link>
-                )}
+                <Link to="/flashcards/review" style={{textDecoration: 'none'}}>
+                  <button className="btn-primary">Open Review</button>
+                </Link>
               </div>
             </div>
 

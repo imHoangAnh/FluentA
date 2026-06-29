@@ -8,6 +8,7 @@ import { ResetPasswordPage } from './routes/auth/ResetPasswordPage'
 import { DashboardPage } from './routes/dashboard/DashboardPage'
 import { WorkspacePage } from './routes/workspace/WorkspacePage'
 import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
+import { FlashcardViewerPage } from './routes/flashcards/FlashcardViewerPage'
 import { PracticeSessionPage } from './routes/flashcards/PracticeSessionPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
 import { ReviewSettingsPage } from './routes/settings/ReviewSettingsPage'
@@ -66,7 +67,15 @@ export default function App() {
         path="/flashcards"
         element={
           <ProtectedRoute>
-            <FlashcardsPage />
+            <FlashcardsPage entryMode="flashcards" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flashcards/practice"
+        element={
+          <ProtectedRoute>
+            <FlashcardsPage entryMode="practice" />
           </ProtectedRoute>
         }
       />
@@ -123,7 +132,15 @@ export default function App() {
         }
       />
       <Route
-        path="/flashcards/decks/:deckId/review"
+        path="/flashcards/decks/:deckId"
+        element={
+          <ProtectedRoute>
+            <FlashcardViewerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flashcards/review"
         element={
           <ProtectedRoute>
             <ReviewSessionPage />

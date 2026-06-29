@@ -26,7 +26,7 @@ export type FlashcardDeck = {
   boardLanguage: string
   pageId?: string | null
   name: string
-  type: 'PageDeck' | 'AllWords'
+  type: 'PageDeck'
   cards: FlashcardCard[]
 }
 
@@ -34,19 +34,36 @@ export type DeckSession = {
   deckId: string
   boardId: string
   deckName: string
-  deckType: 'PageDeck' | 'AllWords'
+  deckType: 'PageDeck'
   boardLanguage: string
   cards: FlashcardCard[]
 }
 
-export type ReviewRating = 0 | 1 | 2 | 3
+export type ReviewMode = 'dictation' | 'meaningToWord' | 'pronunciation' | 'random'
+export type ReviewOrderType = 'sequential' | 'shuffle'
+
+export type ReviewSessionWord = {
+  cardId: string
+  wordId: string
+  word: string
+  wordClass: string
+  meaningVn: string
+  meaningEn: string
+  example: string
+  thesaurus?: string | null
+  collocation?: string | null
+  note?: string | null
+  mode: ReviewMode | Exclude<ReviewMode, 'random'>
+}
 
 export type ReviewSessionCreated = {
   sessionId: string
-  deckId: string
-  deckName: string
-  deckType: 'PageDeck' | 'AllWords'
-  totalCards: number
+  boardId: string
+  boardName: string
+  orderType: ReviewOrderType
+  mode: ReviewMode
+  totalWords: number
+  words: ReviewSessionWord[]
 }
 
 export type ReviewSessionSummary = {
@@ -64,20 +81,8 @@ export type ReviewSessionSummary = {
 }
 
 export type ReviewSettings = {
-  newCardsPerDay: number
-  reviewCardsPerDay: number
-}
-
-export type DueDeck = {
-  deckId: string
-  boardId: string
-  deckName: string
-  boardLanguage: string
-  settings: ReviewSettings
-  newCards: { limit: number; consumed: number; remaining: number }
-  reviews: { limit: number; consumed: number; remaining: number }
-  counts: { overdue: number; dueToday: number; newCards: number; total: number }
-  cards: FlashcardCard[]
+  dailyLimit: number
+  recapAfterAnswer: boolean
 }
 
 export type DashboardForecastPoint = {
@@ -99,6 +104,9 @@ export type FlashcardDashboard = {
 }
 
 export type PracticeMode = 'dictation' | 'meaningToWord' | 'pronunciation'
+export type PracticeSettings = {
+  modeSequence: PracticeMode[]
+}
 
 export type PracticeSessionSummary = {
   id: string
@@ -121,13 +129,13 @@ export async function getDeckSession(deckId: string) {
   return response.data.data!
 }
 
-export async function getDueDeck(deckId: string, timeZoneId: string) {
-  const response = await apiClient.get<ApiEnvelope<DueDeck>>(`/flashcards/decks/${deckId}/due`, { params: { timeZoneId } })
-  return response.data.data!
-}
-
-export async function createReviewSession(deckId: string) {
-  const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/flashcards/sessions', { deckId })
+export async function createReviewSession(input: {
+  boardId: string
+  orderType: ReviewOrderType
+  mode: ReviewMode
+  timeZoneId: string
+}) {
+  const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/flashcards/sessions', input)
   return response.data.data!
 }
 
@@ -137,6 +145,7 @@ export async function createPracticeSessionSummary(input: {
   totalCards: number
   correctCards: number
   wrongCards: number
+  timeZoneId: string
 }) {
   const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/flashcards/practice-sessions', input)
   return response.data.data!
@@ -153,6 +162,16 @@ export async function getDashboard(timeZoneId: string, boardId?: string) {
   return response.data.data!
 }
 
+export async function getPracticeSettings() {
+  const response = await apiClient.get<ApiEnvelope<PracticeSettings>>('/flashcards/practice-settings')
+  return response.data.data!
+}
+
+export async function updatePracticeSettings(input: PracticeSettings) {
+  const response = await apiClient.put<ApiEnvelope<PracticeSettings>>('/flashcards/practice-settings', input)
+  return response.data.data!
+}
+
 export async function getReviewSettings() {
   const response = await apiClient.get<ApiEnvelope<ReviewSettings>>('/flashcards/settings')
   return response.data.data!
@@ -166,7 +185,7 @@ export async function updateReviewSettings(input: ReviewSettings) {
 export async function submitReview(input: {
   sessionId: string
   cardId: string
-  rating: ReviewRating
+  correct: boolean
   timeSpentSeconds: number
   timeZoneId: string
 }) {

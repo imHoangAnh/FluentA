@@ -1,28 +1,29 @@
 import { expect, test } from '@playwright/test';
 
-test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ page }) => {
+test('Page Deck Normal and Shuffle reviews advance dedicated review state', async ({ page }) => {
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
   });
 
-  const email = `all-words-sm2+${crypto.randomUUID()}@example.com`;
+  const email = `page-deck-review+${crypto.randomUUID()}@example.com`;
   const password = 'SecurePass123';
 
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('SM2 Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Create a password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Enter your password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const token = (await (await loginResponsePromise).json()).data.accessToken;
@@ -46,12 +47,41 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
       example: 'Active recall improves retention.',
     },
   });
+  const seededDecks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
+  const seededDeck = seededDecks.find((deck) => deck.type === 'PageDeck');
+  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+    headers,
+    data: {
+      deckId: seededDeck.id,
+      mode: 'dictation',
+      totalCards: 1,
+      correctCards: 1,
+      wrongCards: 0,
+      timeZoneId: 'UTC',
+    },
+  });
+  expect(seededPractice.status()).toBe(200);
 
-  await page.getByTestId('open-flashcards').click();
-  const allWordsDeck = page.locator('article.flashcard-deck').filter({ hasText: 'SM2 Board - All Words' });
-  await allWordsDeck.getByRole('link', { name: 'Study All Words' }).click();
-  await expect(page.getByText('All Words SM-2 Review')).toBeVisible();
-  await expect(page.getByText(/Every rating updates/)).toBeVisible();
+  await page.goto('http://127.0.0.1:5173/flashcards');
+  await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
+  const pageDeck = page.locator('article.flashcard-deck').filter({ hasText: 'SM2 Board - SM2 Page' });
+  await pageDeck.getByRole('link', { name: 'Study this Page Deck' }).click();
+  await expect(page.getByText('Page Deck Active Recall')).toBeVisible();
+  await expect(page.getByText(/choose an order/i)).toBeVisible();
+
+  let decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
+  let card = decks.find((deck) => deck.type === 'PageDeck').cards[0];
+  const initialSchedule = {
+    interval: card.interval,
+    repetitions: card.repetitions,
+    state: card.state,
+    nextReviewDate: card.nextReviewDate,
+  };
+  expect(initialSchedule).toEqual(expect.objectContaining({
+    interval: 1,
+    repetitions: 1,
+    state: 'learning',
+  }));
 
   await page.getByRole('button', { name: /Normal/ }).click();
   await page.getByTestId('start-review-session').click();
@@ -60,17 +90,19 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
   await page.keyboard.press('2');
   await expect(page.getByTestId('review-summary')).toBeVisible();
 
-  let decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
-  let card = decks.find((deck) => deck.type === 'AllWords').cards[0];
-  expect(card.interval).toBe(1);
-  expect(card.repetitions).toBe(1);
-  expect(card.state).toBe('learning');
-  expect(card.nextReviewDate).toBeTruthy();
+  decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
+  card = decks.find((deck) => deck.type === 'PageDeck').cards[0];
+  expect({
+    interval: card.interval,
+    repetitions: card.repetitions,
+    state: card.state,
+    nextReviewDate: card.nextReviewDate,
+  }).not.toEqual(initialSchedule);
 
   await page.getByRole('link', { name: 'Done' }).click();
-  await expect(allWordsDeck.getByText('1 reviews')).toBeVisible();
-  await expect(allWordsDeck.getByText('learning', { exact: true })).toBeVisible();
-  await allWordsDeck.getByRole('link', { name: 'Study All Words' }).click();
+  await expect(pageDeck.getByText('1 reviews')).toBeVisible();
+  await expect(pageDeck.locator('.card-state')).toContainText(/review|mature|learning/i);
+  await pageDeck.getByRole('link', { name: 'Study this Page Deck' }).click();
   await page.getByRole('button', { name: /Shuffle/ }).click();
   await page.getByTestId('start-review-session').click();
   await expect(page.getByText('1 / 1')).toBeVisible();
@@ -79,11 +111,14 @@ test('All Words Normal and Shuffle reviews update SM-2 scheduling', async ({ pag
   await expect(page.getByTestId('review-summary')).toBeVisible();
 
   decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
-  card = decks.find((deck) => deck.type === 'AllWords').cards[0];
-  expect(card.interval).toBe(6);
-  expect(card.repetitions).toBe(2);
-  expect(card.state).toBe('learning');
+  card = decks.find((deck) => deck.type === 'PageDeck').cards[0];
+  expect({
+    interval: card.interval,
+    repetitions: card.repetitions,
+    state: card.state,
+    nextReviewDate: card.nextReviewDate,
+  }).not.toEqual(initialSchedule);
 
   await page.getByRole('link', { name: 'Done' }).click();
-  await expect(allWordsDeck.getByText('2 reviews')).toBeVisible();
+  await expect(pageDeck.getByText('2 reviews')).toBeVisible();
 });

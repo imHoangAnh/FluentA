@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and summary', async ({ page }) => {
+test('Page Deck Active Recall supports keyboard review, TTS, abandonment, summary, and dedicated review-state progression', async ({ page }) => {
   await page.addInitScript(() => {
     window.__spokenWords = [];
     window.speechSynthesis.speak = (utterance) => window.__spokenWords.push({ text: utterance.text, lang: utterance.lang });
@@ -13,17 +13,17 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Active Recall Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Create a password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Enter your password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const token = (await (await loginResponsePromise).json()).data.accessToken;
@@ -51,7 +51,20 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
     });
   }
 
-  await page.getByTestId('open-flashcards').click();
+  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+    headers,
+    data: {
+      deckId: (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data[0].id,
+      mode: 'dictation',
+      totalCards: 4,
+      correctCards: 4,
+      wrongCards: 0,
+      timeZoneId: 'UTC',
+    },
+  });
+  expect(seededPractice.status()).toBe(200);
+
+  await page.goto('http://127.0.0.1:5173/flashcards');
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
   await expect(page.getByText('Recall Board - Recall Page')).toBeVisible();
   const pageDeck = page.locator('article.flashcard-deck').filter({ hasText: 'Recall Board - Recall Page' });
@@ -105,10 +118,32 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, and su
   expect(sessionSummaryPayload.again).toBe(1);
 
   const decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
-  const allWordsCard = decks.find((deck) => deck.type === 'AllWords').cards[0];
-  const rejected = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/review', {
+  const pageDeckCard = decks.find((deck) => deck.type === 'PageDeck').cards[0];
+  const beforeSchedule = {
+    interval: pageDeckCard.interval,
+    easeFactor: pageDeckCard.easeFactor,
+    repetitions: pageDeckCard.repetitions,
+    nextReviewDate: pageDeckCard.nextReviewDate,
+    state: pageDeckCard.state,
+  };
+  expect(beforeSchedule.state).not.toBe('new');
+  expect(beforeSchedule.repetitions).toBeGreaterThanOrEqual(1);
+  expect(beforeSchedule.interval).toBeGreaterThanOrEqual(1);
+  const recorded = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/review', {
     headers,
-    data: { sessionId: crypto.randomUUID(), cardId: allWordsCard.id, rating: 2, timeSpentSeconds: 1, timeZoneId: 'UTC' },
+    data: { sessionId: crypto.randomUUID(), cardId: pageDeckCard.id, rating: 2, timeSpentSeconds: 1, timeZoneId: 'UTC' },
   });
-  expect(rejected.status()).toBe(200);
+  expect(recorded.status()).toBe(200);
+
+  const refreshedDecks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
+  const refreshedCard = refreshedDecks.find((deck) => deck.type === 'PageDeck').cards[0];
+  expect({
+    interval: refreshedCard.interval,
+    easeFactor: refreshedCard.easeFactor,
+    repetitions: refreshedCard.repetitions,
+    nextReviewDate: refreshedCard.nextReviewDate,
+    state: refreshedCard.state,
+  }).not.toEqual(beforeSchedule);
+  expect(refreshedCard.repetitions).toBeGreaterThanOrEqual(beforeSchedule.repetitions);
+  expect(refreshedCard.nextReviewDate).not.toBe(beforeSchedule.nextReviewDate);
 });

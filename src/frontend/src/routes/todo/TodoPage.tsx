@@ -4,9 +4,10 @@ import { Link, useLocation } from 'react-router-dom'
 import '../dashboard/DashboardPage.css'
 import {
   BookOpen, CalendarClock, CheckSquare, Columns3,
-  Globe, HelpCircle, Layers, LogOut, NotebookPen,
+  Globe, HelpCircle, LogOut, NotebookPen,
   Repeat2, Settings, Kanban, Timer,
 } from 'lucide-react'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as todoApi from '../../lib/api/todo.api'
 import { useAuthStore } from '../../stores/authStore'
 import { TodoWeekView } from './TodoWeekView'
@@ -179,9 +180,7 @@ export function TodoPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

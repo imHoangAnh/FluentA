@@ -1,11 +1,12 @@
-import { 
-  Bell, BookOpen, CalendarClock, CheckSquare, 
-  Columns3, Globe, HelpCircle, Layers, LogOut, NotebookPen, Repeat2, Settings, 
+import {
+  Bell, BookOpen, CalendarClock, CheckSquare,
+  Columns3, Globe, HelpCircle, LogOut, NotebookPen, Repeat2, Settings,
   CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3, Kanban, Timer
 } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import * as journalApi from '../../lib/api/journal.api'
 
@@ -290,9 +291,7 @@ export function JournalPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

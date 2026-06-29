@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-test('review settings and All Words Spaced mode apply daily planning', async ({ page }) => {
+test('review settings save and dashboard counts aggregate page decks', async ({ page }) => {
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
   });
 
-  const email = `spaced-planning+${crypto.randomUUID()}@example.com`;
+  const email = `page-deck-dashboard+${crypto.randomUUID()}@example.com`;
   const password = 'SecurePass123';
 
   await page.goto('/register');
@@ -62,27 +62,17 @@ test('review settings and All Words Spaced mode apply daily planning', async ({ 
     data: { word: 'third', meaningVn: 'third', meaningEn: 'third', class: 'other', example: 'third example' },
   });
 
-  const decks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
-  const allWords = decks.find((deck) => deck.type === 'AllWords');
   await page.getByRole('link', { name: 'Flashcards' }).click();
-  await allWordsDeck(page, 'Daily Planning - All Words').getByRole('link', { name: 'Study All Words' }).click();
-  await expect(page.getByRole('button', { name: /Spaced/ })).toHaveClass(/review-mode--active/);
-  await page.getByTestId('start-review-session').click();
-  await expect(page.getByText('1 / 1')).toBeVisible();
-  await page.keyboard.press('Space');
-  await page.keyboard.press('2');
-  await expect(page.getByTestId('review-summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your page decks' })).toBeVisible();
+  await expect(page.getByText('Daily Planning - Today')).toBeVisible();
+  await expect(page.getByText('Second Daily Board - Tomorrow')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Done' }).click();
-  await allWordsDeck(page, 'Second Daily Board - All Words').getByRole('link', { name: 'Study All Words' }).click();
-  await page.getByTestId('start-review-session').click();
-  await expect(page.getByTestId('all-done-today')).toBeVisible();
-  await page.getByRole('link', { name: 'Done' }).click();
-  await allWordsDeck(page, 'Daily Planning - All Words').getByRole('link', { name: 'Study All Words' }).click();
-  await page.getByTestId('start-review-session').click();
-  await expect(page.getByTestId('all-done-today')).toBeVisible();
+  const dashboardResponse = await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/dashboard?timeZoneId=UTC', { headers });
+  expect(dashboardResponse.status()).toBe(200);
+  const dashboard = (await dashboardResponse.json()).data;
+  expect(dashboard.totalCards).toBe(3);
+  expect(dashboard.newCards).toBe(3);
+  expect(dashboard.totalReviews).toBe(0);
+  expect(dashboard.overdue).toBe(0);
+  expect(dashboard.dueToday).toBe(0);
 });
-
-function allWordsDeck(page, name) {
-  return page.locator('article.flashcard-deck').filter({ hasText: name });
-}

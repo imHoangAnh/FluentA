@@ -1,11 +1,12 @@
-import { 
+import {
   CheckCircle2, Clock3, Columns3, Pause, Play, RotateCcw, TimerReset,
-  BookOpen, CalendarClock, CheckSquare, Globe, HelpCircle, Layers, 
+  BookOpen, CalendarClock, CheckSquare, Globe, HelpCircle,
   LogOut, NotebookPen, Repeat2, Settings, Kanban, Timer, Bell
 } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as pomodoroApi from '../../lib/api/pomodoro.api'
 import * as todoApi from '../../lib/api/todo.api'
 import * as kanbanApi from '../../lib/api/kanban.api'
@@ -181,9 +182,7 @@ export function PomodoroPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

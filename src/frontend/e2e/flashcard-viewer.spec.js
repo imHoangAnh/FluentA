@@ -10,43 +10,34 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Flashcard Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Create a password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Enter your password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const loginPayload = await (await loginResponsePromise).json();
   const token = loginPayload.data.accessToken;
+  const headers = { Authorization: `Bearer ${token}` };
+  const board = (await (await page.request.post('http://127.0.0.1:5000/api/v1/boards', {
+    headers,
+    data: { name: 'Live Flashcards', language: 'en' },
+  })).json()).data;
+  const vocabPage = (await (await page.request.post(`http://127.0.0.1:5000/api/v1/boards/${board.id}/pages`, {
+    headers,
+    data: { name: 'Unit 1' },
+  })).json()).data;
 
-  await page.getByTestId('board-name-input').fill('Live Flashcards');
-  await page.getByTestId('create-board-button').click();
-  await page.getByTestId('page-name-input').fill('Unit 1');
-  await page.getByTestId('create-page-button').click();
-  await expect(page.getByLabel('Rename Unit 1')).toBeVisible();
-
-  const boardResponse = await page.request.get('http://127.0.0.1:5000/api/v1/boards', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const boards = (await boardResponse.json()).data;
-  const board = boards.find((item) => item.name === 'Live Flashcards');
-  const detailResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/boards/${board.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const detail = (await detailResponse.json()).data;
-  const vocabPage = detail.pages.find((item) => item.name === 'Unit 1');
-
-  await page.getByTestId('open-flashcards').click();
+  await page.goto('http://127.0.0.1:5173/flashcards');
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
-  await expect(page.getByRole('heading', { name: 'Your synchronized decks' })).toBeVisible();
-  await expect(page.getByText('Live Flashcards - All Words')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your page decks' })).toBeVisible();
   await expect(page.getByText('Live Flashcards - Unit 1')).toBeVisible();
 
   const wordInput = {
@@ -60,25 +51,34 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   const createStarted = Date.now();
   const createResponse = await page.request.post(
     `http://127.0.0.1:5000/api/v1/boards/${board.id}/pages/${vocabPage.id}/words`,
-    { headers: { Authorization: `Bearer ${token}` }, data: wordInput },
+    { headers, data: wordInput },
   );
   const word = (await createResponse.json()).data;
-  await expect(page.getByText('synchronize', { exact: true })).toHaveCount(2, { timeout: 3000 });
+  await expect(page.getByText('1 synchronized words are ready in this page deck.')).toBeVisible({ timeout: 3000 });
   const createVisibleMs = Date.now() - createStarted;
 
   const updateStarted = Date.now();
   await page.request.patch(`http://127.0.0.1:5000/api/v1/boards/${board.id}/words/${word.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
     data: { ...wordInput, word: 'synchronized' },
   });
-  await expect(page.getByText('synchronized', { exact: true })).toHaveCount(2, { timeout: 3000 });
+  await page.getByRole('link', { name: 'Open Flashcards' }).click();
+  await expect(page).toHaveURL(/\/flashcards\/decks\//);
+  await expect(page.getByRole('heading', { name: 'Live Flashcards - Unit 1' })).toBeVisible();
+  await expect(page.getByTestId('flashcard-stage')).toContainText('synchronized');
+  await page.getByTestId('flashcard-stage').click();
+  await expect(page.getByTestId('flashcard-stage')).toContainText('dong bo');
+  await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
+  await expect(page.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', /\/practice$/);
+  await page.getByRole('link', { name: 'Finish' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
   const updateVisibleMs = Date.now() - updateStarted;
 
   const deleteStarted = Date.now();
   await page.request.delete(`http://127.0.0.1:5000/api/v1/boards/${board.id}/words/${word.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
   });
-  await expect(page.getByText('synchronized', { exact: true })).toHaveCount(0, { timeout: 3000 });
+  await expect(page.getByText('0 synchronized words are ready in this page deck.')).toBeVisible({ timeout: 3000 });
   const deleteVisibleMs = Date.now() - deleteStarted;
 
   const foreignEmail = `foreign-flashcards+${Date.now()}@example.com`;
@@ -108,7 +108,7 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
     data: wordInput,
   });
   const ownedDeckResponse = await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', {
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
   });
   const ownedDecks = (await ownedDeckResponse.json()).data;
   expect(ownedDecks.some((deck) => deck.boardName === 'Foreign Private Board')).toBe(false);

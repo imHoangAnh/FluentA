@@ -1,10 +1,9 @@
-import { ArrowLeft, BarChart3, BookOpen, CalendarClock, Flame, Layers, LogOut, Settings, TrendingUp } from 'lucide-react'
+import { ArrowLeft, BarChart3, BookOpen, Layers, LogOut, Settings } from 'lucide-react'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import type { FlashcardDeck } from '../../lib/api/flashcard.api'
-import { getLanguageProfile } from '../../lib/language'
 import { useFlashcardSync } from '../../lib/realtime/useFlashcardSync'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -19,23 +18,16 @@ function groupByBoard(decks: FlashcardDeck[]) {
   return [...groups.entries()]
 }
 
-function displayReviewDate(value?: string | null) {
-  return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : 'Not scheduled'
+type FlashcardsPageProps = {
+  entryMode?: 'flashcards' | 'practice'
 }
 
-export function FlashcardsPage() {
+export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps) {
   const logout = useAuthStore((state) => state.logout)
   useFlashcardSync()
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-
   const decksQuery = useQuery({
     queryKey: ['flashcard', 'decks'],
     queryFn: flashcardApi.listDecks,
-    refetchInterval: 1500,
-  })
-  const dashboardQuery = useQuery({
-    queryKey: ['flashcard', 'dashboard'],
-    queryFn: () => flashcardApi.getDashboard(timeZone),
     refetchInterval: 1500,
   })
   const boardGroups = useMemo(() => groupByBoard(decksQuery.data ?? []), [decksQuery.data])
@@ -43,8 +35,7 @@ export function FlashcardsPage() {
     () => (decksQuery.data ?? []).reduce((total, deck) => total + deck.cards.length, 0),
     [decksQuery.data],
   )
-  const dashboard = dashboardQuery.data
-  const maxForecast = Math.max(1, ...(dashboard?.forecast.map((point) => point.dueCount) ?? [0]))
+  const practiceEntry = entryMode === 'practice'
 
   return (
     <main className="workspace flashcard-workspace">
@@ -63,6 +54,12 @@ export function FlashcardsPage() {
           <Link className="ghost-button ghost-button--inline" to="/settings/review">
             <Settings size={17} /> Review settings
           </Link>
+          <Link className="ghost-button ghost-button--inline" to="/flashcards/practice">
+            <BookOpen size={17} /> Practice
+          </Link>
+          <Link className="ghost-button ghost-button--inline" to="/flashcards/review">
+            <Layers size={17} /> Review
+          </Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
             <LogOut size={18} />
           </button>
@@ -71,9 +68,9 @@ export function FlashcardsPage() {
 
       <section className="flashcard-hero">
         <div>
-          <span className="preview-label">Flashcards</span>
-          <h1>Your synchronized decks</h1>
-          <p>Read-only cards stay aligned with your vocabulary pages and refresh as words change.</p>
+          <span className="preview-label">{practiceEntry ? 'Practice' : 'Flashcards'}</span>
+          <h1>{practiceEntry ? 'Choose a page deck to practice' : 'Your page decks'}</h1>
+          <p>{practiceEntry ? 'Practice stays page-deck scoped. Pick one deck, then run the configured mode sequence before FluentA seeds or resets review state.' : "Choose a page deck to open the read-only flashcard viewer, then continue into practice when you're ready."}</p>
         </div>
         <div className="flashcard-summary" aria-label="Flashcard summary">
           <Layers size={22} />
@@ -81,40 +78,6 @@ export function FlashcardsPage() {
           <span>{cardCount} synchronized cards</span>
         </div>
       </section>
-
-      {dashboard ? (
-        <section className="flashcard-dashboard" aria-label="Flashcard dashboard">
-          <article data-testid="dashboard-streak">
-            <Flame size={20} />
-            <span>Streak</span>
-            <strong>{dashboard.streakDays} day{dashboard.streakDays === 1 ? '' : 's'}</strong>
-          </article>
-          <article data-testid="dashboard-retention">
-            <TrendingUp size={20} />
-            <span>Retention</span>
-            <strong>{dashboard.retentionRate}%</strong>
-          </article>
-          <article data-testid="dashboard-due">
-            <CalendarClock size={20} />
-            <span>Due today</span>
-            <strong>{dashboard.overdue + dashboard.dueToday}</strong>
-            <small>{dashboard.overdue} overdue · {dashboard.newCards} new</small>
-          </article>
-          <article className="flashcard-dashboard__forecast" data-testid="dashboard-forecast">
-            <span>7-day forecast</span>
-            <div>
-              {dashboard.forecast.map((point) => (
-                <div className="forecast-bar" key={point.date}>
-                  <span style={{ height: `${Math.max(8, (point.dueCount / maxForecast) * 58)}px` }} />
-                  <small>{new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(new Date(`${point.date}T00:00:00`))}</small>
-                  <strong>{point.dueCount}</strong>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-      ) : null}
-      {dashboardQuery.isError ? <p className="flashcard-status flashcard-status--error">Unable to load dashboard stats.</p> : null}
 
       {decksQuery.isLoading ? <p className="flashcard-status">Loading flashcards...</p> : null}
       {decksQuery.isError ? <p className="flashcard-status flashcard-status--error">Unable to load flashcards.</p> : null}
@@ -143,7 +106,7 @@ export function FlashcardsPage() {
                 <article className="flashcard-deck" key={deck.id} data-testid={`flashcard-deck-${deck.id}`}>
                   <header className="flashcard-deck__heading">
                     <div>
-                      <span className="deck-type">{deck.type === 'AllWords' ? 'All words' : 'Page deck'}</span>
+                      <span className="deck-type">Page deck</span>
                       <h3>{deck.name}</h3>
                     </div>
                     <strong>{deck.cards.length}</strong>
@@ -151,39 +114,30 @@ export function FlashcardsPage() {
 
                   {deck.cards.length > 0 ? (
                     <div className="deck-actions">
-                      <Link className="primary-button deck-review-link" to={`/flashcards/decks/${deck.id}/review`}>
-                        {deck.type === 'AllWords' ? 'Study All Words' : 'Study this Page Deck'}
-                      </Link>
-                      <Link className="secondary-button deck-practice-link" to={`/flashcards/decks/${deck.id}/practice`}>
-                        {deck.type === 'AllWords' ? 'Practice All Words' : 'Practice this Page Deck'}
-                      </Link>
+                      {practiceEntry ? (
+                        <>
+                          <Link className="primary-button deck-practice-link" to={`/flashcards/decks/${deck.id}/practice`}>
+                            Practice this Page Deck
+                          </Link>
+                          <Link className="secondary-button deck-review-link" to={`/flashcards/decks/${deck.id}`}>
+                            Open Flashcards
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link className="primary-button deck-review-link" to={`/flashcards/decks/${deck.id}`}>
+                            Open Flashcards
+                          </Link>
+                          <Link className="secondary-button deck-practice-link" to={`/flashcards/decks/${deck.id}/practice`}>
+                            Practice this Page Deck
+                          </Link>
+                        </>
+                      )}
                     </div>
                   ) : null}
 
                   {deck.cards.length === 0 ? <p className="deck-empty">No synchronized cards yet.</p> : null}
-                  <div className="flashcard-list">
-                    {deck.cards.map((card) => (
-                      <section className="flashcard-card" key={card.id} data-testid={`flashcard-word-${card.word}`}>
-                        <div className="flashcard-card__topline">
-                          <div>
-                            <span>{card.wordClass}</span>
-                            <h4>{card.word}</h4>
-                          </div>
-                          <span className={`card-state card-state--${card.state}`}>{card.state}</span>
-                        </div>
-                        <dl>
-                          <div><dt>Vietnamese</dt><dd>{card.meaningVn}</dd></div>
-                          <div><dt>{getLanguageProfile(deck.boardLanguage).secondaryMeaningLabel}</dt><dd>{card.meaningEn}</dd></div>
-                          <div><dt>Example</dt><dd>{card.example}</dd></div>
-                        </dl>
-                        <footer>
-                          <CalendarClock size={15} />
-                          <span>{displayReviewDate(card.nextReviewDate)}</span>
-                          <span>{card.repetitions} reviews</span>
-                        </footer>
-                      </section>
-                    ))}
-                  </div>
+                  <p className="deck-summary">{deck.cards.length} synchronized words are ready in this page deck.</p>
                 </article>
               ))}
             </div>

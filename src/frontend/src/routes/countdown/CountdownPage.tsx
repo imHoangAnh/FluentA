@@ -1,10 +1,11 @@
 import { 
   Plus, Edit3, Trash2, X,
-  CalendarClock, Settings, Columns3, BookOpen, Layers, LogOut, NotebookPen, Repeat2, Kanban, Timer, Globe, HelpCircle, FileText, GraduationCap, ClipboardList, CheckSquare, MapPin
+  CalendarClock, Settings, Columns3, BookOpen, LogOut, NotebookPen, Repeat2, Kanban, Timer, Globe, HelpCircle, FileText, GraduationCap, ClipboardList, CheckSquare, MapPin
 } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as countdownApi from '../../lib/api/countdown.api'
 import { useAuthStore } from '../../stores/authStore'
 import './CountdownPage.css'
@@ -173,9 +174,7 @@ export function CountdownPage() {
           <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
             <BookOpen size={20} /> Vocabulary
           </Link>
-          <Link to="/flashcards" className={location.pathname.startsWith('/flashcards') ? 'active' : ''}>
-            <Layers size={20} /> Review
-          </Link>
+          <LearningNavLinks />
           <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
             <CheckSquare size={20} /> Todo
           </Link>

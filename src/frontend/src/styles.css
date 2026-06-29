@@ -2000,6 +2000,13 @@ a {
   background: var(--teal);
 }
 
+.deck-summary {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .deck-type,
 .flashcard-card__topline > div > span {
   color: var(--teal-dark);
@@ -2082,6 +2089,119 @@ a {
   display: grid;
   align-content: start;
   gap: 28px;
+}
+
+.flashcard-viewer {
+  width: min(880px, 100%);
+  margin: 28px auto 0;
+  display: grid;
+  gap: 22px;
+}
+
+.flashcard-viewer__progress {
+  margin-bottom: 0;
+}
+
+.flashcard-viewer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 20px;
+}
+
+.flashcard-viewer__header h1 {
+  margin: 8px 0 0;
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: 1.02;
+}
+
+.flashcard-viewer__header p {
+  margin: 0;
+  max-width: 280px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.flashcard-stage {
+  width: 100%;
+  min-height: 440px;
+  padding: 34px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(244, 197, 66, 0.18), transparent 28%),
+    linear-gradient(145deg, rgba(15, 159, 143, 0.08), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  text-align: left;
+}
+
+.flashcard-stage__face {
+  min-height: 370px;
+  display: grid;
+  align-content: space-between;
+  gap: 22px;
+}
+
+.flashcard-stage__face span {
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flashcard-stage__face h2 {
+  margin: 0;
+  font-size: clamp(42px, 8vw, 78px);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.flashcard-stage__face p,
+.flashcard-stage__face strong {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 28px);
+  line-height: 1.3;
+}
+
+.flashcard-stage__face--back {
+  gap: 18px;
+}
+
+.flashcard-stage__face--back > div {
+  display: grid;
+  gap: 6px;
+}
+
+.flashcard-stage__face small {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.flashcard-viewer__controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.flashcard-viewer__controls .primary-button,
+.flashcard-viewer__controls .secondary-button {
+  width: auto;
+  min-width: 148px;
+  margin-top: 0;
+}
+
+.flashcard-viewer__final-actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .review-setup,
@@ -4693,6 +4813,23 @@ a {
   .practice-pronunciation-controls,
   .deck-actions {
     grid-template-columns: 1fr;
+  }
+
+  .flashcard-viewer__header,
+  .flashcard-viewer__controls,
+  .flashcard-viewer__final-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .flashcard-viewer__header p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .flashcard-stage {
+    min-height: 360px;
+    padding: 24px;
   }
 
   .review-card,
