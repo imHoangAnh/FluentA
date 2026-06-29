@@ -66,6 +66,49 @@ public sealed class FlashcardServiceTests
     }
 
     [Fact]
+    public async Task CreatePracticeSessionSummary_ValidatesCountsAndUsesAuthenticatedUserScope()
+    {
+        var repository = new RecordingFlashcardRepository();
+        var service = new FlashcardService(repository);
+        var userId = Guid.NewGuid();
+        var deckId = Guid.NewGuid();
+
+        var invalid = await service.CreatePracticeSessionSummaryAsync(
+            userId,
+            new CreatePracticeSessionSummaryRequest(deckId, "dictation", 2, 2, 1));
+        Assert.False(invalid.IsSuccess);
+
+        var result = await service.CreatePracticeSessionSummaryAsync(
+            userId,
+            new CreatePracticeSessionSummaryRequest(deckId, "meaningToWord", 2, 1, 1));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(userId, repository.RequestedUserId);
+        Assert.Equal(deckId, repository.RequestedDeckId);
+        Assert.Equal(PracticeMode.MeaningToWord, repository.RequestedPracticeMode);
+        Assert.Equal(2, result.Value!.TotalCards);
+        Assert.Equal(1, result.Value.CorrectCards);
+        Assert.Equal(1, result.Value.WrongCards);
+    }
+
+    [Fact]
+    public async Task CreatePracticeSessionSummary_ReturnsValidationForInconsistentDeckSummary()
+    {
+        var repository = new RecordingFlashcardRepository
+        {
+            PracticeSessionSaveStatus = PracticeSessionSummarySaveStatus.InconsistentSummary,
+        };
+        var service = new FlashcardService(repository);
+
+        var result = await service.CreatePracticeSessionSummaryAsync(
+            Guid.NewGuid(),
+            new CreatePracticeSessionSummaryRequest(Guid.NewGuid(), "dictation", 2, 1, 1));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("VALIDATION_ERROR", ((FlashcardError)result.Error!).Code);
+    }
+
+    [Fact]
     public async Task GetReviewSessionSummary_ValidatesSessionAndUsesAuthenticatedUserScope()
     {
         var repository = new RecordingFlashcardRepository();
@@ -218,6 +261,7 @@ public sealed class FlashcardServiceTests
         public Guid RequestedCreatedSessionId { get; private set; }
         public Guid RequestedSummarySessionId { get; private set; }
         public Guid? RequestedBoardId { get; private set; }
+        public PracticeMode RequestedPracticeMode { get; private set; }
         public ReviewRating RequestedRating { get; private set; }
         public int RequestedTimeSpentSeconds { get; private set; }
         public TimeZoneInfo? RequestedTimeZone { get; private set; }
@@ -226,6 +270,7 @@ public sealed class FlashcardServiceTests
         public DeckType ResultDeckType { get; init; } = DeckType.AllWords;
         public bool DashboardMissing { get; init; }
         public bool SummaryMissing { get; init; }
+        public PracticeSessionSummarySaveStatus PracticeSessionSaveStatus { get; init; } = PracticeSessionSummarySaveStatus.Success;
 
         public Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default)
         {
@@ -242,6 +287,35 @@ public sealed class FlashcardServiceTests
         {
             RequestedUserId = userId;
             return Task.FromResult<DeckSessionDto?>(null);
+        }
+
+        public Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(
+            Guid userId,
+            Guid deckId,
+            PracticeMode mode,
+            int totalCards,
+            int correctCards,
+            int wrongCards,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedUserId = userId;
+            RequestedDeckId = deckId;
+            RequestedPracticeMode = mode;
+
+            if (PracticeSessionSaveStatus != PracticeSessionSummarySaveStatus.Success)
+            {
+                return Task.FromResult(new PracticeSessionSummarySaveResult(PracticeSessionSaveStatus, null));
+            }
+
+            return Task.FromResult(new PracticeSessionSummarySaveResult(
+                PracticeSessionSummarySaveStatus.Success,
+                new PracticeSessionSummaryDto(Guid.NewGuid(), userId, deckId, mode switch
+                {
+                    PracticeMode.Dictation => "dictation",
+                    PracticeMode.MeaningToWord => "meaningToWord",
+                    PracticeMode.Pronunciation => "pronunciation",
+                    _ => "dictation",
+                }, totalCards, correctCards, wrongCards, DateTime.UtcNow)));
         }
 
         public Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(

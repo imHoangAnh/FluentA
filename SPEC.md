@@ -21,6 +21,7 @@
 10. [Development Setup](#10-development-setup)
 11. [Definition of Done](#11-definition-of-done)
 12. [Next Feature Plan — Email Verification OTP & Password Recovery](#12-next-feature-plan--email-verification-otp--password-recovery)
+13. [Feature Plan —  Practice Modes](#13-next-feature-plan--flashcard-practice-modes)
 
 ---
 
@@ -1570,3 +1571,174 @@ Out of scope:
 The first work item is **SPIKE-AUTH-MAIL-001** because Gmail authentication policy, Redis atomic operations, deterministic test delivery, OAuth-only recovery behavior, and secret rotation are feasibility gates for all implementation stories.
 
 Approve this epic map before Planning prepares the current spike/story pack. Implementation starts only after feasibility validation passes and receives a separate execution approval.
+
+---
+
+## 13. Next Feature Plan —  Practice Modes
+
+**Planning status:** Product decisions locked for implementation planning
+
+**Mode:** Normal feature with browser capability risk
+
+**Source of truth:** `history/flashcard-practice-modes/CONTEXT.md`
+
+### 13.1 Desired Outcomes
+
+- Learners can open practice from any existing flashcard deck and choose one of three practice-only modes.
+- Dictation mode plays the target word through browser speech synthesis, then asks the learner to type the word.
+- Meaning-to-word mode shows both Vietnamese meaning and English meaning/definition, then asks the learner to type the target word.
+- Pronunciation mode plays the target word, listens through browser speech recognition, transcribes the learner's speech, and checks it against the target word.
+- Practice sessions reuse existing synchronized flashcard deck/card data and do not change SM-2 scheduling.
+
+### 13.2 Locked Product Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Practice-only behavior | The three new modes never change `interval`, `easeFactor`, `repetitions`, `nextReviewDate`, or card `state`. |
+| Deck coverage | Practice is available from every `PageDeck` and every `AllWords` deck. |
+| Browser speech | MVP uses browser Web Speech APIs only: speech synthesis for playback and speech recognition for pronunciation transcription where supported. |
+| Typed answer matching | Typed answers use exact normalized matching: trim surrounding whitespace and ignore case, but require exact spelling. |
+| Pronunciation matching | Pronunciation mode compares the normalized speech-recognition transcript to `card.word` with the same exact-match rule. |
+| Wrong answer behavior | A wrong answer stays on the same card and allows retry. |
+| Reveal or skip behavior | Reveal/skip counts as wrong for the session summary. |
+| Meaning prompt | Meaning-to-word mode shows both `meaningVn` and `meaningEn`; the expected answer is `card.word`. |
+| Dictation prompt | Dictation mode shows no word, word class, or meaning hints; it provides only audio playback/replay and answer input. |
+| Session summary | Practice summary shows total cards, correct cards, and wrong cards. |
+| Durable practice history | Backend stores only practice session summaries: mode, deck id, total cards, correct count, wrong count, and completed time. It does not store individual attempts or per-card answers in MVP. |
+| UI boundary | Practice uses a separate route instead of the existing SM-2 review route. |
+| Practice entry | Each deck exposes a Practice entry that opens `/flashcards/decks/{deckId}/practice`; the practice page lets the learner choose one of the three modes. |
+| All Words selection | Practice from an `AllWords` deck uses all cards in that deck, not the due queue and not daily review limits. |
+| Language scope | Practice applies to all board languages. TTS and speech recognition use the deck's `boardLanguage`; the answer target remains `card.word`. |
+
+### 13.3 User Experience
+
+From `/flashcards`, each non-empty deck displays a **Practice** action in addition
+to the current study/review action. The Practice action opens:
+
+```text
+/flashcards/decks/{deckId}/practice
+```
+
+The practice page:
+
+1. Loads the owned active deck and its cards through existing flashcard deck data.
+2. Shows the deck name, card count, and three practice mode choices:
+   - Dictation: listen, then type the word.
+   - Meaning -> Word: read meanings, then type the word.
+   - Pronunciation: listen, speak, then compare transcript.
+3. Starts a practice session using all cards in the deck.
+4. Presents one card at a time.
+5. Records correct or wrong for the session summary only.
+6. Allows retry after wrong answers.
+7. Treats reveal/skip as wrong and advances according to the session flow.
+8. Shows a final summary with total cards, correct cards, and wrong cards.
+
+### 13.4 Practice Mode Behavior
+
+#### Dictation
+
+- Prompt: no visible word, word class, meaning, example, or hint.
+- Controls: play audio, replay audio, text input, submit, reveal/skip.
+- Correct answer: `card.word`.
+- Check: exact normalized match.
+- Wrong answer: show wrong feedback and keep the same card available for retry.
+- Reveal/skip: mark wrong for the card and show the answer.
+
+#### Meaning -> Word
+
+- Prompt: `meaningVn` and `meaningEn` are both visible.
+- Controls: text input, submit, reveal/skip.
+- Correct answer: `card.word`.
+- Check: exact normalized match.
+- Wrong answer: show wrong feedback and keep the same card available for retry.
+- Reveal/skip: mark wrong for the card and show the answer.
+
+#### Pronunciation
+
+- Prompt: play the target word through browser speech synthesis.
+- Controls: play/replay, start listening, stop listening where supported, submit transcript/result, reveal/skip.
+- Recognition: browser speech recognition captures the learner's speech and returns a transcript.
+- Correct answer: `card.word`.
+- Check: exact normalized transcript match.
+- Wrong answer: show recognized transcript when available, show wrong feedback, and keep the same card available for retry.
+- Reveal/skip: mark wrong for the card and show the answer.
+- Unsupported browser behavior: the page must show a clear unsupported-state message for speech recognition while preserving access to the other practice modes when possible.
+
+### 13.5 Data And API Expectations
+
+MVP should add a durable practice-session summary surface without storing
+per-attempt data.
+
+Expected persisted fields:
+
+| Field | Purpose |
+|---|---|
+| `id` | Practice summary id. |
+| `userId` | Authenticated owner. |
+| `deckId` | Practiced flashcard deck. |
+| `mode` | `dictation`, `meaningToWord`, or `pronunciation`. |
+| `totalCards` | Number of cards in the practice session. |
+| `correctCards` | Number of cards completed correctly. |
+| `wrongCards` | Number of cards counted wrong, including reveal/skip. |
+| `completedAt` | UTC completion timestamp. |
+
+Expected API capabilities:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `GET` | `/api/v1/flashcards/decks/{deckId}/cards` | Reuse existing owned deck/card read for practice setup. |
+| `POST` | `/api/v1/flashcards/practice-sessions` | Persist a completed practice summary for an owned active deck. |
+
+The exact request/response DTO names can be finalized during implementation
+planning, but the request must include `deckId`, `mode`, `totalCards`,
+`correctCards`, and `wrongCards`. The server must verify deck ownership and
+reject foreign, deleted, or inconsistent summaries.
+
+### 13.6 Scope Boundaries
+
+Out of scope:
+
+- External TTS or speech-recognition providers.
+- AI pronunciation scoring, phoneme-level scoring, waveform analysis, or accent feedback.
+- Fuzzy spelling, typo tolerance, or "almost correct" states.
+- Per-card practice history or per-attempt answer storage.
+- Changing existing SM-2 review scheduling or daily planning behavior.
+- Using `AllWords` due queues or daily limits for practice sessions.
+- Native mobile speech integrations.
+
+### 13.7 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Practice accidentally mutates SM-2 fields | Backend tests prove practice summary writes do not update flashcard card schedule fields. |
+| Deck ownership leak | API tests reject foreign, deleted, and missing decks. |
+| Browser speech support varies | Frontend tests cover unsupported speech-recognition state and preserve non-speech practice modes. |
+| Matching ambiguity | Unit tests cover trim/case normalization and exact spelling failures. |
+| Practice/review confusion | Playwright flow proves practice uses `/flashcards/decks/{deckId}/practice` and existing review route behavior still works. |
+| All Words queue confusion | Tests prove practice uses all deck cards and does not call due queue or consume daily limits. |
+
+### 13.8 Proposed Story Queue
+
+1. **US-PRACTICE-001:** Add practice route, deck entry point, mode selection, and shared practice session shell.
+2. **US-PRACTICE-002:** Implement Dictation and Meaning -> Word practice with exact matching, retry, reveal/skip, and session summary.
+3. **US-PRACTICE-003:** Implement Pronunciation practice with browser speech recognition, unsupported-state handling, and transcript matching.
+4. **US-PRACTICE-004:** Persist practice session summaries and add ownership/invariant validation.
+5. **US-PRACTICE-005:** Run release regression for existing review modes, SM-2 scheduling, dashboard counts, and practice E2E flows.
+
+### 13.9 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- flashcard-practice.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split or refine commands by story, but release proof must cover
+practice mode correctness, no SM-2 mutation, practice summary persistence,
+speech unsupported-state handling, and regression of existing review sessions.

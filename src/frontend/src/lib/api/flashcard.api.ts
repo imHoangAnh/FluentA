@@ -98,6 +98,19 @@ export type FlashcardDashboard = {
   forecast: DashboardForecastPoint[]
 }
 
+export type PracticeMode = 'dictation' | 'meaningToWord' | 'pronunciation'
+
+export type PracticeSessionSummary = {
+  id: string
+  userId: string
+  deckId: string
+  mode: PracticeMode
+  totalCards: number
+  correctCards: number
+  wrongCards: number
+  completedAt: string
+}
+
 export async function listDecks() {
   const response = await apiClient.get<ApiEnvelope<FlashcardDeck[]>>('/flashcards/decks')
   return response.data.data ?? []
@@ -115,6 +128,17 @@ export async function getDueDeck(deckId: string, timeZoneId: string) {
 
 export async function createReviewSession(deckId: string) {
   const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/flashcards/sessions', { deckId })
+  return response.data.data!
+}
+
+export async function createPracticeSessionSummary(input: {
+  deckId: string
+  mode: PracticeMode
+  totalCards: number
+  correctCards: number
+  wrongCards: number
+}) {
+  const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/flashcards/practice-sessions', input)
   return response.data.data!
 }
 

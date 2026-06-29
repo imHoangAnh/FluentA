@@ -130,6 +130,36 @@ thesaurus, collocation, and note from their source vocabulary word.
 - The server validates the browser timezone and derives local-day UTC bounds.
 - Completed Spaced sessions show the immediate daily-completion summary.
 
+## Practice Modes
+
+- Every non-empty Page Deck and All Words deck exposes a separate Practice
+  entry that opens `/flashcards/decks/{deckId}/practice`.
+- Practice setup reuses `GET /api/v1/flashcards/decks/{deckId}/cards` and
+  always uses every active card in the selected deck; it does not use the All
+  Words due queue or daily limits.
+- Practice supports three modes: Dictation, Meaning -> Word, and
+  Pronunciation.
+- Dictation plays the target word through browser speech synthesis and hides
+  word, class, and meaning hints.
+- Meaning -> Word shows both `meaningVn` and `meaningEn`; the learner must
+  type `card.word`.
+- Pronunciation plays the target word through browser speech synthesis, uses
+  browser speech recognition where supported, and compares the normalized
+  transcript to `card.word`.
+- Typed answers and pronunciation transcripts use exact normalized matching:
+  trim surrounding whitespace and ignore case, but require exact spelling.
+- Wrong submissions keep the learner on the same card for retry.
+- Reveal or skip shows the answer, marks the card wrong for the session
+  summary, and advances.
+- Practice completion shows total cards, correct cards, and wrong cards.
+- `POST /api/v1/flashcards/practice-sessions` accepts only an owned, active
+  deck and persists summary-only history: mode, deck id, total cards, correct
+  cards, wrong cards, and completion time.
+- Practice summary writes never change interval, ease factor, repetitions,
+  next review date, card state, review history, or dashboard scheduling data.
+- Browsers without speech-recognition support show a clear unsupported state
+  for Pronunciation while leaving the other practice modes available.
+
 ## Flashcard Dashboard
 
 - Authenticated learners see dashboard stats on `/flashcards`.

@@ -169,6 +169,74 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
                 card.State.ToString().ToLowerInvariant())).ToList());
     }
 
+    public async Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(
+        Guid userId,
+        Guid deckId,
+        PracticeMode mode,
+        int totalCards,
+        int correctCards,
+        int wrongCards,
+        CancellationToken cancellationToken = default)
+    {
+        var deck = await (
+            from flashcardDeck in _dbContext.FlashcardDecks
+            join board in _dbContext.Boards on flashcardDeck.BoardId equals board.Id
+            where flashcardDeck.Id == deckId
+                && flashcardDeck.UserId == userId
+                && flashcardDeck.DeletedAt == null
+                && board.DeletedAt == null
+            select new
+            {
+                flashcardDeck.Id,
+                flashcardDeck.UserId,
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (deck is null)
+        {
+            return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.DeckNotFound, null);
+        }
+
+        var actualCardCount = await _dbContext.FlashcardCards
+            .AsNoTracking()
+            .CountAsync(card => card.DeckId == deck.Id && card.DeletedAt == null, cancellationToken);
+
+        if (actualCardCount != totalCards || correctCards < 0 || wrongCards < 0 || correctCards + wrongCards != totalCards)
+        {
+            return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.InconsistentSummary, null);
+        }
+
+        var completedAt = DateTime.UtcNow;
+        var summary = PracticeSessionSummary.Create(
+            deck.UserId,
+            deck.Id,
+            mode,
+            totalCards,
+            correctCards,
+            wrongCards,
+            completedAt);
+        await _dbContext.PracticeSessionSummaries.AddAsync(summary, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new PracticeSessionSummarySaveResult(
+            PracticeSessionSummarySaveStatus.Success,
+            new PracticeSessionSummaryDto(
+                summary.Id,
+                summary.UserId,
+                summary.DeckId,
+                summary.Mode switch
+                {
+                    PracticeMode.Dictation => "dictation",
+                    PracticeMode.MeaningToWord => "meaningToWord",
+                    PracticeMode.Pronunciation => "pronunciation",
+                    _ => throw new InvalidOperationException("Unknown practice mode."),
+                },
+                summary.TotalCards,
+                summary.CorrectCards,
+                summary.WrongCards,
+                summary.CompletedAt));
+    }
+
     public async Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
         Guid userId,
         Guid deckId,

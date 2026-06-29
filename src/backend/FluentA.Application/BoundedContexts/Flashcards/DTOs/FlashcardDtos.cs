@@ -37,12 +37,40 @@ public sealed record DeckSessionDto(
 
 public sealed record CreateReviewSessionRequest(Guid DeckId);
 
+public sealed record CreatePracticeSessionSummaryRequest(
+    Guid DeckId,
+    string Mode,
+    int TotalCards,
+    int CorrectCards,
+    int WrongCards);
+
 public sealed record ReviewSessionCreatedDto(
     Guid SessionId,
     Guid DeckId,
     string DeckName,
     string DeckType,
     int TotalCards);
+
+public sealed record PracticeSessionSummaryDto(
+    Guid Id,
+    Guid UserId,
+    Guid DeckId,
+    string Mode,
+    int TotalCards,
+    int CorrectCards,
+    int WrongCards,
+    DateTime CompletedAt);
+
+public enum PracticeSessionSummarySaveStatus
+{
+    Success = 0,
+    DeckNotFound = 1,
+    InconsistentSummary = 2,
+}
+
+public sealed record PracticeSessionSummarySaveResult(
+    PracticeSessionSummarySaveStatus Status,
+    PracticeSessionSummaryDto? Summary);
 
 public sealed record ReviewSessionSummaryDto(
     Guid SessionId,

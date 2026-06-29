@@ -150,9 +150,14 @@ export function FlashcardsPage() {
                   </header>
 
                   {deck.cards.length > 0 ? (
-                    <Link className="primary-button deck-review-link" to={`/flashcards/decks/${deck.id}/review`}>
-                      {deck.type === 'AllWords' ? 'Study All Words' : 'Study this Page Deck'}
-                    </Link>
+                    <div className="deck-actions">
+                      <Link className="primary-button deck-review-link" to={`/flashcards/decks/${deck.id}/review`}>
+                        {deck.type === 'AllWords' ? 'Study All Words' : 'Study this Page Deck'}
+                      </Link>
+                      <Link className="secondary-button deck-practice-link" to={`/flashcards/decks/${deck.id}/practice`}>
+                        {deck.type === 'AllWords' ? 'Practice All Words' : 'Practice this Page Deck'}
+                      </Link>
+                    </div>
                   ) : null}
 
                   {deck.cards.length === 0 ? <p className="deck-empty">No synchronized cards yet.</p> : null}

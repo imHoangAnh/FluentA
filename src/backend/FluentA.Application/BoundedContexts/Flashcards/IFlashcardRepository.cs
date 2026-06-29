@@ -7,6 +7,14 @@ public interface IFlashcardRepository
 {
     Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<DeckSessionDto?> GetDeckSessionAsync(Guid userId, Guid deckId, CancellationToken cancellationToken = default);
+    Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(
+        Guid userId,
+        Guid deckId,
+        PracticeMode mode,
+        int totalCards,
+        int correctCards,
+        int wrongCards,
+        CancellationToken cancellationToken = default);
     Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(Guid userId, Guid deckId, Guid sessionId, CancellationToken cancellationToken = default);
     Task<ReviewSessionSummaryDto?> GetReviewSessionSummaryAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default);
     Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default);

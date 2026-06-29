@@ -9,6 +9,11 @@ public interface IFlashcardService
     Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default);
     /// <summary>Returns cards and metadata for a deck review session.</summary>
     Task<OperationResult<DeckSessionDto>> GetDeckSessionAsync(Guid userId, Guid deckId, CancellationToken cancellationToken = default);
+    /// <summary>Persists a completed practice-session summary for an owned deck.</summary>
+    Task<OperationResult<PracticeSessionSummaryDto>> CreatePracticeSessionSummaryAsync(
+        Guid userId,
+        CreatePracticeSessionSummaryRequest request,
+        CancellationToken cancellationToken = default);
     /// <summary>Creates a server-side review session for a deck.</summary>
     Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,

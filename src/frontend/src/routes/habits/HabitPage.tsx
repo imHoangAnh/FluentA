@@ -371,7 +371,7 @@ export function HabitPage() {
                   className={`habit-list-card ${isSelected ? 'active' : ''}`}
                 >
                   <div className="habit-list-card-content">
-                    <div className="habit-list-card-icon" style={{ backgroundColor: `${habit.color}20` || '#e2e8f0' }}>
+                    <div className="habit-list-card-icon" style={{ backgroundColor: habit.color ? `${habit.color}20` : '#e2e8f0' }}>
                       {habit.icon || '📌'}
                     </div>
                     <div className="habit-list-card-info">
@@ -402,7 +402,7 @@ export function HabitPage() {
               {/* Selected Habit Header */}
               <div className="habit-details-header">
                 <div className="habit-details-title-area">
-                  <div className="habit-details-icon" style={{ backgroundColor: `${selectedHabit.color}20` || '#e2e8f0' }}>
+                  <div className="habit-details-icon" style={{ backgroundColor: selectedHabit.color ? `${selectedHabit.color}20` : '#e2e8f0' }}>
                     {selectedHabit.icon || '📌'}
                   </div>
                   <div className="habit-details-text">
@@ -532,7 +532,7 @@ export function HabitPage() {
                 
                 <label>
                   Frequency
-                  <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}>
+                  <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as habitApi.HabitFrequency }))}>
                     <option value="Daily">Every day</option>
                     <option value="Custom">Custom days</option>
                   </select>

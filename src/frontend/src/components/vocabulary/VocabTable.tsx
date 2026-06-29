@@ -101,8 +101,8 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       event.currentTarget.blur()
       return
     }
-    // Only save on Enter for inputs, textareas need enter for newlines
-    if (event.key === 'Enter' && type !== 'textarea' && onEndEnter) {
+    // Enter advances to the next logical cell; Shift+Enter still allows textarea newlines.
+    if (event.key === 'Enter' && !event.shiftKey && onEndEnter) {
       event.preventDefault()
       await commitValue(draft)
       await onEndEnter()
@@ -110,7 +110,6 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
   }
 
   const shared = {
-    ref: register as any,
     'aria-label': label,
     value: draft,
     required,
@@ -123,15 +122,15 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
     <div>
       {type === 'select' ? (
         <div className="vw-select-wrapper">
-          <select className="vw-input" {...shared}>
+          <select className="vw-input" ref={register} {...shared}>
             {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
           <span className="material-symbols-outlined vw-select-icon">expand_more</span>
         </div>
       ) : type === 'textarea' ? (
-        <textarea className="vw-input" {...shared} rows={2} style={{ fontStyle: label.includes('Example') ? 'italic' : 'normal' }} />
+        <textarea className="vw-input" ref={register} {...shared} rows={2} style={{ fontStyle: label.includes('Example') ? 'italic' : 'normal' }} />
       ) : (
-        <input className="vw-input" {...shared} type={type} step={type === 'number' ? 'any' : undefined} />
+        <input className="vw-input" ref={register} {...shared} type={type} step={type === 'number' ? 'any' : undefined} />
       )}
       {saving ? <small style={{fontSize: 11, color: '#6d7a77'}}>Saving...</small> : null}
       {error ? (
@@ -198,7 +197,9 @@ export function VocabTable({ boardId, page, boardLanguage = 'en' }: { boardId: s
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) return parsed
       }
-    } catch {}
+    } catch {
+      return []
+    }
     return []
   })
 

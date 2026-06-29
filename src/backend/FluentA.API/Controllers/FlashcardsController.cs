@@ -37,6 +37,16 @@ public sealed class FlashcardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Persists a completed practice-session summary for an owned deck.</summary>
+    [HttpPost("practice-sessions")]
+    public async Task<IActionResult> CreatePracticeSessionSummary(CreatePracticeSessionSummaryRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _flashcards.CreatePracticeSessionSummaryAsync(CurrentUserId(), request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<PracticeSessionSummaryDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Returns due cards for an All Words spaced-review deck.</summary>
     [HttpGet("decks/{deckId:guid}/due")]
     public async Task<IActionResult> GetDueDeck(Guid deckId, [FromQuery] string? timeZoneId, CancellationToken cancellationToken)

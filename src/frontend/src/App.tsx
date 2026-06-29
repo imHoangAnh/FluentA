@@ -8,6 +8,7 @@ import { ResetPasswordPage } from './routes/auth/ResetPasswordPage'
 import { DashboardPage } from './routes/dashboard/DashboardPage'
 import { WorkspacePage } from './routes/workspace/WorkspacePage'
 import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
+import { PracticeSessionPage } from './routes/flashcards/PracticeSessionPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
 import { ReviewSettingsPage } from './routes/settings/ReviewSettingsPage'
 import { TodoPage } from './routes/todo/TodoPage'
@@ -126,6 +127,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ReviewSessionPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flashcards/decks/:deckId/practice"
+        element={
+          <ProtectedRoute>
+            <PracticeSessionPage />
           </ProtectedRoute>
         }
       />

@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
     public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
     public DbSet<CardReview> CardReviews => Set<CardReview>();
+    public DbSet<PracticeSessionSummary> PracticeSessionSummaries => Set<PracticeSessionSummary>();
     public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();

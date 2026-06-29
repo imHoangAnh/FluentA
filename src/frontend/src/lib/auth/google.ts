@@ -1,7 +1,25 @@
 const googleAuthEndpoint = 'https://accounts.google.com/o/oauth2/v2/auth'
 
 export function googleRedirectUri() {
-  return import.meta.env.VITE_GOOGLE_REDIRECT_URI ?? `${window.location.origin}/auth/google/callback`
+  const runtimeRedirect = `${window.location.origin}/auth/google/callback`
+  const configuredRedirect = import.meta.env.VITE_GOOGLE_REDIRECT_URI as string | undefined
+
+  if (!configuredRedirect) {
+    return runtimeRedirect
+  }
+
+  try {
+    const configuredUrl = new URL(configuredRedirect)
+    const runtimeUrl = new URL(runtimeRedirect)
+
+    if (configuredUrl.origin !== runtimeUrl.origin) {
+      return runtimeRedirect
+    }
+
+    return configuredUrl.toString()
+  } catch {
+    return runtimeRedirect
+  }
 }
 
 export function googleClientId() {

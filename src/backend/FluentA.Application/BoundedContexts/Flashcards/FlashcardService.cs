@@ -31,6 +31,71 @@ public sealed class FlashcardService : IFlashcardService
             : OperationResult<DeckSessionDto>.Success(session);
     }
 
+    public async Task<OperationResult<PracticeSessionSummaryDto>> CreatePracticeSessionSummaryAsync(
+        Guid userId,
+        CreatePracticeSessionSummaryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.DeckId == Guid.Empty)
+        {
+            errors["deckId"] = ["Deck id is required."];
+        }
+
+        if (!TryParsePracticeMode(request.Mode, out var mode))
+        {
+            errors["mode"] = ["Mode must be dictation, meaningToWord, or pronunciation."];
+        }
+
+        if (request.TotalCards <= 0)
+        {
+            errors["totalCards"] = ["Total cards must be greater than 0."];
+        }
+
+        if (request.CorrectCards < 0)
+        {
+            errors["correctCards"] = ["Correct cards must be 0 or greater."];
+        }
+
+        if (request.WrongCards < 0)
+        {
+            errors["wrongCards"] = ["Wrong cards must be 0 or greater."];
+        }
+
+        if (request.CorrectCards + request.WrongCards != request.TotalCards)
+        {
+            errors["summary"] = ["Correct cards plus wrong cards must equal total cards."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return OperationResult<PracticeSessionSummaryDto>.Failure(FlashcardError.Validation(errors));
+        }
+
+        var result = await _repository.CreatePracticeSessionSummaryAsync(
+            userId,
+            request.DeckId,
+            mode,
+            request.TotalCards,
+            request.CorrectCards,
+            request.WrongCards,
+            cancellationToken);
+
+        return result.Status switch
+        {
+            PracticeSessionSummarySaveStatus.Success => OperationResult<PracticeSessionSummaryDto>.Success(result.Summary!),
+            PracticeSessionSummarySaveStatus.DeckNotFound => OperationResult<PracticeSessionSummaryDto>.Failure(FlashcardError.DeckOrCardNotFound()),
+            PracticeSessionSummarySaveStatus.InconsistentSummary => OperationResult<PracticeSessionSummaryDto>.Failure(FlashcardError.Validation(new Dictionary<string, string[]>
+            {
+                ["summary"] = ["Practice summary does not match the owned active deck."]
+            })),
+            _ => OperationResult<PracticeSessionSummaryDto>.Failure(FlashcardError.Validation(new Dictionary<string, string[]>
+            {
+                ["summary"] = ["Practice summary is invalid."]
+            })),
+        };
+    }
+
     public async Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,
         CreateReviewSessionRequest request,
@@ -207,5 +272,23 @@ public sealed class FlashcardService : IFlashcardService
         }
 
         return errors;
+    }
+
+    private static bool TryParsePracticeMode(string? value, out PracticeMode mode)
+    {
+        mode = default;
+        return value switch
+        {
+            "dictation" => Assign(PracticeMode.Dictation, out mode),
+            "meaningToWord" => Assign(PracticeMode.MeaningToWord, out mode),
+            "pronunciation" => Assign(PracticeMode.Pronunciation, out mode),
+            _ => false,
+        };
+    }
+
+    private static bool Assign(PracticeMode value, out PracticeMode mode)
+    {
+        mode = value;
+        return true;
     }
 }
