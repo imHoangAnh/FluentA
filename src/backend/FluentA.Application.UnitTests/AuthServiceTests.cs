@@ -23,7 +23,7 @@ public sealed class AuthServiceTests
         }).Build();
         var tokenService = new JwtTokenService(new JwtSigningKeyProvider(), config);
         var emailSender = new RecordingAccountEmailSender();
-        return (new AuthService(users, challengeStore, refresh, hasher, tokenService, new FakeGoogleOAuthClient(), emailSender), emailSender, challengeStore);
+        return (new AuthService(users, challengeStore, refresh, hasher, tokenService, new FakeGoogleOAuthClient(), emailSender, new FakeAvatarStorage()), emailSender, challengeStore);
     }
 
     [Fact]
@@ -208,6 +208,43 @@ public sealed class AuthServiceTests
         Assert.True(login.IsSuccess);
     }
 
+    [Fact]
+    public async Task UpdateProfile_UpdatesNameBioAndAvatar()
+    {
+        var (service, _, _) = CreateService();
+        var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
+        await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
+        var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+
+        var result = await service.UpdateProfileAsync(login.Value!.User.Id, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every morning.",
+            Avatar: new AvatarUpload("avatar.png", "image/png", [1, 2, 3])));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Updated Learner", result.Value!.FullName);
+        Assert.Equal("Studies every morning.", result.Value.Bio);
+        Assert.Equal("https://cdn.example.com/avatar.png", result.Value.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsReviewFeatureAvatarValidationViolations()
+    {
+        var (service, _, _) = CreateService();
+        var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
+        await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
+        var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+
+        var result = await service.UpdateProfileAsync(login.Value!.User.Id, new UpdateProfileRequest(
+            "Updated Learner",
+            new string('a', 501),
+            Avatar: new AvatarUpload("avatar.gif", "image/gif", [1, 2, 3])));
+
+        Assert.False(result.IsSuccess);
+        var error = Assert.IsType<AuthError>(result.Error);
+        Assert.Equal("VALIDATION_ERROR", error.Code);
+    }
+
     private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
     {
         public Task<OperationResult<GoogleUserInfo>> ExchangeCodeAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default)
@@ -235,6 +272,19 @@ public sealed class AuthServiceTests
         {
             PasswordResetMessages.Add(message);
             return Task.FromResult(new PasswordResetEmailDeliveryResult($"http://localhost:5173{message.ResetUrl}"));
+        }
+    }
+
+    private sealed class FakeAvatarStorage : IAvatarStorage
+    {
+        public Task<AvatarUploadResult> UploadAsync(Guid userId, AvatarUpload upload, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new AvatarUploadResult("https://cdn.example.com/avatar.png", $"{userId:N}/avatar"));
+        }
+
+        public Task DeleteAsync(string publicId, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 

@@ -44,9 +44,9 @@ public sealed class ReviewSettings : BaseEntity
 
     private static void ValidateLimit(int value, string parameterName)
     {
-        if (value is < 0 or > MaximumDailyLimit)
+        if (value is < 1 or > MaximumDailyLimit)
         {
-            throw new ArgumentOutOfRangeException(parameterName, $"Daily limit must be between 0 and {MaximumDailyLimit}.");
+            throw new ArgumentOutOfRangeException(parameterName, $"Daily limit must be between 1 and {MaximumDailyLimit}.");
         }
     }
 }

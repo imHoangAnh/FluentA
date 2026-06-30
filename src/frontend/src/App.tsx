@@ -11,7 +11,7 @@ import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
 import { FlashcardViewerPage } from './routes/flashcards/FlashcardViewerPage'
 import { PracticeSessionPage } from './routes/flashcards/PracticeSessionPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
-import { ReviewSettingsPage } from './routes/settings/ReviewSettingsPage'
+import { SettingsPage } from './routes/settings/SettingsPage'
 import { TodoPage } from './routes/todo/TodoPage'
 import { CountdownPage } from './routes/countdown/CountdownPage'
 import { HabitPage } from './routes/habits/HabitPage'
@@ -124,13 +124,14 @@ export default function App() {
         element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>}
       />
       <Route
-        path="/settings/review"
+        path="/settings"
         element={
           <ProtectedRoute>
-            <ReviewSettingsPage />
+            <SettingsPage />
           </ProtectedRoute>
         }
       />
+      <Route path="/settings/review" element={<Navigate to="/settings" replace />} />
       <Route
         path="/flashcards/decks/:deckId"
         element={

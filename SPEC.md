@@ -23,6 +23,7 @@
 12. [Next Feature Plan — Email Verification OTP & Password Recovery](#12-next-feature-plan--email-verification-otp--password-recovery)
 13. [Feature Plan —  Practice Modes](#13-next-feature-plan--flashcard-practice-modes)
 14. [Next Feature Plan — Flashcard, Practice, And Review Redesign](#14-next-feature-plan--flashcard-practice-and-review-redesign)
+15. [Next Feature Plan — Profile And Learning Settings](#15-next-feature-plan--profile-and-learning-settings)
 
 ---
 
@@ -2035,3 +2036,247 @@ Planning may split proof by story. Release proof must cover destructive
 migration behavior, no All Words deck leakage, dedicated review storage,
 Practice batch semantics, Review overflow semantics, and preservation of the
 implemented speech/text practice interactions.
+
+---
+
+## 15. Next Feature Plan — Profile And Learning Settings
+
+**Planning status:** Product decisions locked for implementation planning
+
+**Mode:** High-risk account/settings feature
+
+**Depends on:** Feature 14's Practice and Review settings contract.
+
+**Source of truth:** `history/profile-learning-settings/CONTEXT.md`
+
+### 15.1 Desired Outcomes
+
+- Authenticated users can open one Settings page that combines profile editing
+  and learning settings.
+- Users can update display name, optional avatar, and optional bio.
+- Avatar upload uses real Cloudinary storage through the backend.
+- Practice Settings lets users configure the global Practice mode sequence
+  introduced in Feature 14.
+- Review Settings lets users configure global review limit and recap behavior
+  introduced in Feature 14.
+- Practice and Review settings autosave independently when changed, while
+  Profile uses an explicit Save button.
+
+### 15.2 Locked Product Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Settings route | A single Settings page contains Profile first, then Practice Settings, then Review Settings. |
+| Profile fields | Profile supports name, avatar, bio, and read-only email. |
+| Name validation | Name is required and must be 2-100 characters. |
+| Bio validation | Bio is optional, plain text only, and at most 500 characters. |
+| Email behavior | Email is shown read-only and cannot be changed in this feature. |
+| Avatar optionality | Avatar can be null. |
+| Avatar upload | Avatar uses real Cloudinary upload through the backend. |
+| Avatar file types | Avatar accepts JPG, PNG, and WebP only. |
+| Avatar size | Avatar max file size is 2MB. |
+| Avatar save UX | Selecting a new avatar shows a local preview; upload occurs only when the user clicks Save Profile. |
+| Avatar remove UX | Remove avatar sets avatar to null on Save Profile. If a new unsaved file was selected, remove discards it and saves null. |
+| Avatar replace cleanup | When replacing avatar, upload new Cloudinary image and update DB successfully before deleting the old Cloudinary image. |
+| Avatar save atomicity | If Cloudinary config is missing or upload fails, Profile save fails entirely and keeps old profile/avatar. |
+| Uploaded-image cleanup | If new Cloudinary upload succeeds but DB update fails, backend deletes the newly uploaded image. |
+| Avatar response | Profile API returns `avatarUrl` only. Backend stores Cloudinary `publicId` internally. |
+| Old avatar deletion | Uploading a new avatar deletes the previous avatar after the new avatar and DB update are successful. |
+| Remove avatar deletion | Removing avatar deletes the current Cloudinary image and sets profile avatar to null. |
+| Profile save | Profile uses an explicit Save Profile button; it does not autosave text fields. |
+| Profile propagation | Updated name/avatar appears anywhere the app currently shows user email, name, or profile identity. |
+| Practice Settings | Practice Settings includes only the global Practice mode sequence. |
+| Practice Settings validation | Practice mode sequence must include at least one unique mode from Dictation, Meaning -> Word, and Pronunciation. |
+| Practice default | Default Practice sequence remains Dictation -> Meaning -> Word -> Pronunciation. |
+| Review Settings | Review Settings includes only global review limit and recap-after-answer. |
+| Review limit default | Review limit defaults to 300 words/day. |
+| Review limit validation | Review limit must be 1-1000 words/day. |
+| Recap setting | Recap-after-answer is a global boolean Review setting. |
+| Settings autosave | Practice Settings and Review Settings autosave on change. |
+| Autosave failure | Autosave failure shows an error and keeps the draft value visible so the user can retry or change it. |
+| Password/security | Change Password and password/security links are out of scope and are not shown on this Settings page. |
+| Cloudinary fallback | No local fallback storage is included. Avatar upload requires real Cloudinary config and runs like production. |
+
+### 15.3 Settings Page Layout
+
+The Settings page is one authenticated screen with three stacked sections:
+
+1. **Profile**
+   - Avatar preview/current avatar.
+   - Upload/select avatar.
+   - Remove avatar.
+   - Name input.
+   - Bio textarea.
+   - Read-only email.
+   - Save Profile button.
+2. **Practice Settings**
+   - Controls for selecting and ordering the global Practice mode sequence.
+   - Modes: Dictation, Meaning -> Word, Pronunciation.
+   - At least one mode must remain selected.
+   - Changes autosave.
+3. **Review Settings**
+   - Review limit input: 1-1000 words/day, default 300.
+   - Recap-after-answer toggle.
+   - Changes autosave.
+
+The page must not include Change Password, Forgot Password, or password-security
+placeholder controls.
+
+### 15.4 Profile Behavior
+
+Profile editing is explicit-save, not autosave.
+
+Save Profile flow:
+
+1. Validate name and bio.
+2. If a new avatar file is selected, validate MIME type and size.
+3. Upload the new avatar to Cloudinary.
+4. Update the database with name, bio, `avatarUrl`, and internal
+   `avatarPublicId`.
+5. If database update succeeds, delete the old Cloudinary avatar when one
+   exists.
+6. If database update fails after new upload, delete the newly uploaded
+   Cloudinary image.
+7. Return the updated profile with `avatarUrl`, but not `avatarPublicId`.
+
+Remove avatar flow:
+
+1. User clicks Remove avatar.
+2. UI marks avatar as null in the draft.
+3. Save Profile deletes the existing Cloudinary avatar and updates the profile
+   avatar fields to null.
+4. If deletion or DB update fails, the profile remains unchanged and the UI
+   shows an error.
+
+If Cloudinary config is missing, invalid, or unavailable, any Profile save that
+requires avatar upload must fail entirely and preserve the old profile/avatar.
+
+### 15.5 Practice Settings Behavior
+
+Practice Settings controls the global Practice mode sequence used by Feature
+14. This setting applies to every Practice session.
+
+Rules:
+
+- The default sequence is Dictation -> Meaning -> Word -> Pronunciation.
+- The user may choose one, two, or three modes.
+- A mode may appear at most once.
+- The user may reorder selected modes.
+- Empty sequence is invalid.
+- Unknown modes are invalid.
+- This setting does not affect Review.
+- Changes autosave independently from Profile and Review Settings.
+
+Examples of valid sequences:
+
+- Dictation
+- Dictation -> Meaning -> Word
+- Dictation -> Pronunciation
+- Meaning -> Word -> Dictation -> Pronunciation
+
+### 15.6 Review Settings Behavior
+
+Review Settings controls the global Review defaults used by Feature 14.
+
+Rules:
+
+- `reviewLimitWordsPerDay` defaults to 300.
+- `reviewLimitWordsPerDay` accepts only 1-1000.
+- `recapAfterAnswer` is a global boolean.
+- Review order type and Review mode remain session-level choices and are not
+  stored in Settings.
+- Changes autosave independently from Profile and Practice Settings.
+
+### 15.7 API Expectations
+
+Exact DTO names can be finalized during implementation planning. The public
+capabilities must support:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `GET` | `/api/v1/settings` | Return profile, Practice Settings, and Review Settings for the authenticated user. |
+| `PUT` | `/api/v1/profile` | Update name, bio, avatar file/null intent, and return updated profile. |
+| `PUT` | `/api/v1/practice/settings` | Autosave global Practice mode sequence. |
+| `PUT` | `/api/v1/review/settings` | Autosave review limit and recap-after-answer. |
+
+Profile update should accept multipart form data when an avatar file is present.
+The API may use a separate avatar endpoint only if planning proves it preserves
+the same save semantics and failure behavior.
+
+### 15.8 Data And Configuration Expectations
+
+Profile storage needs durable fields for:
+
+| Field | Purpose |
+|---|---|
+| `name` | Display name, required 2-100 chars. |
+| `bio` | Optional plain text bio, max 500 chars. |
+| `avatarUrl` | Public avatar URL returned to clients. |
+| `avatarPublicId` | Internal Cloudinary id used for deletion/replacement. |
+
+Cloudinary configuration must come from environment variables, user-secrets, or
+equivalent secret storage. Tracked config must not contain real Cloudinary
+secrets.
+
+Practice/Review settings may reuse the Feature 14 settings storage or extend it
+as needed, but must remain user-scoped and lazily defaulted when no settings row
+exists.
+
+### 15.9 Scope Boundaries
+
+Out of scope:
+
+- Change Password.
+- Forgot Password links or account security sections in Settings.
+- Email change or email re-verification.
+- Avatar cropper/editor.
+- Avatar upload through direct browser-to-Cloudinary signed upload.
+- Local fallback avatar storage.
+- S3 storage.
+- Rich text or Markdown bio.
+- Practice default order type.
+- Review default order type.
+- Review default mode.
+- Speech settings such as autoplay or replay count.
+
+### 15.10 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Avatar upload accepts unsafe files | Backend validation rejects unsupported MIME types and files over 2MB. |
+| Cloudinary failure corrupts profile | Tests prove failed config/upload leaves old profile/avatar unchanged. |
+| DB failure leaks uploaded image | Tests or smoke proof verify newly uploaded Cloudinary image is deleted when DB update fails. |
+| Avatar replacement loses old avatar | Tests prove old avatar is deleted only after new upload and DB update succeed. |
+| Avatar removal leaves stale profile | Tests prove remove sets avatar null and deletes Cloudinary image. |
+| Secret leakage | Config/diff review proves Cloudinary secrets are not tracked. |
+| Practice setting invalid sequence | Unit/API tests reject empty, duplicate, or unknown Practice modes. |
+| Autosave failure hides error | UI test proves failed autosave shows error and keeps draft visible. |
+| Profile identity stale in UI | Frontend tests prove updated name/avatar propagate to Settings and existing user identity surfaces. |
+| Review limit invalid values | Unit/API/UI tests reject values below 1 and above 1000. |
+
+### 15.11 Proposed Story Queue
+
+1. **US-SETTINGS-001:** Add Settings page shell with Profile, Practice Settings, and Review Settings sections.
+2. **US-SETTINGS-002:** Implement profile fields, validation, and UI propagation for name/avatar/bio/email.
+3. **US-SETTINGS-003:** Implement Cloudinary avatar upload, replacement, removal, cleanup, and secret-safe config.
+4. **US-SETTINGS-004:** Implement Practice Settings global mode sequence autosave and validation.
+5. **US-SETTINGS-005:** Implement Review Settings review limit and recap-after-answer autosave and validation.
+6. **US-SETTINGS-006:** Run release regression for auth profile, Feature 14 Practice/Review settings, avatar failure paths, and settings UI.
+
+### 15.12 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- settings-profile.spec.js settings-learning.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split proof by story. Release proof must include real Cloudinary
+configuration/upload behavior in a credentialed environment, plus deterministic
+tests for validation and failure semantics.

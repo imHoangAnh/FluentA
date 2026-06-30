@@ -51,8 +51,8 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
           <Link className="ghost-button ghost-button--inline" to="/vocabulary">
             <ArrowLeft size={17} /> Vocabulary
           </Link>
-          <Link className="ghost-button ghost-button--inline" to="/settings/review">
-            <Settings size={17} /> Review settings
+          <Link className="ghost-button ghost-button--inline" to="/settings">
+            <Settings size={17} /> Settings
           </Link>
           <Link className="ghost-button ghost-button--inline" to="/flashcards/practice">
             <BookOpen size={17} /> Practice

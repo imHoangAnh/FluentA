@@ -121,6 +121,31 @@ public sealed class AuthController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult<UserProfileDto>(result);
     }
 
+    /// <summary>Updates the authenticated user's profile details and avatar.</summary>
+    [Authorize]
+    [HttpPut("/api/v1/profile")]
+    [RequestSizeLimit(3 * 1024 * 1024)]
+    public async Task<IActionResult> UpdateProfile([FromForm] UpdateProfileForm form, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(userId, out var id))
+        {
+            return Unauthorized(ApiEnvelope<object>.Fail(new ApiErrorEnvelope("UNAUTHORIZED", "Missing or invalid authentication credentials.")));
+        }
+
+        AvatarUpload? avatar = null;
+        if (form.Avatar is not null)
+        {
+            await using var stream = form.Avatar.OpenReadStream();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+            avatar = new AvatarUpload(form.Avatar.FileName, form.Avatar.ContentType, buffer.ToArray());
+        }
+
+        var result = await _auth.UpdateProfileAsync(id, new UpdateProfileRequest(form.FullName, form.Bio, form.RemoveAvatar, avatar), cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult<UserProfileDto>(result);
+    }
+
     private IActionResult AuthResult(OperationResult<AuthResponse> result)
     {
         if (!result.IsSuccess)

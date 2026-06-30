@@ -15,6 +15,7 @@ public sealed partial class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IGoogleOAuthClient _googleOAuthClient;
     private readonly IAccountEmailSender _accountEmailSender;
+    private readonly IAvatarStorage _avatarStorage;
 
     public AuthService(
         IUserRepository users,
@@ -23,7 +24,8 @@ public sealed partial class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IGoogleOAuthClient googleOAuthClient,
-        IAccountEmailSender accountEmailSender)
+        IAccountEmailSender accountEmailSender,
+        IAvatarStorage avatarStorage)
     {
         _users = users;
         _challengeStore = challengeStore;
@@ -32,6 +34,7 @@ public sealed partial class AuthService : IAuthService
         _tokenService = tokenService;
         _googleOAuthClient = googleOAuthClient;
         _accountEmailSender = accountEmailSender;
+        _avatarStorage = avatarStorage;
     }
 
     public async Task<OperationResult<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -295,6 +298,92 @@ public sealed partial class AuthService : IAuthService
             : OperationResult<UserProfileDto>.Success(ToProfile(user));
     }
 
+    public async Task<OperationResult<UserProfileDto>> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized());
+        }
+
+        var errors = ValidateProfileUpdate(request);
+        if (errors.Count > 0)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
+        }
+
+        var originalName = user.FullName;
+        var originalBio = user.Bio;
+        var originalAvatarUrl = user.AvatarUrl;
+        var originalAvatarPublicId = user.AvatarPublicId;
+        AvatarUploadResult? uploadedAvatar = null;
+
+        try
+        {
+            if (!request.RemoveAvatar && request.Avatar is not null)
+            {
+                uploadedAvatar = await _avatarStorage.UploadAsync(userId, request.Avatar, cancellationToken);
+            }
+        }
+        catch (AvatarStorageUnavailableException)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.AvatarStorageUnavailable());
+        }
+        catch (AvatarStorageOperationException)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.AvatarUploadFailed());
+        }
+
+        var nextAvatarUrl = request.RemoveAvatar
+            ? null
+            : uploadedAvatar?.Url ?? originalAvatarUrl;
+        var nextAvatarPublicId = request.RemoveAvatar
+            ? null
+            : uploadedAvatar?.PublicId ?? originalAvatarPublicId;
+
+        try
+        {
+            user.UpdateProfile(request.FullName!, request.Bio, nextAvatarUrl, nextAvatarPublicId);
+            await _users.UpdateAsync(user, cancellationToken);
+        }
+        catch
+        {
+            if (uploadedAvatar is not null)
+            {
+                await TryDeleteAsync(uploadedAvatar.PublicId, cancellationToken);
+            }
+
+            throw;
+        }
+
+        if (request.RemoveAvatar && !string.IsNullOrWhiteSpace(originalAvatarPublicId))
+        {
+            try
+            {
+                await _avatarStorage.DeleteAsync(originalAvatarPublicId, cancellationToken);
+            }
+            catch (AvatarStorageUnavailableException)
+            {
+                user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalAvatarPublicId);
+                await _users.UpdateAsync(user, cancellationToken);
+                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarStorageUnavailable());
+            }
+            catch (AvatarStorageOperationException)
+            {
+                user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalAvatarPublicId);
+                await _users.UpdateAsync(user, cancellationToken);
+                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarDeleteFailed());
+            }
+        }
+
+        if (uploadedAvatar is not null && !string.IsNullOrWhiteSpace(originalAvatarPublicId))
+        {
+            await TryDeleteAsync(originalAvatarPublicId, cancellationToken);
+        }
+
+        return OperationResult<UserProfileDto>.Success(ToProfile(user));
+    }
+
     public async Task<OperationResult<AuthResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
@@ -345,7 +434,65 @@ public sealed partial class AuthService : IAuthService
     }
 
     private static UserProfileDto ToProfile(User user) =>
-        new(user.Id, user.Email, user.FullName, user.IsEmailVerified);
+        new(user.Id, user.Email, user.FullName, user.IsEmailVerified, user.Bio, user.AvatarUrl);
+
+    private static Dictionary<string, string[]> ValidateProfileUpdate(UpdateProfileRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length is < 2 or > 100)
+        {
+            errors["fullName"] = ["Full name must be between 2 and 100 characters."];
+        }
+
+        if ((request.Bio?.Trim().Length ?? 0) > 500)
+        {
+            errors["bio"] = ["Bio must be 500 characters or fewer."];
+        }
+
+        if (!request.RemoveAvatar && request.Avatar is not null)
+        {
+            if (request.Avatar.Content.Length == 0)
+            {
+                errors["avatar"] = ["Avatar file cannot be empty."];
+            }
+            else
+            {
+                if (request.Avatar.Content.Length > 2 * 1024 * 1024)
+                {
+                    errors["avatar"] = ["Avatar file must be 2MB or smaller."];
+                }
+
+                if (!AllowedAvatarMimeTypes.Contains(request.Avatar.ContentType))
+                {
+                    errors["avatar"] = ["Avatar file must be JPG, PNG, or WebP."];
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private async Task TryDeleteAsync(string publicId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _avatarStorage.DeleteAsync(publicId, cancellationToken);
+        }
+        catch (AvatarStorageUnavailableException)
+        {
+        }
+        catch (AvatarStorageOperationException)
+        {
+        }
+    }
+
+    private static readonly HashSet<string> AllowedAvatarMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    };
 
     private static Dictionary<string, string[]> ValidateRegistration(RegisterRequest request)
     {

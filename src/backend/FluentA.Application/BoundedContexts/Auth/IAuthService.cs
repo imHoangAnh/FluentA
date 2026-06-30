@@ -19,6 +19,8 @@ public interface IAuthService
     Task<OperationResult<bool>> LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default);
     /// <summary>Returns the current user profile by user id.</summary>
     Task<OperationResult<UserProfileDto>> GetMeAsync(Guid userId, CancellationToken cancellationToken = default);
+    /// <summary>Updates the authenticated user's profile.</summary>
+    Task<OperationResult<UserProfileDto>> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default);
     /// <summary>Starts a password reset flow for a password-capable account.</summary>
     Task<OperationResult<ForgotPasswordResponse>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     /// <summary>Resets a password from a single-use reset token.</summary>

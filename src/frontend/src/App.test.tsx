@@ -58,6 +58,18 @@ function createQueryClient() {
   })
   queryClient.setQueryData(['flashcard', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
   queryClient.setQueryData(['flashcard', 'practice-settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
+  queryClient.setQueryData(['settings'], {
+    profile: {
+      id: 'user-1',
+      email: 'learner@example.com',
+      fullName: 'FluentA Learner',
+      isEmailVerified: true,
+      bio: '',
+      avatarUrl: null,
+    },
+    practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
+    reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
+  })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
@@ -370,18 +382,19 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
   })
 
-  it('renders protected review settings from cached data', () => {
+  it('renders protected settings from cached data', () => {
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    renderApp('/settings/review')
+    renderApp('/settings')
 
-    expect(screen.getByRole('heading', { name: 'Choose the global practice mode sequence' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Shape the board review queue' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your settings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
     expect(screen.getByLabelText('Daily limit')).toHaveValue(300)
-    expect(screen.getByLabelText('Recap after each correct answer')).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Recap after each correct answer' })).toBeChecked()
   })
 })

@@ -121,10 +121,11 @@ thesaurus, collocation, and note from their source vocabulary word.
 - New-card count is the number of synchronized page-deck words without review
   state.
 - Retention rate is still based on persisted `CardReview` ratings.
-- The protected review-settings page now stores separate Practice and Review
-  settings.
+- The protected `/settings` page stores Profile, Practice settings, and Review
+  settings in one authenticated screen.
 - Practice settings persist the global mode sequence.
 - Review settings persist `dailyLimit` and `recapAfterAnswer`.
+- Review `dailyLimit` accepts `1-1000` and defaults to `300`.
 - When a board has more due words than `dailyLimit`, the oldest due words stay
   in-session and the overflow due dates are moved to tomorrow when the review
   session starts.

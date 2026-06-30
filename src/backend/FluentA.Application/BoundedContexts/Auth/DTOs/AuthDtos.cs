@@ -35,9 +35,26 @@ public sealed record BasicMessageResponse(string Message);
 
 public sealed record GoogleLoginRequest(string Code, string? RedirectUri = null);
 
+public sealed record UpdateProfileRequest(
+    string? FullName = null,
+    string? Bio = null,
+    bool RemoveAvatar = false,
+    AvatarUpload? Avatar = null);
+
+public sealed record SettingsDto(
+    UserProfileDto Profile,
+    FluentA.Application.BoundedContexts.Flashcards.DTOs.PracticeSettingsDto PracticeSettings,
+    FluentA.Application.BoundedContexts.Flashcards.DTOs.ReviewSettingsDto ReviewSettings);
+
 public sealed record AuthResponse(string AccessToken, UserProfileDto User, string RefreshToken);
 
-public sealed record UserProfileDto(Guid Id, string Email, string FullName, bool IsEmailVerified);
+public sealed record UserProfileDto(
+    Guid Id,
+    string Email,
+    string FullName,
+    bool IsEmailVerified,
+    string? Bio = null,
+    string? AvatarUrl = null);
 
 public sealed record RefreshTokenIssue(string RawToken, DateTime ExpiresAt);
 

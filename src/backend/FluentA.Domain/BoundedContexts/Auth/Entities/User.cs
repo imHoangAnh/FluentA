@@ -8,12 +8,14 @@ public sealed class User : BaseEntity, IAggregateRoot
     {
         Email = string.Empty;
         FullName = string.Empty;
+        Bio = string.Empty;
     }
 
     private User(string email, string fullName, string? passwordHash, string? googleId, bool isEmailVerified)
     {
         Email = NormalizeEmail(email);
         FullName = fullName.Trim();
+        Bio = string.Empty;
         PasswordHash = passwordHash;
         GoogleId = googleId;
         IsEmailVerified = isEmailVerified;
@@ -21,6 +23,9 @@ public sealed class User : BaseEntity, IAggregateRoot
 
     public string Email { get; private set; }
     public string FullName { get; private set; }
+    public string Bio { get; private set; }
+    public string? AvatarUrl { get; private set; }
+    public string? AvatarPublicId { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
     public bool IsEmailVerified { get; private set; }
@@ -88,6 +93,37 @@ public sealed class User : BaseEntity, IAggregateRoot
         }
 
         IsEmailVerified = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateProfile(string fullName, string? bio, string? avatarUrl, string? avatarPublicId)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            throw new ArgumentException("Full name is required.", nameof(fullName));
+        }
+
+        var normalizedName = fullName.Trim();
+        if (normalizedName.Length is < 2 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fullName), "Full name must be between 2 and 100 characters.");
+        }
+
+        var normalizedBio = bio?.Trim() ?? string.Empty;
+        if (normalizedBio.Length > 500)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bio), "Bio must be 500 characters or fewer.");
+        }
+
+        if (string.IsNullOrWhiteSpace(avatarUrl) != string.IsNullOrWhiteSpace(avatarPublicId))
+        {
+            throw new ArgumentException("Avatar URL and public id must be stored together.", nameof(avatarUrl));
+        }
+
+        FullName = normalizedName;
+        Bio = normalizedBio;
+        AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
+        AvatarPublicId = string.IsNullOrWhiteSpace(avatarPublicId) ? null : avatarPublicId.Trim();
         UpdatedAt = DateTime.UtcNow;
     }
 

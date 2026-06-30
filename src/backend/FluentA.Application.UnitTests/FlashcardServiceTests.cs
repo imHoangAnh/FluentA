@@ -184,7 +184,7 @@ public sealed class FlashcardServiceTests
         var service = new FlashcardService(repository);
         var userId = Guid.NewGuid();
 
-        var invalid = await service.UpdateReviewSettingsAsync(userId, new UpdateReviewSettingsRequest(-1, true));
+        var invalid = await service.UpdateReviewSettingsAsync(userId, new UpdateReviewSettingsRequest(0, true));
         Assert.False(invalid.IsSuccess);
 
         var result = await service.UpdateReviewSettingsAsync(userId, new UpdateReviewSettingsRequest(10, false));

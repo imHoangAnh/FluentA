@@ -202,7 +202,7 @@ public sealed class VocabularyTests
         settings.Update(120, false);
         Assert.Equal(120, settings.DailyLimit);
         Assert.False(settings.RecapAfterAnswer);
-        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(-1, false));
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(0, false));
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.Update(1001, true));
     }
 

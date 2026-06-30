@@ -278,9 +278,9 @@ public sealed class FlashcardService : IFlashcardService
     private static Dictionary<string, string[]> ValidateSettings(UpdateReviewSettingsRequest request)
     {
         var errors = new Dictionary<string, string[]>();
-        if (request.DailyLimit is < 0 or > ReviewSettings.MaximumDailyLimit)
+        if (request.DailyLimit is < 1 or > ReviewSettings.MaximumDailyLimit)
         {
-            errors["dailyLimit"] = [$"Daily limit must be between 0 and {ReviewSettings.MaximumDailyLimit}."];
+            errors["dailyLimit"] = [$"Daily limit must be between 1 and {ReviewSettings.MaximumDailyLimit}."];
         }
 
         return errors;

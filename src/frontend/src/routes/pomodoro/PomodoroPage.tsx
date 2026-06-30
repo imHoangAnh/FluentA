@@ -6,6 +6,7 @@ import {
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { getUserAvatarUrl } from '../../lib/avatar'
 import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as pomodoroApi from '../../lib/api/pomodoro.api'
 import * as todoApi from '../../lib/api/todo.api'
@@ -48,6 +49,7 @@ export function PomodoroPage() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const displayName = user?.fullName?.split(' ')[0] || 'User'
+  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const configQuery = useQuery({
     queryKey: ['pomodoro', 'config'],
@@ -207,7 +209,7 @@ export function PomodoroPage() {
           <div className="dashboard-user-card">
             <img 
               className="dashboard-user-avatar" 
-              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              src={avatarUrl}
               alt="User" 
             />
             <div className="dashboard-user-info">
@@ -216,7 +218,7 @@ export function PomodoroPage() {
             </div>
           </div>
           <div className="dashboard-user-links">
-            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="/settings"><Settings size={16} /> Settings</Link>
             <Link to="#"><HelpCircle size={16} /> Help</Link>
             <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
           </div>

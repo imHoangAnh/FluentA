@@ -14,6 +14,7 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - A registered user can log in with email and password.
 - A password-capable account can request a password reset email and choose a new password from a single-use link.
 - A logged-in user can view their current profile through `/api/v1/auth/me`.
+- A logged-in user can update their full name, optional plain-text bio, and optional avatar from the unified Settings page.
 - A logged-in user can refresh access without re-entering credentials while the refresh cookie is valid.
 - A logged-in user can log out and lose access to protected routes.
 - A user can continue with Google when local Google credentials are configured.
@@ -34,6 +35,7 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - PostgreSQL stores auth users in `auth_users` through EF Core migrations.
 - Email is normalized and unique.
 - Google subject ids are optional and unique when present.
+- User profiles store `full_name`, `bio`, `avatar_url`, and internal `avatar_public_id`.
 - Redis stores FluentA refresh sessions, email verification challenges, and password reset challenges; Google refresh tokens are not stored.
 
 ## API Contract
@@ -72,6 +74,8 @@ All responses use the FluentA envelope:
 | `POST` | `/api/v1/auth/logout` | Revokes the refresh token and clears the cookie. |
 | `GET` | `/api/v1/auth/me` | Returns the current authenticated user profile. |
 | `POST` | `/api/v1/auth/google` | Exchanges a Google authorization code, creates or links the user, and returns an access token plus refresh cookie. |
+| `PUT` | `/api/v1/profile` | Updates full name, bio, and avatar for the authenticated user through multipart form data when needed. |
+| `GET` | `/api/v1/settings` | Returns the authenticated profile plus Practice and Review settings for the unified Settings page. |
 
 ## Validation And Error Rules
 
@@ -90,6 +94,8 @@ All responses use the FluentA envelope:
 - Missing Google OAuth credentials return `501 GOOGLE_OAUTH_NOT_CONFIGURED`.
 - Invalid Google authorization codes or profile responses return `401 GOOGLE_OAUTH_FAILED`.
 - A Google subject conflict on an existing email returns `409 GOOGLE_ACCOUNT_CONFLICT`.
+- Avatar saves reject unsupported file types, files over 2MB, names outside 2-100 characters, and bios over 500 characters with `422 VALIDATION_ERROR`.
+- Avatar saves that require Cloudinary fail with `503 AVATAR_STORAGE_UNAVAILABLE` when storage credentials are missing.
 
 ## Email Challenge Delivery
 
@@ -127,8 +133,10 @@ All responses use the FluentA envelope:
 - Password reset links are single-use and allow login with the new password without revoking other sessions.
 - Email/password login returns an access token and sets an HttpOnly refresh cookie.
 - `/me` returns the logged-in user with a valid access token.
+- `/me` and login/refresh responses expose the current `fullName`, optional `bio`, and optional `avatarUrl`.
 - Refresh returns a new access token while the refresh cookie is valid.
 - Logout revokes the refresh token, clears the cookie, and the protected UI no longer shows authenticated content.
+- Profile saves update Settings and the existing authenticated identity surfaces without exposing Cloudinary `publicId` to clients.
 - Refresh after rotation rejects the previous refresh token.
 - Refresh after logout rejects the logged-out refresh token.
 - Local Postgres migration creates the auth user table.

@@ -11,6 +11,7 @@ type AuthState = {
   status: AuthStatus
   error: string | null
   setAccessToken: (token: string | null) => void
+  setUser: (user: UserProfile | null) => void
   register: (input: { email: string; password: string; fullName: string }) => Promise<RegisterPayload>
   login: (input: { email: string; password: string }) => Promise<void>
   googleLogin: (input: { code: string; redirectUri: string }) => Promise<void>
@@ -34,6 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'idle',
   error: null,
   setAccessToken: (token) => set({ accessToken: token }),
+  setUser: (user) => set({ user }),
   register: async (input) => {
     set({ error: null })
     return authApi.registerAccount(input)

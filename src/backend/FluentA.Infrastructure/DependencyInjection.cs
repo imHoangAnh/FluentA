@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
+        services.AddSingleton<IAvatarStorage, CloudinaryAvatarStorage>();
         if (string.Equals(configuration["Authentication:Email:Provider"], "gmail-smtp", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAccountEmailSender, GmailSmtpAccountEmailSender>();

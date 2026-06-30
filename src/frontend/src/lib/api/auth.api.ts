@@ -5,6 +5,8 @@ export type UserProfile = {
   email: string
   fullName: string
   isEmailVerified: boolean
+  bio?: string | null
+  avatarUrl?: string | null
 }
 
 export type AuthPayload = {

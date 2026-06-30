@@ -6,6 +6,7 @@ import {
 import { type DragEvent, type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { getUserAvatarUrl } from '../../lib/avatar'
 import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import * as kanbanApi from '../../lib/api/kanban.api'
@@ -58,6 +59,7 @@ export function KanbanPage() {
   const user = useAuthStore((state) => state.user)
   const location = useLocation()
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [boardName, setBoardName] = useState('')
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null)
@@ -277,7 +279,7 @@ export function KanbanPage() {
           <div className="dashboard-user-card">
             <img 
               className="dashboard-user-avatar" 
-              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} 
+              src={avatarUrl}
               alt="User" 
             />
             <div className="dashboard-user-info">
@@ -286,7 +288,7 @@ export function KanbanPage() {
             </div>
           </div>
           <div className="dashboard-user-links">
-            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="/settings"><Settings size={16} /> Settings</Link>
             <Link to="#"><HelpCircle size={16} /> Help</Link>
             <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
           </div>
@@ -333,7 +335,7 @@ export function KanbanPage() {
             <div className="kanban-project-actions">
               <div className="kanban-avatars">
                 <div className="kanban-avatar">
-                  <img src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} alt="User" />
+                  <img src={avatarUrl} alt="User" />
                 </div>
                 <div className="kanban-avatar-count">+3</div>
               </div>
@@ -436,7 +438,7 @@ export function KanbanPage() {
                               </div>
                             ) : <div></div>}
                             <div className="kanban-card-avatar">
-                               <img src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`} alt="User" />
+                               <img src={avatarUrl} alt="User" />
                             </div>
                           </div>
                         </div>

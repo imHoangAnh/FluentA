@@ -1,6 +1,7 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+import { getUserAvatarUrl } from '../../lib/avatar'
 import '../dashboard/DashboardPage.css'
 import {
   BookOpen, CalendarClock, CheckSquare, Columns3,
@@ -57,6 +58,7 @@ export function TodoPage() {
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [selectedDate, setSelectedDate] = useState(() => toDateInput(new Date()))
   const [view, setView] = useState<TodoView>('day')
@@ -205,7 +207,7 @@ export function TodoPage() {
           <div className="dashboard-user-card">
             <img
               className="dashboard-user-avatar"
-              src={`https://ui-avatars.com/api/?name=${displayName}&background=0D9488&color=fff`}
+              src={avatarUrl}
               alt="User"
             />
             <div className="dashboard-user-info">
@@ -214,7 +216,7 @@ export function TodoPage() {
             </div>
           </div>
           <div className="dashboard-user-links">
-            <Link to="/settings/review"><Settings size={16} /> Settings</Link>
+            <Link to="/settings"><Settings size={16} /> Settings</Link>
             <Link to="#"><HelpCircle size={16} /> Help</Link>
             <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
           </div>
