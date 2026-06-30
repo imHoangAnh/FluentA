@@ -209,28 +209,6 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
             return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.InconsistentSummary, null);
         }
 
-        var wordIds = await _dbContext.FlashcardCards
-            .AsNoTracking()
-            .Where(card => card.DeckId == deck.Id && card.DeletedAt == null)
-            .Select(card => card.WordId)
-            .ToListAsync(cancellationToken);
-        var nextReviewDate = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
-        var existingStates = await _dbContext.WordReviewStates
-            .Where(state => wordIds.Contains(state.WordId))
-            .ToListAsync(cancellationToken);
-        var statesByWordId = existingStates.ToDictionary(state => state.WordId);
-        foreach (var wordId in wordIds)
-        {
-            if (statesByWordId.TryGetValue(wordId, out var state))
-            {
-                state.ResetToLearning(nextReviewDate);
-            }
-            else
-            {
-                await _dbContext.WordReviewStates.AddAsync(WordReviewState.CreateLearning(wordId, nextReviewDate), cancellationToken);
-            }
-        }
-
         var completedAt = DateTime.UtcNow;
         var summary = PracticeSessionSummary.Create(
             deck.UserId,
@@ -260,6 +238,64 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
                 summary.CorrectCards,
                 summary.WrongCards,
                 summary.CompletedAt));
+    }
+
+    public async Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        Guid deckId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var deck = await (
+            from flashcardDeck in _dbContext.FlashcardDecks
+            join board in _dbContext.Boards on flashcardDeck.BoardId equals board.Id
+            where flashcardDeck.Id == deckId
+                && flashcardDeck.UserId == userId
+                && flashcardDeck.Type == DeckType.PageDeck
+                && flashcardDeck.DeletedAt == null
+                && board.DeletedAt == null
+            select new
+            {
+                flashcardDeck.Id,
+                flashcardDeck.UserId,
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (deck is null)
+        {
+            return null;
+        }
+
+        var wordIds = await _dbContext.FlashcardCards
+            .AsNoTracking()
+            .Where(card => card.DeckId == deck.Id && card.DeletedAt == null)
+            .Select(card => card.WordId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (wordIds.Count == 0)
+        {
+            return new AddPracticeWordsToReviewDto(deck.Id, 0, ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone));
+        }
+
+        var existingWordIds = await _dbContext.WordReviewStates
+            .Where(state => state.UserId == userId && wordIds.Contains(state.WordId))
+            .Select(state => state.WordId)
+            .ToListAsync(cancellationToken);
+
+        var missingWordIds = wordIds.Except(existingWordIds).ToList();
+        var nextReviewDate = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
+
+        foreach (var wordId in missingWordIds)
+        {
+            await _dbContext.WordReviewStates.AddAsync(
+                WordReviewState.CreateLevelZero(userId, wordId, nextReviewDate),
+                cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return new AddPracticeWordsToReviewDto(deck.Id, missingWordIds.Count, nextReviewDate);
     }
 
     public async Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
@@ -335,7 +371,7 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
             var tomorrow = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
             foreach (var item in overflow)
             {
-                item.state.ApplyReviewResult(item.state.Interval, item.state.EaseFactor, item.state.Repetitions, tomorrow, item.state.State);
+                item.state.MoveDueDate(tomorrow);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -347,7 +383,6 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
         }
 
         var assignedModes = kept.Select(item => new ReviewSessionWordDto(
-            item.Id,
             item.WordId,
             item.Word,
             item.WordClass,
@@ -374,46 +409,33 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
         Guid sessionId,
         CancellationToken cancellationToken = default)
     {
-        var reviews = await (
-            from review in _dbContext.CardReviews.AsNoTracking()
-            join card in _dbContext.FlashcardCards.AsNoTracking() on review.CardId equals card.Id
-            join deck in _dbContext.FlashcardDecks.AsNoTracking() on card.DeckId equals deck.Id
-            join board in _dbContext.Boards.AsNoTracking() on deck.BoardId equals board.Id
-            where review.SessionId == sessionId
-                && deck.UserId == userId
-                && deck.DeletedAt == null
-                && card.DeletedAt == null
-                && board.DeletedAt == null
-            select new
+        var materialized = await _dbContext.WordReviewHistories
+            .AsNoTracking()
+            .Where(review => review.UserId == userId && review.SessionId == sessionId)
+            .Select(review => new
             {
-                review.Rating,
+                review.Result,
                 review.TimeSpentSeconds
             })
             .ToListAsync(cancellationToken);
 
-        if (reviews.Count == 0)
+        if (materialized.Count == 0)
         {
             return null;
         }
 
-        var easy = reviews.Count(review => review.Rating == ReviewRating.Easy);
-        var good = reviews.Count(review => review.Rating == ReviewRating.Good);
-        var hard = reviews.Count(review => review.Rating == ReviewRating.Hard);
-        var again = reviews.Count(review => review.Rating == ReviewRating.Again);
-        var total = reviews.Count;
-        var averageTime = (int)Math.Round(reviews.Average(review => review.TimeSpentSeconds), MidpointRounding.AwayFromZero);
+        var correct = materialized.Count(review => review.Result == FluentAsrsReviewResult.Correct);
+        var wrong = materialized.Count(review => review.Result == FluentAsrsReviewResult.Wrong);
+        var total = materialized.Count;
+        var averageTime = (int)Math.Round(materialized.Average(review => review.TimeSpentSeconds), MidpointRounding.AwayFromZero);
 
         return new ReviewSessionSummaryDto(
             sessionId,
             total,
-            easy,
-            good,
-            hard,
-            again,
-            Percentage(easy, total),
-            Percentage(good, total),
-            Percentage(hard, total),
-            Percentage(again, total),
+            correct,
+            wrong,
+            Percentage(correct, total),
+            Percentage(wrong, total),
             averageTime);
     }
 
@@ -534,24 +556,24 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
             select new
             {
                 state.WordId,
-                state.State,
+                state.Level,
                 state.NextReviewDate
             })
             .ToListAsync(cancellationToken);
 
         var reviews = await (
-            from review in _dbContext.CardReviews.AsNoTracking()
-            join card in _dbContext.FlashcardCards.AsNoTracking() on review.CardId equals card.Id
-            join deck in _dbContext.FlashcardDecks.AsNoTracking() on card.DeckId equals deck.Id
-            join board in _dbContext.Boards.AsNoTracking() on deck.BoardId equals board.Id
-            where deck.UserId == userId
-                && deck.DeletedAt == null
-                && card.DeletedAt == null
+            from review in _dbContext.WordReviewHistories.AsNoTracking()
+            join word in _dbContext.Words.AsNoTracking() on review.WordId equals word.Id
+            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+            where review.UserId == userId
+                && word.DeletedAt == null
+                && page.DeletedAt == null
                 && board.DeletedAt == null
-                && (!boardId.HasValue || deck.BoardId == boardId.Value)
+                && (!boardId.HasValue || board.Id == boardId.Value)
             select new
             {
-                review.Rating,
+                review.Result,
                 review.ReviewedAt
             })
             .ToListAsync(cancellationToken);
@@ -559,7 +581,7 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
         var overdue = reviewStates.Count(state => state.NextReviewDate < startUtc);
         var dueToday = reviewStates.Count(state => state.NextReviewDate >= startUtc && state.NextReviewDate < endUtc);
         var newCards = Math.Max(0, pageDeckCards.Count - reviewStates.Count);
-        var retained = reviews.Count(review => review.Rating is ReviewRating.Good or ReviewRating.Easy);
+        var retained = reviews.Count(review => review.Result == FluentAsrsReviewResult.Correct);
         var retentionRate = reviews.Count == 0 ? 0 : (int)Math.Round((double)retained / reviews.Count * 100, MidpointRounding.AwayFromZero);
         var localToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
 
@@ -606,21 +628,26 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
     public async Task<ReviewResultDto?> AddReviewAsync(
         Guid userId,
         Guid sessionId,
-        Guid cardId,
+        Guid wordId,
         bool correct,
         int timeSpentSeconds,
         TimeZoneInfo timeZone,
         CancellationToken cancellationToken = default)
     {
         var owned = await (
-            from flashcardCard in _dbContext.FlashcardCards
-            join deck in _dbContext.FlashcardDecks on flashcardCard.DeckId equals deck.Id
-            join board in _dbContext.Boards on deck.BoardId equals board.Id
-            where flashcardCard.Id == cardId
-                && deck.UserId == userId
-                && deck.DeletedAt == null
+            from word in _dbContext.Words
+            join page in _dbContext.Pages on word.PageId equals page.Id
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where word.Id == wordId
+                && board.UserId == userId
+                && word.DeletedAt == null
+                && page.DeletedAt == null
                 && board.DeletedAt == null
-            select new { Card = flashcardCard, Deck = deck })
+            select new
+            {
+                WordId = word.Id,
+                BoardId = board.Id,
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
         if (owned is null)
@@ -629,49 +656,42 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
         }
 
         var reviewedAt = DateTime.UtcNow;
+        var (_, endUtc) = ReviewTime.LocalDayBoundsUtc(reviewedAt, timeZone);
         var reviewState = await _dbContext.WordReviewStates
-            .SingleOrDefaultAsync(state => state.WordId == owned.Card.WordId, cancellationToken);
-        if (reviewState is null)
+            .SingleOrDefaultAsync(state => state.UserId == userId && state.WordId == owned.WordId, cancellationToken);
+        if (reviewState is null || reviewState.NextReviewDate >= endUtc)
         {
             return null;
         }
 
-        var rating = correct ? ReviewRating.Good : ReviewRating.Again;
-        var schedule = Sm2Scheduler.Calculate(
-            reviewState.Interval,
-            reviewState.EaseFactor,
-            reviewState.Repetitions,
-            rating);
-        reviewState.ApplyReviewResult(
-            schedule.Interval,
-            schedule.EaseFactor,
-            schedule.Repetitions,
-            ReviewTime.NextReviewUtc(reviewedAt, schedule.Interval, timeZone),
-            schedule.State);
+        var levelBefore = reviewState.Level;
+        var schedule = correct
+            ? FluentAsrsScheduler.ApplyCorrect(reviewState.Level, reviewState.LapseCount)
+            : FluentAsrsScheduler.ApplyWrong(reviewState.Level, reviewState.LapseCount);
+        var nextReviewDate = ReviewTime.NextReviewUtc(reviewedAt, schedule.IntervalDays, timeZone);
+        reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedAt);
 
-        var review = CardReview.Create(
-            owned.Card.Id,
+        var review = WordReviewHistory.Create(
+            userId,
+            owned.WordId,
             sessionId,
-            rating,
             timeSpentSeconds,
             reviewedAt,
-            reviewState.Interval,
-            reviewState.EaseFactor);
-        await _dbContext.CardReviews.AddAsync(review, cancellationToken);
+            correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong,
+            levelBefore,
+            schedule.LevelAfter,
+            nextReviewDate);
+        await _dbContext.WordReviewHistories.AddAsync(review, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return new ReviewResultDto(
-            owned.Card.Id,
+            owned.WordId,
             review.Id,
-            owned.Deck.BoardId,
-            owned.Deck.Id,
-            owned.Deck.Type.ToString(),
-            rating.ToString().ToLowerInvariant(),
-            reviewState.Interval,
-            reviewState.EaseFactor,
-            reviewState.Repetitions,
-            reviewState.NextReviewDate,
-            reviewState.State.ToString().ToLowerInvariant());
+            correct ? "correct" : "wrong",
+            levelBefore,
+            schedule.LevelAfter,
+            schedule.LapseCountAfter,
+            nextReviewDate);
     }
 
     private static string PickRandomReviewMode()
@@ -711,11 +731,9 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
             card.Thesaurus,
             card.Collocation,
             card.Note,
-            reviewState?.Interval ?? 0,
-            reviewState?.EaseFactor ?? 2.5f,
-            reviewState?.Repetitions ?? 0,
+            reviewState?.Level,
             reviewState?.NextReviewDate,
-            (reviewState?.State ?? CardState.New).ToString().ToLowerInvariant());
+            reviewState?.LapseCount ?? 0);
 
     private sealed record ProjectedCard(
         Guid Id,

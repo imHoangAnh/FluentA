@@ -70,7 +70,7 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
         <div>
           <span className="preview-label">{practiceEntry ? 'Practice' : 'Flashcards'}</span>
           <h1>{practiceEntry ? 'Choose a page deck to practice' : 'Your page decks'}</h1>
-          <p>{practiceEntry ? 'Practice stays page-deck scoped. Pick one deck, then run the configured mode sequence before FluentA seeds or resets review state.' : "Choose a page deck to open the read-only flashcard viewer, then continue into practice when you're ready."}</p>
+          <p>{practiceEntry ? 'Practice stays page-deck scoped. Pick one deck, finish the configured mode sequence, then decide whether to add new words to Review.' : "Choose a page deck to open the read-only flashcard viewer, then continue into practice when you're ready."}</p>
         </div>
         <div className="flashcard-summary" aria-label="Flashcard summary">
           <Layers size={22} />

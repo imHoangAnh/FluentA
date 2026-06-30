@@ -46,9 +46,12 @@ target behavior for that split and the data ownership rules that support it.
 - Wrong answers stay on the current step until the learner answers correctly
   or uses skip/reveal.
 - Skip/reveal completes the current step.
-- Practice tracks completion in the UI during the session, but the backend
-  creates or resets review state only after the full page-deck session
-  finishes.
+- Practice tracks completion in the UI during the session. After the full
+  page-deck session finishes, the learner chooses `Finish` or `Add to Review`.
+- `Finish` saves the practice summary without creating new review state.
+- `Add to Review` creates missing review state as FluentA SRS `Level 0`, due
+  tomorrow.
+- Re-practicing a word that already has review state leaves its SRS unchanged.
 - Leaving Practice before the session finishes persists no review-state
   changes.
 
@@ -67,7 +70,8 @@ target behavior for that split and the data ownership rules that support it.
   each word.
 - Review uses automatic correct/wrong results. It does not show
   Easy/Good/Hard/Again buttons.
-- Correct maps to SM-2 `Good`; wrong maps to SM-2 `Again`.
+- Correct advances one FluentA SRS level; wrong resets or keeps the word at
+  `Level 0` and schedules tomorrow.
 - Review persists each answered word immediately.
 - Wrong answers show answer/recap and move to the next word.
 - Correct-answer recap follows the global review `recap after answer` setting.
@@ -81,16 +85,30 @@ target behavior for that split and the data ownership rules that support it.
 - Practice settings and Review settings are separate, but FluentA edits them
   together from the unified authenticated `/settings` page.
 
+## FluentA SRS
+
+- FluentA SRS uses deterministic levels `0` through `5`.
+- `Add to Review` creates `Level 0`, due `+1 day`.
+- Correct transitions:
+  `0 -> 1 (+2 days)`, `1 -> 2 (+4 days)`, `2 -> 3 (+14 days)`,
+  `3 -> 4 (+39 days)`, `4 -> 5 (+60 days)`, and `5 -> 5 (+60 days)`.
+- Wrong at any level schedules `+1 day`.
+- Wrong at Levels `1-5` increments `lapseCount`; wrong at `Level 0` does not.
+- The next due date is always calculated from the actual review date.
+
 ## Learning Data Ownership
 
 - All Words decks are removed from the product model.
 - Each vocabulary page synchronizes to exactly one page deck.
 - Review state is stored in a dedicated table linked to `VocabWord`.
 - New vocabulary words do not create review state automatically.
-- Completing Practice for a word creates review state as `Learning`, due
-  tomorrow.
-- Re-practicing a word resets its existing review state to `Learning`, due
-  tomorrow.
+- Practice alone does not create review state automatically.
+- `Add to Review` creates review state only for words that do not already have
+  it.
+- Review state stores `level`, `nextReviewDate`, `lapseCount`, and
+  `lastReviewedAt`.
+- Review history stores `wordId`, `reviewedAt`, `result`, `levelBefore`,
+  `levelAfter`, and `nextReviewDate`.
 - Deleting a word, page, or board hard-deletes related review-state records.
 - Destructive migration from the old All Words review model is acceptable for
   this redesign.
@@ -98,8 +116,7 @@ target behavior for that split and the data ownership rules that support it.
 ## Scope Boundaries
 
 - Preserving old All Words review history is out of scope.
-- Improving the SRS algorithm beyond correct = Good and wrong = Again is out
-  of scope for this MVP.
+- Easy/Good/Hard/Again scoring is out of scope for this workflow.
 - Practice does not persist partial progress for abandoned sessions.
 - Practice mode overrides per session are out of scope; Practice mode sequence
   is global.

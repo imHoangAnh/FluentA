@@ -47,6 +47,16 @@ public sealed class FlashcardsController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Adds completed practice words without existing SRS state to review.</summary>
+    [HttpPost("/api/v1/practice/add-to-review")]
+    public async Task<IActionResult> AddPracticeWordsToReview(AddPracticeWordsToReviewRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _flashcards.AddPracticeWordsToReviewAsync(CurrentUserId(), request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<AddPracticeWordsToReviewDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Creates a server-side board review session.</summary>
     [HttpPost("sessions")]
     public async Task<IActionResult> CreateReviewSession(CreateReviewSessionRequest request, CancellationToken cancellationToken)

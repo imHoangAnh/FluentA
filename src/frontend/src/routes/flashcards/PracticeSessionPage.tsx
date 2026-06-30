@@ -67,11 +67,14 @@ export function PracticeSessionPage() {
   const [correctWords, setCorrectWords] = useState(0)
   const [wrongWords, setWrongWords] = useState(0)
   const [sessionCards, setSessionCards] = useState<flashcardApi.FlashcardCard[]>([])
+  const [completionPending, setCompletionPending] = useState<{ correctCards: number; wrongCards: number } | null>(null)
+  const [completionAction, setCompletionAction] = useState<'finish' | 'addToReview' | null>(null)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const sessionQuery = useQuery({ queryKey: ['flashcard', 'deck-session', deckId], queryFn: () => flashcardApi.getDeckSession(deckId), enabled: Boolean(deckId) })
   const practiceSettingsQuery = useQuery({ queryKey: ['flashcard', 'practice-settings'], queryFn: flashcardApi.getPracticeSettings })
   const saveSummaryMutation = useMutation({ mutationFn: flashcardApi.createPracticeSessionSummary })
+  const addToReviewMutation = useMutation({ mutationFn: flashcardApi.addPracticeWordsToReview })
 
   const currentCard = sessionCards[currentIndex] ?? null
   const language = sessionQuery.data?.boardLanguage ?? 'en'
@@ -110,14 +113,17 @@ export function PracticeSessionPage() {
     setCurrentStepIndex(0)
     setCorrectWords(0)
     setWrongWords(0)
+    setCompletionPending(null)
+    setCompletionAction(null)
     setWordHasMistake(false)
     saveSummaryMutation.reset()
+    addToReviewMutation.reset()
     resetStepState()
   }
 
   async function persistCompletion(nextCorrectCards: number, nextWrongCards: number) {
     if (!sessionQuery.data) return
-    await saveSummaryMutation.mutateAsync({
+    return saveSummaryMutation.mutateAsync({
       deckId: sessionQuery.data.deckId,
       mode: practiceSettingsQuery.data?.modeSequence[0] ?? 'dictation',
       totalCards: sessionCards.length,
@@ -133,7 +139,7 @@ export function PracticeSessionPage() {
     setCorrectWords(nextCorrect)
     setWrongWords(nextWrong)
     if (currentIndex + 1 >= sessionCards.length) {
-      void persistCompletion(nextCorrect, nextWrong)
+      setCompletionPending({ correctCards: nextCorrect, wrongCards: nextWrong })
       setSessionStarted(false)
       return
     }
@@ -219,6 +225,20 @@ export function PracticeSessionPage() {
     recognition.start()
   }
 
+  async function finalizePractice(action: 'finish' | 'addToReview') {
+    if (!sessionQuery.data || !completionPending) return
+
+    await persistCompletion(completionPending.correctCards, completionPending.wrongCards)
+    if (action === 'addToReview') {
+      await addToReviewMutation.mutateAsync({
+        deckId: sessionQuery.data.deckId,
+        timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      })
+    }
+
+    setCompletionAction(action)
+  }
+
   return (
     <main className="workspace review-workspace">
       <header className="workspace-header">
@@ -232,7 +252,7 @@ export function PracticeSessionPage() {
         </nav>
       </header>
 
-      {sessionQuery.data && !sessionStarted ? (
+      {sessionQuery.data && !sessionStarted && !completionPending ? (
         <section className="review-setup practice-setup">
           <span className="preview-label">Practice</span>
           <h1>{sessionQuery.data.deckName}</h1>
@@ -255,13 +275,38 @@ export function PracticeSessionPage() {
         </section>
       ) : null}
 
-      {!sessionStarted && saveSummaryMutation.isSuccess ? (
+      {!sessionStarted && completionPending ? (
         <section className="review-summary practice-summary" data-testid="practice-summary">
           <CheckCircle2 size={38} />
           <span className="preview-label">Practice complete</span>
           <h1>{sessionQuery.data?.deckName}</h1>
           <p>{correctWords} words completed cleanly and {wrongWords} words needed reveal/skip across {sessionCards.length} practiced words.</p>
-          <Link className="primary-button review-summary__done" to="/flashcards">Done</Link>
+          {completionAction === 'addToReview' && addToReviewMutation.isSuccess ? (
+            <p>{addToReviewMutation.data.addedWordCount} new words were added to Review and will be due on {new Date(addToReviewMutation.data.nextReviewDate).toLocaleDateString()}.</p>
+          ) : null}
+          {completionAction === null ? (
+            <div className="deck-actions">
+              <button
+                className="primary-button review-summary__done"
+                type="button"
+                onClick={() => void finalizePractice('finish')}
+                disabled={saveSummaryMutation.isPending || addToReviewMutation.isPending}
+              >
+                Finish
+              </button>
+              <button
+                className="secondary-button review-summary__done"
+                type="button"
+                onClick={() => void finalizePractice('addToReview')}
+                disabled={saveSummaryMutation.isPending || addToReviewMutation.isPending}
+              >
+                Add to Review
+              </button>
+            </div>
+          ) : (
+            <Link className="primary-button review-summary__done" to="/flashcards">Done</Link>
+          )}
+          {saveSummaryMutation.isError || addToReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to save this practice result. Try again.</p> : null}
         </section>
       ) : null}
 

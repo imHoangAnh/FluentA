@@ -11,11 +11,9 @@ public sealed record FlashcardCardDto(
     string? Thesaurus,
     string? Collocation,
     string? Note,
-    int Interval,
-    float EaseFactor,
-    int Repetitions,
+    int? ReviewLevel,
     DateTime? NextReviewDate,
-    string State);
+    int LapseCount);
 
 public sealed record FlashcardDeckDto(
     Guid Id,
@@ -43,8 +41,16 @@ public sealed record CreatePracticeSessionSummaryRequest(
     int WrongCards,
     string TimeZoneId);
 
+public sealed record AddPracticeWordsToReviewRequest(
+    Guid DeckId,
+    string TimeZoneId);
+
+public sealed record AddPracticeWordsToReviewDto(
+    Guid DeckId,
+    int AddedWordCount,
+    DateTime NextReviewDate);
+
 public sealed record ReviewSessionWordDto(
-    Guid CardId,
     Guid WordId,
     string Word,
     string WordClass,
@@ -98,15 +104,11 @@ public sealed record PracticeSessionSummarySaveResult(
 
 public sealed record ReviewSessionSummaryDto(
     Guid SessionId,
-    int TotalCardsReviewed,
-    int Easy,
-    int Good,
-    int Hard,
-    int Again,
-    int EasyPercent,
-    int GoodPercent,
-    int HardPercent,
-    int AgainPercent,
+    int TotalWordsReviewed,
+    int Correct,
+    int Wrong,
+    int CorrectPercent,
+    int WrongPercent,
     int AverageTimeSpentSeconds);
 
 public sealed record ReviewSettingsDto(int DailyLimit, bool RecapAfterAnswer);
@@ -129,20 +131,16 @@ public sealed record FlashcardDashboardDto(
 
 public sealed record SubmitReviewRequest(
     Guid SessionId,
-    Guid CardId,
+    Guid WordId,
     bool Correct,
     int TimeSpentSeconds,
     string TimeZoneId);
 
 public sealed record ReviewResultDto(
-    Guid CardId,
-    Guid ReviewId,
-    Guid BoardId,
-    Guid DeckId,
-    string DeckType,
-    string Rating,
-    int Interval,
-    float EaseFactor,
-    int Repetitions,
-    DateTime? NextReviewDate,
-    string State);
+    Guid WordId,
+    Guid ReviewHistoryId,
+    string Result,
+    int LevelBefore,
+    int LevelAfter,
+    int LapseCount,
+    DateTime NextReviewDate);

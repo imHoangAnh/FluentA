@@ -8,59 +8,59 @@ public sealed class WordReviewState : BaseEntity
     {
     }
 
-    private WordReviewState(Guid wordId, int interval, float easeFactor, int repetitions, DateTime nextReviewDate, CardState state)
+    private WordReviewState(Guid userId, Guid wordId, int level, DateTime nextReviewDate, int lapseCount, DateTime? lastReviewedAt)
     {
-        if (wordId == Guid.Empty)
+        if (userId == Guid.Empty || wordId == Guid.Empty)
         {
-            throw new ArgumentException("Word id is required.", nameof(wordId));
+            throw new ArgumentException("User id and word id are required.");
         }
 
-        ValidateSchedule(interval, easeFactor, repetitions, nextReviewDate);
+        ValidateState(level, nextReviewDate, lapseCount);
+        UserId = userId;
         WordId = wordId;
-        Interval = interval;
-        EaseFactor = easeFactor;
-        Repetitions = repetitions;
+        Level = level;
         NextReviewDate = nextReviewDate;
-        State = state;
+        LapseCount = lapseCount;
+        LastReviewedAt = lastReviewedAt;
     }
 
+    public Guid UserId { get; private set; }
     public Guid WordId { get; private set; }
-    public int Interval { get; private set; }
-    public float EaseFactor { get; private set; }
-    public int Repetitions { get; private set; }
+    public int Level { get; private set; }
     public DateTime NextReviewDate { get; private set; }
-    public CardState State { get; private set; }
+    public int LapseCount { get; private set; }
+    public DateTime? LastReviewedAt { get; private set; }
 
-    public static WordReviewState CreateLearning(Guid wordId, DateTime nextReviewDate) =>
-        new(wordId, interval: 1, easeFactor: 2.5f, repetitions: 1, nextReviewDate, CardState.Learning);
+    public static WordReviewState CreateLevelZero(Guid userId, Guid wordId, DateTime nextReviewDate) =>
+        new(userId, wordId, level: 0, nextReviewDate, lapseCount: 0, lastReviewedAt: null);
 
-    public void ResetToLearning(DateTime nextReviewDate)
+    public void ApplyResult(int levelAfter, DateTime nextReviewDate, int lapseCountAfter, DateTime reviewedAtUtc)
     {
-        ValidateSchedule(interval: 1, easeFactor: 2.5f, repetitions: 1, nextReviewDate);
-        Interval = 1;
-        EaseFactor = 2.5f;
-        Repetitions = 1;
+        ValidateState(levelAfter, nextReviewDate, lapseCountAfter);
+        Level = levelAfter;
         NextReviewDate = nextReviewDate;
-        State = CardState.Learning;
+        LapseCount = lapseCountAfter;
+        LastReviewedAt = reviewedAtUtc;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void ApplyReviewResult(int interval, float easeFactor, int repetitions, DateTime nextReviewDate, CardState state)
+    public void MoveDueDate(DateTime nextReviewDate)
     {
-        ValidateSchedule(interval, easeFactor, repetitions, nextReviewDate);
-        Interval = interval;
-        EaseFactor = easeFactor;
-        Repetitions = repetitions;
+        ValidateState(Level, nextReviewDate, LapseCount);
         NextReviewDate = nextReviewDate;
-        State = state;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    private static void ValidateSchedule(int interval, float easeFactor, int repetitions, DateTime nextReviewDate)
+    private static void ValidateState(int level, DateTime nextReviewDate, int lapseCount)
     {
-        if (interval < 0 || easeFactor <= 0 || repetitions < 0)
+        if (level is < 0 or > 5)
         {
-            throw new ArgumentException("Review scheduling values must be non-negative and ease factor must be positive.");
+            throw new ArgumentOutOfRangeException(nameof(level), "FluentA SRS level must be between 0 and 5.");
+        }
+
+        if (lapseCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lapseCount), "Lapse count must be non-negative.");
         }
 
         if (nextReviewDate == default)

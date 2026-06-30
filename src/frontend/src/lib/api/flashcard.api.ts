@@ -12,11 +12,9 @@ export type FlashcardCard = {
   thesaurus?: string | null
   collocation?: string | null
   note?: string | null
-  interval: number
-  easeFactor: number
-  repetitions: number
+  reviewLevel?: number | null
   nextReviewDate?: string | null
-  state: string
+  lapseCount: number
 }
 
 export type FlashcardDeck = {
@@ -43,7 +41,6 @@ export type ReviewMode = 'dictation' | 'meaningToWord' | 'pronunciation' | 'rand
 export type ReviewOrderType = 'sequential' | 'shuffle'
 
 export type ReviewSessionWord = {
-  cardId: string
   wordId: string
   word: string
   wordClass: string
@@ -68,15 +65,11 @@ export type ReviewSessionCreated = {
 
 export type ReviewSessionSummary = {
   sessionId: string
-  totalCardsReviewed: number
-  easy: number
-  good: number
-  hard: number
-  again: number
-  easyPercent: number
-  goodPercent: number
-  hardPercent: number
-  againPercent: number
+  totalWordsReviewed: number
+  correct: number
+  wrong: number
+  correctPercent: number
+  wrongPercent: number
   averageTimeSpentSeconds: number
 }
 
@@ -119,6 +112,12 @@ export type PracticeSessionSummary = {
   completedAt: string
 }
 
+export type AddPracticeWordsToReviewResult = {
+  deckId: string
+  addedWordCount: number
+  nextReviewDate: string
+}
+
 export async function listDecks() {
   const response = await apiClient.get<ApiEnvelope<FlashcardDeck[]>>('/flashcards/decks')
   return response.data.data ?? []
@@ -148,6 +147,14 @@ export async function createPracticeSessionSummary(input: {
   timeZoneId: string
 }) {
   const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/flashcards/practice-sessions', input)
+  return response.data.data!
+}
+
+export async function addPracticeWordsToReview(input: {
+  deckId: string
+  timeZoneId: string
+}) {
+  const response = await apiClient.post<ApiEnvelope<AddPracticeWordsToReviewResult>>('/practice/add-to-review', input)
   return response.data.data!
 }
 
@@ -184,7 +191,7 @@ export async function updateReviewSettings(input: ReviewSettings) {
 
 export async function submitReview(input: {
   sessionId: string
-  cardId: string
+  wordId: string
   correct: boolean
   timeSpentSeconds: number
   timeZoneId: string

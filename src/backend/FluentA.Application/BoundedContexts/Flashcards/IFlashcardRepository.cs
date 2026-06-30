@@ -17,6 +17,12 @@ public interface IFlashcardRepository
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
+    Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        Guid deckId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default);
     Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
         Guid userId,
         Guid boardId,
@@ -47,7 +53,7 @@ public interface IFlashcardRepository
     Task<ReviewResultDto?> AddReviewAsync(
         Guid userId,
         Guid sessionId,
-        Guid cardId,
+        Guid wordId,
         bool correct,
         int timeSpentSeconds,
         TimeZoneInfo timeZone,

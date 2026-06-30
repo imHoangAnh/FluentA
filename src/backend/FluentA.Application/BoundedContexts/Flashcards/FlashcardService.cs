@@ -101,6 +101,39 @@ public sealed class FlashcardService : IFlashcardService
         };
     }
 
+    public async Task<OperationResult<AddPracticeWordsToReviewDto>> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        AddPracticeWordsToReviewRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.DeckId == Guid.Empty)
+        {
+            errors["deckId"] = ["Deck id is required."];
+        }
+
+        if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
+        {
+            errors["timeZoneId"] = ["A valid browser timezone id is required."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return OperationResult<AddPracticeWordsToReviewDto>.Failure(FlashcardError.Validation(errors));
+        }
+
+        var result = await _repository.AddPracticeWordsToReviewAsync(
+            userId,
+            request.DeckId,
+            timeZone!,
+            DateTime.UtcNow,
+            cancellationToken);
+
+        return result is null
+            ? OperationResult<AddPracticeWordsToReviewDto>.Failure(FlashcardError.DeckOrCardNotFound())
+            : OperationResult<AddPracticeWordsToReviewDto>.Success(result);
+    }
+
     public async Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,
         CreateReviewSessionRequest request,
@@ -238,9 +271,9 @@ public sealed class FlashcardService : IFlashcardService
             errors["sessionId"] = ["Session id is required."];
         }
 
-        if (request.CardId == Guid.Empty)
+        if (request.WordId == Guid.Empty)
         {
-            errors["cardId"] = ["Card id is required."];
+            errors["wordId"] = ["Word id is required."];
         }
 
         if (request.TimeSpentSeconds is < 0 or > 86400)
@@ -261,7 +294,7 @@ public sealed class FlashcardService : IFlashcardService
         var result = await _repository.AddReviewAsync(
             userId,
             request.SessionId,
-            request.CardId,
+            request.WordId,
             request.Correct,
             request.TimeSpentSeconds,
             timeZone!,

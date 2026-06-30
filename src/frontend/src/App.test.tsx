@@ -143,11 +143,9 @@ function renderAppWithDashboardData(initialEntry: string) {
       meaningVn: 'xin chao',
       meaningEn: 'hello',
       example: 'hello',
-      interval: 0,
-      easeFactor: 2.5,
-      repetitions: 0,
+      reviewLevel: null,
       nextReviewDate: null,
-      state: 'new',
+      lapseCount: 0,
     }],
   }])
   queryClient.setQueryData(['flashcard', 'dashboard'], {
@@ -210,11 +208,9 @@ function renderAppWithDeck(initialEntry: string) {
       meaningVn: 'xin chào',
       meaningEn: 'ni hao',
       example: '你好！',
-      interval: 0,
-      easeFactor: 2.5,
-      repetitions: 0,
+      reviewLevel: null,
       nextReviewDate: null,
-      state: 'new',
+      lapseCount: 0,
     }],
   }
 

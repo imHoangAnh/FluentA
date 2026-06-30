@@ -14,8 +14,8 @@ file must reflect the implementation truth instead of the final target shape.
 - Every vocabulary page now synchronizes to exactly one Page Deck.
 - Dedicated SRS ownership lives in `word_review_states`, linked to
   `VocabWord`.
-- Practice completion creates or resets dedicated review state for the words in
-  the completed page-deck session.
+- Practice completion saves the practice summary first, then lets the learner
+  choose `Finish` or `Add to Review`.
 - Review submissions read and update dedicated review state instead of mutating
   scheduling fields on `flashcard_cards`.
 - Protected navigation now exposes distinct `Flashcard`, `Practice`, and
@@ -32,8 +32,8 @@ file must reflect the implementation truth instead of the final target shape.
   transaction.
 - Word updates synchronize copied card content.
 - Word deletion soft-deletes the vocabulary word and hard-deletes the
-  synchronized card, its `CardReview` history, and any related
-  `word_review_states` row.
+  synchronized card, any related `word_review_states` row, and any related
+  `word_review_histories` rows.
 - Page and board deletion remove all affected synchronized cards, review
   history, and word review state.
 - Existing active words were backfilled to page-deck-only cards by
@@ -46,16 +46,16 @@ thesaurus, collocation, and note from their source vocabulary word.
 
 ## Dedicated Review State
 
-- `word_review_states` stores interval, ease factor, repetitions,
-  `next_review_date`, and state for one vocabulary word.
+- `word_review_states` stores `user_id`, `level`, `next_review_date`,
+  `lapse_count`, and `last_reviewed_at` for one vocabulary word.
 - New vocabulary words do not create review state automatically.
-- Completing Practice for a page deck creates missing review-state rows as
-  `Learning` with interval `1`, repetitions `1`, ease factor `2.5`, and next
-  review due tomorrow in the learner-local timezone.
-- Re-practicing a word resets the existing row back to that same `Learning`
-  baseline.
-- Review answers apply SM-2 updates to the review-state row and persist a
-  matching `CardReview` snapshot.
+- Completing Practice does not create or reset review state by itself.
+- `Add to Review` creates missing review-state rows as FluentA SRS `Level 0`
+  due tomorrow in the learner-local timezone.
+- Re-practicing a word does not reset an existing review-state row.
+- Review answers apply FluentA SRS updates to the review-state row and persist
+  a matching `word_review_histories` record with before/after levels and the
+  next due date.
 
 ## Flashcard Surface
 
@@ -86,10 +86,11 @@ thesaurus, collocation, and note from their source vocabulary word.
 - Reveal/skip completes that step, marks the word wrong for the session, and
   advances through the remaining workflow.
 - `POST /api/v1/flashcards/practice-sessions` accepts only an owned active page
-  deck, validates totals and timezone, stores the practice summary, and
-  creates/resets dedicated review state for all words in the completed deck.
+  deck, validates totals and timezone, and stores the practice summary.
+- `POST /api/v1/practice/add-to-review` adds only missing review-state rows for
+  the completed deck as FluentA SRS `Level 0`.
 - Leaving Practice before completion persists no review-state changes because
-  the batch write only happens at summary submission.
+  review-state creation happens only when `Add to Review` is chosen.
 
 ## Review Surface
 
@@ -99,14 +100,14 @@ thesaurus, collocation, and note from their source vocabulary word.
   board, selected order type, selected mode, and valid timezone id.
 - The created review session returns only due words for that board, plus the
   resolved per-word mode list for the session.
-- `POST /api/v1/flashcards/review` accepts only an owned active card in the
+- `POST /api/v1/flashcards/review` accepts only an owned due `wordId` in the
   live session plus a valid timezone id.
-- Review requires existing dedicated review state for the card's source word.
-  In practice, that state is seeded by completed Practice.
-- Review updates the dedicated review-state row and inserts one `CardReview`
-  snapshot immediately per answer.
-- Review scoring is automatic: correct maps to SM-2 `Good`, wrong maps to
-  SM-2 `Again`.
+- Review requires existing dedicated review state for the word. In practice,
+  that state is created only by `Add to Review`.
+- Review updates the dedicated review-state row and inserts one
+  `word_review_histories` record immediately per answer.
+- Review scoring is automatic: correct advances one FluentA SRS level, wrong
+  resets or keeps the word at `Level 0` and schedules tomorrow.
 - Review no longer uses Page Deck session summaries or manual rating buttons.
 
 ## Dashboard And Settings
@@ -120,7 +121,8 @@ thesaurus, collocation, and note from their source vocabulary word.
 - Overdue, due-today, and forecast values come from `word_review_states`.
 - New-card count is the number of synchronized page-deck words without review
   state.
-- Retention rate is still based on persisted `CardReview` ratings.
+- Retention rate is based on persisted `word_review_histories` correct/wrong
+  results.
 - The protected `/settings` page stores Profile, Practice settings, and Review
   settings in one authenticated screen.
 - Practice settings persist the global mode sequence.

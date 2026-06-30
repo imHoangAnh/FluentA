@@ -90,7 +90,7 @@ export function ReviewSessionPage() {
 
     await submitReviewMutation.mutateAsync({
       sessionId: session.sessionId,
-      cardId: currentWord.cardId,
+      wordId: currentWord.wordId,
       correct,
       timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',

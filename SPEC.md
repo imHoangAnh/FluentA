@@ -24,6 +24,7 @@
 13. [Feature Plan —  Practice Modes](#13-next-feature-plan--flashcard-practice-modes)
 14. [Next Feature Plan — Flashcard, Practice, And Review Redesign](#14-next-feature-plan--flashcard-practice-and-review-redesign)
 15. [Next Feature Plan — Profile And Learning Settings](#15-next-feature-plan--profile-and-learning-settings)
+16. [Next Feature Plan — FluentA SRS Algorithm](#16-next-feature-plan--fluenta-srs-algorithm)
 
 ---
 
@@ -1812,7 +1813,7 @@ SRS. Feature 13 practice modes remain reusable UI/interaction building blocks.
 | Review mode selection | Each Review session asks the learner to choose `Dictation`, `Pronunciation`, `Meaning -> Word`, or `Random`. |
 | Review random mode | Random assigns one of the three modes per word while still respecting the selected order type. |
 | Review scoring | Review uses automatic correct/wrong results from the selected mode; it does not show Easy/Good/Hard/Again buttons. |
-| SRS mapping | MVP maps correct to `Good` and wrong to `Again` in the existing SM-2 calculation until the SRS algorithm is improved later. |
+| SRS algorithm | Review scheduling uses the FluentA SRS level algorithm defined in Section 16. It replaces the previous SM-2 mapping. |
 | Review wrong answer UX | A wrong Review answer records the wrong result, shows answer/recap, and moves to the next word. |
 | Review persistence | Review persists each word immediately after it is answered. Abandoning a session keeps already-reviewed word updates. |
 | Review recap setting | `Recap after answer` is a global user setting. If enabled, correct and wrong answers show recap before Next. If disabled, correct answers can move quickly; wrong answers still show answer/recap. |
@@ -1861,8 +1862,8 @@ Optional fields are hidden when empty.
 
 ### 14.5 Practice Workflow
 
-Practice is the first-learning workflow and can also be used to reset an
-already-learned word back into Learning.
+Practice is the first-learning and re-practice workflow. It does not reset SRS
+for words that are already in Review.
 
 1. Learner opens **Practice**.
 2. Learner selects a board, then a page deck.
@@ -1886,17 +1887,21 @@ already-learned word back into Learning.
    skip/reveal.
 9. Skip/reveal completes the current step.
 10. UI tracks completion per word.
-11. Backend creates or resets SRS records only after the entire practice session
-   finishes.
-12. If the learner abandons the session before finishing, no SRS state changes
-    are saved.
+11. At the end of Practice, learner chooses:
+   - `Finish`: end Practice without creating SRS for words that do not already
+     have SRS state.
+   - `Add to Review`: create FluentA SRS Level 0 records, due tomorrow, for
+     practiced words that do not already have SRS state.
+12. If the learner abandons the session before choosing an end action, no SRS
+    state changes are saved.
 
-SRS result after full Practice completion:
+SRS result after Practice end action:
 
 | Word condition | Result |
 |---|---|
-| No existing review record | Create review record as `Learning`, due tomorrow. |
-| Existing review record | Reset existing record to `Learning`, due tomorrow. |
+| No existing review record + `Finish` | No SRS state is created. |
+| No existing review record + `Add to Review` | Create FluentA SRS `level = 0`, due tomorrow. |
+| Existing review record + either action | Keep current level, due date, and lapse count unchanged. |
 
 ### 14.6 Review Workflow
 
@@ -1921,7 +1926,8 @@ Review is the only SRS workflow.
    - Immediately move overflow words to tomorrow.
    - Review session uses only the selected queue.
 9. Each answer is automatically evaluated as correct or wrong by the mode.
-10. Correct maps to SM-2 `Good`; wrong maps to SM-2 `Again`.
+10. Correct and wrong answers update scheduling through FluentA SRS as defined
+    in Section 16.
 11. Each answered word persists immediately.
 12. Wrong answers show answer/recap and move to the next word.
 13. Correct answer recap follows the global `recap after answer` setting.
@@ -1941,19 +1947,18 @@ Expected review/SRS state fields:
 | `userId` | Owner for fast ownership scoping. |
 | `wordId` | Linked `VocabWord`. |
 | `boardId` | Denormalized board scope for queue building, or queryable through page/board relation if planning rejects denormalization. |
-| `state` | `Learning`, `Review`, or `Mature`. |
-| `interval` | Current interval in days. |
-| `easeFactor` | Current SM-2 ease factor. |
-| `repetitions` | Current successful repetition count. |
+| `level` | Current FluentA SRS level from 0 through 5. |
 | `nextReviewDate` | UTC date/time used for due queue. |
+| `lapseCount` | Count of wrong answers from Level 1 through Level 5 that reset the word to Level 0. |
 | `lastReviewedAt` | Last Review completion timestamp. |
 | `createdAt` / `updatedAt` | Standard audit timestamps. |
 
 Creation and deletion rules:
 
 - New `VocabWord` creation does not create review state.
-- Full Practice completion creates review state.
-- Re-practice resets the existing review state.
+- Practice `Add to Review` creates review state only for practiced words without
+  existing SRS state.
+- Re-practice never resets existing SRS state.
 - Word/page/board deletion hard-deletes related review state.
 - Destructive migration from existing All Words review storage is acceptable.
 
@@ -1984,7 +1989,6 @@ Out of scope:
 
 - Preserving existing All Words review history.
 - Keeping All Words decks in the product model.
-- Improving the SRS algorithm beyond correct = Good and wrong = Again.
 - AI pronunciation scoring or external speech providers.
 - Per-attempt answer storage for Practice steps.
 - Saving partial Practice progress when the session is abandoned.
@@ -2007,6 +2011,7 @@ Out of scope:
 | Review mode/order conflict | Tests prove Random mode randomizes mode per word while Sequential/Shuffle still controls word order. |
 | Flashcard no longer acts as review | Playwright proof covers read-only card browsing, click-to-flip, final Finish/Let's practice actions, and redirect to Practice. |
 | Existing Feature 13 regression | Reused dictation, meaning-to-word, and pronunciation interactions remain covered in Practice and Review flows. |
+| SRS algorithm drift | Unit tests prove every FluentA SRS level transition and due-date calculation from Section 16. |
 
 ### 14.11 Proposed Story Queue
 
@@ -2016,7 +2021,7 @@ Out of scope:
 4. **US-LR-004:** Rebuild Flashcard as read-only page-deck viewer with one-card flow and Let's practice redirect.
 5. **US-LR-005:** Build Practice board -> page deck selection, sequential/shuffle ordering, global configurable mode sequence, recap, and batch SRS completion.
 6. **US-LR-006:** Build Review board selection, global settings, due queue start, overflow rescheduling, mode selection, and immediate per-word persistence.
-7. **US-LR-007:** Run release regression for vocabulary sync, Feature 13 interactions, SM-2 mapping, dashboard impacts, and browser speech fallbacks.
+7. **US-LR-007:** Run release regression for vocabulary sync, Feature 13 interactions, FluentA SRS transitions, dashboard impacts, and browser speech fallbacks.
 
 ### 14.12 Verification Ladder
 
@@ -2280,3 +2285,242 @@ git diff --check
 Planning may split proof by story. Release proof must include real Cloudinary
 configuration/upload behavior in a credentialed environment, plus deterministic
 tests for validation and failure semantics.
+
+---
+
+## 16. Next Feature Plan — FluentA SRS Algorithm
+
+**Planning status:** Product decisions locked for implementation planning
+
+**Mode:** High-risk scheduling algorithm change
+
+**Supersedes:** SM-2 scheduling for the Feature 14 Review workflow.
+
+**Source of truth:** `history/fluenta-srs-algorithm/CONTEXT.md`
+
+### 16.1 Desired Outcomes
+
+- FluentA Review uses a deterministic level-based SRS algorithm with only
+  `correct` and `wrong` outcomes.
+- Practice can add newly practiced words to Review, but Practice itself does
+  not force SRS creation unless the learner chooses **Add to Review**.
+- Review never requires retry-until-correct. Each answer immediately updates
+  the word's SRS state and moves on.
+- The old SM-2 fields and rating mapping are replaced by FluentA SRS levels,
+  next review date, lapse count, and review history.
+
+### 16.2 Locked Product Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Algorithm name | The product algorithm is named `FluentA SRS`, not SM-2. |
+| Outcomes | Review has only `correct` and `wrong`. No Easy/Good/Hard/Again buttons. |
+| No retry | Review does not allow retry-until-correct. A wrong answer is recorded and the session moves on. |
+| No early review | Review queue includes only words due today or overdue. Users cannot update SRS early. |
+| Initial add | At the end of Practice, learner chooses `Finish` or `Add to Review`. |
+| Finish behavior | `Finish` ends Practice without creating SRS state for words that do not already have it. |
+| Add to Review behavior | `Add to Review` creates SRS state for every practiced word that does not already have SRS state. |
+| Existing SRS during Add to Review | Words that already have SRS state are skipped and keep their current level and due date. |
+| Initial level | New SRS state starts at Level 0. |
+| Initial due date | New Level 0 words are due one day after Add to Review. |
+| Correct transition | Correct answers advance one level until Level 5. |
+| Level 5 correct | Correct at Level 5 keeps Level 5 and schedules another review 60 days later. |
+| Wrong transition | Wrong at any level resets or keeps the word at Level 0 and schedules review one day later. |
+| Lapse count | Wrong at Level 1 through Level 5 increments `lapseCount`; wrong at Level 0 does not increment `lapseCount`. |
+| Late review | If a word is overdue and answered correct, the next interval is calculated from the actual review date. |
+| State fields | SRS state uses `level`, `nextReviewDate`, and `lapseCount`; it does not use `interval`, `easeFactor`, or `repetitions`. |
+| Review history | Each Review answer stores `wordId`, `reviewedAt`, result, `levelBefore`, `levelAfter`, and `nextReviewDate`. |
+| History interval | Review history does not store `nextIntervalDays` in MVP. |
+
+### 16.3 Level Schedule
+
+FluentA SRS uses these level transitions:
+
+| Current level at review | Correct result | Next review date |
+|---:|---:|---:|
+| New Add to Review event | Level 0 | +1 day |
+| 0 | Level 1 | +2 days |
+| 1 | Level 2 | +4 days |
+| 2 | Level 3 | +14 days |
+| 3 | Level 4 | +39 days |
+| 4 | Level 5 | +60 days |
+| 5 | Level 5 | +60 days |
+
+The `+N days` interval is always calculated from the actual event date:
+
+- For Add to Review, event date is the date the learner clicks Add to Review.
+- For Review, event date is the date the learner answers the due word.
+- If the word is overdue and answered correct, the next due date still uses the
+  actual review date, not the original missed due date.
+
+### 16.4 Examples
+
+Happy path:
+
+```text
+01/07: Practice finished, Add to Review
+  -> Level 0, due 02/07
+
+02/07: Level 0 review correct
+  -> Level 1, due 04/07
+
+04/07: Level 1 review correct
+  -> Level 2, due 08/07
+
+08/07: Level 2 review correct
+  -> Level 3, due 22/07
+
+22/07: Level 3 review correct
+  -> Level 4, due 30/08
+
+30/08: Level 4 review correct
+  -> Level 5, due 29/10
+
+29/10: Level 5 review correct
+  -> Level 5, due 28/12
+```
+
+Wrong answer:
+
+```text
+08/07: Level 2 review wrong
+  -> Level 0, due 09/07
+  -> lapseCount increments by 1
+
+09/07: Level 0 review wrong
+  -> Level 0, due 10/07
+  -> lapseCount does not increment
+
+10/07: Level 0 review correct
+  -> Level 1, due 12/07
+```
+
+Late review:
+
+```text
+04/07: Level 1 word was due
+10/07: Learner reviews it late and answers correct
+  -> Level 2, due 14/07
+```
+
+### 16.5 Practice Integration
+
+Practice no longer automatically creates SRS state at full session completion.
+At the end of Practice, the learner sees:
+
+- **Finish**: exits Practice without adding new words to Review.
+- **Add to Review**: creates Level 0 SRS state due tomorrow for all practiced
+  words that do not already have SRS state.
+
+Rules:
+
+- Add to Review skips words that already have SRS state.
+- Re-practicing a word does not reset SRS.
+- Practice completion still has its own UI/session summary, but scheduling only
+  changes when Add to Review is chosen for words without SRS state.
+
+### 16.6 Data Model Expectations
+
+Review state fields:
+
+| Field | Purpose |
+|---|---|
+| `id` | Review state id. |
+| `userId` | Owner. |
+| `wordId` | Linked vocabulary word. |
+| `level` | Integer 0-5. |
+| `nextReviewDate` | Next due date. |
+| `lapseCount` | Number of wrong answers at Level 1-5. |
+| `lastReviewedAt` | Last Review answer timestamp. |
+| `createdAt` / `updatedAt` | Standard timestamps. |
+
+Review history fields:
+
+| Field | Purpose |
+|---|---|
+| `id` | History id. |
+| `userId` | Owner. |
+| `wordId` | Linked vocabulary word. |
+| `reviewedAt` | Review answer timestamp. |
+| `result` | `correct` or `wrong`. |
+| `levelBefore` | Level before answer. |
+| `levelAfter` | Level after answer. |
+| `nextReviewDate` | Due date after applying the answer. |
+
+Removed or unused scheduling fields:
+
+- `interval`
+- `easeFactor`
+- `repetitions`
+- `ReviewRating`
+
+Planning may retain legacy columns temporarily only as a migration bridge, but
+the FluentA SRS behavior must not depend on them.
+
+### 16.7 API Expectations
+
+Exact DTO names can be finalized during implementation planning. The public
+capabilities must support:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `POST` | `/api/v1/practice/add-to-review` | Add practiced words without SRS state to Level 0, due tomorrow. |
+| `POST` | `/api/v1/review/answers` | Apply one correct/wrong answer through FluentA SRS and persist history. |
+| `GET` | `/api/v1/review/sessions/start` or `POST` equivalent | Build due Review queue using `nextReviewDate <= today`. |
+
+All endpoints are authenticated and owner-scoped. Foreign, deleted, or
+non-due words must be rejected for review answer updates.
+
+### 16.8 Scope Boundaries
+
+Out of scope:
+
+- Easy/Good/Hard/Again ratings.
+- SM-2 `easeFactor`, `interval`, or `repetitions` scheduling.
+- Fuzzy scoring or confidence-weighted interval changes.
+- Early review that mutates SRS before due date.
+- Per-mode interval adjustments.
+- Storing `nextIntervalDays` in review history.
+- Auto-adding Practice words to Review without user choosing Add to Review.
+
+### 16.9 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Off-by-one level transition | Unit tests cover every correct transition from Level 0 through Level 5. |
+| Wrong answer reset bug | Unit tests prove wrong at every level resets to Level 0 and schedules +1 day. |
+| Lapse count drift | Tests prove wrong at Level 1-5 increments lapseCount and wrong at Level 0 does not. |
+| Late review miscalculation | Tests prove correct answers use actual review date for next due date. |
+| Early review mutation | API/integration tests reject non-due review answer updates. |
+| Legacy SM-2 leakage | Tests and code review prove FluentA SRS does not use easeFactor, interval, repetitions, or ReviewRating. |
+| Practice auto-add regression | E2E/API tests prove Finish does not create SRS and Add to Review creates only missing SRS states. |
+| History audit gap | Tests prove each Review answer writes the required history fields. |
+
+### 16.10 Proposed Story Queue
+
+1. **US-SRS-001:** Replace SM-2 state with FluentA SRS level state and review history schema.
+2. **US-SRS-002:** Implement deterministic FluentA SRS transition service and unit tests.
+3. **US-SRS-003:** Update Practice finish/Add to Review behavior.
+4. **US-SRS-004:** Update Review answer persistence to use FluentA SRS and write history.
+5. **US-SRS-005:** Update Review queue validation to reject early/non-due SRS mutation.
+6. **US-SRS-006:** Run release regression for Practice, Review, settings, and dashboard/reporting impacts.
+
+### 16.11 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj --filter FluentASrs
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --filter Review
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- practice-workflow.spec.js review-workflow.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split proof by story. Release proof must cover all level
+transitions, wrong-answer reset behavior, late review scheduling, Practice Add
+to Review behavior, and removal of legacy SM-2 scheduling from the Review path.

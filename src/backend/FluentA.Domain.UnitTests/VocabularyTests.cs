@@ -92,19 +92,28 @@ public sealed class VocabularyTests
     }
 
     [Fact]
-    public void CardReview_StoresResultAndValidatesInputs()
+    public void WordReviewHistory_StoresResultAndValidatesInputs()
     {
         var reviewedAt = DateTime.UtcNow;
-        var review = CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Easy, 12, reviewedAt, 6, 2.6f);
+        var review = WordReviewHistory.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            12,
+            reviewedAt,
+            FluentAsrsReviewResult.Correct,
+            2,
+            3,
+            reviewedAt.AddDays(14));
 
-        Assert.Equal(ReviewRating.Easy, review.Rating);
+        Assert.Equal(FluentAsrsReviewResult.Correct, review.Result);
         Assert.Equal(12, review.TimeSpentSeconds);
         Assert.Equal(reviewedAt, review.ReviewedAt);
-        Assert.Equal(6, review.IntervalAfter);
-        Assert.Equal(2.6f, review.EaseFactorAfter);
-        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.Empty, Guid.NewGuid(), ReviewRating.Good, 1, reviewedAt, 1, 2.5f));
-        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Good, -1, reviewedAt, 1, 2.5f));
-        Assert.Throws<ArgumentException>(() => CardReview.Create(Guid.NewGuid(), Guid.NewGuid(), ReviewRating.Good, 1, reviewedAt, 1, 0));
+        Assert.Equal(2, review.LevelBefore);
+        Assert.Equal(3, review.LevelAfter);
+        Assert.Throws<ArgumentException>(() => WordReviewHistory.Create(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), 1, reviewedAt, FluentAsrsReviewResult.Correct, 0, 1, reviewedAt.AddDays(1)));
+        Assert.Throws<ArgumentException>(() => WordReviewHistory.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), -1, reviewedAt, FluentAsrsReviewResult.Correct, 0, 1, reviewedAt.AddDays(1)));
+        Assert.Throws<ArgumentException>(() => WordReviewHistory.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, reviewedAt, FluentAsrsReviewResult.Correct, 0, 6, reviewedAt.AddDays(1)));
     }
 
     [Fact]
@@ -166,29 +175,19 @@ public sealed class VocabularyTests
     }
 
     [Theory]
-    [InlineData(0, 2.5f, 0, ReviewRating.Again, 1, 2.18f, 0, CardState.Learning)]
-    [InlineData(9, 2.5f, 4, ReviewRating.Hard, 1, 2.36f, 0, CardState.Learning)]
-    [InlineData(0, 2.5f, 0, ReviewRating.Good, 1, 2.5f, 1, CardState.Learning)]
-    [InlineData(1, 2.5f, 1, ReviewRating.Easy, 6, 2.6f, 2, CardState.Learning)]
-    [InlineData(6, 2.5f, 2, ReviewRating.Good, 15, 2.5f, 3, CardState.Review)]
-    [InlineData(10, 2.05f, 3, ReviewRating.Easy, 21, 2.15f, 4, CardState.Mature)]
-    [InlineData(10, 1.3f, 3, ReviewRating.Again, 1, 1.3f, 0, CardState.Learning)]
-    public void Sm2Scheduler_CalculatesDeterministicResult(
-        int interval,
-        float easeFactor,
-        int repetitions,
-        ReviewRating rating,
-        int expectedInterval,
-        float expectedEaseFactor,
-        int expectedRepetitions,
-        CardState expectedState)
+    [InlineData(0, 1, 0)]
+    [InlineData(1, 2, 0)]
+    [InlineData(2, 3, 0)]
+    [InlineData(3, 4, 0)]
+    [InlineData(4, 5, 0)]
+    [InlineData(5, 5, 0)]
+    public void FluentAsrsScheduler_AdvancesLevelsOnCorrect(int levelBefore, int expectedLevelAfter, int lapseCount)
     {
-        var result = Sm2Scheduler.Calculate(interval, easeFactor, repetitions, rating);
+        var result = FluentAsrsScheduler.ApplyCorrect(levelBefore, lapseCount);
 
-        Assert.Equal(expectedInterval, result.Interval);
-        Assert.Equal(expectedEaseFactor, result.EaseFactor, precision: 2);
-        Assert.Equal(expectedRepetitions, result.Repetitions);
-        Assert.Equal(expectedState, result.State);
+        Assert.Equal(expectedLevelAfter, result.LevelAfter);
+        Assert.Equal(lapseCount, result.LapseCountAfter);
+        Assert.Equal(FluentAsrsScheduler.IntervalDaysForLevel(expectedLevelAfter), result.IntervalDays);
     }
 
     [Fact]
@@ -207,25 +206,37 @@ public sealed class VocabularyTests
     }
 
     [Fact]
-    public void WordReviewState_CreatesAndResetsLearningState()
+    public void FluentAsrsScheduler_ResetsToLevelZeroOnWrongAndIncrementsLapsesAboveLevelZero()
+    {
+        var levelZero = FluentAsrsScheduler.ApplyWrong(0, 3);
+        var levelThree = FluentAsrsScheduler.ApplyWrong(3, 3);
+
+        Assert.Equal(0, levelZero.LevelAfter);
+        Assert.Equal(3, levelZero.LapseCountAfter);
+        Assert.Equal(1, levelZero.IntervalDays);
+        Assert.Equal(0, levelThree.LevelAfter);
+        Assert.Equal(4, levelThree.LapseCountAfter);
+        Assert.Equal(1, levelThree.IntervalDays);
+    }
+
+    [Fact]
+    public void WordReviewState_CreatesAndAppliesFluentAsrsState()
     {
         var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
-        var state = WordReviewState.CreateLearning(Guid.NewGuid(), nextReviewDate);
+        var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), nextReviewDate);
 
-        Assert.Equal(1, state.Interval);
-        Assert.Equal(2.5f, state.EaseFactor);
-        Assert.Equal(1, state.Repetitions);
+        Assert.Equal(0, state.Level);
+        Assert.Equal(0, state.LapseCount);
         Assert.Equal(nextReviewDate, state.NextReviewDate);
-        Assert.Equal(CardState.Learning, state.State);
+        Assert.Null(state.LastReviewedAt);
 
-        var resetDate = nextReviewDate.AddDays(2);
-        state.ResetToLearning(resetDate);
+        var reviewedAt = DateTime.UtcNow;
+        state.ApplyResult(1, nextReviewDate.AddDays(1), 0, reviewedAt);
 
-        Assert.Equal(1, state.Interval);
-        Assert.Equal(2.5f, state.EaseFactor);
-        Assert.Equal(1, state.Repetitions);
-        Assert.Equal(resetDate, state.NextReviewDate);
-        Assert.Equal(CardState.Learning, state.State);
+        Assert.Equal(1, state.Level);
+        Assert.Equal(0, state.LapseCount);
+        Assert.Equal(nextReviewDate.AddDays(1), state.NextReviewDate);
+        Assert.Equal(reviewedAt, state.LastReviewedAt);
     }
 
     [Fact]

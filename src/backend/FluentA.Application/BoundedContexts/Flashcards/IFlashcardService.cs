@@ -14,6 +14,11 @@ public interface IFlashcardService
         Guid userId,
         CreatePracticeSessionSummaryRequest request,
         CancellationToken cancellationToken = default);
+    /// <summary>Adds completed practice words without SRS state to review.</summary>
+    Task<OperationResult<AddPracticeWordsToReviewDto>> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        AddPracticeWordsToReviewRequest request,
+        CancellationToken cancellationToken = default);
     /// <summary>Creates a server-side review session for one board.</summary>
     Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,
