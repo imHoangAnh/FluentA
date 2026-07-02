@@ -35,7 +35,7 @@ function renderTable(boardLanguage = 'en') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <VocabTable boardId="board-1" page={{ id: 'page-1', boardId: 'board-1', name: 'Page One', sortOrder: 0, createdAt: '', updatedAt: '' }} boardLanguage={boardLanguage} />
+      <VocabTable boardId="board-1" page={{ id: 'page-1', boardId: 'board-1', name: 'Page One', createdAt: '', updatedAt: '' }} boardLanguage={boardLanguage} />
     </QueryClientProvider>,
   )
 }
@@ -49,8 +49,8 @@ describe('VocabTable columns', () => {
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([])
     vi.mocked(vocabularyApi.getColumnConfiguration).mockResolvedValue({
       customColumns: [
-        { id: 'text-column', name: 'Register', type: 'text', sortOrder: 0 },
-        { id: 'number-column', name: 'Priority', type: 'number', sortOrder: 1 },
+        { id: 'text-column', name: 'Register', type: 'text', createdAt: '' },
+        { id: 'number-column', name: 'Priority', type: 'number', createdAt: '' },
       ],
       hiddenColumnKeys: ['note'],
     })

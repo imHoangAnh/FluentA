@@ -507,7 +507,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "SessionId");
+                    b.HasIndex("UserId", "ReviewedAt")
+                        .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("UserId", "SessionId")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("WordId", "ReviewedAt");
 
@@ -562,7 +567,8 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("WordId")
                         .IsUnique();
 
-                    b.HasIndex("UserId", "NextReviewDate");
+                    b.HasIndex("UserId", "NextReviewDate")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("word_review_states", (string)null);
                 });

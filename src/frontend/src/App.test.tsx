@@ -278,7 +278,7 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('link', { name: 'Vocabulary' })).toHaveAttribute('href', '/vocabulary')
     expect(screen.getByRole('link', { name: 'Flashcard' })).toHaveAttribute('href', '/flashcards')
     expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/flashcards/practice')
-    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/flashcards/review')
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/review')
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdown')
@@ -301,7 +301,7 @@ describe('FluentA app routes', () => {
 
     renderAppWithDashboardData('/')
 
-    expect(screen.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/flashcards/review')
+    expect(screen.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review')
     expect(screen.getByText('Plan speaking practice')).toBeInTheDocument()
     expect(screen.getByText('Read English')).toBeInTheDocument()
     expect(screen.getByText(/IELTS Exam/)).toBeInTheDocument()

@@ -208,14 +208,14 @@ export function DashboardPage() {
                 <div className="review-stats">
                   <div className="review-stat-row">
                     <div className="review-stat-label"><div className="review-stat-dot bg-teal"></div> Review</div>
-                    <strong>{flashcardDashboard?.overdue ?? 0 + (flashcardDashboard?.dueToday ?? 0)}</strong>
+                    <strong>{(flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)}</strong>
                   </div>
                   <div className="review-stat-row">
                     <div className="review-stat-label"><div className="review-stat-dot bg-light-teal"></div> Learning</div>
                     <strong>{flashcardDashboard?.newCards ?? 0}</strong>
                   </div>
                 </div>
-                <Link to="/flashcards/review" style={{textDecoration: 'none'}}>
+                <Link to="/review" style={{textDecoration: 'none'}}>
                   <button className="btn-primary">Open Review</button>
                 </Link>
               </div>

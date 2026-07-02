@@ -5,7 +5,6 @@ export type BoardSummary = {
   id: string
   name: string
   language: string
-  sortOrder: number
   pageCount: number
   createdAt: string
   updatedAt: string
@@ -15,7 +14,6 @@ export type Page = {
   id: string
   boardId: string
   name: string
-  sortOrder: number
   createdAt: string
   updatedAt: string
 }
@@ -54,7 +52,7 @@ export type CustomColumn = {
   id: string
   name: string
   type: 'text' | 'number'
-  sortOrder: number
+  createdAt: string
 }
 
 export type ColumnConfiguration = {
@@ -77,7 +75,7 @@ export async function getBoard(boardId: string) {
   return response.data.data!
 }
 
-export async function updateBoard(boardId: string, input: { name: string; language: string; sortOrder?: number }) {
+export async function updateBoard(boardId: string, input: { name: string; language: string }) {
   const response = await apiClient.patch<ApiEnvelope<BoardDetail>>(`/boards/${boardId}`, input)
   return response.data.data!
 }
@@ -86,12 +84,12 @@ export async function deleteBoard(boardId: string) {
   await apiClient.delete(`/boards/${boardId}`)
 }
 
-export async function createPage(boardId: string, input: { name: string; sortOrder?: number }) {
+export async function createPage(boardId: string, input: { name: string }) {
   const response = await apiClient.post<ApiEnvelope<Page>>(`/boards/${boardId}/pages`, input)
   return response.data.data!
 }
 
-export async function updatePage(boardId: string, pageId: string, input: { name: string; sortOrder?: number }) {
+export async function updatePage(boardId: string, pageId: string, input: { name: string }) {
   const response = await apiClient.patch<ApiEnvelope<Page>>(`/boards/${boardId}/pages/${pageId}`, input)
   return response.data.data!
 }

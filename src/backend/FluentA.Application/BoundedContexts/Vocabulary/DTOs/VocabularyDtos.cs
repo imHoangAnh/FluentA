@@ -2,13 +2,12 @@ namespace FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 
 public sealed record CreateBoardRequest(string Name, string Language);
 
-public sealed record UpdateBoardRequest(string Name, string Language, int? SortOrder = null);
+public sealed record UpdateBoardRequest(string Name, string Language);
 
 public sealed record BoardSummaryDto(
     Guid Id,
     string Name,
     string Language,
-    int SortOrder,
     int PageCount,
     DateTime CreatedAt,
     DateTime UpdatedAt);
@@ -17,16 +16,15 @@ public sealed record BoardDetailDto(
     Guid Id,
     string Name,
     string Language,
-    int SortOrder,
     IReadOnlyList<PageDto> Pages,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
-public sealed record CreatePageRequest(string Name, int? SortOrder = null);
+public sealed record CreatePageRequest(string Name);
 
-public sealed record UpdatePageRequest(string Name, int? SortOrder = null);
+public sealed record UpdatePageRequest(string Name);
 
-public sealed record PageDto(Guid Id, Guid BoardId, string Name, int SortOrder, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record PageDto(Guid Id, Guid BoardId, string Name, DateTime CreatedAt, DateTime UpdatedAt);
 
 public sealed record WordRequest(
     string Word,
@@ -62,7 +60,7 @@ public sealed record WordDto(
 
 public sealed record CreateCustomColumnRequest(string Name, string Type);
 
-public sealed record CustomColumnDto(Guid Id, string Name, string Type, int SortOrder);
+public sealed record CustomColumnDto(Guid Id, string Name, string Type, DateTime CreatedAt);
 
 public sealed record ColumnConfigurationDto(
     IReadOnlyList<CustomColumnDto> CustomColumns,

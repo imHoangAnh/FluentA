@@ -36,7 +36,7 @@ export function LearningNavLinks({ className }: LearningNavLinksProps) {
       <NavLink to="/flashcards/practice" className={className}>
         <PenSquare size={20} /> Practice
       </NavLink>
-      <NavLink to="/flashcards/review" className={className}>
+      <NavLink to="/review" className={className}>
         <BookOpen size={20} /> Review
       </NavLink>
     </>

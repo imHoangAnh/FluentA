@@ -141,7 +141,7 @@ export default function App() {
         }
       />
       <Route
-        path="/flashcards/review"
+        path="/review"
         element={
           <ProtectedRoute>
             <ReviewSessionPage />

@@ -55,49 +55,44 @@ async function listDecks(page, headers) {
   return (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
 }
 
-function scheduleSnapshot(deck) {
+function reviewSnapshot(deck) {
   return [...deck.cards]
     .map((card) => ({
       word: card.word,
-      interval: card.interval,
-      repetitions: card.repetitions,
-      state: card.state,
+      reviewLevel: card.reviewLevel,
+      lapseCount: card.lapseCount,
       nextReviewDate: card.nextReviewDate,
     }))
     .sort((left, right) => left.word.localeCompare(right.word));
 }
 
-test('practice workflow uses global sequence, leaves no abandoned progress, and persists only on full completion', async ({ page }) => {
+async function completeMeaningToWordPractice(page) {
+  await page.getByRole('button', { name: 'Sequential' }).click();
+  await page.getByTestId('start-practice-session').click();
+
+  await expect(page.getByText('1 / 2')).toBeVisible();
+  await page.getByTestId('practice-answer-input').fill('wrong');
+  await page.getByRole('button', { name: 'Submit answer' }).click();
+  await expect(page.getByText('That answer does not match yet. Try again or reveal the answer.')).toBeVisible();
+  await page.getByTestId('practice-answer-input').fill('mitigate');
+  await page.getByRole('button', { name: 'Submit answer' }).click();
+  await page.getByTestId('practice-next-card').click();
+  await expect(page.getByTestId('practice-answer-reveal')).toContainText('mitigate');
+  await page.getByTestId('practice-next-card').click();
+
+  await expect(page.getByText('2 / 2')).toBeVisible();
+  await page.getByRole('button', { name: 'Reveal / skip' }).click();
+  await page.getByTestId('practice-next-card').click();
+  await expect(page.getByTestId('practice-answer-reveal')).toContainText('nuance');
+  await page.getByTestId('practice-next-card').click();
+
+  await expect(page.getByTestId('practice-summary')).toContainText('1 words completed cleanly and 1 words needed reveal/skip');
+}
+
+test('practice completion separates Finish from Add to Review FluentA SRS creation', async ({ page }) => {
   await page.addInitScript(() => {
-    window.__practiceTranscripts = [];
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
-
-    class FakeSpeechRecognition {
-      constructor() {
-        this.lang = 'en-US';
-        this.interimResults = false;
-        this.maxAlternatives = 1;
-        this.onresult = null;
-        this.onerror = null;
-        this.onend = null;
-      }
-
-      start() {
-        const transcript = window.__practiceTranscripts.shift() ?? '';
-        setTimeout(() => {
-          this.onresult?.({ results: [[{ transcript }]] });
-          this.onend?.();
-        }, 0);
-      }
-
-      stop() {
-        this.onend?.();
-      }
-    }
-
-    window.SpeechRecognition = FakeSpeechRecognition;
-    window.webkitSpeechRecognition = FakeSpeechRecognition;
   });
 
   const { headers } = await registerAndLogin(page, 'practice-workflow');
@@ -105,80 +100,76 @@ test('practice workflow uses global sequence, leaves no abandoned progress, and 
 
   const initialDecks = await listDecks(page, headers);
   const pageDeck = initialDecks.find((deck) => deck.name === 'Practice Workflow Board - Practice Workflow Page');
-  const initialSchedule = scheduleSnapshot(pageDeck);
+  const initialSchedule = reviewSnapshot(pageDeck);
+  expect(initialSchedule).toEqual([
+    expect.objectContaining({ word: 'mitigate', reviewLevel: null, lapseCount: 0, nextReviewDate: null }),
+    expect.objectContaining({ word: 'nuance', reviewLevel: null, lapseCount: 0, nextReviewDate: null }),
+  ]);
 
-  await page.goto('/settings/review');
-  await page.getByRole('button', { name: 'dictation' }).click();
-  await page.getByRole('button', { name: 'Save practice settings' }).click();
-  await expect(page.getByText('Practice settings saved.')).toBeVisible();
-
-  const practiceSettingsResponse = await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/practice-settings', { headers });
-  const practiceSettings = (await practiceSettingsResponse.json()).data;
-  expect(practiceSettings.modeSequence).toEqual(['meaningToWord', 'pronunciation']);
+  const practiceSettingsResponse = await page.request.put('http://127.0.0.1:5000/api/v1/practice/settings', {
+    headers,
+    data: { modeSequence: ['meaningToWord'] },
+  });
+  expect(practiceSettingsResponse.status()).toBe(200);
 
   await page.goto('/flashcards');
-  const pageDeckCard = page.locator('article.flashcard-deck').filter({ hasText: 'Practice Workflow Board - Practice Workflow Page' });
+  const pageDeckCard = page.getByTestId(`flashcard-deck-${pageDeck.id}`);
+  await expect(pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' })).toBeVisible();
+
   await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
   await expect(page.getByRole('heading', { name: 'Practice Workflow Board - Practice Workflow Page' })).toBeVisible();
   await expect(page.getByText('Meaning -> Word')).toBeVisible();
-  await expect(page.getByText('pronunciation')).toBeVisible();
   await expect(page.getByText('recap', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Shuffle' }).click();
   await page.getByTestId('start-practice-session').click();
   await expect(page.getByText('1 / 2')).toBeVisible();
-  await expect(page.getByTestId('active-practice-card').getByText('Meaning -> Word')).toBeVisible();
   await page.getByRole('link', { name: 'Back to decks' }).click();
 
   const afterAbandonDecks = await listDecks(page, headers);
-  expect(scheduleSnapshot(afterAbandonDecks.find((deck) => deck.name === 'Practice Workflow Board - Practice Workflow Page'))).toEqual(initialSchedule);
-
-  await page.evaluate(() => {
-    window.__practiceTranscripts = ['mitigate'];
-  });
-
-  const summaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+  expect(reviewSnapshot(afterAbandonDecks.find((deck) => deck.name === pageDeck.name))).toEqual(initialSchedule);
 
   await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
-  await page.getByRole('button', { name: 'Sequential' }).click();
-  await page.getByTestId('start-practice-session').click();
+  await completeMeaningToWordPractice(page);
 
-  await page.getByTestId('practice-answer-input').fill('wrong');
-  await page.getByRole('button', { name: 'Submit answer' }).click();
-  await expect(page.getByText('That answer does not match yet. Try again or reveal the answer.')).toBeVisible();
-  await page.getByTestId('practice-answer-input').fill('mitigate');
-  await page.getByRole('button', { name: 'Submit answer' }).click();
-  await page.getByTestId('practice-next-card').click();
+  const finishSummaryResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Finish' }).click();
+  const finishSummaryPayload = (await (await finishSummaryResponsePromise).json()).data;
+  expect(finishSummaryPayload.totalCards).toBe(2);
+  expect(finishSummaryPayload.correctCards).toBe(1);
+  expect(finishSummaryPayload.wrongCards).toBe(1);
+  await page.getByRole('link', { name: 'Done' }).click();
 
-  await page.getByRole('button', { name: 'Start listening' }).click();
-  await expect(page.getByTestId('practice-transcript')).toHaveValue('mitigate');
-  await page.getByRole('button', { name: 'Check transcript' }).click();
-  await page.getByTestId('practice-next-card').click();
-  await expect(page.getByTestId('practice-answer-reveal')).toContainText('mitigate');
-  await page.getByTestId('practice-next-card').click();
+  const afterFinishDecks = await listDecks(page, headers);
+  expect(reviewSnapshot(afterFinishDecks.find((deck) => deck.name === pageDeck.name))).toEqual(initialSchedule);
 
-  await expect(page.getByText('2 / 2')).toBeVisible();
-  await page.getByRole('button', { name: 'Reveal / skip' }).click();
-  await expect(page.getByTestId('practice-answer-reveal')).toContainText('nuance');
-  await page.getByTestId('practice-next-card').click();
-  await page.getByRole('button', { name: 'Reveal / skip' }).click();
-  await page.getByTestId('practice-next-card').click();
-  await expect(page.getByTestId('practice-answer-reveal')).toContainText('nuance');
-  await page.getByTestId('practice-next-card').click();
+  await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
+  await completeMeaningToWordPractice(page);
 
-  const summaryPayload = (await (await summaryResponsePromise).json()).data;
-  expect(summaryPayload.totalCards).toBe(2);
-  expect(summaryPayload.correctCards).toBe(1);
-  expect(summaryPayload.wrongCards).toBe(1);
-  await expect(page.getByTestId('practice-summary')).toContainText('1 words completed cleanly and 1 words needed reveal/skip');
+  const addSummaryResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+  const addToReviewResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith('/api/v1/practice/add-to-review') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Add to Review' }).click();
+  await addSummaryResponsePromise;
+  const addToReviewPayload = (await (await addToReviewResponsePromise).json()).data;
+  expect(addToReviewPayload.addedWordCount).toBe(2);
+  await expect(page.getByTestId('practice-summary')).toContainText('2 new words were added to Review');
 
-  const completedDecks = await listDecks(page, headers);
-  const completedSchedule = scheduleSnapshot(completedDecks.find((deck) => deck.name === 'Practice Workflow Board - Practice Workflow Page'));
-  expect(completedSchedule).not.toEqual(initialSchedule);
-  expect(completedSchedule).toEqual([
-    expect.objectContaining({ word: 'mitigate', interval: 1, repetitions: 1, state: 'learning' }),
-    expect.objectContaining({ word: 'nuance', interval: 1, repetitions: 1, state: 'learning' }),
+  const afterAddDecks = await listDecks(page, headers);
+  const afterAddSchedule = reviewSnapshot(afterAddDecks.find((deck) => deck.name === pageDeck.name));
+  expect(afterAddSchedule).toEqual([
+    expect.objectContaining({ word: 'mitigate', reviewLevel: 0, lapseCount: 0, nextReviewDate: expect.any(String) }),
+    expect.objectContaining({ word: 'nuance', reviewLevel: 0, lapseCount: 0, nextReviewDate: expect.any(String) }),
   ]);
-  expect(completedSchedule.every((card) => typeof card.nextReviewDate === 'string' && card.nextReviewDate)).toBe(true);
+
+  const repeatAdd = await page.request.post('http://127.0.0.1:5000/api/v1/practice/add-to-review', {
+    headers,
+    data: { deckId: pageDeck.id, timeZoneId: 'UTC' },
+  });
+  expect(repeatAdd.status()).toBe(200);
+  expect((await repeatAdd.json()).data.addedWordCount).toBe(0);
+
+  const afterRepeatAddDecks = await listDecks(page, headers);
+  expect(reviewSnapshot(afterRepeatAddDecks.find((deck) => deck.name === pageDeck.name))).toEqual(afterAddSchedule);
 });

@@ -25,6 +25,7 @@
 14. [Next Feature Plan — Flashcard, Practice, And Review Redesign](#14-next-feature-plan--flashcard-practice-and-review-redesign)
 15. [Next Feature Plan — Profile And Learning Settings](#15-next-feature-plan--profile-and-learning-settings)
 16. [Next Feature Plan — FluentA SRS Algorithm](#16-next-feature-plan--fluenta-srs-algorithm)
+17. [Next Feature Plan — Database Performance Optimization](#17-next-feature-plan--database-performance-optimization)
 
 ---
 
@@ -1971,13 +1972,14 @@ capabilities must support:
 |---|---|---|
 | `GET` | `/api/v1/flashcards/decks` | Return only page decks synced from vocabulary pages. No All Words decks. |
 | `GET` | `/api/v1/flashcards/decks/{deckId}/cards` | Return cards for one owned active page deck for Flashcard and Practice. |
-| `POST` | `/api/v1/practice/sessions/complete` | Batch create/reset review state for all words in a completed Practice session. |
+| `POST` | `/api/v1/flashcards/practice-sessions` | Persist a completed Practice summary without creating review state. |
+| `POST` | `/api/v1/practice/add-to-review` | Add missing practiced words to FluentA SRS Level 0 due tomorrow. |
 | `GET` | `/api/v1/practice/settings` | Return the global Practice mode sequence. |
 | `PUT` | `/api/v1/practice/settings` | Update the global Practice mode sequence. |
 | `GET` | `/api/v1/review/settings` | Return global review limit and recap-after-answer setting. |
 | `PUT` | `/api/v1/review/settings` | Update global review limit and recap-after-answer setting. |
-| `POST` | `/api/v1/review/sessions/start` | Build a board due queue, apply daily limit, and move overflow due words to tomorrow. |
-| `POST` | `/api/v1/review/answers` | Persist one reviewed word result immediately using correct/wrong mapping. |
+| `POST` | `/api/v1/review/sessions` | Build a board due queue, apply daily limit, and move overflow due words to tomorrow. |
+| `POST` | `/api/v1/review` | Persist one reviewed word result immediately using correct/wrong mapping. |
 
 All endpoints are authenticated and owner-scoped. Foreign words, deleted words,
 deleted pages, deleted boards, and inconsistent board/deck references must be
@@ -2465,8 +2467,8 @@ capabilities must support:
 | Method | Endpoint | Outcome |
 |---|---|---|
 | `POST` | `/api/v1/practice/add-to-review` | Add practiced words without SRS state to Level 0, due tomorrow. |
-| `POST` | `/api/v1/review/answers` | Apply one correct/wrong answer through FluentA SRS and persist history. |
-| `GET` | `/api/v1/review/sessions/start` or `POST` equivalent | Build due Review queue using `nextReviewDate <= today`. |
+| `POST` | `/api/v1/review` | Apply one correct/wrong answer through FluentA SRS and persist history. |
+| `POST` | `/api/v1/review/sessions` | Build due Review queue using words due before the end of the learner's local day. |
 
 All endpoints are authenticated and owner-scoped. Foreign, deleted, or
 non-due words must be rejected for review answer updates.
@@ -2524,3 +2526,222 @@ git diff --check
 Planning may split proof by story. Release proof must cover all level
 transitions, wrong-answer reset behavior, late review scheduling, Practice Add
 to Review behavior, and removal of legacy SM-2 scheduling from the Review path.
+
+---
+
+## 17. Next Feature Plan — Database Performance Optimization
+
+**Planning status:** Candidate feature for high-risk implementation planning
+
+**Mode:** High-risk maintenance initiative for PostgreSQL query performance,
+index strategy, connection stability, and database observability.
+
+**Supabase Postgres guidance applied:** prioritize query performance,
+connection management, schema/index design, concurrency, data access patterns,
+and monitoring before advanced database changes.
+
+**Depends on:** Current PostgreSQL 16, EF Core persistence, Hangfire PostgreSQL
+storage, Redis-only transient state, and the existing owner-scoped API contract.
+
+### 17.1 Desired Outcomes
+
+- FluentA's growing tables keep interactive API paths under the existing p95
+  target of 300ms for representative local and staging workloads.
+- Hot read paths use intentional PostgreSQL indexes that match real `WHERE`,
+  `JOIN`, `ORDER BY`, and soft-delete filters.
+- Slow-query work is driven by `pg_stat_statements` and
+  `EXPLAIN (ANALYZE, BUFFERS)` evidence, not guesswork.
+- EF Core repositories avoid N+1 query patterns, unnecessary tracking, deep
+  offset scans, and broad in-memory filtering on growing datasets.
+- Connection usage stays stable under API plus Hangfire concurrency and does
+  not exhaust PostgreSQL connections.
+- Database optimization does not change product behavior, data ownership,
+  authorization boundaries, or API response contracts.
+
+### 17.2 Locked Engineering Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Evidence first | Every index or query rewrite must cite a baseline query plan, slow-query metric, or known high-growth access path. |
+| Owner scope first | User-owned queries must continue filtering by authenticated owner before returning data. |
+| FK index coverage | Every high-use foreign key used for joins, ownership checks, cascades, or deletes must have an index on the referencing side. |
+| Composite index order | Composite indexes place equality columns first, then range/filter columns, then sort columns when supported by the access pattern. |
+| Soft-delete filtering | Hot queries that always exclude deleted rows prefer partial indexes such as `WHERE deleted_at IS NULL` over bloated full indexes when the predicate is stable. |
+| Covering indexes | `INCLUDE` columns are allowed only for proven read-heavy hot paths where index-only scans materially reduce heap fetches. |
+| Index type fit | B-tree remains the default; GIN/trigram/full-text indexes are used only for search patterns that need them. |
+| Short transactions | Transactions must hold locks only around database work; no external provider calls or long-running application work occur inside a database transaction. |
+| Safe migrations | Large-table indexes need production-safe migration planning, including concurrent index creation where required and rollback notes. |
+| Behavior preservation | No feature may rely on a faster query by weakening validation, ownership filtering, soft deletion, or consistency rules. |
+
+### 17.3 Target Surfaces
+
+Optimization planning starts with the current high-growth and high-frequency
+tables:
+
+| Area | Tables / Paths | Expected Optimization Focus |
+|---|---|---|
+| Review and dashboard | `word_review_states`, `word_review_histories`, `flashcard_cards`, `flashcard_decks`, `vocab_words`, `vocab_pages`, `vocab_boards` | Due queue, review answer ownership check, dashboard aggregation, review history summaries. |
+| Vocabulary workspace | `vocab_boards`, `vocab_pages`, `vocab_words`, `vocab_custom_columns`, `vocab_custom_values`, `vocab_column_visibility` | Board/page loading, selected-page word table, custom value lookup, cell autosave synchronization. |
+| Productivity workflows | `todo_items`, `habits`, `habit_entries`, `countdown_events`, `notifications`, `pomodoro_sessions` | Date-range lists, carry-over jobs, reminder jobs, notification inbox, Pomodoro history. |
+| Journal | `journal_entries` | Newest-first list, learning-date calendar, Unicode search. |
+| Kanban | `kanban_boards`, `kanban_columns`, `kanban_cards` | Board loading, column/card ordering, soft-deleted exclusion. |
+| Runtime storage | EF Core `AppDbContext`, Npgsql pool, Hangfire PostgreSQL storage | Connection pool limits, Hangfire worker impact, statement timeout, migration safety. |
+
+Planning may reorder these surfaces after the first slow-query baseline. The
+Review, Vocabulary, Todo/Habit, Journal, Kanban, Pomodoro, Notification, and
+Hangfire paths must remain independently measurable.
+
+### 17.4 Performance Baseline Requirements
+
+Before implementation, create a baseline report for a representative database
+with enough data to expose non-trivial plans. The report must include:
+
+1. Top queries by total time and mean time from `pg_stat_statements`.
+2. Top high-call-count queries from `pg_stat_statements`.
+3. `EXPLAIN (ANALYZE, BUFFERS)` for the highest-risk API paths.
+4. Missing foreign-key index query output.
+5. Current index list for target tables and approximate index sizes.
+6. Current connection counts grouped by state while API and Hangfire are
+   running.
+7. Current table statistics freshness from `pg_stat_user_tables`.
+
+Baseline artifacts belong in the approved story packet or validation report,
+not only in terminal output.
+
+### 17.5 Query And Index Expectations
+
+The implementation should use EF Core migrations and explicit raw SQL only
+when the migration needs PostgreSQL-specific behavior that EF cannot express.
+
+Required index analysis:
+
+| Pattern | Required Evaluation |
+|---|---|
+| Owner/date filters | Composite indexes for `user_id` plus date/range columns used by Todo, Habit, Journal, Pomodoro, Notification, and Review paths. |
+| Due review queue | Indexes that support owner/board scoping, due-date filtering, and deterministic ordering without scanning all review states. |
+| Page word loading | Indexes that support `page_id`, active rows, created order, and custom-value lookup by word ids. |
+| Soft-deleted rows | Partial indexes for hot active-row queries where `deleted_at IS NULL` is always present. |
+| Unique lazy defaults | Unique indexes for one-row-per-user settings/config tables must continue supporting concurrent default creation. |
+| Search | Existing Journal search must remain backed by the correct search index type; any future broad search must choose trigram or full-text indexes based on query semantics. |
+| Cascades and cleanup | FK-side indexes must protect delete, soft-delete, and cleanup jobs from full scans. |
+
+Indexes are rejected when they duplicate an existing useful index, optimize a
+non-hot query at write-cost expense, or only hide an inefficient data access
+pattern that should be fixed in the repository.
+
+### 17.6 EF Core Data Access Expectations
+
+Repository work must prefer:
+
+- Projection queries that fetch only the columns needed by the API DTO.
+- `AsNoTracking()` for read-only paths.
+- Batch loading with `Contains`/joins instead of per-row follow-up queries.
+- Server-side grouping, counting, and filtering when the result set can grow.
+- Keyset/cursor pagination for growing history or inbox feeds instead of deep
+  `Skip`/`Take` pagination.
+- Bounded result sizes for search, history, dashboard, and notification views.
+- Stable ordering that matches the supporting index.
+
+Repository work must avoid:
+
+- Loading whole user domains into memory only to count, filter, or sort them.
+- Hidden N+1 loops behind navigation properties.
+- Query changes that remove owner checks or deleted-row filters.
+- Client-side randomness on large due queues before a server-side limit has
+  reduced the candidate set.
+
+### 17.7 Connection And Operations Expectations
+
+Connection work must account for both HTTP request traffic and Hangfire workers.
+
+Required planning decisions:
+
+| Concern | Requirement |
+|---|---|
+| Npgsql pooling | Define app-side pool settings appropriate for local, staging, and production instead of relying on accidental defaults. |
+| PostgreSQL limits | Document expected `max_connections`, reserved operational connections, and app/Hangfire pool budgets. |
+| Pooler strategy | If deploying through Supabase or another managed Postgres environment, use the provider's recommended connection pooler for high concurrency. |
+| Timeouts | Add or document statement/command timeout expectations for runaway queries without breaking valid migrations. |
+| Hangfire | Confirm Hangfire storage and worker concurrency do not starve normal API queries. |
+| Maintenance | Document autovacuum/analyze expectations for high-churn tables and run `ANALYZE` after large migrations or seed loads. |
+
+### 17.8 Scope Boundaries
+
+Out of scope:
+
+- Product workflow redesign.
+- Public API shape changes.
+- New user-visible settings or admin screens.
+- Database sharding or bounded-context database split.
+- Replacing EF Core as the main application persistence layer.
+- Adding PostgreSQL Row-Level Security without a separate architecture decision.
+- Moving durable product data into Redis.
+- Changing soft-delete retention rules.
+- Production tuning based on unsanitized production data copied into local
+  artifacts.
+- Blindly adding indexes to every foreign key or column without measured or
+  growth-path justification.
+
+### 17.9 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Index does not match query shape | `EXPLAIN (ANALYZE, BUFFERS)` proves the intended index is used on representative data. |
+| Duplicate or unused indexes slow writes | Index inventory and `pg_stat_user_indexes` review show no obvious duplicate/unused additions after validation. |
+| Soft-delete partial index misses queries | Tests and query plans prove active-row queries include `deleted_at IS NULL` where required. |
+| FK scans block cleanup or deletes | Missing-FK-index query returns no unresolved high-use FK gaps for target tables. |
+| Migration locks production tables | Large-table migration plan uses concurrent index creation or an approved maintenance-window strategy. |
+| EF rewrite changes behavior | Existing unit/integration/E2E tests for affected product paths still pass. |
+| Owner isolation regression | API/integration tests continue proving foreign-user and deleted-resource non-disclosure. |
+| Dashboard or review queues still overfetch | Query plans and repository tests prove server-side filtering/limits before materialization. |
+| Connection exhaustion | Load or smoke proof shows API plus Hangfire stay within the documented connection budget. |
+| Stale planner statistics | Validation records `ANALYZE` or autovacuum evidence after large data changes. |
+
+### 17.10 Proposed Story Queue
+
+1. **US-DBOPT-001:** Capture PostgreSQL performance baseline with
+   `pg_stat_statements`, index inventory, connection usage, FK-index audit, and
+   `EXPLAIN (ANALYZE, BUFFERS)` for the highest-risk API paths.
+2. **US-DBOPT-002:** Add or refine indexes for Review, Flashcard dashboard,
+   and Vocabulary workspace hot paths.
+3. **US-DBOPT-003:** Add or refine indexes for Todo, Habit, Countdown,
+   Notification, Journal, Kanban, and Pomodoro hot paths.
+4. **US-DBOPT-004:** Rewrite EF Core repository queries that overfetch, track
+   read-only entities, perform N+1 loading, or paginate growing feeds with deep
+   offsets.
+5. **US-DBOPT-005:** Define Npgsql, Hangfire, and PostgreSQL connection budget
+   settings for local/staging/production.
+6. **US-DBOPT-006:** Run release proof comparing baseline vs optimized query
+   plans, API timings, integration tests, and Harness matrix evidence.
+
+### 17.11 Verification Ladder
+
+```powershell
+docker compose -f docker-compose.dev.yml up -d
+dotnet tool restore
+dotnet tool run dotnet-ef database update `
+  --project src/backend/FluentA.Infrastructure `
+  --startup-project src/backend/FluentA.API
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Database-specific proof must additionally include saved SQL or report artifacts
+for:
+
+- `pg_stat_statements` top total-time, mean-time, and call-count queries.
+- `EXPLAIN (ANALYZE, BUFFERS)` before and after each optimized hot path.
+- Missing foreign-key index audit.
+- Index size and duplicate-index review.
+- Connection usage while API and Hangfire are both running.
+- Table statistics freshness after migrations or representative seed loading.
+
+Planning may split verification by story. Release proof must compare measured
+baseline and optimized results, and must state any query that was inspected but
+intentionally left unchanged.

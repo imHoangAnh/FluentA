@@ -12,14 +12,16 @@ spaced-repetition review behavior are separate stories.
 - A logged-in user can create boards with a name and target language.
 - A logged-in user can see only their own boards.
 - A logged-in user can update or soft-delete their own boards.
-- A logged-in user can create, rename, reorder, and delete pages within their
-  own boards.
+- A logged-in user can create, rename, and delete pages within their own
+  boards.
 - A logged-in user can select a page and create, edit, list, and soft-delete
   vocabulary words in an inline table.
 - A logged-in user can add board-wide text and number custom columns, edit
   typed custom values on every page, and permanently delete custom columns and
   their values.
 - A logged-in user's hidden optional/custom columns are private per board.
+- Board lists, page lists, and custom columns render in creation order using
+  `created_at`.
 - Existing vocabulary cells autosave independently on blur or Tab. Failed
   autosaves preserve the draft and show inline Retry.
 - Tab and Shift+Tab traverse visible editable cells, Escape cancels the current
@@ -65,11 +67,11 @@ All responses use the FluentA envelope.
 | `GET` | `/api/v1/boards` | List the current user's boards with page counts. |
 | `POST` | `/api/v1/boards` | Create a board. |
 | `GET` | `/api/v1/boards/{boardId}` | Get one board with pages. |
-| `PATCH` | `/api/v1/boards/{boardId}` | Update board name, language, or sort order. |
+| `PATCH` | `/api/v1/boards/{boardId}` | Update board name or language. |
 | `DELETE` | `/api/v1/boards/{boardId}` | Soft-delete a board. |
 | `GET` | `/api/v1/boards/{boardId}/pages` | List pages for one board. |
 | `POST` | `/api/v1/boards/{boardId}/pages` | Create a page and its Page deck. |
-| `PATCH` | `/api/v1/boards/{boardId}/pages/{pageId}` | Rename or reorder a page. |
+| `PATCH` | `/api/v1/boards/{boardId}/pages/{pageId}` | Rename a page. |
 | `DELETE` | `/api/v1/boards/{boardId}/pages/{pageId}` | Soft-delete a page. |
 | `GET` | `/api/v1/boards/{boardId}/pages/{pageId}/words` | List active words in a page. |
 | `POST` | `/api/v1/boards/{boardId}/pages/{pageId}/words` | Create a word in a page. |

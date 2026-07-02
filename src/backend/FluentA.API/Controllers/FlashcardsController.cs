@@ -58,6 +58,7 @@ public sealed class FlashcardsController : ControllerBase
     }
 
     /// <summary>Creates a server-side board review session.</summary>
+    [HttpPost("/api/v1/review/sessions")]
     [HttpPost("sessions")]
     public async Task<IActionResult> CreateReviewSession(CreateReviewSessionRequest request, CancellationToken cancellationToken)
     {
@@ -68,6 +69,7 @@ public sealed class FlashcardsController : ControllerBase
     }
 
     /// <summary>Returns a completed review session summary.</summary>
+    [HttpGet("/api/v1/review/sessions/{sessionId:guid}/summary")]
     [HttpGet("sessions/{sessionId:guid}/summary")]
     public async Task<IActionResult> GetReviewSessionSummary(Guid sessionId, CancellationToken cancellationToken)
     {
@@ -134,6 +136,7 @@ public sealed class FlashcardsController : ControllerBase
     }
 
     /// <summary>Records a review answer for a card in a review session.</summary>
+    [HttpPost("/api/v1/review")]
     [HttpPost("review")]
     public async Task<IActionResult> SubmitReview(SubmitReviewRequest request, CancellationToken cancellationToken)
     {

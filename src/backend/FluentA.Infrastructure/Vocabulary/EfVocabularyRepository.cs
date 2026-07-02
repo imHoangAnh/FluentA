@@ -21,8 +21,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         return await _dbContext.Boards
             .Include(board => board.Pages)
             .Where(board => board.UserId == userId && board.DeletedAt == null)
-            .OrderBy(board => board.SortOrder)
-            .ThenBy(board => board.CreatedAt)
+            .OrderBy(board => board.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
@@ -78,7 +77,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             from column in _dbContext.VocabCustomColumns
             join board in _dbContext.Boards on column.BoardId equals board.Id
             where column.BoardId == boardId && board.UserId == userId && board.DeletedAt == null
-            orderby column.SortOrder, column.CreatedAt
+            orderby column.CreatedAt
             select column)
             .ToListAsync(cancellationToken);
     }
@@ -106,35 +105,6 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
                 && deck.PageId == pageId)
             .Select(deck => deck.Id)
             .ToListAsync(cancellationToken);
-    }
-
-    public async Task<int> NextBoardSortOrderAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var maxSortOrder = await _dbContext.Boards
-            .Where(board => board.UserId == userId && board.DeletedAt == null)
-            .Select(board => (int?)board.SortOrder)
-            .MaxAsync(cancellationToken);
-
-        return (maxSortOrder ?? -1) + 1;
-    }
-
-    public async Task<int> NextPageSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
-    {
-        var maxSortOrder = await _dbContext.Pages
-            .Where(page => page.BoardId == boardId && page.DeletedAt == null)
-            .Select(page => (int?)page.SortOrder)
-            .MaxAsync(cancellationToken);
-
-        return (maxSortOrder ?? -1) + 1;
-    }
-
-    public async Task<int> NextCustomColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
-    {
-        var maxSortOrder = await _dbContext.VocabCustomColumns
-            .Where(column => column.BoardId == boardId)
-            .Select(column => (int?)column.SortOrder)
-            .MaxAsync(cancellationToken);
-        return (maxSortOrder ?? -1) + 1;
     }
 
     public async Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)

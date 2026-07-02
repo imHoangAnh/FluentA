@@ -31,8 +31,7 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<BoardDetailDto>.Failure(VocabularyError.Validation(errors));
         }
 
-        var sortOrder = await _repository.NextBoardSortOrderAsync(userId, cancellationToken);
-        var board = VocabBoard.Create(userId, request.Name, request.Language, sortOrder);
+        var board = VocabBoard.Create(userId, request.Name, request.Language);
         await _repository.AddBoardAsync(board, cancellationToken);
 
         return OperationResult<BoardDetailDto>.Success(ToDetail(board));
@@ -60,7 +59,7 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<BoardDetailDto>.Failure(VocabularyError.NotFound());
         }
 
-        board.Update(request.Name, request.Language, request.SortOrder ?? board.SortOrder);
+        board.Update(request.Name, request.Language, board.SortOrder);
         await _repository.UpdateBoardAsync(board, cancellationToken);
         return OperationResult<BoardDetailDto>.Success(ToDetail(board));
     }
@@ -99,8 +98,7 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<PageDto>.Failure(VocabularyError.NotFound());
         }
 
-        var sortOrder = request.SortOrder ?? await _repository.NextPageSortOrderAsync(boardId, cancellationToken);
-        var page = VocabPage.Create(board.Id, request.Name, sortOrder);
+        var page = VocabPage.Create(board.Id, request.Name, board.Pages.Count(page => page.DeletedAt is null));
         var deck = FlashcardDeck.CreatePageDeck(userId, board.Id, page.Id, board.Name, page.Name);
         await _repository.AddPageWithDeckAsync(page, deck, cancellationToken);
 
@@ -121,7 +119,7 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<PageDto>.Failure(VocabularyError.NotFound());
         }
 
-        page.Update(request.Name, request.SortOrder ?? page.SortOrder);
+        page.Update(request.Name, page.SortOrder);
         await _repository.UpdatePageAsync(page, cancellationToken);
         return OperationResult<PageDto>.Success(ToPage(page));
     }
@@ -320,8 +318,7 @@ public sealed class VocabularyService : IVocabularyService
             }));
         }
 
-        var sortOrder = await _repository.NextCustomColumnSortOrderAsync(boardId, cancellationToken);
-        var column = VocabCustomColumn.Create(boardId, request.Name, type, sortOrder);
+        var column = VocabCustomColumn.Create(boardId, request.Name, type, columns.Count);
         await _repository.AddCustomColumnAsync(column, cancellationToken);
         return OperationResult<CustomColumnDto>.Success(ToCustomColumn(column));
     }
@@ -377,7 +374,6 @@ public sealed class VocabularyService : IVocabularyService
             board.Id,
             board.Name,
             board.Language,
-            board.SortOrder,
             board.Pages.Count(page => page.DeletedAt is null),
             board.CreatedAt,
             board.UpdatedAt);
@@ -389,7 +385,6 @@ public sealed class VocabularyService : IVocabularyService
             board.Id,
             board.Name,
             board.Language,
-            board.SortOrder,
             ToPages(board),
             board.CreatedAt,
             board.UpdatedAt);
@@ -399,15 +394,14 @@ public sealed class VocabularyService : IVocabularyService
     {
         return board.Pages
             .Where(page => page.DeletedAt is null)
-            .OrderBy(page => page.SortOrder)
-            .ThenBy(page => page.CreatedAt)
+            .OrderBy(page => page.CreatedAt)
             .Select(ToPage)
             .ToList();
     }
 
     private static PageDto ToPage(VocabPage page)
     {
-        return new PageDto(page.Id, page.BoardId, page.Name, page.SortOrder, page.CreatedAt, page.UpdatedAt);
+        return new PageDto(page.Id, page.BoardId, page.Name, page.CreatedAt, page.UpdatedAt);
     }
 
     private static WordDto ToWord(VocabWord word, IEnumerable<VocabCustomValue> values)
@@ -431,7 +425,7 @@ public sealed class VocabularyService : IVocabularyService
     }
 
     private static CustomColumnDto ToCustomColumn(VocabCustomColumn column) =>
-        new(column.Id, column.Name, column.Type.ToString().ToLowerInvariant(), column.SortOrder);
+        new(column.Id, column.Name, column.Type.ToString().ToLowerInvariant(), column.CreatedAt);
 
     private static ColumnConfigurationDto ToColumnConfiguration(
         IEnumerable<VocabCustomColumn> columns,

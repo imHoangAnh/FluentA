@@ -34,6 +34,11 @@ public static class ReviewTime
     public static (DateTime StartUtc, DateTime EndUtc) LocalDayBoundsUtc(DateTime utcNow, TimeZoneInfo timeZone)
     {
         var localDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
+        return LocalDateBoundsUtc(localDate, timeZone);
+    }
+
+    public static (DateTime StartUtc, DateTime EndUtc) LocalDateBoundsUtc(DateTime localDate, TimeZoneInfo timeZone)
+    {
         return (LocalDateStartUtc(localDate, timeZone), LocalDateStartUtc(localDate.AddDays(1), timeZone));
     }
 

@@ -21,7 +21,7 @@ file must reflect the implementation truth instead of the final target shape.
 - Protected navigation now exposes distinct `Flashcard`, `Practice`, and
   `Review` entry points.
 - `/flashcards` is the dedicated Flashcard landing page, `/flashcards/practice`
-  is the dedicated Practice landing page, and `/flashcards/review` is the only
+  is the dedicated Practice landing page, and `/review` is the only
   shipped review engine.
 
 ## Synchronization Rules
@@ -94,13 +94,13 @@ thesaurus, collocation, and note from their source vocabulary word.
 
 ## Review Surface
 
-- Review starts from the dedicated `/flashcards/review` route and requires one
+- Review starts from the dedicated `/review` route and requires one
   owned vocabulary board.
-- `POST /api/v1/flashcards/sessions` creates a server-side session for an owned
+- `POST /api/v1/review/sessions` creates a server-side session for an owned
   board, selected order type, selected mode, and valid timezone id.
 - The created review session returns only due words for that board, plus the
   resolved per-word mode list for the session.
-- `POST /api/v1/flashcards/review` accepts only an owned due `wordId` in the
+- `POST /api/v1/review` accepts only an owned due `wordId` in the
   live session plus a valid timezone id.
 - Review requires existing dedicated review state for the word. In practice,
   that state is created only by `Add to Review`.

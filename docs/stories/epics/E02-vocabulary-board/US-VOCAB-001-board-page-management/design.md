@@ -3,9 +3,11 @@
 ## Domain Model
 
 `VocabBoard` is an aggregate owned by `UserId`. It has `Name`, `Language`, and
-`SortOrder`, and soft-delete metadata inherited from `BaseEntity`.
+soft-delete metadata inherited from `BaseEntity`. Workspace board lists now
+sort by `CreatedAt`.
 
-`VocabPage` belongs to a board and stores `Name` and `SortOrder`.
+`VocabPage` belongs to a board and stores `Name`. Board detail and page lists
+now sort by `CreatedAt`.
 
 `FlashcardDeck` is introduced as a minimal record so board/page creation can
 satisfy the spec's deck side effects. It stores board id, optional page id,
@@ -22,6 +24,8 @@ with the corresponding deck record.
 
 The protected API exposes `/api/v1/boards` and nested page routes. Controllers
 extract the authenticated user id from JWT claims and return FluentA envelopes.
+Board and page APIs no longer accept or return explicit reorder fields; clients
+render both lists in `CreatedAt` order.
 
 Errors:
 

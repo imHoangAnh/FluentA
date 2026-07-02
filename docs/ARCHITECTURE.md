@@ -285,6 +285,12 @@ The first scaling steps are operational:
 5. Scale PostgreSQL with indexes, connection tuning, and read/query analysis
    before considering database decomposition.
 
+The local runtime now makes the first PostgreSQL connection budget explicit:
+the API normalizes Npgsql pooling from configuration, local development caps the
+application pool at 30 connections, and Hangfire defaults to 5 workers. Staging
+and production must set equivalent pool, timeout, and worker values from their
+own PostgreSQL limits and provider pooler strategy.
+
 A bounded context should become an independent service only when it needs an
 independent deployment cadence, scaling profile, failure boundary, or data
 ownership model that outweighs distributed-system cost.

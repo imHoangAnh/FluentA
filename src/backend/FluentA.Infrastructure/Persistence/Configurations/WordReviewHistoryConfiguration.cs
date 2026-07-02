@@ -32,7 +32,11 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
             .HasForeignKey(history => history.WordId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(history => new { history.UserId, history.SessionId });
+        builder.HasIndex(history => new { history.UserId, history.SessionId })
+            .HasFilter("deleted_at IS NULL");
+        builder.HasIndex(history => new { history.UserId, history.ReviewedAt })
+            .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
+            .HasFilter("deleted_at IS NULL");
         builder.HasIndex(history => new { history.WordId, history.ReviewedAt });
     }
 }

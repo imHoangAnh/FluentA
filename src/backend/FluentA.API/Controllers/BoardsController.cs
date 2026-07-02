@@ -46,7 +46,7 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Updates board metadata such as name, language, and sort order.</summary>
+    /// <summary>Updates board metadata such as name and language.</summary>
     [HttpPatch("{boardId:guid}")]
     public async Task<IActionResult> UpdateBoard(Guid boardId, UpdateBoardRequest request, CancellationToken cancellationToken)
     {
@@ -82,7 +82,7 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Updates page metadata.</summary>
+    /// <summary>Updates page metadata such as the page name.</summary>
     [HttpPatch("{boardId:guid}/pages/{pageId:guid}")]
     public async Task<IActionResult> UpdatePage(Guid boardId, Guid pageId, UpdatePageRequest request, CancellationToken cancellationToken)
     {

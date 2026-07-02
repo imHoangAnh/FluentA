@@ -10,6 +10,11 @@ domains that actually exist in that spec, for example `overview.md`,
 Do not create domain files before the spec just to fill the folder. Empty
 structure is healthier than fake product truth.
 
+## Current Contracts
+
+- `database-performance.md`: PostgreSQL query, index, baseline, and connection
+  budget rules for non-visible performance work.
+
 ## Update Rule
 
 When behavior changes:

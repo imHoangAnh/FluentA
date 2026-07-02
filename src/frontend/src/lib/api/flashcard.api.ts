@@ -73,6 +73,16 @@ export type ReviewSessionSummary = {
   averageTimeSpentSeconds: number
 }
 
+export type ReviewResult = {
+  wordId: string
+  reviewHistoryId: string
+  result: 'correct' | 'wrong'
+  levelBefore: number
+  levelAfter: number
+  lapseCount: number
+  nextReviewDate: string
+}
+
 export type ReviewSettings = {
   dailyLimit: number
   recapAfterAnswer: boolean
@@ -134,7 +144,7 @@ export async function createReviewSession(input: {
   mode: ReviewMode
   timeZoneId: string
 }) {
-  const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/flashcards/sessions', input)
+  const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/review/sessions', input)
   return response.data.data!
 }
 
@@ -159,7 +169,7 @@ export async function addPracticeWordsToReview(input: {
 }
 
 export async function getReviewSessionSummary(sessionId: string) {
-  const response = await apiClient.get<ApiEnvelope<ReviewSessionSummary>>(`/flashcards/sessions/${sessionId}/summary`)
+  const response = await apiClient.get<ApiEnvelope<ReviewSessionSummary>>(`/review/sessions/${sessionId}/summary`)
   return response.data.data!
 }
 
@@ -196,6 +206,6 @@ export async function submitReview(input: {
   timeSpentSeconds: number
   timeZoneId: string
 }) {
-  const response = await apiClient.post('/flashcards/review', input)
-  return response.data
+  const response = await apiClient.post<ApiEnvelope<ReviewResult>>('/review', input)
+  return response.data.data!
 }

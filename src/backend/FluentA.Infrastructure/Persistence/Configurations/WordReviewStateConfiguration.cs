@@ -30,6 +30,7 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(state => state.WordId).IsUnique();
-        builder.HasIndex(state => new { state.UserId, state.NextReviewDate });
+        builder.HasIndex(state => new { state.UserId, state.NextReviewDate })
+            .HasFilter("deleted_at IS NULL");
     }
 }

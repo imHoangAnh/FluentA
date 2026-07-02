@@ -54,8 +54,8 @@ public sealed class VocabularyServiceTests
         var listedBoards = await service.ListBoardsAsync(userId);
         var listedPages = await service.ListPagesAsync(userId, board.Value.Id);
         var listedWords = await service.ListWordsAsync(userId, board.Value.Id, page.Value.Id);
-        var updatedBoard = await service.UpdateBoardAsync(userId, board.Value.Id, new UpdateBoardRequest("HSK", "zh", 9));
-        var updatedPage = await service.UpdatePageAsync(userId, board.Value.Id, page.Value.Id, new UpdatePageRequest("Lesson 2", 3));
+        var updatedBoard = await service.UpdateBoardAsync(userId, board.Value.Id, new UpdateBoardRequest("HSK", "zh"));
+        var updatedPage = await service.UpdatePageAsync(userId, board.Value.Id, page.Value.Id, new UpdatePageRequest("Lesson 2"));
         var deletedWord = await service.DeleteWordAsync(userId, board.Value.Id, created.Value!.Id);
         var deletedPage = await service.DeletePageAsync(userId, board.Value.Id, page.Value.Id);
         var deletedBoard = await service.DeleteBoardAsync(userId, board.Value.Id);
@@ -65,9 +65,7 @@ public sealed class VocabularyServiceTests
         Assert.Equal("mitigate", Assert.Single(listedWords.Value!).Word);
         Assert.Equal("HSK", updatedBoard.Value!.Name);
         Assert.Equal("zh", updatedBoard.Value.Language);
-        Assert.Equal(9, updatedBoard.Value.SortOrder);
         Assert.Equal("Lesson 2", updatedPage.Value!.Name);
-        Assert.Equal(3, updatedPage.Value.SortOrder);
         Assert.True(deletedWord.Value);
         Assert.True(deletedPage.Value);
         Assert.True(deletedBoard.Value);
@@ -327,19 +325,6 @@ public sealed class VocabularyServiceTests
                 .Select(deck => deck.Id)
                 .ToList());
         }
-
-        public Task<int> NextBoardSortOrderAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_boards.Count(board => board.UserId == userId));
-        }
-
-        public Task<int> NextPageSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_pages.Count(page => page.BoardId == boardId));
-        }
-
-        public Task<int> NextCustomColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Columns.Count(column => column.BoardId == boardId));
 
         public Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
         {

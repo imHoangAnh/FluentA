@@ -26,6 +26,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 using StackExchange.Redis;
 
 namespace FluentA.Infrastructure;
@@ -35,15 +36,30 @@ public static class DependencyInjection
     private const string DefaultPostgresConnection =
         "Host=localhost;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_local_pass";
     private const string DefaultRedisConnection = "localhost:6379";
+    private const int DefaultPostgresMinPoolSize = 0;
+    private const int DefaultPostgresMaxPoolSize = 30;
+    private const int DefaultPostgresConnectionTimeoutSeconds = 15;
+    private const int DefaultPostgresCommandTimeoutSeconds = 30;
+    private const int DefaultHangfireWorkerCount = 5;
 
     public static IServiceCollection AddFluentAInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var postgresConnection = configuration.GetConnectionString("Postgres") ?? DefaultPostgresConnection;
+        var postgresConnection = BuildPostgresConnectionString(configuration.GetConnectionString("Postgres") ?? DefaultPostgresConnection, configuration);
+        var postgresCommandTimeoutSeconds = GetPositiveInt(
+            configuration,
+            "Database:Postgres:CommandTimeoutSeconds",
+            DefaultPostgresCommandTimeoutSeconds);
+        var hangfireWorkerCount = GetPositiveInt(
+            configuration,
+            "Hangfire:WorkerCount",
+            DefaultHangfireWorkerCount);
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
 
-        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(postgresConnection));
+        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
+            postgresConnection,
+            npgsqlOptions => npgsqlOptions.CommandTimeout(postgresCommandTimeoutSeconds)));
         services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
-        services.AddHangfireServer();
+        services.AddHangfireServer(options => options.WorkerCount = hangfireWorkerCount);
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
         services.TryAddSingleton<JwtSigningKeyProvider>();
         services.AddScoped<IUserRepository, EfUserRepository>();
@@ -83,5 +99,38 @@ public static class DependencyInjection
         services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
+    }
+
+    private static string BuildPostgresConnectionString(string connectionString, IConfiguration configuration)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = true,
+            MinPoolSize = GetNonNegativeInt(configuration, "Database:Postgres:MinPoolSize", DefaultPostgresMinPoolSize),
+            MaxPoolSize = GetPositiveInt(configuration, "Database:Postgres:MaxPoolSize", DefaultPostgresMaxPoolSize),
+            Timeout = GetPositiveInt(
+                configuration,
+                "Database:Postgres:ConnectionTimeoutSeconds",
+                DefaultPostgresConnectionTimeoutSeconds),
+            CommandTimeout = GetPositiveInt(
+                configuration,
+                "Database:Postgres:CommandTimeoutSeconds",
+                DefaultPostgresCommandTimeoutSeconds),
+            ApplicationName = configuration["Database:Postgres:ApplicationName"] ?? "FluentA.Api"
+        };
+
+        return builder.ConnectionString;
+    }
+
+    private static int GetPositiveInt(IConfiguration configuration, string key, int fallback)
+    {
+        var value = configuration.GetValue<int?>(key);
+        return value is > 0 ? value.Value : fallback;
+    }
+
+    private static int GetNonNegativeInt(IConfiguration configuration, string key, int fallback)
+    {
+        var value = configuration.GetValue<int?>(key);
+        return value is >= 0 ? value.Value : fallback;
     }
 }

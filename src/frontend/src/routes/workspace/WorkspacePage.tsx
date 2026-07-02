@@ -30,11 +30,11 @@ export function WorkspacePage() {
 
   const activeBoard = boardQuery.data
   const sortedBoards = useMemo(
-    () => boards.toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
+    () => boards.toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.name.localeCompare(right.name)),
     [boards],
   )
   const sortedPages = useMemo(
-    () => (activeBoard?.pages ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
+    () => (activeBoard?.pages ?? []).toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.name.localeCompare(right.name)),
     [activeBoard?.pages],
   )
   
