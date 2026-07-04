@@ -26,6 +26,8 @@
 15. [Next Feature Plan — Profile And Learning Settings](#15-next-feature-plan--profile-and-learning-settings)
 16. [Next Feature Plan — FluentA SRS Algorithm](#16-next-feature-plan--fluenta-srs-algorithm)
 17. [Next Feature Plan — Database Performance Optimization](#17-next-feature-plan--database-performance-optimization)
+18. [Next Feature Plan — MinIO Asset Storage](#18-next-feature-plan--minio-asset-storage)
+19. [Next Feature Plan — FluentA Worker Runtime](#19-next-feature-plan--fluenta-worker-runtime)
 
 ---
 
@@ -267,8 +269,8 @@ FluentA.sln
 │   │   └── Cache/
 │   │       └── RedisService.cs
 │   │
-│   └── FluentA.Jobs/                     # Background Jobs (Hangfire)
-│       └── SpacedRepetitionJob.cs
+│   └── FluentA.Worker/                   # Separate Hangfire worker host
+│       └── Program.cs
 │
 └── tests/
     ├── FluentA.Domain.UnitTests/
@@ -940,7 +942,9 @@ public class UnitOfWork : IUnitOfWork
 ### 6.8 Background Job: Daily SR Queue Builder
 
 ```csharp
-// SpacedRepetitionJob.cs — runs at 00:00 daily via Hangfire
+// Review scheduling is request-driven in the current product. Recurring
+// background jobs run from the dedicated FluentA.Worker process after
+// Feature 19, not from FluentA.API.
 public class SpacedRepetitionJob
 {
     public async Task BuildDailyQueues()
@@ -2056,12 +2060,18 @@ implemented speech/text practice interactions.
 
 **Source of truth:** `history/profile-learning-settings/CONTEXT.md`
 
+**Avatar storage superseded by Feature 18:** this section originally locked a
+Cloudinary-backed avatar implementation. Feature 18 replaces that provider and
+upload flow with MinIO-backed shared asset storage. The profile/settings
+behavior remains relevant; Cloudinary-specific storage rules are legacy context.
+
 ### 15.1 Desired Outcomes
 
 - Authenticated users can open one Settings page that combines profile editing
   and learning settings.
 - Users can update display name, optional avatar, and optional bio.
-- Avatar upload uses real Cloudinary storage through the backend.
+- Avatar upload uses durable external object storage; Feature 18 defines the
+  current MinIO-backed storage contract.
 - Practice Settings lets users configure the global Practice mode sequence
   introduced in Feature 14.
 - Review Settings lets users configure global review limit and recap behavior
@@ -2079,17 +2089,17 @@ implemented speech/text practice interactions.
 | Bio validation | Bio is optional, plain text only, and at most 500 characters. |
 | Email behavior | Email is shown read-only and cannot be changed in this feature. |
 | Avatar optionality | Avatar can be null. |
-| Avatar upload | Avatar uses real Cloudinary upload through the backend. |
+| Avatar upload | Avatar uses durable external object storage. Feature 18 supersedes the original Cloudinary provider with MinIO-backed asset storage. |
 | Avatar file types | Avatar accepts JPG, PNG, and WebP only. |
 | Avatar size | Avatar max file size is 2MB. |
-| Avatar save UX | Selecting a new avatar shows a local preview; upload occurs only when the user clicks Save Profile. |
+| Avatar save UX | Selecting a new avatar shows a local preview; the profile avatar changes only after the save/finalize flow succeeds. |
 | Avatar remove UX | Remove avatar sets avatar to null on Save Profile. If a new unsaved file was selected, remove discards it and saves null. |
-| Avatar replace cleanup | When replacing avatar, upload new Cloudinary image and update DB successfully before deleting the old Cloudinary image. |
-| Avatar save atomicity | If Cloudinary config is missing or upload fails, Profile save fails entirely and keeps old profile/avatar. |
-| Uploaded-image cleanup | If new Cloudinary upload succeeds but DB update fails, backend deletes the newly uploaded image. |
-| Avatar response | Profile API returns `avatarUrl` only. Backend stores Cloudinary `publicId` internally. |
+| Avatar replace cleanup | When replacing avatar, make the new avatar durable and update DB successfully before deleting the old avatar object. |
+| Avatar save atomicity | If storage config is missing or upload/finalize fails, Profile save fails entirely and keeps old profile/avatar. |
+| Uploaded-image cleanup | If new object upload succeeds but DB update fails, backend deletes the newly uploaded object. |
+| Avatar response | Profile API returns `avatarUrl` only. Provider object keys and asset metadata stay internal. |
 | Old avatar deletion | Uploading a new avatar deletes the previous avatar after the new avatar and DB update are successful. |
-| Remove avatar deletion | Removing avatar deletes the current Cloudinary image and sets profile avatar to null. |
+| Remove avatar deletion | Removing avatar deletes the current stored avatar object and sets profile avatar to null. |
 | Profile save | Profile uses an explicit Save Profile button; it does not autosave text fields. |
 | Profile propagation | Updated name/avatar appears anywhere the app currently shows user email, name, or profile identity. |
 | Practice Settings | Practice Settings includes only the global Practice mode sequence. |
@@ -2102,7 +2112,7 @@ implemented speech/text practice interactions.
 | Settings autosave | Practice Settings and Review Settings autosave on change. |
 | Autosave failure | Autosave failure shows an error and keeps the draft value visible so the user can retry or change it. |
 | Password/security | Change Password and password/security links are out of scope and are not shown on this Settings page. |
-| Cloudinary fallback | No local fallback storage is included. Avatar upload requires real Cloudinary config and runs like production. |
+| Storage fallback | No Cloudinary fallback is included after Feature 18. Local development uses real MinIO from Docker Compose. |
 
 ### 15.3 Settings Page Layout
 
@@ -2136,26 +2146,26 @@ Profile editing is explicit-save, not autosave.
 Save Profile flow:
 
 1. Validate name and bio.
-2. If a new avatar file is selected, validate MIME type and size.
-3. Upload the new avatar to Cloudinary.
-4. Update the database with name, bio, `avatarUrl`, and internal
-   `avatarPublicId`.
-5. If database update succeeds, delete the old Cloudinary avatar when one
-   exists.
-6. If database update fails after new upload, delete the newly uploaded
-   Cloudinary image.
-7. Return the updated profile with `avatarUrl`, but not `avatarPublicId`.
+2. If a new avatar file is selected, validate MIME type and size before storage.
+3. Make the new avatar durable through the current storage contract.
+4. Update the database with name, bio, and the public avatar URL or linked
+   asset reference.
+5. If database update succeeds, delete the old avatar object when one exists.
+6. If database update fails after new object upload, delete the newly uploaded
+   object.
+7. Return the updated profile with `avatarUrl`, but not provider object keys or
+   asset internals.
 
 Remove avatar flow:
 
 1. User clicks Remove avatar.
 2. UI marks avatar as null in the draft.
-3. Save Profile deletes the existing Cloudinary avatar and updates the profile
-   avatar fields to null.
+3. Save Profile deletes the existing stored avatar object and updates the
+   profile avatar fields to null.
 4. If deletion or DB update fails, the profile remains unchanged and the UI
    shows an error.
 
-If Cloudinary config is missing, invalid, or unavailable, any Profile save that
+If avatar storage config is missing, invalid, or unavailable, any Profile save that
 requires avatar upload must fail entirely and preserve the old profile/avatar.
 
 ### 15.5 Practice Settings Behavior
@@ -2202,13 +2212,14 @@ capabilities must support:
 | Method | Endpoint | Outcome |
 |---|---|---|
 | `GET` | `/api/v1/settings` | Return profile, Practice Settings, and Review Settings for the authenticated user. |
-| `PUT` | `/api/v1/profile` | Update name, bio, avatar file/null intent, and return updated profile. |
+| `PUT` | `/api/v1/profile` | Update name, bio, `removeAvatar`, and optional finalized `avatarAssetId`, then return updated profile. |
 | `PUT` | `/api/v1/practice/settings` | Autosave global Practice mode sequence. |
 | `PUT` | `/api/v1/review/settings` | Autosave review limit and recap-after-answer. |
 
-Profile update should accept multipart form data when an avatar file is present.
-The API may use a separate avatar endpoint only if planning proves it preserves
-the same save semantics and failure behavior.
+Profile update now uses JSON. Avatar file bytes do not go through
+`PUT /api/v1/profile`; the frontend performs the Feature 18
+`presign -> direct upload -> finalize -> profile save` flow and then sends the
+finalized `avatarAssetId` to `PUT /api/v1/profile`.
 
 ### 15.8 Data And Configuration Expectations
 
@@ -2219,11 +2230,11 @@ Profile storage needs durable fields for:
 | `name` | Display name, required 2-100 chars. |
 | `bio` | Optional plain text bio, max 500 chars. |
 | `avatarUrl` | Public avatar URL returned to clients. |
-| `avatarPublicId` | Internal Cloudinary id used for deletion/replacement. |
+| `currentAvatarAssetId` | Internal link to the owned finalized avatar asset currently reflected by `avatarUrl`. |
 
-Cloudinary configuration must come from environment variables, user-secrets, or
-equivalent secret storage. Tracked config must not contain real Cloudinary
-secrets.
+Avatar storage configuration must come from environment variables, user-secrets,
+Docker Compose development config, or equivalent secret storage. Tracked config
+must not contain real production storage secrets.
 
 Practice/Review settings may reuse the Feature 14 settings storage or extend it
 as needed, but must remain user-scoped and lazily defaulted when no settings row
@@ -2237,9 +2248,10 @@ Out of scope:
 - Forgot Password links or account security sections in Settings.
 - Email change or email re-verification.
 - Avatar cropper/editor.
-- Avatar upload through direct browser-to-Cloudinary signed upload.
-- Local fallback avatar storage.
-- S3 storage.
+- Cloudinary upload, Cloudinary fallback, or Cloudinary cleanup bridge after
+  Feature 18.
+- Local filesystem fallback avatar storage.
+- Production/staging S3-compatible storage decisions.
 - Rich text or Markdown bio.
 - Practice default order type.
 - Review default order type.
@@ -2251,11 +2263,11 @@ Out of scope:
 | Risk | Required Proof Before Release |
 |---|---|
 | Avatar upload accepts unsafe files | Backend validation rejects unsupported MIME types and files over 2MB. |
-| Cloudinary failure corrupts profile | Tests prove failed config/upload leaves old profile/avatar unchanged. |
-| DB failure leaks uploaded image | Tests or smoke proof verify newly uploaded Cloudinary image is deleted when DB update fails. |
+| Storage failure corrupts profile | Tests prove failed config/upload/finalize leaves old profile/avatar unchanged. |
+| DB failure leaks uploaded image | Tests or smoke proof verify newly uploaded storage object is deleted when DB update fails. |
 | Avatar replacement loses old avatar | Tests prove old avatar is deleted only after new upload and DB update succeed. |
-| Avatar removal leaves stale profile | Tests prove remove sets avatar null and deletes Cloudinary image. |
-| Secret leakage | Config/diff review proves Cloudinary secrets are not tracked. |
+| Avatar removal leaves stale profile | Tests prove remove sets avatar null and deletes the stored object. |
+| Secret leakage | Config/diff review proves production storage secrets are not tracked. |
 | Practice setting invalid sequence | Unit/API tests reject empty, duplicate, or unknown Practice modes. |
 | Autosave failure hides error | UI test proves failed autosave shows error and keeps draft visible. |
 | Profile identity stale in UI | Frontend tests prove updated name/avatar propagate to Settings and existing user identity surfaces. |
@@ -2265,7 +2277,7 @@ Out of scope:
 
 1. **US-SETTINGS-001:** Add Settings page shell with Profile, Practice Settings, and Review Settings sections.
 2. **US-SETTINGS-002:** Implement profile fields, validation, and UI propagation for name/avatar/bio/email.
-3. **US-SETTINGS-003:** Implement Cloudinary avatar upload, replacement, removal, cleanup, and secret-safe config.
+3. **US-SETTINGS-003:** Implement avatar upload, replacement, removal, cleanup, and secret-safe config. The original Cloudinary provider is superseded by Feature 18.
 4. **US-SETTINGS-004:** Implement Practice Settings global mode sequence autosave and validation.
 5. **US-SETTINGS-005:** Implement Review Settings review limit and recap-after-answer autosave and validation.
 6. **US-SETTINGS-006:** Run release regression for auth profile, Feature 14 Practice/Review settings, avatar failure paths, and settings UI.
@@ -2284,9 +2296,9 @@ npm --prefix src/frontend run test:e2e -- settings-profile.spec.js settings-lear
 git diff --check
 ```
 
-Planning may split proof by story. Release proof must include real Cloudinary
-configuration/upload behavior in a credentialed environment, plus deterministic
-tests for validation and failure semantics.
+Planning may split proof by story. Release proof must include real configured
+avatar storage behavior in the active development environment, plus
+deterministic tests for validation and failure semantics.
 
 ---
 
@@ -2745,3 +2757,430 @@ for:
 Planning may split verification by story. Release proof must compare measured
 baseline and optimized results, and must state any query that was inspected but
 intentionally left unchanged.
+
+---
+
+## 18. Next Feature Plan — MinIO Asset Storage
+
+**Planning status:** Product decisions locked for high-risk implementation
+planning
+
+**Mode:** High-risk platform and account-storage initiative
+
+**Depends on:** Feature 15 profile/avatar behavior, current Auth ownership
+rules, PostgreSQL durable metadata, Hangfire background jobs, and local Docker
+Compose development runtime.
+
+**Source of truth:** `history/minio-asset-storage/CONTEXT.md`
+
+### 18.1 Desired Outcomes
+
+- FluentA has a shared, user-owned asset storage foundation backed by MinIO in
+  local development.
+- Avatar is the first user-facing use case for the asset foundation.
+- Existing Cloudinary avatar storage is removed from the avatar flow.
+- Future asset use cases such as vocabulary images, journal images, habit icons,
+  countdown icons, and attachments can extend the same asset model later.
+- Frontend upload uses presigned URLs so browser upload traffic goes directly
+  to MinIO without exposing MinIO secrets to the client.
+- Asset metadata in PostgreSQL records ownership, type, object key, public URL,
+  content type, size, lifecycle state, and soft deletion.
+- Pending uploads are finalized explicitly and cleaned up if abandoned.
+
+### 18.2 Locked Product And Engineering Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Asset foundation | MinIO is introduced as a shared asset storage foundation, not an avatar-only patch. |
+| First user-facing scope | Only profile avatar behavior changes in the first delivery. Other product asset surfaces are deferred. |
+| Existing Cloudinary avatars | Existing Cloudinary avatars are not migrated or preserved. Users may need to upload avatars again. |
+| Cloudinary removal | Cloudinary is removed from the avatar flow with no fallback and no cleanup bridge. |
+| Local development | `docker-compose.dev.yml` runs MinIO with a default development bucket. |
+| Production decision | Staging and production storage provider strategy is not decided by this feature. |
+| Avatar visibility | Avatar assets are public-read and exposed to the frontend by public URL. |
+| Upload model | Browser uploads use presigned URLs issued by FluentA. The frontend never receives MinIO secrets. |
+| Finalize model | Upload uses two steps: presign, direct upload to MinIO, then backend finalize. |
+| Pending expiry | Pending avatar uploads expire after 1 hour. |
+| Pending cleanup | A cleanup job deletes expired pending objects that were uploaded but not finalized. |
+| Finalize verification | Backend finalize verifies object existence, user/pending key ownership, content type, and size through MinIO object metadata. |
+| Content validation | Avatar accepts only JPG, PNG, and WebP, with a maximum size of 2MB. |
+| Asset ownership | Initial asset records are user-owned only. System/global assets are deferred. |
+| Asset type | `assetType` is a controlled enum/domain type. Initial allowed value is `avatar`. |
+| Asset metadata | Metadata stores both object key and public URL. Object key is used for management/deletion; public URL is returned to clients. |
+| Shared asset API | Presign and finalize use a shared asset API, for example `/api/v1/assets/presign` and `/api/v1/assets/finalize`, with `assetType=avatar`. |
+| Asset API scope | The first asset API includes presign, finalize, list, and delete, but only supports `avatar`. |
+| Current avatar delete | Deleting the asset currently used as profile avatar also clears profile avatar to null. |
+| Avatar replacement cleanup | Finalizing a new avatar deletes the old MinIO object and soft-deletes old asset metadata. |
+| Old object deletion order | Replacing or removing an avatar deletes the old object only after the database update succeeds. |
+| New object rollback | If upload succeeds but database update/finalize fails, the backend deletes the new object and preserves the old profile/avatar. |
+
+### 18.3 Asset Lifecycle
+
+Presigned upload flow:
+
+1. Authenticated frontend requests a presigned upload URL from the asset API with
+   `assetType=avatar`, file name, content type, and size.
+2. Backend validates owner, asset type, content type, and size, creates a
+   pending asset record or pending upload token, and returns a presigned MinIO
+   upload URL plus object key/pending id.
+3. Frontend uploads the object directly to MinIO using the presigned URL.
+4. Frontend calls the asset finalize endpoint.
+5. Backend verifies the MinIO object with a metadata/`HEAD` check.
+6. Backend marks the new asset finalized, updates the authenticated user's
+   profile avatar, returns the new public `avatarUrl`, and then deletes the old
+   avatar object plus soft-deletes old metadata when replacement applies.
+
+Abandoned upload flow:
+
+1. Backend has issued a pending upload.
+2. Frontend never calls finalize, or finalize fails before the asset is made
+   current.
+3. A cleanup job deletes pending objects older than 1 hour and marks the
+   metadata expired or deleted.
+
+Delete flow:
+
+1. Authenticated user calls the asset delete endpoint for one of their assets.
+2. Backend verifies ownership and asset state.
+3. If the asset is the current profile avatar, backend clears the profile avatar
+   first.
+4. Backend deletes the MinIO object after the database update succeeds and
+   soft-deletes the asset metadata.
+
+### 18.4 Data Model Expectations
+
+Planning may finalize exact entity and column names, but durable asset metadata
+must support:
+
+| Field | Purpose |
+|---|---|
+| `id` | Asset metadata id. |
+| `userId` | Owner. Required in the first delivery. |
+| `assetType` | Controlled enum/domain type; initial value `avatar`. |
+| `objectKey` | MinIO object key used for management and deletion. |
+| `publicUrl` | Public URL returned to clients for avatar display. |
+| `contentType` | Stored content type, restricted to allowed avatar image types. |
+| `sizeBytes` | Stored object size, restricted to 2MB for avatar. |
+| `status` | Pending, finalized/current, expired, or deleted lifecycle state. |
+| `expiresAt` | Pending upload expiry timestamp. Required for cleanup. |
+| `createdAt` / `updatedAt` | Standard timestamps. |
+| `deletedAt` | Soft-delete timestamp for metadata history. |
+
+The profile response still returns `avatarUrl` only. Provider object keys,
+bucket names, presigned URLs, and asset metadata internals must not leak through
+normal profile DTOs.
+
+### 18.5 API Expectations
+
+Exact DTO names can be finalized during implementation planning. The public
+capabilities must support:
+
+| Method | Endpoint | Outcome |
+|---|---|---|
+| `POST` | `/api/v1/assets/presign` | Authenticated user requests a presigned upload URL for `assetType=avatar`. |
+| `POST` | `/api/v1/assets/finalize` | Authenticated user finalizes a pending avatar object after direct upload. |
+| `GET` | `/api/v1/assets` | Authenticated user lists their asset metadata; initial supported type is `avatar`. |
+| `DELETE` | `/api/v1/assets/{id}` | Authenticated user deletes one of their assets; deleting current avatar clears profile avatar. |
+| `GET` | `/api/v1/settings` | Returns profile with current `avatarUrl` after Feature 18 is implemented. |
+| `PUT` | `/api/v1/profile` | Continues to update name and bio; avatar changes consume finalized asset behavior rather than Cloudinary file upload. |
+
+All asset API endpoints are authenticated and owner-scoped. Foreign assets,
+deleted assets, expired pending uploads, and unsupported asset types must be
+rejected without disclosing cross-user data.
+
+### 18.6 Local Development Configuration
+
+Local development must include:
+
+- MinIO service in `docker-compose.dev.yml`.
+- A default development bucket for FluentA assets.
+- Secret-safe local credentials suitable only for development.
+- API configuration for MinIO endpoint, bucket, access key, secret key, and
+  public base URL.
+- Startup or bootstrap instructions that make the default bucket available
+  before avatar upload proof runs.
+
+Tracked files must not contain production MinIO, S3, or storage-provider
+secrets. Staging and production provider choice remains out of scope.
+
+### 18.7 Scope Boundaries
+
+Out of scope:
+
+- Migrating, copying, or preserving existing Cloudinary avatars.
+- Keeping Cloudinary as fallback or cleanup bridge.
+- Vocabulary images.
+- Journal images or attachments.
+- Habit or Countdown icon file uploads.
+- System/global assets.
+- Private asset reads, backend image proxying, or signed read URLs.
+- Avatar cropper/editor.
+- GIF, SVG, files larger than 2MB, or non-image avatar uploads.
+- Backend downloading the image body to verify actual image signatures in the
+  first delivery.
+- Production/staging storage provider decision.
+- CDN integration.
+- Virus scanning or moderation.
+
+### 18.8 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Presigned upload exposes secrets | Config/diff review proves MinIO secrets stay server-side and responses expose only presigned URLs scoped to the pending object. |
+| User uploads unsupported file | API tests reject unsupported content types and files over 2MB before issuing presigned URLs and during finalize metadata checks. |
+| Foreign user finalizes or deletes asset | API/integration tests prove owner scoping for presign, finalize, list, and delete. |
+| Pending uploads accumulate | Job or integration proof shows pending objects older than 1 hour are deleted and metadata is expired/deleted. |
+| Finalize trusts frontend object key | Tests prove finalize accepts only pending object keys issued to the authenticated user. |
+| DB failure leaks new object | Tests or smoke proof verify uploaded objects are deleted when finalize/database update fails. |
+| Avatar replacement loses old avatar too early | Tests prove old object deletion happens only after new asset/profile DB update succeeds. |
+| Deleting current avatar leaves broken profile | Tests prove deleting the current avatar asset clears profile avatar to null. |
+| Cloudinary code remains active | Build/config review proves Cloudinary avatar flow, fallback, and dependency wiring are removed or unreachable. |
+| Public URL is wrong in local dev | Browser/API smoke proves a finalized avatar public URL renders from local MinIO. |
+| Asset metadata expands unsafely | Domain/API tests prove only controlled `avatar` asset type is accepted in the first delivery. |
+
+### 18.9 Proposed Story Queue
+
+1. **US-ASSET-001:** Add local MinIO development runtime, bucket bootstrap, and
+   secret-safe API configuration.
+2. **US-ASSET-002:** Add user-owned asset metadata model, migration, repository,
+   and controlled `avatar` asset type.
+3. **US-ASSET-003:** Implement presign and finalize asset API for avatar with
+   owner scope, metadata validation, and public URL generation.
+4. **US-ASSET-004:** Replace Cloudinary avatar flow with MinIO asset finalize,
+   profile avatar update, old object cleanup, and rollback behavior.
+5. **US-ASSET-005:** Implement asset list/delete API and expired pending upload
+   cleanup job.
+6. **US-ASSET-006:** Run release proof for MinIO local upload/render, profile
+   propagation, cleanup, failure paths, and Cloudinary removal.
+
+### 18.10 Verification Ladder
+
+```powershell
+docker compose -f docker-compose.dev.yml up -d
+dotnet tool restore
+dotnet tool run dotnet-ef database update `
+  --project src/backend/FluentA.Infrastructure `
+  --startup-project src/backend/FluentA.API
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- settings-profile.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split proof by story. Release proof must include live local MinIO
+presign/upload/finalize/render behavior, expired pending cleanup evidence,
+owner-isolation checks, avatar replacement/delete rollback checks, and evidence
+that Cloudinary avatar wiring is removed or unreachable.
+
+---
+
+## 19. Next Feature Plan — FluentA Worker Runtime
+
+**Planning status:** Product and runtime decisions locked for high-risk
+implementation planning
+
+**Mode:** High-risk architecture/runtime refactor for recurring and future
+background jobs
+
+**Depends on:** Current Hangfire PostgreSQL storage, `IScheduledProductivityJobs`,
+existing recurring job IDs, Feature 18 pending asset cleanup, current
+PostgreSQL/Redis/MinIO local runtime, and the API/realtime composition root.
+
+**Source of truth:** `history/fluent-worker-runtime/CONTEXT.md`
+
+### 19.1 Current State
+
+Hangfire currently runs inside the `FluentA.API` process. API startup wires the
+Hangfire server, registers recurring jobs, exposes HTTP controllers, and hosts
+SignalR. The recurring jobs are implemented through Application and
+Infrastructure contracts, but the runtime owner is still the API process.
+
+Current recurring jobs:
+
+| Job id | Cron | Behavior |
+|---|---|---|
+| `todo-carry-over` | `5 0 * * *` | Carry overdue incomplete todos into the current day. |
+| `habit-reminders` | `0 20 * * *` | Create notifications for unchecked scheduled habits. |
+| `countdown-alerts` | `*/5 * * * *` | Create countdown-complete notifications and mark alerted countdowns. |
+| `pending-asset-cleanup` | `15 * * * *` | Retire expired pending asset uploads. |
+| `database-cleanup` | `0 2 * * 0` | Permanently delete selected product records soft-deleted for more than 30 days. |
+
+### 19.2 Desired Outcomes
+
+- `FluentA.Worker` exists as a separate .NET project at
+  `src/backend/FluentA.Worker`.
+- API no longer starts a Hangfire server and no longer registers recurring job
+  schedules.
+- Worker owns Hangfire server execution and recurring job registration.
+- All existing recurring jobs run from the Worker with the same IDs, cron
+  expressions, and behavior.
+- Worker exposes minimal health endpoints for local and operational checks.
+- API remains independently startable when Worker is offline.
+- The feature prepares the architecture for future one-off/background jobs
+  without implementing a new enqueue use case.
+
+### 19.3 Locked Rules
+
+| Rule | Required Behavior |
+|---|---|
+| Worker process | `FluentA.Worker` is a real separate process, not only a folder or namespace refactor. |
+| API ownership | `FluentA.API` does not run Hangfire server and does not register recurring jobs after this feature. |
+| Job migration | All current recurring jobs move to Worker ownership: todo carry-over, habit reminders, countdown alerts, pending asset cleanup, and database cleanup. |
+| Registration owner | Worker owns recurring job registration and updates schedules on startup. |
+| Job implementation location | Existing job implementation remains in Application/Infrastructure. Worker is a composition root and does not contain business/job logic. |
+| Hangfire storage | Keep existing Hangfire PostgreSQL storage. Do not split Hangfire to a separate database/schema in this feature. |
+| No broker replacement | Do not replace Hangfire with RabbitMQ, Kafka, SQS, Azure Service Bus, or another queue/broker. |
+| API startup independence | API starts normally when Worker is not running; only recurring/background jobs stop executing. |
+| Future job posture | Worker is the intended executor for future one-off/background jobs, but this feature does not add a new enqueue use case. |
+| Health endpoints | Worker exposes `/health/live` for liveness and `/health/ready` for readiness. |
+| Readiness checks | `/health/ready` verifies at least PostgreSQL/Hangfire storage reachability. |
+| Dashboard | Do not expose Hangfire dashboard in this feature. |
+| Local command | Local dev supports `dotnet run --project src/backend/FluentA.Worker`. |
+| Docker Compose | Local Docker Compose includes a Worker service. |
+| Local ports | API keeps port `5000`; Worker uses a separate local health port such as `5001`. |
+
+### 19.4 Runtime Shape
+
+Target local/runtime shape:
+
+```text
+React SPA
+  -> FluentA.API
+       - REST controllers
+       - SignalR hub
+       - auth and request logging
+       - no Hangfire server
+       - no recurring job registration
+
+FluentA.Worker
+  -> Hangfire server
+  -> recurring job registration
+  -> Application/Infrastructure job services
+  -> health endpoints
+
+PostgreSQL
+  -> product data
+  -> Hangfire storage
+
+Redis
+  -> refresh sessions
+  -> Pomodoro transient state
+```
+
+### 19.5 Worker Responsibilities
+
+Worker must:
+
+- Configure the same application/infrastructure dependencies needed by scheduled
+  jobs.
+- Start Hangfire server with configured worker count.
+- Register or update stable recurring jobs on startup.
+- Keep existing recurring job IDs and cron expressions unless planning records a
+  separate product decision.
+- Emit structured logs for startup, recurring registration, job execution, and
+  health/readiness failures.
+- Expose `/health/live` and `/health/ready` on the worker health port.
+
+Worker must not:
+
+- Own HTTP product APIs.
+- Own SignalR hub behavior.
+- Contain job business logic that belongs in Application/Infrastructure.
+- Expose Hangfire dashboard.
+- Introduce a new external message broker.
+
+### 19.6 API Responsibilities After Refactor
+
+API must:
+
+- Continue serving REST controllers and SignalR.
+- Continue using shared application/infrastructure services needed by request
+  flows.
+- Start successfully when Worker is offline.
+- Avoid direct Hangfire package/runtime references unless planning proves an
+  unavoidable compile-time bridge that does not start server or register jobs.
+
+API must not:
+
+- Call recurring job registration at startup.
+- Start Hangfire server.
+- Host recurring background job execution.
+
+### 19.7 Local Development Expectations
+
+Local development must support both modes:
+
+```powershell
+dotnet run --project src/backend/FluentA.API --launch-profile http
+dotnet run --project src/backend/FluentA.Worker
+```
+
+Docker Compose must also support running the local Worker service alongside
+PostgreSQL, Redis, MinIO, and API-related dependencies. The API keeps its local
+HTTP port at `5000`; the Worker maps a separate health port such as `5001`.
+
+### 19.8 Scope Boundaries
+
+Out of scope:
+
+- Hangfire dashboard.
+- Admin UI for jobs.
+- Replacing Hangfire.
+- Separate Hangfire database/schema.
+- New user-visible product behavior.
+- New API enqueue endpoint for one-off jobs.
+- Moving job implementation/business logic into `FluentA.Worker`.
+- Production deployment automation beyond documenting the intended separate
+  worker process.
+- New message broker or outbox implementation.
+
+### 19.9 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| API still starts Hangfire | Code/build review proves API no longer starts Hangfire server or registers recurring jobs. |
+| Worker fails to register jobs | Integration or live smoke proves Worker startup registers all five stable recurring job IDs with expected cron expressions. |
+| Job behavior changes during move | Existing job unit/integration tests continue passing and at least one live Worker smoke proves scheduled service execution path. |
+| API depends on Worker availability | Smoke proof starts API without Worker and verifies REST/OpenAPI or an authenticated API path still responds. |
+| Worker cannot reach storage | `/health/ready` fails when PostgreSQL/Hangfire storage is unavailable and succeeds when it is reachable. |
+| Health endpoint gives false signal | `/health/live` and `/health/ready` are tested separately. |
+| Duplicate execution | Local proof verifies only Worker owns Hangfire server; API does not run a competing server. |
+| Docker Compose drift | `docker compose -f docker-compose.dev.yml config` and local startup proof include Worker service and health port. |
+| Dashboard exposed accidentally | Route/config review proves Hangfire dashboard is not mapped. |
+
+### 19.10 Proposed Story Queue
+
+1. **US-WORKER-001:** Create `src/backend/FluentA.Worker`, wire shared
+   configuration, dependencies, logging, and health endpoints.
+2. **US-WORKER-002:** Move Hangfire server startup and recurring job
+   registration from API to Worker while preserving job IDs and cron schedules.
+3. **US-WORKER-003:** Remove API Hangfire runtime ownership and prove API starts
+   independently without Worker.
+4. **US-WORKER-004:** Add local Docker Compose Worker service and development
+   runbook updates.
+5. **US-WORKER-005:** Run release proof for Worker health, recurring
+   registration, API independence, no dashboard exposure, and existing job
+   behavior.
+
+### 19.11 Verification Ladder
+
+```powershell
+docker compose -f docker-compose.dev.yml config
+dotnet build src/backend/FluentA.Worker/FluentA.Worker.csproj --no-restore
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet test src/backend/FluentA.slnx
+dotnet run --project src/backend/FluentA.Worker
+dotnet run --project src/backend/FluentA.API --launch-profile http
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Release proof must show the Worker registers all existing recurring jobs,
+`/health/live` and `/health/ready` behave distinctly, API can start without the
+Worker process, and no Hangfire dashboard is exposed.

@@ -1,4 +1,5 @@
 using FluentA.Application.BackgroundJobs;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -10,11 +11,13 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 {
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
+    private readonly IAssetService _assetService;
 
-    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger)
+    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _assetService = assetService;
     }
 
     public async Task CarryOverTodosAsync(CancellationToken cancellationToken = default)
@@ -77,6 +80,12 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("CountdownAlertJob marked {Count} countdowns complete.", countdowns.Count);
+    }
+
+    public async Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default)
+    {
+        var cleaned = await _assetService.CleanupExpiredPendingAsync(cancellationToken);
+        _logger.LogInformation("PendingAssetCleanupJob retired {Count} expired pending assets.", cleaned);
     }
 
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)

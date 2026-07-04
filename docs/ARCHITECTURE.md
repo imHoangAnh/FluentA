@@ -15,6 +15,7 @@ Browser (React SPA)
   |<====== authenticated SignalR ===|
                                       |-- EF Core ------> PostgreSQL
                                       |-- Redis client -> Redis
+                                      |-- S3 API -------> MinIO (local asset runtime)
                                       |-- HTTPS --------> Google OAuth
                                       |-- HTTPS --------> AWS SES (optional)
                                       `-- Hangfire -----> PostgreSQL storage
@@ -47,6 +48,7 @@ Redis, or provider SDKs.
 The implemented bounded contexts are:
 
 - Auth
+- Assets
 - Vocabulary
 - Flashcards and reviews
 - Todo
@@ -73,6 +75,7 @@ derived flashcards before the commit completes.
 `FluentA.Infrastructure` implements application ports:
 
 - EF Core repositories and migrations over PostgreSQL.
+- Shared asset metadata persistence plus an S3-compatible object-storage seam.
 - Redis refresh-session and Pomodoro current-state stores.
 - BCrypt password hashing and JWT token creation.
 - Google authorization-code exchange.
@@ -177,10 +180,10 @@ concerns.
 
 ## Data Ownership
 
-PostgreSQL stores durable user and product data, including users, vocabulary,
-flashcards, review history and settings, productivity entities, journal data,
-Kanban data, Pomodoro configuration and history, notifications, and Hangfire
-state.
+PostgreSQL stores durable user and product data, including users, shared asset
+metadata, vocabulary, flashcards, review history and settings, productivity
+entities, journal data, Kanban data, Pomodoro configuration and history,
+notifications, and Hangfire state.
 
 Redis stores only state with an expiration or revocation lifecycle:
 

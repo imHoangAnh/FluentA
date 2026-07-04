@@ -22,17 +22,85 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Auth.Entities.User", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("AvatarPublicId")
+                    b.Property<string>("ContentType")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("avatar_public_id");
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PublicUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_url");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("asset_type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Status", "DeletedAt");
+
+                    b.HasIndex("UserId", "Type", "DeletedAt");
+
+                    b.ToTable("assets", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Auth.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(2048)
@@ -48,6 +116,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentAvatarAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_avatar_asset_id");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -88,6 +160,8 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrentAvatarAssetId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1426,6 +1500,23 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("PageId", "CreatedAt");
 
                     b.ToTable("vocab_words", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Auth.Entities.User", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentAvatarAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>

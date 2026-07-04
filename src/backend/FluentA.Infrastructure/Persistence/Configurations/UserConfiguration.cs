@@ -1,4 +1,5 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
+using FluentA.Domain.BoundedContexts.Assets.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,7 +18,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.FullName).HasColumnName("full_name").HasMaxLength(100).IsRequired();
         builder.Property(user => user.Bio).HasColumnName("bio").HasMaxLength(500).IsRequired();
         builder.Property(user => user.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(2048);
-        builder.Property(user => user.AvatarPublicId).HasColumnName("avatar_public_id").HasMaxLength(255);
+        builder.Property(user => user.CurrentAvatarAssetId).HasColumnName("current_avatar_asset_id");
         builder.Property(user => user.PasswordHash).HasColumnName("password_hash").HasMaxLength(256);
         builder.Property(user => user.GoogleId).HasColumnName("google_id").HasMaxLength(128);
         builder.Property(user => user.IsEmailVerified).HasColumnName("is_email_verified").IsRequired();
@@ -28,5 +29,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(user => user.Email).IsUnique();
         builder.HasIndex(user => user.GoogleId).IsUnique().HasFilter("google_id IS NOT NULL");
+        builder.HasIndex(user => user.CurrentAvatarAssetId);
+
+        builder.HasOne<Asset>()
+            .WithMany()
+            .HasForeignKey(user => user.CurrentAvatarAssetId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

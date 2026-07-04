@@ -1,4 +1,5 @@
 using FluentA.Domain.BoundedContexts.Habit.Entities;
+using FluentA.Domain.BoundedContexts.Habit.Enums;
 
 namespace FluentA.Domain.UnitTests;
 

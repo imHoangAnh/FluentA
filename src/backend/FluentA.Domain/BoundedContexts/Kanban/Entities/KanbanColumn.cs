@@ -1,3 +1,4 @@
+using FluentA.Domain.BoundedContexts.Kanban.Enums;
 using FluentA.Domain.SeedWork;
 
 namespace FluentA.Domain.BoundedContexts.Kanban.Entities;

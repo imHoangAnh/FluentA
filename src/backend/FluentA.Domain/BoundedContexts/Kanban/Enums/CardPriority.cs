@@ -1,4 +1,4 @@
-namespace FluentA.Domain.BoundedContexts.Kanban.Entities;
+namespace FluentA.Domain.BoundedContexts.Kanban.Enums;
 
 public enum CardPriority
 {

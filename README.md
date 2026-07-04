@@ -85,6 +85,9 @@ docker compose -f docker-compose.dev.yml up -d
 ```
 
 This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
+It also starts MinIO on `127.0.0.1:9000` with the console at
+`http://127.0.0.1:9001` and bootstraps the development bucket
+`fluenta-assets-dev`.
 
 ### Apply database migrations
 
@@ -103,6 +106,11 @@ dotnet run --project src/backend/FluentA.API --launch-profile http
 
 The API listens at `http://localhost:5000`; REST endpoints use the
 `/api/v1` prefix and the authenticated SignalR hub is `/hubs/sync`.
+
+Tracked development config also enables the local MinIO asset runtime through
+the `AssetStorage` section in `src/backend/FluentA.API/appsettings.Development.json`.
+Those credentials are development-only and must not be reused outside local
+Docker.
 
 ### Start the frontend
 

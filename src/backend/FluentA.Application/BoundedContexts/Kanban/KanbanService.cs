@@ -2,6 +2,7 @@ using System.Globalization;
 using FluentA.Application.BoundedContexts.Kanban.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Kanban.Enums;
 
 namespace FluentA.Application.BoundedContexts.Kanban;
 

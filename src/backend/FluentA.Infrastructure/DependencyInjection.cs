@@ -1,3 +1,5 @@
+using Amazon.S3;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Flashcards;
@@ -8,6 +10,7 @@ using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
+using FluentA.Infrastructure.Assets;
 using FluentA.Application.BackgroundJobs;
 using FluentA.Infrastructure.BackgroundJobs;
 using Hangfire;
@@ -54,6 +57,7 @@ public static class DependencyInjection
             "Hangfire:WorkerCount",
             DefaultHangfireWorkerCount);
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
+        var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
             postgresConnection,
@@ -63,13 +67,24 @@ public static class DependencyInjection
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
         services.TryAddSingleton<JwtSigningKeyProvider>();
         services.AddScoped<IUserRepository, EfUserRepository>();
+        services.AddScoped<IAssetRepository, EfAssetRepository>();
+        services.AddScoped<IAssetService, AssetService>();
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
         services.AddSingleton<IRefreshTokenStore, RedisRefreshTokenStore>();
         services.AddSingleton<IAccountChallengeStore, RedisAccountChallengeStore>();
+        services.AddSingleton(assetStorageOptions);
+        if (assetStorageOptions.Enabled)
+        {
+            services.AddSingleton<IAmazonS3>(_ => CreateAssetStorageClient(assetStorageOptions));
+            services.AddSingleton<IAssetObjectStorage, MinioAssetObjectStorage>();
+        }
+        else
+        {
+            services.AddSingleton<IAssetObjectStorage, DisabledAssetObjectStorage>();
+        }
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
-        services.AddSingleton<IAvatarStorage, CloudinaryAvatarStorage>();
         if (string.Equals(configuration["Authentication:Email:Provider"], "gmail-smtp", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAccountEmailSender, GmailSmtpAccountEmailSender>();
@@ -99,6 +114,23 @@ public static class DependencyInjection
         services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
+    }
+
+    private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)
+    {
+        options.Validate();
+
+        var endpoint = new Uri(options.Endpoint, UriKind.Absolute);
+        return new AmazonS3Client(
+            options.AccessKey,
+            options.SecretKey,
+            new AmazonS3Config
+            {
+                ServiceURL = options.Endpoint,
+                ForcePathStyle = options.UsePathStyle,
+                AuthenticationRegion = options.Region,
+                UseHttp = string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            });
     }
 
     private static string BuildPostgresConnectionString(string connectionString, IConfiguration configuration)

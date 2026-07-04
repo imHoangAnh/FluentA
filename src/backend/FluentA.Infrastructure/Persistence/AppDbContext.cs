@@ -1,4 +1,5 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
+using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
@@ -21,6 +22,7 @@ public sealed class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
     public DbSet<VocabWord> Words => Set<VocabWord>();

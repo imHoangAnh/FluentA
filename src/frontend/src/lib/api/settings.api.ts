@@ -17,20 +17,13 @@ export async function updateProfile(input: {
   fullName: string
   bio: string
   removeAvatar: boolean
-  avatarFile?: File | null
+  avatarAssetId?: string | null
 }) {
-  const form = new FormData()
-  form.set('fullName', input.fullName)
-  form.set('bio', input.bio)
-  form.set('removeAvatar', input.removeAvatar ? 'true' : 'false')
-  if (input.avatarFile) {
-    form.set('avatar', input.avatarFile)
-  }
-
-  const response = await apiClient.put<ApiEnvelope<UserProfile>>('/profile', form, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+  const response = await apiClient.put<ApiEnvelope<UserProfile>>('/profile', {
+    fullName: input.fullName,
+    bio: input.bio,
+    removeAvatar: input.removeAvatar,
+    avatarAssetId: input.avatarAssetId ?? null,
   })
 
   return response.data.data!

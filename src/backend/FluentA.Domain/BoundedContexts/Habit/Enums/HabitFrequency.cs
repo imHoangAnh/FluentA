@@ -1,4 +1,4 @@
-namespace FluentA.Domain.BoundedContexts.Habit.Entities;
+namespace FluentA.Domain.BoundedContexts.Habit.Enums;
 
 public enum HabitFrequency
 {
