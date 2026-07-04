@@ -44,7 +44,7 @@ Frontend:
 
 ## Runtime Impact
 
-Hangfire registers a recurring `pending-asset-cleanup` job on the existing API
+Hangfire registers a recurring `pending-asset-cleanup` job on the Worker
 process schedule, running hourly at minute 15.
 
 ## Alternatives Considered

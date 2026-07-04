@@ -1,10 +1,11 @@
 # Architecture
 
 FluentA is a browser-based personal learning and productivity system built as
-a modular monolith. A React SPA communicates with one ASP.NET Core API through
-versioned REST endpoints and an authenticated SignalR hub. PostgreSQL is the
-durable system of record; Redis holds revocable sessions and transient timer
-state; Hangfire runs recurring work from the API process.
+a modular monolith with two .NET composition roots. A React SPA communicates
+with one ASP.NET Core API through versioned REST endpoints and an authenticated
+SignalR hub. A separate ASP.NET Core Worker hosts Hangfire recurring work.
+PostgreSQL is the durable system of record; Redis holds revocable sessions and
+transient timer state.
 
 ## System Context
 
@@ -18,12 +19,18 @@ Browser (React SPA)
                                       |-- S3 API -------> MinIO (local asset runtime)
                                       |-- HTTPS --------> Google OAuth
                                       |-- HTTPS --------> AWS SES (optional)
-                                      `-- Hangfire -----> PostgreSQL storage
+
+FluentA.Worker
+  |-- Hangfire server --------------> PostgreSQL storage
+  |-- EF Core ----------------------> PostgreSQL
+  |-- Redis client -----------------> Redis
+  `-- S3 API -----------------------> MinIO (local asset runtime)
 ```
 
-The current deployment unit is one API application plus one static frontend.
-PostgreSQL and Redis are external runtime dependencies. There is no message
-broker, SignalR backplane, or independently deployed domain service.
+The current deployment units are one API application, one Worker application,
+and one static frontend. PostgreSQL and Redis are external runtime
+dependencies. There is no message broker, SignalR backplane, or independently
+deployed domain service.
 
 ## Backend Layers
 
@@ -80,7 +87,8 @@ derived flashcards before the commit completes.
 - BCrypt password hashing and JWT token creation.
 - Google authorization-code exchange.
 - Local-log and AWS SES email verification senders.
-- Hangfire storage, workers, and scheduled productivity jobs.
+- Hangfire storage, recurring schedule registration, and scheduled
+  productivity jobs used by the Worker.
 
 All bounded contexts currently share one `AppDbContext`. Module ownership is
 therefore enforced by code structure, repository interfaces, review, and tests
@@ -95,11 +103,19 @@ rather than by separate schemas or databases.
 - The authorized SignalR hub at `/hubs/sync`.
 - CORS for the local frontend.
 - Canonical request logging and error envelopes.
-- Infrastructure dependency injection and recurring Hangfire registration.
+- Infrastructure dependency injection for request/realtime flows.
 
 Controllers parse transport input, obtain the authenticated user identity, and
 delegate use cases to application services. Business rules do not belong in
 controllers.
+
+### Worker
+
+`FluentA.Worker` is the background-work composition root. It configures shared
+application and infrastructure dependencies, starts the Hangfire server,
+registers stable recurring schedules, and exposes `/health/live` plus
+`/health/ready` on its own health port. It does not expose product APIs,
+SignalR hubs, or the Hangfire dashboard.
 
 ## Frontend Architecture
 
@@ -164,14 +180,17 @@ considered reliable across instances.
 ### Background jobs and notifications
 
 Hangfire uses the application PostgreSQL server for durable schedules and job
-state. Stable recurring jobs are registered at API startup and execute inside
-the API process. The public Hangfire dashboard is intentionally disabled.
+state. Stable recurring jobs are registered by `FluentA.Worker` at startup and
+execute inside the Worker process. The API starts independently when the Worker
+is offline; recurring jobs do not execute until the Worker runs. The public
+Hangfire dashboard is intentionally disabled.
 
 Scheduled jobs currently:
 
 - Carry overdue incomplete todos into the current day.
 - Create due habit reminder notifications.
 - Create notifications for completed countdowns.
+- Retire expired pending asset uploads.
 - Permanently remove selected records soft-deleted for more than 30 days.
 
 Notification records are owner-scoped and use per-user deduplication keys.
@@ -253,8 +272,9 @@ authenticated user when available, action, duration, status, and message.
 Background jobs emit structured operational summaries. Product notifications
 and future audit records must not be replaced by application logs.
 
-OpenAPI is exposed in the Development environment. Health endpoints and a
-production metrics/tracing backend are not currently part of the runtime.
+OpenAPI is exposed by the API in the Development environment. Worker health is
+exposed through `/health/live` and `/health/ready`; a production
+metrics/tracing backend is not currently part of the runtime.
 
 ## Validation Architecture
 
@@ -281,18 +301,16 @@ The first scaling steps are operational:
 
 1. Run multiple stateless API instances behind a load balancer.
 2. Add a Redis SignalR backplane or managed SignalR service.
-3. Move Hangfire workers into a separately deployed process while retaining
-   shared application contracts.
-4. Add production health checks, metrics, distributed tracing, and secret
+3. Add production health checks, metrics, distributed tracing, and secret
    management.
-5. Scale PostgreSQL with indexes, connection tuning, and read/query analysis
+4. Scale PostgreSQL with indexes, connection tuning, and read/query analysis
    before considering database decomposition.
 
 The local runtime now makes the first PostgreSQL connection budget explicit:
-the API normalizes Npgsql pooling from configuration, local development caps the
-application pool at 30 connections, and Hangfire defaults to 5 workers. Staging
-and production must set equivalent pool, timeout, and worker values from their
-own PostgreSQL limits and provider pooler strategy.
+API and Worker processes normalize Npgsql pooling from configuration, local
+development caps each application pool at 30 connections, and Hangfire defaults
+to 5 Worker threads. Staging and production must set equivalent pool, timeout,
+and worker values from their own PostgreSQL limits and provider pooler strategy.
 
 A bounded context should become an independent service only when it needs an
 independent deployment cadence, scaling profile, failure boundary, or data

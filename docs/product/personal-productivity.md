@@ -241,10 +241,10 @@ All responses use the FluentA envelope.
   deferred until there is enough cross-domain read-model pressure to justify it.
 - Dashboard widget visibility can be toggled from Dashboard settings and is
   persisted in the current browser.
-- PostgreSQL-backed Hangfire infrastructure registers `TodoCarryOverJob`,
-  `HabitReminderJob`, `CountdownAlertJob`, and `DatabaseCleanupJob` schedules.
-  Todo carry-over, daily unchecked-habit reminder queuing, one-time expired
-  countdown alerts, and 30-day product-record cleanup are implemented.
+- PostgreSQL-backed Hangfire infrastructure registers current schedules from
+  `FluentA.Worker`, not from the API. Todo carry-over, daily unchecked-habit
+  reminder queuing, one-time expired countdown alerts, expired pending-asset
+  cleanup, and 30-day product-record cleanup are implemented.
 - Reminder and countdown jobs persist delivery markers before retry completion,
   preventing duplicate daily/event notifications.
 - External notification delivery and per-habit reminder preferences remain

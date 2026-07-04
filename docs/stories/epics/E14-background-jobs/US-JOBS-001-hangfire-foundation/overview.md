@@ -2,8 +2,10 @@
 
 ## Target Behavior
 
-The API hosts a PostgreSQL-backed Hangfire server and registers the SPEC1
-recurring-job schedules at startup without exposing a public dashboard.
+Historical baseline: this story originally hosted a PostgreSQL-backed Hangfire
+server in the API and registered the SPEC1 recurring-job schedules at startup
+without exposing a public dashboard. Feature 19 / decision 0042 supersedes the
+runtime owner: `FluentA.Worker` now hosts the server and registration.
 
 ## Non-Goals
 

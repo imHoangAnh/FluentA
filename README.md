@@ -5,10 +5,11 @@ vocabulary study and spaced-repetition flashcards with todos, habits,
 countdowns, journaling, Kanban boards, Pomodoro sessions, and an in-app
 notification inbox.
 
-The repository contains a React single-page application and an ASP.NET Core
-modular monolith. PostgreSQL is the durable system of record, Redis stores
-short-lived session and timer state, SignalR synchronizes active browser
-sessions, and Hangfire runs recurring productivity jobs.
+The repository contains a React single-page application, an ASP.NET Core API,
+and a separate ASP.NET Core Worker process. PostgreSQL is the durable system of
+record, Redis stores short-lived session and timer state, SignalR synchronizes
+active browser sessions, and the Worker hosts Hangfire recurring productivity
+jobs.
 
 ## Features
 
@@ -38,7 +39,7 @@ sessions, and Hangfire runs recurring productivity jobs.
 | Persistence | PostgreSQL 16, Entity Framework Core |
 | Ephemeral state | Redis 7 |
 | Realtime | SignalR |
-| Background work | Hangfire with PostgreSQL storage |
+| Background work | FluentA.Worker with Hangfire PostgreSQL storage |
 | Testing | xUnit, Vitest, Playwright |
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for component boundaries,
@@ -50,6 +51,7 @@ data ownership, and runtime flows.
 src/
   backend/
     FluentA.API/                 HTTP and SignalR interface
+    FluentA.Worker/              Hangfire worker host and health endpoints
     FluentA.Application/         Use cases and ports
     FluentA.Domain/              Entities and business rules
     FluentA.Infrastructure/      PostgreSQL, Redis, providers, jobs
@@ -111,6 +113,25 @@ Tracked development config also enables the local MinIO asset runtime through
 the `AssetStorage` section in `src/backend/FluentA.API/appsettings.Development.json`.
 Those credentials are development-only and must not be reused outside local
 Docker.
+
+### Start the worker
+
+Run the Worker in a second terminal after dependencies and migrations are ready:
+
+```powershell
+dotnet run --project src/backend/FluentA.Worker
+```
+
+The Worker listens on `http://localhost:5001` for `/health/live` and
+`/health/ready`. It owns the Hangfire server and recurring schedule
+registration; the API does not need the Worker to be online for REST and
+SignalR startup.
+
+Docker Compose can run the Worker through its explicit profile:
+
+```powershell
+docker compose -f docker-compose.dev.yml --profile worker up -d worker
+```
 
 ### Start the frontend
 
