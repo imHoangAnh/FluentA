@@ -2,8 +2,10 @@
 
 ## Application Flow
 
-Infrastructure registers Hangfire with the existing PostgreSQL connection. API
-startup registers stable recurring-job IDs through typed inert job contracts.
+Infrastructure registers Hangfire with the existing PostgreSQL connection.
+Historically, API startup registered stable recurring-job IDs through typed
+inert job contracts. Feature 19 moved runtime registration to
+`FluentA.Worker` while preserving IDs and cron expressions.
 
 ## Schedules
 

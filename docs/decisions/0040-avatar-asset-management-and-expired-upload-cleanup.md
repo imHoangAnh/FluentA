@@ -37,7 +37,7 @@ together with the asset soft deletion. MinIO object deletion stays best-effort
 after the durable user/asset write succeeds.
 
 Expired pending upload cleanup runs as an internal recurring Hangfire job in
-the API process. The cleanup path selects assets already marked `Expired` plus
+the Worker process. The cleanup path selects assets already marked `Expired` plus
 `Pending` assets whose `expires_at` has passed, attempts MinIO object deletion
 best-effort, marks pending rows expired when needed, then soft-deletes the
 metadata.

@@ -47,7 +47,7 @@ Local development defaults:
 - FluentA API Npgsql pool: minimum 0, maximum 30.
 - Npgsql connection timeout: 15 seconds.
 - Npgsql command timeout: 30 seconds for normal runtime commands.
-- Hangfire worker count: 5.
+- FluentA Worker Hangfire worker count: 5.
 
 Staging and production must set equivalent values through configuration or
 environment variables before load testing. Supabase or other managed Postgres

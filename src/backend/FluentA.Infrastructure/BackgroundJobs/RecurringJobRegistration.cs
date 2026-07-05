@@ -1,7 +1,7 @@
 using FluentA.Application.BackgroundJobs;
 using Hangfire;
 
-namespace FluentA.API.BackgroundJobs;
+namespace FluentA.Infrastructure.BackgroundJobs;
 
 public static class RecurringJobRegistration
 {

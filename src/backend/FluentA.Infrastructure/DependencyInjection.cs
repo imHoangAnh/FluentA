@@ -52,18 +52,12 @@ public static class DependencyInjection
             configuration,
             "Database:Postgres:CommandTimeoutSeconds",
             DefaultPostgresCommandTimeoutSeconds);
-        var hangfireWorkerCount = GetPositiveInt(
-            configuration,
-            "Hangfire:WorkerCount",
-            DefaultHangfireWorkerCount);
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
         var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
             postgresConnection,
             npgsqlOptions => npgsqlOptions.CommandTimeout(postgresCommandTimeoutSeconds)));
-        services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
-        services.AddHangfireServer(options => options.WorkerCount = hangfireWorkerCount);
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
         services.TryAddSingleton<JwtSigningKeyProvider>();
         services.AddScoped<IUserRepository, EfUserRepository>();
@@ -113,6 +107,19 @@ public static class DependencyInjection
         services.AddScoped<IPomodoroRepository, EfPomodoroRepository>();
         services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
+        return services;
+    }
+
+    public static IServiceCollection AddFluentAHangfireWorker(this IServiceCollection services, IConfiguration configuration)
+    {
+        var postgresConnection = BuildPostgresConnectionString(configuration.GetConnectionString("Postgres") ?? DefaultPostgresConnection, configuration);
+        var hangfireWorkerCount = GetPositiveInt(
+            configuration,
+            "Hangfire:WorkerCount",
+            DefaultHangfireWorkerCount);
+
+        services.AddSingleton(new HangfireWorkerOptions(hangfireWorkerCount));
+        services.AddHangfire(hangfire => hangfire.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
         return services;
     }
 
@@ -166,3 +173,5 @@ public static class DependencyInjection
         return value is >= 0 ? value.Value : fallback;
     }
 }
+
+public sealed record HangfireWorkerOptions(int WorkerCount);

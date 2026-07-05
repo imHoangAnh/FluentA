@@ -61,6 +61,38 @@ services:
         mc mb --ignore-existing "local/$$MINIO_BUCKET"
         mc anonymous set download "local/$$MINIO_BUCKET"
 
+  worker:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    container_name: fluenta-worker
+    profiles:
+      - worker
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:5001
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_local_pass
+      ConnectionStrings__Redis: redis:6379
+      Database__Postgres__ApplicationName: FluentA.Worker.Compose
+      AssetStorage__Endpoint: http://minio:9000
+      AssetStorage__PublicBaseUrl: http://127.0.0.1:9000
+    ports:
+      - "5001:5001"
+    volumes:
+      - .:/workspace
+    command: dotnet run --project src/backend/FluentA.Worker --no-launch-profile
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5001/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   fluenta_postgres_data:
   fluenta_minio_data:

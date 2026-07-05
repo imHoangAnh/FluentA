@@ -6,8 +6,6 @@ using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.API.Middleware;
-using FluentA.API.BackgroundJobs;
-using Hangfire;
 using FluentA.Infrastructure;
 using FluentA.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -102,7 +100,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SyncHub>("/hubs/sync");
-RecurringJobRegistration.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 
 app.Run();
 

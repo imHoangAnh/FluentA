@@ -5,4 +5,5 @@
   <Project Path="FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj" />
   <Project Path="FluentA.Domain/FluentA.Domain.csproj" />
   <Project Path="FluentA.Infrastructure/FluentA.Infrastructure.csproj" />
+  <Project Path="FluentA.Worker/FluentA.Worker.csproj" />
 </Solution>
