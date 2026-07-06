@@ -39,6 +39,8 @@ const profiles: Record<string, Omit<LanguageProfile, 'code'>> = {
   },
 }
 
+export const supportedLanguageProfiles = Object.entries(profiles).map(([code, profile]) => ({ code, ...profile }))
+
 export function languageBase(language?: string | null) {
   return (language ?? 'en').trim().toLowerCase().split(/[-_]/)[0] || 'en'
 }

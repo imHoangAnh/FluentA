@@ -16,7 +16,6 @@ public sealed class VocabBoardConfiguration : IEntityTypeConfiguration<VocabBoar
         builder.Property(board => board.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(board => board.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
         builder.Property(board => board.Language).HasColumnName("language").HasMaxLength(8).IsRequired();
-        builder.Property(board => board.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(board => board.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(board => board.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(board => board.DeletedAt).HasColumnName("deleted_at");
@@ -26,7 +25,7 @@ public sealed class VocabBoardConfiguration : IEntityTypeConfiguration<VocabBoar
             .HasForeignKey(page => page.BoardId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(board => new { board.UserId, board.SortOrder });
+        builder.HasIndex(board => new { board.UserId, board.CreatedAt });
         builder.HasIndex(board => new { board.UserId, board.Name });
     }
 }

@@ -8,6 +8,27 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 
 public sealed class VocabularyService : IVocabularyService
 {
+    private static readonly string[] FixedColumnOrder =
+    [
+        "word",
+        "meaningVn",
+        "ipaPronunciation",
+        "definition",
+        "class",
+        "example",
+        "note",
+        "synonyms",
+        "antonyms"
+    ];
+
+    private static readonly HashSet<string> HideableColumns =
+    [
+        "definition",
+        "note",
+        "synonyms",
+        "antonyms"
+    ];
+
     private readonly IVocabularyRepository _repository;
     private readonly IFlashcardSyncNotifier _flashcardSyncNotifier;
     private readonly IFlashcardVocabularySyncPort _flashcardSync;
@@ -41,16 +62,19 @@ public sealed class VocabularyService : IVocabularyService
 
         var board = VocabBoard.Create(userId, request.Name, request.Language);
         await _repository.AddBoardAsync(board, cancellationToken);
-
-        return OperationResult<BoardDetailDto>.Success(ToDetail(board));
+        return OperationResult<BoardDetailDto>.Success(ToDetail(board, null));
     }
 
     public async Task<OperationResult<BoardDetailDto>> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
-        return board is null
-            ? OperationResult<BoardDetailDto>.Failure(VocabularyError.NotFound())
-            : OperationResult<BoardDetailDto>.Success(ToDetail(board));
+        if (board is null)
+        {
+            return OperationResult<BoardDetailDto>.Failure(VocabularyError.NotFound());
+        }
+
+        var preferences = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
+        return OperationResult<BoardDetailDto>.Success(ToDetail(board, preferences));
     }
 
     public async Task<OperationResult<BoardDetailDto>> UpdateBoardAsync(Guid userId, Guid boardId, UpdateBoardRequest request, CancellationToken cancellationToken = default)
@@ -67,9 +91,10 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<BoardDetailDto>.Failure(VocabularyError.NotFound());
         }
 
-        board.Update(request.Name, request.Language, board.SortOrder);
+        board.Update(request.Name, request.Language);
         await _repository.UpdateBoardAsync(board, cancellationToken);
-        return OperationResult<BoardDetailDto>.Success(ToDetail(board));
+        var preferences = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
+        return OperationResult<BoardDetailDto>.Success(ToDetail(board, preferences));
     }
 
     public async Task<OperationResult<bool>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
@@ -119,11 +144,10 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<PageDto>.Failure(VocabularyError.NotFound());
         }
 
-        var page = VocabPage.Create(board.Id, request.Name, board.Pages.Count(page => page.DeletedAt is null));
+        var page = VocabPage.Create(board.Id, request.Name);
         await _repository.AddPageAsync(page, cancellationToken);
         await _flashcardSync.CreatePageDeckAsync(userId, board.Id, page.Id, board.Name, page.Name, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
-
         return OperationResult<PageDto>.Success(ToPage(page));
     }
 
@@ -141,7 +165,7 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<PageDto>.Failure(VocabularyError.NotFound());
         }
 
-        page.Update(request.Name, page.SortOrder);
+        page.Update(request.Name);
         await _repository.UpdatePageAsync(page, cancellationToken);
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
@@ -181,8 +205,7 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         var words = await _repository.ListWordsAsync(userId, boardId, pageId, cancellationToken);
-        var values = await _repository.ListCustomValuesAsync(words.Select(word => word.Id), cancellationToken);
-        return OperationResult<IReadOnlyList<WordDto>>.Success(words.Select(word => ToWord(word, values)).ToList());
+        return OperationResult<IReadOnlyList<WordDto>>.Success(words.Select(ToWord).ToList());
     }
 
     public async Task<OperationResult<WordDto>> CreateWordAsync(Guid userId, Guid boardId, Guid pageId, WordRequest request, CancellationToken cancellationToken = default)
@@ -203,24 +226,19 @@ public sealed class VocabularyService : IVocabularyService
             page.Id,
             request.Word,
             request.MeaningVn,
-            request.MeaningEn,
+            request.IpaPronunciation,
             validation.WordClass!.Value,
+            request.Definition,
             request.Example,
-            request.Thesaurus,
-            request.Collocation,
-            request.Note);
-        var customValues = await BuildCustomValuesAsync(userId, boardId, word.Id, request.CustomValues, cancellationToken);
-        if (customValues.Errors.Count > 0)
-        {
-            return OperationResult<WordDto>.Failure(VocabularyError.Validation(customValues.Errors));
-        }
-
-        await _repository.AddWordAsync(word, customValues.Values, cancellationToken);
+            request.Note,
+            request.Synonyms,
+            request.Antonyms);
+        await _repository.AddWordAsync(word, cancellationToken);
         await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
         word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
-        return OperationResult<WordDto>.Success(ToWord(word, customValues.Values));
+        return OperationResult<WordDto>.Success(ToWord(word));
     }
 
     public async Task<OperationResult<WordDto>> UpdateWordAsync(Guid userId, Guid boardId, Guid wordId, WordRequest request, CancellationToken cancellationToken = default)
@@ -240,26 +258,19 @@ public sealed class VocabularyService : IVocabularyService
         word.Update(
             request.Word,
             request.MeaningVn,
-            request.MeaningEn,
+            request.IpaPronunciation,
             validation.WordClass!.Value,
+            request.Definition,
             request.Example,
-            request.Thesaurus,
-            request.Collocation,
-            request.Note);
-        var customValues = await BuildCustomValuesAsync(userId, boardId, word.Id, request.CustomValues, cancellationToken);
-        if (customValues.Errors.Count > 0)
-        {
-            return OperationResult<WordDto>.Failure(VocabularyError.Validation(customValues.Errors));
-        }
-
-        var valuesToPersist = request.CustomValues is null ? null : customValues.Values;
-        await _repository.UpdateWordAsync(word, valuesToPersist, cancellationToken);
+            request.Note,
+            request.Synonyms,
+            request.Antonyms);
+        await _repository.UpdateWordAsync(word, cancellationToken);
         await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
         word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
-        var responseValues = valuesToPersist ?? await _repository.ListCustomValuesAsync([word.Id], cancellationToken);
-        return OperationResult<WordDto>.Success(ToWord(word, responseValues));
+        return OperationResult<WordDto>.Success(ToWord(word));
     }
 
     public async Task<OperationResult<WordDto>> UpdateWordCellAsync(Guid userId, Guid boardId, Guid wordId, UpdateWordCellRequest request, CancellationToken cancellationToken = default)
@@ -270,45 +281,18 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<WordDto>.Failure(VocabularyError.NotFound());
         }
 
-        var key = request.ColumnKey.Trim();
-        if (key.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!Guid.TryParse(key["custom:".Length..], out var columnId))
-            {
-                return CellValidation("columnKey", "Custom column key is invalid.");
-            }
-
-            var column = (await _repository.ListCustomColumnsAsync(userId, boardId, cancellationToken))
-                .SingleOrDefault(item => item.Id == columnId);
-            if (column is null)
-            {
-                return OperationResult<WordDto>.Failure(VocabularyError.NotFound());
-            }
-
-            var valueResult = BuildCustomValue(word.Id, column, request.Value);
-            if (valueResult.Error is not null)
-            {
-                return CellValidation("value", valueResult.Error);
-            }
-
-            await _repository.UpdateCustomValueAsync(word.Id, column.Id, valueResult.Value, cancellationToken);
-            var values = await _repository.ListCustomValuesAsync([word.Id], cancellationToken);
-            return OperationResult<WordDto>.Success(ToWord(word, values));
-        }
-
-        var updated = ApplyFixedCell(word, key, request.Value);
+        var updated = ApplyFixedCell(word, request.ColumnKey.Trim(), request.Value);
         if (updated is not null)
         {
             return CellValidation("value", updated);
         }
 
-        await _repository.UpdateFixedCellAsync(word, key, cancellationToken);
+        await _repository.UpdateFixedCellAsync(word, request.ColumnKey, cancellationToken);
         await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
         word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
-        var customValues = await _repository.ListCustomValuesAsync([word.Id], cancellationToken);
-        return OperationResult<WordDto>.Success(ToWord(word, customValues));
+        return OperationResult<WordDto>.Success(ToWord(word));
     }
 
     public async Task<OperationResult<bool>> DeleteWordAsync(Guid userId, Guid boardId, Guid wordId, CancellationToken cancellationToken = default)
@@ -328,81 +312,34 @@ public sealed class VocabularyService : IVocabularyService
         return OperationResult<bool>.Success(true);
     }
 
-    public async Task<OperationResult<ColumnConfigurationDto>> GetColumnConfigurationAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<BoardPreferencesDto>> UpdateBoardPreferencesAsync(Guid userId, Guid boardId, UpdateBoardPreferencesRequest request, CancellationToken cancellationToken = default)
     {
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
         {
-            return OperationResult<ColumnConfigurationDto>.Failure(VocabularyError.NotFound());
+            return OperationResult<BoardPreferencesDto>.Failure(VocabularyError.NotFound());
         }
 
-        var columns = await _repository.ListCustomColumnsAsync(userId, boardId, cancellationToken);
-        var preferences = await _repository.ListColumnVisibilityAsync(userId, boardId, cancellationToken);
-        return OperationResult<ColumnConfigurationDto>.Success(ToColumnConfiguration(columns, preferences));
-    }
-
-    public async Task<OperationResult<CustomColumnDto>> CreateCustomColumnAsync(Guid userId, Guid boardId, CreateCustomColumnRequest request, CancellationToken cancellationToken = default)
-    {
-        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
-        if (board is null)
+        var errors = ValidatePreferences(request);
+        if (errors.Count > 0)
         {
-            return OperationResult<CustomColumnDto>.Failure(VocabularyError.NotFound());
+            return OperationResult<BoardPreferencesDto>.Failure(VocabularyError.Validation(errors));
         }
 
-        if (!Enum.TryParse<CustomColumnType>(request.Type, true, out var type) || !Enum.IsDefined(type))
+        var preference = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
+        if (preference is null)
         {
-            return OperationResult<CustomColumnDto>.Failure(VocabularyError.Validation(new Dictionary<string, string[]>
-            {
-                ["type"] = ["Type must be text or number."]
-            }));
+            preference = VocabBoardPreference.Create(userId, boardId, request.HiddenColumns, request.ColumnOrder, request.ColumnWidths);
+            await _repository.AddBoardPreferenceAsync(preference, cancellationToken);
         }
-
-        var columns = await _repository.ListCustomColumnsAsync(userId, boardId, cancellationToken);
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 120
-            || columns.Any(column => string.Equals(column.Name, request.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+        else
         {
-            return OperationResult<CustomColumnDto>.Failure(VocabularyError.Validation(new Dictionary<string, string[]>
-            {
-                ["name"] = ["Column name must be unique and between 1 and 120 characters."]
-            }));
+            preference.Update(request.HiddenColumns, request.ColumnOrder, request.ColumnWidths);
+            await _repository.UpdateBoardPreferenceAsync(preference, cancellationToken);
         }
 
-        var column = VocabCustomColumn.Create(boardId, request.Name, type, columns.Count);
-        await _repository.AddCustomColumnAsync(column, cancellationToken);
-        return OperationResult<CustomColumnDto>.Success(ToCustomColumn(column));
-    }
-
-    public async Task<OperationResult<bool>> DeleteCustomColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
-    {
-        return await _repository.DeleteCustomColumnAsync(userId, boardId, columnId, cancellationToken)
-            ? OperationResult<bool>.Success(true)
-            : OperationResult<bool>.Failure(VocabularyError.NotFound());
-    }
-
-    public async Task<OperationResult<ColumnConfigurationDto>> UpdateColumnVisibilityAsync(Guid userId, Guid boardId, UpdateColumnVisibilityRequest request, CancellationToken cancellationToken = default)
-    {
-        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
-        if (board is null)
-        {
-            return OperationResult<ColumnConfigurationDto>.Failure(VocabularyError.NotFound());
-        }
-
-        var columns = await _repository.ListCustomColumnsAsync(userId, boardId, cancellationToken);
-        var allowedKeys = columns.Select(column => $"custom:{column.Id}".ToLowerInvariant())
-            .Concat(["thesaurus", "collocation", "note"])
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var hiddenKeys = request.HiddenColumnKeys.Select(key => key.Trim().ToLowerInvariant()).Distinct().ToList();
-        if (hiddenKeys.Any(key => !allowedKeys.Contains(key)))
-        {
-            return OperationResult<ColumnConfigurationDto>.Failure(VocabularyError.Validation(new Dictionary<string, string[]>
-            {
-                ["hiddenColumnKeys"] = ["One or more column keys are invalid."]
-            }));
-        }
-
-        var preferences = hiddenKeys.Select(key => VocabColumnVisibility.Create(userId, boardId, key)).ToList();
-        await _repository.ReplaceColumnVisibilityAsync(userId, boardId, preferences, cancellationToken);
-        return OperationResult<ColumnConfigurationDto>.Success(ToColumnConfiguration(columns, preferences));
+        await _repository.SaveChangesAsync(cancellationToken);
+        return OperationResult<BoardPreferencesDto>.Success(ToPreferences(preference));
     }
 
     private async Task NotifyWordSavedAsync(Guid userId, Guid boardId, VocabWord word, CancellationToken cancellationToken)
@@ -428,13 +365,14 @@ public sealed class VocabularyService : IVocabularyService
             board.UpdatedAt);
     }
 
-    private static BoardDetailDto ToDetail(VocabBoard board)
+    private static BoardDetailDto ToDetail(VocabBoard board, VocabBoardPreference? preferences)
     {
         return new BoardDetailDto(
             board.Id,
             board.Name,
             board.Language,
             ToPages(board),
+            ToPreferences(preferences),
             board.CreatedAt,
             board.UpdatedAt);
     }
@@ -443,7 +381,8 @@ public sealed class VocabularyService : IVocabularyService
     {
         return board.Pages
             .Where(page => page.DeletedAt is null)
-            .OrderBy(page => page.CreatedAt)
+            .OrderByDescending(page => page.CreatedAt)
+            .ThenByDescending(page => page.Id)
             .Select(ToPage)
             .ToList();
     }
@@ -453,107 +392,38 @@ public sealed class VocabularyService : IVocabularyService
         return new PageDto(page.Id, page.BoardId, page.Name, page.CreatedAt, page.UpdatedAt);
     }
 
-    private static WordDto ToWord(VocabWord word, IEnumerable<VocabCustomValue> values)
+    private static WordDto ToWord(VocabWord word)
     {
         return new WordDto(
             word.Id,
             word.PageId,
             word.Word,
             word.MeaningVn,
-            word.MeaningEn,
+            word.IpaPronunciation,
             word.Class.ToString().ToLowerInvariant(),
+            word.Definition,
             word.Example,
-            word.Thesaurus,
-            word.Collocation,
             word.Note,
-            values.Where(value => value.WordId == word.Id)
-                .Select(value => new CustomValueDto(value.ColumnId, value.TextValue ?? value.NumberValue?.ToString("G29", System.Globalization.CultureInfo.InvariantCulture)))
-                .ToList(),
+            word.Synonyms,
+            word.Antonyms,
             word.CreatedAt,
             word.UpdatedAt);
     }
 
-    private static CustomColumnDto ToCustomColumn(VocabCustomColumn column) =>
-        new(column.Id, column.Name, column.Type.ToString().ToLowerInvariant(), column.CreatedAt);
-
-    private static ColumnConfigurationDto ToColumnConfiguration(
-        IEnumerable<VocabCustomColumn> columns,
-        IEnumerable<VocabColumnVisibility> preferences) =>
-        new(columns.Select(ToCustomColumn).ToList(), preferences.Select(preference => preference.ColumnKey).ToList());
-
-    private async Task<(Dictionary<string, string[]> Errors, IReadOnlyList<VocabCustomValue> Values)> BuildCustomValuesAsync(
-        Guid userId,
-        Guid boardId,
-        Guid wordId,
-        IReadOnlyList<CustomValueRequest>? requests,
-        CancellationToken cancellationToken)
+    private static BoardPreferencesDto ToPreferences(VocabBoardPreference? preference)
     {
-        var errors = new Dictionary<string, string[]>();
-        if (requests is null)
+        if (preference is null)
         {
-            return (errors, []);
+            return new BoardPreferencesDto(null, [], FixedColumnOrder, new Dictionary<string, int>(), null, null);
         }
 
-        if (requests.GroupBy(value => value.ColumnId).Any(group => group.Count() > 1))
-        {
-            errors["customValues"] = ["A custom column may appear only once."];
-            return (errors, []);
-        }
-
-        var columns = (await _repository.ListCustomColumnsAsync(userId, boardId, cancellationToken)).ToDictionary(column => column.Id);
-        var values = new List<VocabCustomValue>();
-        foreach (var request in requests.Where(request => !string.IsNullOrWhiteSpace(request.Value)))
-        {
-            if (!columns.TryGetValue(request.ColumnId, out var column))
-            {
-                errors["customValues"] = ["One or more custom columns could not be found."];
-                break;
-            }
-
-            if (column.Type == CustomColumnType.Text)
-            {
-                if (request.Value!.Trim().Length > 4000)
-                {
-                    errors["customValues"] = ["Custom text values must be at most 4000 characters."];
-                    break;
-                }
-                values.Add(VocabCustomValue.CreateText(wordId, column.Id, request.Value));
-            }
-            else if (decimal.TryParse(request.Value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var number)
-                && decimal.Abs(number) < 100_000_000_000_000m
-                && decimal.Round(number, 4) == number)
-            {
-                values.Add(VocabCustomValue.CreateNumber(wordId, column.Id, number));
-            }
-            else
-            {
-                errors["customValues"] = [$"{column.Name} must be a number with at most 14 whole digits and 4 decimal places."];
-                break;
-            }
-        }
-
-        return (errors, values);
-    }
-
-    private static (VocabCustomValue? Value, string? Error) BuildCustomValue(Guid wordId, VocabCustomColumn column, string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return (null, null);
-        }
-
-        if (column.Type == CustomColumnType.Text)
-        {
-            return value.Trim().Length <= 4000
-                ? (VocabCustomValue.CreateText(wordId, column.Id, value), null)
-                : (null, "Custom text values must be at most 4000 characters.");
-        }
-
-        return decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var number)
-            && decimal.Abs(number) < 100_000_000_000_000m
-            && decimal.Round(number, 4) == number
-            ? (VocabCustomValue.CreateNumber(wordId, column.Id, number), null)
-            : (null, $"{column.Name} must be a number with at most 14 whole digits and 4 decimal places.");
+        return new BoardPreferencesDto(
+            preference.Id,
+            preference.HiddenColumns,
+            preference.ColumnOrder.Count == 0 ? FixedColumnOrder : preference.ColumnOrder,
+            preference.ColumnWidths,
+            preference.CreatedAt,
+            preference.UpdatedAt);
     }
 
     private static string? ApplyFixedCell(VocabWord word, string key, string? value)
@@ -562,12 +432,13 @@ public sealed class VocabularyService : IVocabularyService
         {
             "word" => ToRequest(word) with { Word = value ?? string.Empty },
             "meaningvn" => ToRequest(word) with { MeaningVn = value ?? string.Empty },
-            "meaningen" => ToRequest(word) with { MeaningEn = value ?? string.Empty },
+            "ipapronunciation" => ToRequest(word) with { IpaPronunciation = value ?? string.Empty },
+            "definition" => ToRequest(word) with { Definition = value },
             "class" => ToRequest(word) with { Class = value ?? string.Empty },
             "example" => ToRequest(word) with { Example = value ?? string.Empty },
-            "thesaurus" => ToRequest(word) with { Thesaurus = value },
-            "collocation" => ToRequest(word) with { Collocation = value },
             "note" => ToRequest(word) with { Note = value },
+            "synonyms" => ToRequest(word) with { Synonyms = value },
+            "antonyms" => ToRequest(word) with { Antonyms = value },
             _ => null
         };
         if (request is null)
@@ -581,20 +452,41 @@ public sealed class VocabularyService : IVocabularyService
             return validation.Errors.Values.First()[0];
         }
 
-        word.Update(request.Word, request.MeaningVn, request.MeaningEn, validation.WordClass!.Value, request.Example, request.Thesaurus, request.Collocation, request.Note);
+        word.Update(
+            request.Word,
+            request.MeaningVn,
+            request.IpaPronunciation,
+            validation.WordClass!.Value,
+            request.Definition,
+            request.Example,
+            request.Note,
+            request.Synonyms,
+            request.Antonyms);
         return null;
     }
 
-    private static WordRequest ToRequest(VocabWord word) =>
-        new(word.Word, word.MeaningVn, word.MeaningEn, word.Class.ToString().ToLowerInvariant(), word.Example, word.Thesaurus, word.Collocation, word.Note);
+    private static WordRequest ToRequest(VocabWord word)
+    {
+        return new WordRequest(
+            word.Word,
+            word.MeaningVn,
+            word.IpaPronunciation,
+            word.Class.ToString().ToLowerInvariant(),
+            word.Definition,
+            word.Example,
+            word.Note,
+            word.Synonyms,
+            word.Antonyms);
+    }
 
-    private static OperationResult<WordDto> CellValidation(string field, string message) =>
-        OperationResult<WordDto>.Failure(VocabularyError.Validation(new Dictionary<string, string[]> { [field] = [message] }));
+    private static OperationResult<WordDto> CellValidation(string field, string message)
+    {
+        return OperationResult<WordDto>.Failure(VocabularyError.Validation(new Dictionary<string, string[]> { [field] = [message] }));
+    }
 
     private static Dictionary<string, string[]> ValidateBoard(string? name, string? language)
     {
         var errors = new Dictionary<string, string[]>();
-
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 120)
         {
             errors["name"] = ["Board name must be between 1 and 120 characters."];
@@ -625,11 +517,12 @@ public sealed class VocabularyService : IVocabularyService
         var errors = new Dictionary<string, string[]>();
         ValidateRequired(errors, "word", request.Word, 240);
         ValidateRequired(errors, "meaningVn", request.MeaningVn, 1000);
-        ValidateRequired(errors, "meaningEn", request.MeaningEn, 2000);
+        ValidateRequired(errors, "ipaPronunciation", request.IpaPronunciation, 2000);
+        ValidateOptional(errors, "definition", request.Definition, 4000);
         ValidateRequired(errors, "example", request.Example, 2000);
-        ValidateOptional(errors, "thesaurus", request.Thesaurus, 2000);
-        ValidateOptional(errors, "collocation", request.Collocation, 2000);
         ValidateOptional(errors, "note", request.Note, 4000);
+        ValidateOptional(errors, "synonyms", request.Synonyms, 2000);
+        ValidateOptional(errors, "antonyms", request.Antonyms, 2000);
 
         WordClass? wordClass = null;
         if (Enum.TryParse<WordClass>(request.Class, true, out var parsedClass) && Enum.IsDefined(parsedClass))
@@ -642,6 +535,42 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         return (errors, wordClass);
+    }
+
+    private static Dictionary<string, string[]> ValidatePreferences(UpdateBoardPreferencesRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var hiddenColumns = request.HiddenColumns
+            .Select(key => key.Trim())
+            .Where(key => key.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (hiddenColumns.Any(key => !HideableColumns.Contains(key)))
+        {
+            errors["hiddenColumns"] = ["Only nullable fixed columns may be hidden."];
+        }
+
+        var columnOrder = request.ColumnOrder
+            .Select(key => key.Trim())
+            .Where(key => key.Length > 0)
+            .ToList();
+        if (columnOrder.Count != FixedColumnOrder.Length
+            || columnOrder.Distinct(StringComparer.OrdinalIgnoreCase).Count() != FixedColumnOrder.Length
+            || FixedColumnOrder.Except(columnOrder, StringComparer.OrdinalIgnoreCase).Any()
+            || columnOrder.Except(FixedColumnOrder, StringComparer.OrdinalIgnoreCase).Any())
+        {
+            errors["columnOrder"] = ["Column order must include each fixed column exactly once."];
+        }
+
+        if (request.ColumnWidths.Any(pair =>
+                !FixedColumnOrder.Contains(pair.Key, StringComparer.OrdinalIgnoreCase)
+                || pair.Value < 80
+                || pair.Value > 1200))
+        {
+            errors["columnWidths"] = ["Column widths must target fixed columns only and stay between 80 and 1200 pixels."];
+        }
+
+        return errors;
     }
 
     private static void ValidateRequired(Dictionary<string, string[]> errors, string field, string? value, int maxLength)

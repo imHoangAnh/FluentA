@@ -17,6 +17,7 @@ public sealed record BoardDetailDto(
     string Name,
     string Language,
     IReadOnlyList<PageDto> Pages,
+    BoardPreferencesDto Preferences,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -29,17 +30,13 @@ public sealed record PageDto(Guid Id, Guid BoardId, string Name, DateTime Create
 public sealed record WordRequest(
     string Word,
     string MeaningVn,
-    string MeaningEn,
+    string IpaPronunciation,
     string Class,
+    string? Definition,
     string Example,
-    string? Thesaurus = null,
-    string? Collocation = null,
     string? Note = null,
-    IReadOnlyList<CustomValueRequest>? CustomValues = null);
-
-public sealed record CustomValueRequest(Guid ColumnId, string? Value);
-
-public sealed record CustomValueDto(Guid ColumnId, string? Value);
+    string? Synonyms = null,
+    string? Antonyms = null);
 
 public sealed record UpdateWordCellRequest(string ColumnKey, string? Value);
 
@@ -48,22 +45,25 @@ public sealed record WordDto(
     Guid PageId,
     string Word,
     string MeaningVn,
-    string MeaningEn,
+    string IpaPronunciation,
     string Class,
+    string? Definition,
     string Example,
-    string? Thesaurus,
-    string? Collocation,
     string? Note,
-    IReadOnlyList<CustomValueDto> CustomValues,
+    string? Synonyms,
+    string? Antonyms,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
-public sealed record CreateCustomColumnRequest(string Name, string Type);
+public sealed record BoardPreferencesDto(
+    Guid? Id,
+    IReadOnlyList<string> HiddenColumns,
+    IReadOnlyList<string> ColumnOrder,
+    IReadOnlyDictionary<string, int> ColumnWidths,
+    DateTime? CreatedAt,
+    DateTime? UpdatedAt);
 
-public sealed record CustomColumnDto(Guid Id, string Name, string Type, DateTime CreatedAt);
-
-public sealed record ColumnConfigurationDto(
-    IReadOnlyList<CustomColumnDto> CustomColumns,
-    IReadOnlyList<string> HiddenColumnKeys);
-
-public sealed record UpdateColumnVisibilityRequest(IReadOnlyList<string> HiddenColumnKeys);
+public sealed record UpdateBoardPreferencesRequest(
+    IReadOnlyList<string> HiddenColumns,
+    IReadOnlyList<string> ColumnOrder,
+    IReadOnlyDictionary<string, int> ColumnWidths);

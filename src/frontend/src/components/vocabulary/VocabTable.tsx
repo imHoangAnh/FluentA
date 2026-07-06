@@ -1,21 +1,20 @@
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
-import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
-import { getLanguageProfile } from '../../lib/language'
 
 const emptyWord = (): vocabularyApi.WordInput => ({
   word: '',
   meaningVn: '',
-  meaningEn: '',
+  ipaPronunciation: '',
+  definition: '',
   class: 'noun',
   example: '',
-  thesaurus: '',
-  collocation: '',
   note: '',
-  customValues: [],
+  synonyms: '',
+  antonyms: '',
 })
 
 const classOptions = ['noun', 'verb', 'adj', 'adv', 'phrase', 'other']
@@ -24,7 +23,7 @@ type Column = {
   key: string
   label: string
   newLabel: string
-  type: 'text' | 'textarea' | 'number' | 'select'
+  type: 'text' | 'textarea' | 'select'
   required?: boolean
   value: (word: vocabularyApi.WordInput) => string
   update: (word: vocabularyApi.WordInput, value: string) => vocabularyApi.WordInput
@@ -38,6 +37,13 @@ type AutosaveCellProps = {
   onSave: (value: string) => Promise<void>
   onEndEnter?: () => Promise<void> | void
   register: (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null) => void
+}
+
+type VocabTableProps = {
+  boardId: string
+  page: vocabularyApi.Page
+  preferences: vocabularyApi.BoardPreferences
+  onPreferencesChange: (preferences: vocabularyApi.BoardPreferences) => Promise<void>
 }
 
 function AutosaveCell({ label, value, type, required, onSave, onEndEnter, register }: AutosaveCellProps) {
@@ -69,7 +75,6 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
     try {
       await onSave(nextValue)
       confirmed.current = nextValue
-      setError(null)
     } catch {
       setError('Save failed.')
     } finally {
@@ -88,6 +93,7 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       suppressBlur.current = false
       return
     }
+
     void commitValue(draft)
   }
 
@@ -101,7 +107,7 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       event.currentTarget.blur()
       return
     }
-    // Enter advances to the next logical cell; Shift+Enter still allows textarea newlines.
+
     if (event.key === 'Enter' && !event.shiftKey && onEndEnter) {
       event.preventDefault()
       await commitValue(draft)
@@ -128,13 +134,13 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
           <span className="material-symbols-outlined vw-select-icon">expand_more</span>
         </div>
       ) : type === 'textarea' ? (
-        <textarea className="vw-input" ref={register} {...shared} rows={2} style={{ fontStyle: label.includes('Example') ? 'italic' : 'normal' }} />
+        <textarea className="vw-input" ref={register} {...shared} rows={2} />
       ) : (
-        <input className="vw-input" ref={register} {...shared} type={type} step={type === 'number' ? 'any' : undefined} />
+        <input className="vw-input" ref={register} {...shared} type="text" />
       )}
-      {saving ? <small style={{fontSize: 11, color: '#6d7a77'}}>Saving...</small> : null}
+      {saving ? <small style={{ fontSize: 11, color: '#6d7a77' }}>Saving...</small> : null}
       {error ? (
-        <small style={{fontSize: 11, color: '#ba1a1a'}}>
+        <small style={{ fontSize: 11, color: '#ba1a1a' }}>
           {error} <button type="button" onClick={() => void commitValue(draft)}>Retry</button>
         </small>
       ) : null}
@@ -142,77 +148,60 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
   )
 }
 
-function SortableHeader({ id, label }: { id: string, label: string }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    zIndex: isDragging ? 1 : 0,
-    opacity: isDragging ? 0.5 : 1,
-    cursor: 'grab',
-    userSelect: 'none' as const,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  };
+function SortableHeader({
+  id,
+  label,
+  width,
+  onResizeStart,
+}: {
+  id: string
+  label: string
+  width: number
+  onResizeStart: (event: React.MouseEvent<HTMLButtonElement>, key: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <span className="material-symbols-outlined" style={{ fontSize: '14px', cursor: 'grab', verticalAlign: 'text-bottom' }}>drag_indicator</span>
-      {label}
+    <div
+      ref={setNodeRef}
+      className="vw-table-header__item"
+      style={{
+        width,
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+    >
+      <button type="button" className="vw-table-header__drag" {...attributes} {...listeners}>
+        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>drag_indicator</span>
+        {label}
+      </button>
+      <button
+        type="button"
+        aria-label={`Resize ${label}`}
+        className="vw-table-header__resize"
+        onMouseDown={(event) => onResizeStart(event, id)}
+      />
     </div>
-  );
+  )
 }
 
-export function VocabTable({ boardId, page, boardLanguage = 'en' }: { boardId: string; page: vocabularyApi.Page; boardLanguage?: string }) {
+export function VocabTable({ boardId, page, preferences, onPreferencesChange }: VocabTableProps) {
   const queryClient = useQueryClient()
   const [newWord, setNewWord] = useState<vocabularyApi.WordInput>(emptyWord)
+  const [columnOrder, setColumnOrder] = useState<string[]>(preferences.columnOrder)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS,
+    ...preferences.columnWidths,
+  })
   const cellRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({})
-  const languageProfile = getLanguageProfile(boardLanguage)
+  const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
+
   const wordsKey = ['vocab', 'words', page.id]
   const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
-  const columnsQuery = useQuery({
-    queryKey: ['vocab', 'columns', boardId],
-    queryFn: () => vocabularyApi.getColumnConfiguration(boardId),
-  })
-  const hidden = new Set(columnsQuery.data?.hiddenColumnKeys ?? [])
+  const sensors = useSensors(useSensor(PointerSensor))
+  const hidden = new Set(preferences.hiddenColumns)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor)
-  );
-
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`vocab_column_order_${boardId}`)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch {
-      return []
-    }
-    return []
-  })
-
-  useEffect(() => {
-    localStorage.setItem(`vocab_column_order_${boardId}`, JSON.stringify(columnOrder))
-  }, [columnOrder, boardId])
-
-  const customValue = (word: vocabularyApi.WordInput, columnId: string) =>
-    word.customValues?.find((value) => value.columnId === columnId)?.value ?? ''
-  const updateCustom = (word: vocabularyApi.WordInput, columnId: string, value: string) => ({
-    ...word,
-    customValues: [...(word.customValues ?? []).filter((item) => item.columnId !== columnId), { columnId, value }],
-  })
   const fixed = (key: keyof vocabularyApi.WordInput, label: string, newLabel: string, type: Column['type'] = 'text', required = false): Column => ({
     key: String(key),
     label,
@@ -222,54 +211,23 @@ export function VocabTable({ boardId, page, boardLanguage = 'en' }: { boardId: s
     value: (word) => String(word[key] ?? ''),
     update: (word, value) => ({ ...word, [key]: value }),
   })
+
   const baseColumns: Column[] = [
     fixed('word', 'Word', 'word', 'text', true),
     fixed('meaningVn', 'Vietnamese meaning', 'Vietnamese meaning', 'textarea', true),
-    fixed('meaningEn', languageProfile.secondaryMeaningLabel, languageProfile.secondaryMeaningNewLabel, 'textarea', true),
+    fixed('ipaPronunciation', 'IPA pronunciation', 'IPA pronunciation', 'text', true),
+    ...(!hidden.has('definition') ? [fixed('definition', 'Definition', 'definition', 'textarea')] : []),
     fixed('class', 'Class', 'word class', 'select', true),
     fixed('example', 'Example', 'example', 'textarea', true),
-    ...(!hidden.has('thesaurus') ? [fixed('thesaurus', 'Thesaurus', 'thesaurus')] : []),
-    ...(!hidden.has('collocation') ? [fixed('collocation', 'Collocation', 'collocation')] : []),
-    ...(!hidden.has('note') ? [fixed('note', 'Note', 'note')] : []),
-    ...((columnsQuery.data?.customColumns ?? [])
-      .filter((column) => !hidden.has(`custom:${column.id}`))
-      .map<Column>((column) => ({
-        key: `custom:${column.id}`,
-        label: column.name,
-        newLabel: column.name,
-        type: column.type,
-        value: (word) => customValue(word, column.id),
-        update: (word, value) => updateCustom(word, column.id, value),
-      }))),
+    ...(!hidden.has('note') ? [fixed('note', 'Note', 'note', 'textarea')] : []),
+    ...(!hidden.has('synonyms') ? [fixed('synonyms', 'Synonyms', 'synonyms', 'textarea')] : []),
+    ...(!hidden.has('antonyms') ? [fixed('antonyms', 'Antonyms', 'antonyms', 'textarea')] : []),
   ]
 
-  const columns = [...baseColumns].sort((a, b) => {
-    const aIdx = columnOrder.indexOf(a.key)
-    const bIdx = columnOrder.indexOf(b.key)
-    if (aIdx === -1 && bIdx === -1) return 0
-    if (aIdx === -1) return 1
-    if (bIdx === -1) return -1
-    return aIdx - bIdx
-  })
-
-  const gridTemplateColumns = `${columns.map((c) => c.key === 'class' ? 'minmax(100px, 0.5fr)' : 'minmax(150px, 1fr)').join(' ')} 40px`
+  const columns = [...baseColumns].sort((left, right) => columnOrder.indexOf(left.key) - columnOrder.indexOf(right.key))
+  const gridTemplateColumns = `${columns.map((column) => `${columnWidths[column.key] ?? vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS[column.key]}px`).join(' ')} 40px`
   const firstKey = columns[0]?.key
   const lastKey = columns.at(-1)?.key
-  const focus = (rowId: string, key: string | undefined) => {
-    if (key) requestAnimationFrame(() => cellRefs.current[`${rowId}:${key}`]?.focus())
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setColumnOrder(() => {
-        const currentOrder = columns.map(c => c.key)
-        const oldIndex = currentOrder.indexOf(active.id as string);
-        const newIndex = currentOrder.indexOf(over.id as string);
-        return arrayMove(currentOrder, oldIndex, newIndex);
-      });
-    }
-  }
 
   const createWord = useMutation({
     mutationFn: (input: vocabularyApi.WordInput) => vocabularyApi.createWord(boardId, page.id, input),
@@ -279,10 +237,65 @@ export function VocabTable({ boardId, page, boardLanguage = 'en' }: { boardId: s
       focus('new', firstKey)
     },
   })
+
   const deleteWord = useMutation({
     mutationFn: (wordId: string) => vocabularyApi.deleteWord(boardId, wordId),
     onSuccess: (_, wordId) => queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== wordId)),
   })
+
+  useEffect(() => {
+    function onMouseMove(event: MouseEvent) {
+      if (!resizeRef.current) return
+      const nextWidth = Math.max(80, Math.min(1200, resizeRef.current.startWidth + event.clientX - resizeRef.current.startX))
+      setColumnWidths((current) => ({ ...current, [resizeRef.current!.key]: nextWidth }))
+    }
+
+    function onMouseUp() {
+      if (!resizeRef.current) return
+      const nextPreferences = {
+        ...preferences,
+        columnOrder,
+        columnWidths,
+      }
+      resizeRef.current = null
+      void onPreferencesChange(nextPreferences)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [columnOrder, columnWidths, onPreferencesChange, preferences])
+
+  function focus(rowId: string, key: string | undefined) {
+    if (key) requestAnimationFrame(() => cellRefs.current[`${rowId}:${key}`]?.focus())
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const currentOrder = columns.map((column) => column.key)
+    const nextOrder = arrayMove(currentOrder, currentOrder.indexOf(active.id as string), currentOrder.indexOf(over.id as string))
+    setColumnOrder(nextOrder)
+    void onPreferencesChange({
+      ...preferences,
+      columnOrder: nextOrder,
+      columnWidths,
+    })
+  }
+
+  function handleResizeStart(event: React.MouseEvent<HTMLButtonElement>, key: string) {
+    event.preventDefault()
+    event.stopPropagation()
+    resizeRef.current = {
+      key,
+      startX: event.clientX,
+      startWidth: columnWidths[key] ?? vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS[key],
+    }
+  }
 
   async function saveCell(wordId: string, columnKey: string, value: string) {
     const updated = await vocabularyApi.updateWordCell(boardId, wordId, columnKey, value)
@@ -317,69 +330,84 @@ export function VocabTable({ boardId, page, boardLanguage = 'en' }: { boardId: s
         }
       },
     }
-    return column.type === 'select' ? (
-      <div className="vw-select-wrapper">
-        <select className="vw-input" {...shared}>
-          {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-        <span className="material-symbols-outlined vw-select-icon">expand_more</span>
-      </div>
-    ) : column.type === 'textarea' ? (
-      <textarea className="vw-input" {...shared} rows={1} placeholder={column.label} style={{ fontStyle: column.label.includes('Example') ? 'italic' : 'normal' }} />
-    ) : (
-      <input className="vw-input" {...shared} type={column.type} step={column.type === 'number' ? 'any' : undefined} placeholder={column.label} />
-    )
+
+    if (column.type === 'select') {
+      return (
+        <div className="vw-select-wrapper">
+          <select className="vw-input" {...shared}>
+            {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <span className="material-symbols-outlined vw-select-icon">expand_more</span>
+        </div>
+      )
+    }
+
+    if (column.type === 'textarea') {
+      return <textarea className="vw-input" {...shared} rows={1} placeholder={column.label} />
+    }
+
+    return <input className="vw-input" {...shared} type="text" placeholder={column.label} />
   }
 
   return (
-    <div className="vw-table-container">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={columns.map(c => c.key)} strategy={horizontalListSortingStrategy}>
-          <div className="vw-table-header" style={{ gridTemplateColumns }}>
-            {columns.map(column => <SortableHeader key={column.key} id={column.key} label={column.label} />)}
-            <div></div>
+    <div className="vw-table-scroll" data-testid="vocab-table-scroll">
+      <div className="vw-table-container">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={columns.map((column) => column.key)} strategy={horizontalListSortingStrategy}>
+            <div className="vw-table-header" style={{ gridTemplateColumns }}>
+              {columns.map((column) => (
+                <SortableHeader
+                  key={column.key}
+                  id={column.key}
+                  label={column.label}
+                  width={columnWidths[column.key] ?? vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS[column.key]}
+                  onResizeStart={handleResizeStart}
+                />
+              ))}
+              <div />
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {wordsQuery.data?.map((word) => (
+          <div className="vw-table-row" style={{ gridTemplateColumns }} key={word.id}>
+            {columns.map((column) => (
+              <AutosaveCell
+                key={column.key}
+                label={`${column.label} for ${word.word}`}
+                value={column.value(word)}
+                type={column.type}
+                required={column.required}
+                register={(element) => { cellRefs.current[`${word.id}:${column.key}`] = element }}
+                onSave={(value) => saveCell(word.id, column.key, value)}
+                onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
+              />
+            ))}
+            <div className="vw-action-cell">
+              <button
+                className="vw-delete-btn"
+                type="button"
+                tabIndex={-1}
+                aria-label={`Delete ${word.word}`}
+                onClick={() => { if (window.confirm(`Delete "${word.word}"?`)) deleteWord.mutate(word.id) }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+              </button>
+            </div>
           </div>
-        </SortableContext>
-      </DndContext>
-      
-      {wordsQuery.data?.map((word) => (
-        <div className="vw-table-row" style={{ gridTemplateColumns }} key={word.id}>
-          {columns.map((column) => (
-            <AutosaveCell
-              key={column.key}
-              label={`${column.label} for ${word.word}`}
-              value={column.value(word)}
-              type={column.type}
-              required={column.required}
-              register={(element) => { cellRefs.current[`${word.id}:${column.key}`] = element }}
-              onSave={(value) => saveCell(word.id, column.key, value)}
-              onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
-            />
-          ))}
+        ))}
+
+        <form className="vw-table-row create-row" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
+          {columns.map((column) => <div key={column.key}>{renderBlankCell(column)}</div>)}
           <div className="vw-action-cell">
-            <button
-              className="vw-delete-btn"
-              type="button"
-              tabIndex={-1}
-              aria-label={`Delete ${word.word}`}
-              onClick={() => { if (window.confirm(`Delete "${word.word}"?`)) deleteWord.mutate(word.id) }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+            <button className="vw-confirm-btn" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add">
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
             </button>
           </div>
-        </div>
-      ))}
-      
-      <form className="vw-table-row create-row" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
-        {columns.map((column) => <div key={column.key}>{renderBlankCell(column)}</div>)}
-        <div className="vw-action-cell">
-          <button className="vw-confirm-btn" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add">
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
-          </button>
-        </div>
-      </form>
-      {wordsQuery.isLoading ? <div style={{padding: 16, color: '#6d7a77'}}>Loading words...</div> : null}
-      {createWord.isError ? <div style={{padding: 16, color: '#ba1a1a'}}>Could not create word. Fix the row and try again.</div> : null}
+        </form>
+        {wordsQuery.isLoading ? <div style={{ padding: 16, color: '#6d7a77' }}>Loading words...</div> : null}
+        {createWord.isError ? <div style={{ padding: 16, color: '#ba1a1a' }}>Could not create word. Fix the row and try again.</div> : null}
+      </div>
     </div>
   )
 }

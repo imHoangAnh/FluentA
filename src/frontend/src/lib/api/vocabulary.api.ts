@@ -1,6 +1,30 @@
 import { apiClient } from './client'
 import type { ApiEnvelope } from './auth.api'
 
+export const DEFAULT_VOCAB_COLUMN_ORDER = [
+  'word',
+  'meaningVn',
+  'ipaPronunciation',
+  'definition',
+  'class',
+  'example',
+  'note',
+  'synonyms',
+  'antonyms',
+] as const
+
+export const DEFAULT_VOCAB_COLUMN_WIDTHS: Record<string, number> = {
+  word: 220,
+  meaningVn: 240,
+  ipaPronunciation: 180,
+  definition: 260,
+  class: 140,
+  example: 320,
+  note: 260,
+  synonyms: 220,
+  antonyms: 220,
+}
+
 export type BoardSummary = {
   id: string
   name: string
@@ -18,8 +42,18 @@ export type Page = {
   updatedAt: string
 }
 
+export type BoardPreferences = {
+  id?: string | null
+  hiddenColumns: string[]
+  columnOrder: string[]
+  columnWidths: Record<string, number>
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 export type BoardDetail = BoardSummary & {
   pages: Page[]
+  preferences: BoardPreferences
 }
 
 export type WordClass = 'noun' | 'verb' | 'adj' | 'adv' | 'phrase' | 'other'
@@ -27,18 +61,13 @@ export type WordClass = 'noun' | 'verb' | 'adj' | 'adv' | 'phrase' | 'other'
 export type WordInput = {
   word: string
   meaningVn: string
-  meaningEn: string
+  ipaPronunciation: string
+  definition?: string | null
   class: WordClass
   example: string
-  thesaurus?: string | null
-  collocation?: string | null
   note?: string | null
-  customValues?: CustomValue[]
-}
-
-export type CustomValue = {
-  columnId: string
-  value?: string | null
+  synonyms?: string | null
+  antonyms?: string | null
 }
 
 export type Word = WordInput & {
@@ -46,18 +75,6 @@ export type Word = WordInput & {
   pageId: string
   createdAt: string
   updatedAt: string
-}
-
-export type CustomColumn = {
-  id: string
-  name: string
-  type: 'text' | 'number'
-  createdAt: string
-}
-
-export type ColumnConfiguration = {
-  customColumns: CustomColumn[]
-  hiddenColumnKeys: string[]
 }
 
 export async function listBoards() {
@@ -122,21 +139,11 @@ export async function deleteWord(boardId: string, wordId: string) {
   await apiClient.delete(`/boards/${boardId}/words/${wordId}`)
 }
 
-export async function getColumnConfiguration(boardId: string) {
-  const response = await apiClient.get<ApiEnvelope<ColumnConfiguration>>(`/boards/${boardId}/columns`)
-  return response.data.data!
-}
-
-export async function createCustomColumn(boardId: string, input: { name: string; type: 'text' | 'number' }) {
-  const response = await apiClient.post<ApiEnvelope<CustomColumn>>(`/boards/${boardId}/columns`, input)
-  return response.data.data!
-}
-
-export async function deleteCustomColumn(boardId: string, columnId: string) {
-  await apiClient.delete(`/boards/${boardId}/columns/${columnId}`)
-}
-
-export async function updateColumnVisibility(boardId: string, hiddenColumnKeys: string[]) {
-  const response = await apiClient.put<ApiEnvelope<ColumnConfiguration>>(`/boards/${boardId}/column-visibility`, { hiddenColumnKeys })
+export async function updateBoardPreferences(boardId: string, input: {
+  hiddenColumns: string[]
+  columnOrder: string[]
+  columnWidths: Record<string, number>
+}) {
+  const response = await apiClient.put<ApiEnvelope<BoardPreferences>>(`/boards/${boardId}/preferences`, input)
   return response.data.data!
 }

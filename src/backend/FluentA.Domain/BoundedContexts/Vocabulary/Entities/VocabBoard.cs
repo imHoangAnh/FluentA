@@ -12,43 +12,40 @@ public sealed class VocabBoard : BaseEntity, IAggregateRoot
         Language = string.Empty;
     }
 
-    private VocabBoard(Guid userId, string name, string language, int sortOrder)
+    private VocabBoard(Guid userId, string name, string language)
     {
         UserId = userId;
         Name = CleanName(name);
         Language = CleanLanguage(language);
-        SortOrder = sortOrder;
     }
 
     public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public string Language { get; private set; }
-    public int SortOrder { get; private set; }
     public IReadOnlyList<VocabPage> Pages => _pages.AsReadOnly();
 
-    public static VocabBoard Create(Guid userId, string name, string language, int sortOrder = 0)
+    public static VocabBoard Create(Guid userId, string name, string language)
     {
         if (userId == Guid.Empty)
         {
             throw new ArgumentException("User id is required.", nameof(userId));
         }
 
-        return new VocabBoard(userId, name, language, sortOrder);
+        return new VocabBoard(userId, name, language);
     }
 
-    public VocabPage AddPage(string name, int sortOrder)
+    public VocabPage AddPage(string name)
     {
-        var page = VocabPage.Create(Id, name, sortOrder);
+        var page = VocabPage.Create(Id, name);
         _pages.Add(page);
         UpdatedAt = DateTime.UtcNow;
         return page;
     }
 
-    public void Update(string name, string language, int sortOrder)
+    public void Update(string name, string language)
     {
         Name = CleanName(name);
         Language = CleanLanguage(language);
-        SortOrder = sortOrder;
         UpdatedAt = DateTime.UtcNow;
     }
 

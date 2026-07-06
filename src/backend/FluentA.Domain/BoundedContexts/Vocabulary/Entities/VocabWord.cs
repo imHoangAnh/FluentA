@@ -1,5 +1,5 @@
-using FluentA.Domain.SeedWork;
 using FluentA.Domain.BoundedContexts.Vocabulary.Events;
+using FluentA.Domain.SeedWork;
 
 namespace FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
@@ -9,7 +9,7 @@ public sealed class VocabWord : BaseEntity
     {
         Word = string.Empty;
         MeaningVn = string.Empty;
-        MeaningEn = string.Empty;
+        IpaPronunciation = string.Empty;
         Example = string.Empty;
     }
 
@@ -17,48 +17,48 @@ public sealed class VocabWord : BaseEntity
         Guid pageId,
         string word,
         string meaningVn,
-        string meaningEn,
+        string ipaPronunciation,
         WordClass wordClass,
+        string? definition,
         string example,
-        string? thesaurus,
-        string? collocation,
-        string? note)
+        string? note,
+        string? synonyms,
+        string? antonyms)
+        : this()
     {
-        Word = string.Empty;
-        MeaningVn = string.Empty;
-        MeaningEn = string.Empty;
-        Example = string.Empty;
         PageId = pageId;
-        Apply(word, meaningVn, meaningEn, wordClass, example, thesaurus, collocation, note);
+        Apply(word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
     }
 
     public Guid PageId { get; private set; }
     public string Word { get; private set; }
     public string MeaningVn { get; private set; }
-    public string MeaningEn { get; private set; }
+    public string IpaPronunciation { get; private set; }
     public WordClass Class { get; private set; }
+    public string? Definition { get; private set; }
     public string Example { get; private set; }
-    public string? Thesaurus { get; private set; }
-    public string? Collocation { get; private set; }
     public string? Note { get; private set; }
+    public string? Synonyms { get; private set; }
+    public string? Antonyms { get; private set; }
 
     public static VocabWord Create(
         Guid pageId,
         string word,
         string meaningVn,
-        string meaningEn,
+        string ipaPronunciation,
         WordClass wordClass,
+        string? definition,
         string example,
-        string? thesaurus = null,
-        string? collocation = null,
-        string? note = null)
+        string? note = null,
+        string? synonyms = null,
+        string? antonyms = null)
     {
         if (pageId == Guid.Empty)
         {
             throw new ArgumentException("Page id is required.", nameof(pageId));
         }
 
-        var vocabWord = new VocabWord(pageId, word, meaningVn, meaningEn, wordClass, example, thesaurus, collocation, note);
+        var vocabWord = new VocabWord(pageId, word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
         vocabWord.AddDomainEvent(new WordAddedEvent(vocabWord.Id, vocabWord.PageId, DateTime.UtcNow));
         return vocabWord;
     }
@@ -66,14 +66,15 @@ public sealed class VocabWord : BaseEntity
     public void Update(
         string word,
         string meaningVn,
-        string meaningEn,
+        string ipaPronunciation,
         WordClass wordClass,
+        string? definition,
         string example,
-        string? thesaurus,
-        string? collocation,
-        string? note)
+        string? note,
+        string? synonyms,
+        string? antonyms)
     {
-        Apply(word, meaningVn, meaningEn, wordClass, example, thesaurus, collocation, note);
+        Apply(word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new WordUpdatedEvent(Id, PageId, UpdatedAt));
     }
@@ -88,21 +89,23 @@ public sealed class VocabWord : BaseEntity
     private void Apply(
         string word,
         string meaningVn,
-        string meaningEn,
+        string ipaPronunciation,
         WordClass wordClass,
+        string? definition,
         string example,
-        string? thesaurus,
-        string? collocation,
-        string? note)
+        string? note,
+        string? synonyms,
+        string? antonyms)
     {
         Word = CleanRequired(word, 240, "Word");
         MeaningVn = CleanRequired(meaningVn, 1000, "Vietnamese meaning");
-        MeaningEn = CleanRequired(meaningEn, 2000, "English meaning");
+        IpaPronunciation = CleanRequired(ipaPronunciation, 2000, "IPA pronunciation");
         Class = wordClass;
+        Definition = CleanOptional(definition, 4000, "Definition");
         Example = CleanRequired(example, 2000, "Example");
-        Thesaurus = CleanOptional(thesaurus, 2000, "Thesaurus");
-        Collocation = CleanOptional(collocation, 2000, "Collocation");
         Note = CleanOptional(note, 4000, "Note");
+        Synonyms = CleanOptional(synonyms, 2000, "Synonyms");
+        Antonyms = CleanOptional(antonyms, 2000, "Antonyms");
     }
 
     private static string CleanRequired(string value, int maxLength, string field)

@@ -3486,6 +3486,8 @@ no longer user-defined.
 | Column order | Users can drag columns to reorder them. The order is saved in `vocab_board_preferences` and reused on every page in that board. |
 | Column width | Users can resize columns by dragging column headers. Widths are saved in `vocab_board_preferences` and reused on every page in that board. |
 | Horizontal overflow | If visible columns exceed the viewport, the table scrolls horizontally instead of squeezing fields until content becomes unusable. |
+| Board language | Keep `vocab_boards.language`; users choose the target language when creating a board, and existing language-aware labels and speech behavior remain intact. |
+| Board/page ordering | Remove `sort_order` from `vocab_boards` and `vocab_pages`. List both by `created_at` descending, with newest items first; manual board/page ordering is not supported. |
 
 ### 21.3 Target Vocabulary Word Shape
 

@@ -1,7 +1,7 @@
-using FluentA.Application.BoundedContexts.Vocabulary;
-using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Review;
+using FluentA.Application.BoundedContexts.Vocabulary;
+using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
@@ -14,13 +14,12 @@ public sealed class VocabularyServiceTests
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
-        var userId = Guid.NewGuid();
 
-        var result = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS Vocabulary", "en"));
+        var result = await service.CreateBoardAsync(Guid.NewGuid(), new CreateBoardRequest("IELTS Vocabulary", "en"));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("IELTS Vocabulary", result.Value!.Name);
         Assert.Empty(repository.Decks);
+        Assert.Equal("word", result.Value!.Preferences.ColumnOrder[0]);
     }
 
     [Fact]
@@ -35,61 +34,36 @@ public sealed class VocabularyServiceTests
         var result = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1 - Education"));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Unit 1 - Education", result.Value!.Name);
         Assert.Single(repository.Decks);
         Assert.Equal(DeckType.PageDeck, repository.Decks[0].Type);
-        Assert.Equal(result.Value.Id, repository.Decks[0].PageId);
+        Assert.Equal(result.Value!.Id, repository.Decks[0].PageId);
     }
 
     [Fact]
-    public async Task UpdateListAndDeleteBoardPageAndWords_UseOwnedEntities()
+    public async Task BoardAndPageLists_ReturnNewestFirst()
     {
         var repository = new FakeVocabularyRepository();
-        var notifier = new RecordingFlashcardSyncNotifier();
-        var flashcardSync = new FakeFlashcardVocabularySyncPort(repository);
-        var reviewCleanup = new RecordingVocabularyReviewCleanupPort();
-        var service = new VocabularyService(repository, notifier, flashcardSync, reviewCleanup);
+        var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
-        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
-        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb"));
-        notifier.UpdatedDeckGroups.Clear();
+        var olderBoard = await service.CreateBoardAsync(userId, new CreateBoardRequest("Older", "en"));
+        await Task.Delay(2);
+        var newerBoard = await service.CreateBoardAsync(userId, new CreateBoardRequest("Newer", "fr"));
+        await Task.Delay(2);
+        var boardWithPages = VocabBoard.Create(userId, "Pages", "en");
+        var olderPage = boardWithPages.AddPage("Older page");
+        await Task.Delay(2);
+        var newerPage = boardWithPages.AddPage("Newer page");
+        await repository.AddBoardAsync(boardWithPages);
 
-        var listedBoards = await service.ListBoardsAsync(userId);
-        var listedPages = await service.ListPagesAsync(userId, board.Value.Id);
-        var listedWords = await service.ListWordsAsync(userId, board.Value.Id, page.Value.Id);
-        var updatedBoard = await service.UpdateBoardAsync(userId, board.Value.Id, new UpdateBoardRequest("HSK", "zh"));
-        var updatedPage = await service.UpdatePageAsync(userId, board.Value.Id, page.Value.Id, new UpdatePageRequest("Lesson 2"));
-        var deletedWord = await service.DeleteWordAsync(userId, board.Value.Id, created.Value!.Id);
-        var deletedPage = await service.DeletePageAsync(userId, board.Value.Id, page.Value.Id);
-        var deletedBoard = await service.DeleteBoardAsync(userId, board.Value.Id);
+        var boards = await service.ListBoardsAsync(userId);
+        var board = await service.GetBoardAsync(userId, boardWithPages.Id);
 
-        Assert.Single(listedBoards.Value!);
-        Assert.Empty(listedPages.Value!);
-        Assert.Equal("mitigate", Assert.Single(listedWords.Value!).Word);
-        Assert.Equal("HSK", updatedBoard.Value!.Name);
-        Assert.Equal("zh", updatedBoard.Value.Language);
-        Assert.Equal("Lesson 2", updatedPage.Value!.Name);
-        Assert.True(deletedWord.Value);
-        Assert.True(deletedPage.Value);
-        Assert.True(deletedBoard.Value);
-        Assert.Single(notifier.UpdatedDeckGroups);
-        Assert.Equal([created.Value.Id], reviewCleanup.RemovedWordIds);
+        Assert.Equal([boardWithPages.Id, newerBoard.Value!.Id, olderBoard.Value!.Id], boards.Value!.Select(item => item.Id));
+        Assert.Equal([newerPage.Id, olderPage.Id], board.Value!.Pages.Select(item => item.Id));
     }
 
     [Fact]
-    public async Task CreateBoard_RejectsInvalidLanguage()
-    {
-        var service = new VocabularyService(new FakeVocabularyRepository());
-
-        var result = await service.CreateBoardAsync(Guid.NewGuid(), new CreateBoardRequest("IELTS", "x"));
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
-    }
-
-    [Fact]
-    public async Task CreateUpdateDeleteWord_UsesOwnedPage()
+    public async Task CreateUpdateDeleteWord_UsesOwnedEntities()
     {
         var repository = new FakeVocabularyRepository();
         var notifier = new RecordingFlashcardSyncNotifier();
@@ -101,17 +75,21 @@ public sealed class VocabularyServiceTests
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
 
         var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb"));
-        var updated = await service.UpdateWordAsync(userId, board.Value.Id, created.Value!.Id, Word("mitigation", "noun"));
+        var updated = await service.UpdateWordAsync(userId, board.Value.Id, created.Value!.Id, Word("mitigation", "noun") with
+        {
+            IpaPronunciation = "/mItI'geISn/",
+            Definition = "risk reduction",
+            Synonyms = "reduction",
+            Antonyms = "aggravation",
+        });
         var deleted = await service.DeleteWordAsync(userId, board.Value.Id, created.Value.Id);
 
         Assert.True(created.IsSuccess);
-        Assert.Equal("mitigation", updated.Value!.Word);
-        Assert.Equal("noun", updated.Value.Class);
+        Assert.Equal("/mItI'geISn/", updated.Value!.IpaPronunciation);
+        Assert.Equal("reduction", updated.Value.Synonyms);
         Assert.True(deleted.IsSuccess);
         Assert.DoesNotContain(repository.Words, word => word.DeletedAt is null);
         Assert.Equal(2, notifier.SavedWords.Count);
-        Assert.Equal(3, notifier.UpdatedDeckGroups.Count);
-        Assert.All(notifier.UpdatedDeckGroups, update => Assert.Single(update.DeckIds));
         Assert.Equal([created.Value.Id], reviewCleanup.RemovedWordIds);
     }
 
@@ -124,7 +102,7 @@ public sealed class VocabularyServiceTests
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
 
-        var result = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "adjective"));
+        var result = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "invalid"));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
@@ -153,78 +131,59 @@ public sealed class VocabularyServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        repository.FailWordCommits = true;
+        repository.FailCommits = true;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb")));
+            service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb")));
 
         Assert.Empty(notifier.SavedWords);
         Assert.Empty(notifier.UpdatedDeckGroups);
     }
 
     [Fact]
-    public async Task CustomColumnConfiguration_IsBoardWideTypedAndUserPrivate()
+    public async Task BoardPreferences_AreBoardWideAndOwnerScoped()
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
-        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var column = await service.CreateCustomColumnAsync(userId, board.Value.Id, new CreateCustomColumnRequest("Priority", "number"));
-        var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb") with
-        {
-            CustomValues = [new CustomValueRequest(column.Value!.Id, "3.5")]
-        });
-        var hidden = await service.UpdateColumnVisibilityAsync(userId, board.Value.Id, new UpdateColumnVisibilityRequest(["note", $"custom:{column.Value.Id}"]));
 
-        Assert.Equal("3.5", Assert.Single(created.Value!.CustomValues).Value);
-        Assert.Equal(2, hidden.Value!.HiddenColumnKeys.Count);
-        Assert.Empty((await service.GetColumnConfigurationAsync(Guid.NewGuid(), board.Value.Id)).Value?.CustomColumns ?? []);
+        var updated = await service.UpdateBoardPreferencesAsync(
+            userId,
+            board.Value!.Id,
+            new UpdateBoardPreferencesRequest(
+                ["definition", "note"],
+                ["word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms"],
+                new Dictionary<string, int> { ["word"] = 260, ["example"] = 360 }));
+        var loaded = await service.GetBoardAsync(userId, board.Value.Id);
+        var foreign = await service.GetBoardAsync(Guid.NewGuid(), board.Value.Id);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(["definition", "note"], updated.Value!.HiddenColumns);
+        Assert.Equal(260, updated.Value.ColumnWidths["word"]);
+        Assert.Equal(["definition", "note"], loaded.Value!.Preferences.HiddenColumns);
+        Assert.False(foreign.IsSuccess);
     }
 
     [Fact]
-    public async Task CustomNumber_RejectsValuesOutsideDatabasePrecision()
+    public async Task BoardPreferences_RejectInvalidHiddenColumns()
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
-        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var column = await service.CreateCustomColumnAsync(userId, board.Value.Id, new CreateCustomColumnRequest("Priority", "number"));
 
-        var result = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb") with
-        {
-            CustomValues = [new CustomValueRequest(column.Value!.Id, "1.23456")]
-        });
+        var result = await service.UpdateBoardPreferencesAsync(
+            userId,
+            board.Value!.Id,
+            new UpdateBoardPreferencesRequest(["word"], ["word"], new Dictionary<string, int>()));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
     }
 
     [Fact]
-    public async Task CustomColumnConfiguration_RejectsInvalidDuplicateAndMissingInputs()
-    {
-        var repository = new FakeVocabularyRepository();
-        var service = new VocabularyService(repository);
-        var userId = Guid.NewGuid();
-        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
-        var column = await service.CreateCustomColumnAsync(userId, board.Value!.Id, new CreateCustomColumnRequest("Priority", "number"));
-
-        var duplicate = await service.CreateCustomColumnAsync(userId, board.Value.Id, new CreateCustomColumnRequest(" priority ", "number"));
-        var invalidType = await service.CreateCustomColumnAsync(userId, board.Value.Id, new CreateCustomColumnRequest("Register", "date"));
-        var invalidVisibility = await service.UpdateColumnVisibilityAsync(userId, board.Value.Id, new UpdateColumnVisibilityRequest(["missing"]));
-        var missingDelete = await service.DeleteCustomColumnAsync(userId, board.Value.Id, Guid.NewGuid());
-        var deleted = await service.DeleteCustomColumnAsync(userId, board.Value.Id, column.Value!.Id);
-
-        Assert.False(duplicate.IsSuccess);
-        Assert.False(invalidType.IsSuccess);
-        Assert.False(invalidVisibility.IsSuccess);
-        Assert.False(missingDelete.IsSuccess);
-        Assert.True(deleted.Value);
-    }
-
-    [Fact]
-    public async Task UpdateWordCell_ChangesOnlyNamedCellAndCustomCellDoesNotNotifyCards()
+    public async Task UpdateWordCell_ChangesOnlyNamedCell()
     {
         var repository = new FakeVocabularyRepository();
         var notifier = new RecordingFlashcardSyncNotifier();
@@ -233,19 +192,14 @@ public sealed class VocabularyServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var column = await service.CreateCustomColumnAsync(userId, board.Value.Id, new CreateCustomColumnRequest("Priority", "number"));
-        var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb"));
+        var created = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb"));
         notifier.SavedWords.Clear();
-        notifier.UpdatedDeckGroups.Clear();
 
-        var fixedUpdate = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value!.Id, new UpdateWordCellRequest("meaningEn", "reduce harm"));
-        var customUpdate = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value.Id, new UpdateWordCellRequest($"custom:{column.Value!.Id}", "4.5"));
+        var updated = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value!.Id, new UpdateWordCellRequest("ipaPronunciation", "/mItIgeIt/"));
 
-        Assert.Equal("mitigate", fixedUpdate.Value!.Word);
-        Assert.Equal("reduce harm", fixedUpdate.Value.MeaningEn);
-        Assert.Equal("4.5", Assert.Single(customUpdate.Value!.CustomValues).Value);
+        Assert.Equal("/mItIgeIt/", updated.Value!.IpaPronunciation);
+        Assert.Equal("reduce harm", updated.Value.Definition);
         Assert.Single(notifier.SavedWords);
-        Assert.Single(notifier.UpdatedDeckGroups);
     }
 
     [Fact]
@@ -256,7 +210,7 @@ public sealed class VocabularyServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb"));
+        var created = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb"));
 
         var result = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value!.Id, new UpdateWordCellRequest("word", ""));
 
@@ -266,7 +220,7 @@ public sealed class VocabularyServiceTests
 
     private static WordRequest Word(string word, string wordClass)
     {
-        return new WordRequest(word, "nghĩa tiếng Việt", "English meaning", wordClass, "Example sentence.");
+        return new WordRequest(word, "nghia tieng Viet", "/mItIgeIt/", wordClass, "reduce harm", "Example sentence.", null, "reduce", "worsen");
     }
 
     private sealed class FakeVocabularyRepository : IVocabularyRepository
@@ -276,56 +230,33 @@ public sealed class VocabularyServiceTests
         public List<FlashcardDeck> Decks { get; } = [];
         public List<FlashcardCard> Cards { get; } = [];
         public List<VocabWord> Words { get; } = [];
-        public List<VocabCustomColumn> Columns { get; } = [];
-        public List<VocabCustomValue> CustomValues { get; } = [];
-        public List<VocabColumnVisibility> Visibility { get; } = [];
-        public bool FailWordCommits { get; set; }
+        public List<VocabBoardPreference> Preferences { get; } = [];
+        public bool FailCommits { get; set; }
 
         public Task<IReadOnlyList<VocabBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<VocabBoard>>(_boards.Where(board => board.UserId == userId).ToList());
-        }
+            => Task.FromResult<IReadOnlyList<VocabBoard>>(_boards
+                .Where(board => board.UserId == userId)
+                .OrderByDescending(board => board.CreatedAt)
+                .ThenByDescending(board => board.Id)
+                .ToList());
 
         public Task<VocabBoard?> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
-        {
-            var board = _boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt is null);
-            return Task.FromResult(board);
-        }
+            => Task.FromResult(_boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt is null));
 
         public Task<VocabPage?> GetPageAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
-        {
-            var page = _pages.FirstOrDefault(page => page.BoardId == boardId && page.Id == pageId && page.DeletedAt is null);
-            return Task.FromResult(page);
-        }
+            => Task.FromResult(_pages.FirstOrDefault(page => page.BoardId == boardId && page.Id == pageId && page.DeletedAt is null));
 
         public Task<VocabWord?> GetWordAsync(Guid userId, Guid boardId, Guid wordId, CancellationToken cancellationToken = default)
         {
-            var ownedPageIds = _pages
-                .Where(page => page.BoardId == boardId && page.DeletedAt is null)
-                .Select(page => page.Id)
-                .ToHashSet();
+            var ownedPageIds = _pages.Where(page => page.BoardId == boardId && page.DeletedAt is null).Select(page => page.Id).ToHashSet();
             return Task.FromResult(Words.FirstOrDefault(word => word.Id == wordId && ownedPageIds.Contains(word.PageId) && word.DeletedAt is null));
         }
 
+        public Task<VocabBoardPreference?> GetBoardPreferenceAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+            => Task.FromResult(Preferences.FirstOrDefault(preference => preference.UserId == userId && preference.BoardId == boardId && preference.DeletedAt is null));
+
         public Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => word.PageId == pageId && word.DeletedAt is null).ToList());
-        }
-
-        public Task<IReadOnlyList<VocabCustomColumn>> ListCustomColumnsAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<VocabCustomColumn>>(
-                _boards.Any(board => board.Id == boardId && board.UserId == userId)
-                    ? Columns.Where(column => column.BoardId == boardId).ToList()
-                    : []);
-
-        public Task<IReadOnlyList<VocabCustomValue>> ListCustomValuesAsync(IEnumerable<Guid> wordIds, CancellationToken cancellationToken = default)
-        {
-            var ids = wordIds.ToHashSet();
-            return Task.FromResult<IReadOnlyList<VocabCustomValue>>(CustomValues.Where(value => ids.Contains(value.WordId)).ToList());
-        }
-
-        public Task<IReadOnlyList<VocabColumnVisibility>> ListColumnVisibilityAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<VocabColumnVisibility>>(Visibility.Where(value => value.UserId == userId && value.BoardId == boardId).ToList());
+            => Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => word.PageId == pageId && word.DeletedAt is null).ToList());
 
         public Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
         {
@@ -339,58 +270,22 @@ public sealed class VocabularyServiceTests
             return Task.CompletedTask;
         }
 
-        public Task AddWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default)
+        public Task AddWordAsync(VocabWord word, CancellationToken cancellationToken = default)
         {
             Words.Add(word);
-            CustomValues.AddRange(customValues ?? []);
             return Task.CompletedTask;
         }
 
-        public Task AddCustomColumnAsync(VocabCustomColumn column, CancellationToken cancellationToken = default)
+        public Task AddBoardPreferenceAsync(VocabBoardPreference preference, CancellationToken cancellationToken = default)
         {
-            Columns.Add(column);
+            Preferences.Add(preference);
             return Task.CompletedTask;
-        }
-
-        public Task ReplaceColumnVisibilityAsync(Guid userId, Guid boardId, IReadOnlyList<VocabColumnVisibility> preferences, CancellationToken cancellationToken = default)
-        {
-            Visibility.RemoveAll(value => value.UserId == userId && value.BoardId == boardId);
-            Visibility.AddRange(preferences);
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> DeleteCustomColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
-        {
-            var removed = Columns.RemoveAll(column => column.Id == columnId && column.BoardId == boardId) > 0;
-            CustomValues.RemoveAll(value => value.ColumnId == columnId);
-            Visibility.RemoveAll(value => value.BoardId == boardId && value.ColumnKey == $"custom:{columnId}".ToLowerInvariant());
-            return Task.FromResult(removed);
         }
 
         public Task UpdateBoardAsync(VocabBoard board, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
         public Task UpdatePageAsync(VocabPage page, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task UpdateWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default)
-        {
-            if (customValues is not null)
-            {
-                CustomValues.RemoveAll(value => value.WordId == word.Id);
-                CustomValues.AddRange(customValues);
-            }
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateCustomValueAsync(Guid wordId, Guid columnId, VocabCustomValue? value, CancellationToken cancellationToken = default)
-        {
-            CustomValues.RemoveAll(item => item.WordId == wordId && item.ColumnId == columnId);
-            if (value is not null)
-            {
-                CustomValues.Add(value);
-            }
-            return Task.CompletedTask;
-        }
-
+        public Task UpdateWordAsync(VocabWord word, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task UpdateBoardPreferenceAsync(VocabBoardPreference preference, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateFixedCellAsync(VocabWord word, string columnKey, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task SoftDeleteBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
@@ -413,7 +308,7 @@ public sealed class VocabularyServiceTests
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            if (FailWordCommits)
+            if (FailCommits)
             {
                 throw new InvalidOperationException("Simulated commit failure.");
             }
@@ -465,9 +360,7 @@ public sealed class VocabularyServiceTests
 
         public Task RenamePageDeckAsync(Guid pageId, string boardName, string pageName, CancellationToken cancellationToken = default)
         {
-            _repository.Decks
-                .Single(deck => deck.PageId == pageId && deck.DeletedAt is null)
-                .Rename($"{boardName} - {pageName}");
+            _repository.Decks.Single(deck => deck.PageId == pageId && deck.DeletedAt is null).Rename($"{boardName} - {pageName}");
             return Task.CompletedTask;
         }
 
@@ -479,11 +372,6 @@ public sealed class VocabularyServiceTests
                 var deck = _repository.Decks.Single(deck => deck.PageId == word.PageId && deck.DeletedAt is null);
                 _repository.Cards.Add(FlashcardCard.Create(deck.Id, word));
                 return Task.CompletedTask;
-            }
-
-            if (cards.Count != 1)
-            {
-                throw new InvalidOperationException("An active word must have exactly one synchronized page-deck card.");
             }
 
             cards[0].SyncFromWord(word);
@@ -509,8 +397,7 @@ public sealed class VocabularyServiceTests
 
         public Task SoftDeleteDeckForPageAsync(Guid pageId, CancellationToken cancellationToken = default)
         {
-            var deck = _repository.Decks.SingleOrDefault(item => item.PageId == pageId && item.DeletedAt is null);
-            deck?.SoftDelete();
+            _repository.Decks.SingleOrDefault(deck => deck.PageId == pageId && deck.DeletedAt is null)?.SoftDelete();
             return Task.CompletedTask;
         }
     }

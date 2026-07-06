@@ -1,12 +1,12 @@
-using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
+using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
-using FluentA.Domain.BoundedContexts.Practice.Entities;
-using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
+using FluentA.Domain.BoundedContexts.Practice.Entities;
+using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -28,9 +28,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
     public DbSet<VocabWord> Words => Set<VocabWord>();
-    public DbSet<VocabCustomColumn> VocabCustomColumns => Set<VocabCustomColumn>();
-    public DbSet<VocabCustomValue> VocabCustomValues => Set<VocabCustomValue>();
-    public DbSet<VocabColumnVisibility> VocabColumnVisibility => Set<VocabColumnVisibility>();
+    public DbSet<VocabBoardPreference> VocabBoardPreferences => Set<VocabBoardPreference>();
     public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
     public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
     public DbSet<WordReviewState> WordReviewStates => Set<WordReviewState>();

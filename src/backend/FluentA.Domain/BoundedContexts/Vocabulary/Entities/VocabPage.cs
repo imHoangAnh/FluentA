@@ -9,31 +9,28 @@ public sealed class VocabPage : BaseEntity
         Name = string.Empty;
     }
 
-    private VocabPage(Guid boardId, string name, int sortOrder)
+    private VocabPage(Guid boardId, string name)
     {
         BoardId = boardId;
         Name = CleanName(name);
-        SortOrder = sortOrder;
     }
 
     public Guid BoardId { get; private set; }
     public string Name { get; private set; }
-    public int SortOrder { get; private set; }
 
-    public static VocabPage Create(Guid boardId, string name, int sortOrder)
+    public static VocabPage Create(Guid boardId, string name)
     {
         if (boardId == Guid.Empty)
         {
             throw new ArgumentException("Board id is required.", nameof(boardId));
         }
 
-        return new VocabPage(boardId, name, sortOrder);
+        return new VocabPage(boardId, name);
     }
 
-    public void Update(string name, int sortOrder)
+    public void Update(string name)
     {
         Name = CleanName(name);
-        SortOrder = sortOrder;
         UpdatedAt = DateTime.UtcNow;
     }
 

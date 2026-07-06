@@ -15,11 +15,10 @@ public sealed class VocabPageConfiguration : IEntityTypeConfiguration<VocabPage>
         builder.Property(page => page.Id).HasColumnName("id");
         builder.Property(page => page.BoardId).HasColumnName("board_id").IsRequired();
         builder.Property(page => page.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
-        builder.Property(page => page.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(page => page.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(page => page.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(page => page.DeletedAt).HasColumnName("deleted_at");
 
-        builder.HasIndex(page => new { page.BoardId, page.SortOrder });
+        builder.HasIndex(page => new { page.BoardId, page.CreatedAt });
     }
 }

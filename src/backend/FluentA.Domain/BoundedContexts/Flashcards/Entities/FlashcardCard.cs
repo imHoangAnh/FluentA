@@ -60,10 +60,10 @@ public sealed class FlashcardCard : BaseEntity
         Word = word.Word;
         WordClass = word.Class.ToString().ToLowerInvariant();
         MeaningVn = word.MeaningVn;
-        MeaningEn = word.MeaningEn;
+        MeaningEn = word.Definition ?? string.Empty;
         Example = word.Example;
-        Thesaurus = word.Thesaurus;
-        Collocation = word.Collocation;
+        Thesaurus = word.Synonyms;
+        Collocation = word.Antonyms;
         Note = word.Note;
         UpdatedAt = DateTime.UtcNow;
     }
