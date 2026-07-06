@@ -11,7 +11,7 @@ public sealed class PracticeSettingsConfiguration : IEntityTypeConfiguration<Pra
 {
     public void Configure(EntityTypeBuilder<PracticeSettings> builder)
     {
-        builder.ToTable("settings", "practice");
+        builder.ToTable("practice_settings");
         builder.HasKey(settings => settings.Id);
         builder.Property(settings => settings.Id).HasColumnName("id");
         builder.Property(settings => settings.UserId).HasColumnName("user_id").IsRequired();

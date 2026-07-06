@@ -11,7 +11,7 @@ public sealed class PracticeSessionSummaryConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<PracticeSessionSummary> builder)
     {
-        builder.ToTable("session_summaries", "practice");
+        builder.ToTable("practice_session_summaries");
 
         builder.HasKey(summary => summary.Id);
 

@@ -11,7 +11,7 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
 {
     public void Configure(EntityTypeBuilder<WordReviewState> builder)
     {
-        builder.ToTable("word_states", "review");
+        builder.ToTable("word_review_states");
 
         builder.HasKey(state => state.Id);
 

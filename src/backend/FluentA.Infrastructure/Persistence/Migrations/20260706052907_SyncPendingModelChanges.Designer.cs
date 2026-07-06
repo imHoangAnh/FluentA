@@ -3,6 +3,7 @@ using System;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FluentA.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706052907_SyncPendingModelChanges")]
+    partial class SyncPendingModelChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -330,7 +333,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("NextReviewDate", "State");
 
-                    b.ToTable("flashcard_cards", (string)null);
+                    b.ToTable("cards", "flashcards");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", b =>
@@ -386,7 +389,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "BoardId");
 
-                    b.ToTable("flashcard_decks", (string)null);
+                    b.ToTable("decks", "flashcards");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", b =>
@@ -925,7 +928,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "CompletedAt");
 
-                    b.ToTable("practice_session_summaries", (string)null);
+                    b.ToTable("session_summaries", "practice");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
@@ -962,7 +965,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_practice_settings_user_id");
 
-                    b.ToTable("practice_settings", (string)null);
+                    b.ToTable("settings", "practice");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", b =>
@@ -1002,7 +1005,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_review_settings_user_id");
 
-                    b.ToTable("review_settings", (string)null);
+                    b.ToTable("settings", "review");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
@@ -1065,7 +1068,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "ReviewedAt")
-                        .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
+                        .HasDatabaseName("IX_word_histories_user_id_reviewed_at_active")
                         .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("UserId", "SessionId")
@@ -1073,7 +1076,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WordId", "ReviewedAt");
 
-                    b.ToTable("word_review_histories", (string)null);
+                    b.ToTable("word_histories", "review");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewState", b =>
@@ -1127,7 +1130,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "NextReviewDate")
                         .HasFilter("deleted_at IS NULL");
 
-                    b.ToTable("word_review_states", (string)null);
+                    b.ToTable("word_states", "review");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Todo.Entities.TodoItem", b =>

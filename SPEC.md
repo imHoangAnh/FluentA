@@ -3455,3 +3455,168 @@ Planning may split proof by story. Release proof must cover backend context
 boundaries, endpoint cutover, EF schema ownership, Vocabulary sync/cleanup,
 Review SRS ownership, Practice-to-Review port behavior, frontend API cutover,
 and no remaining dependency on removed legacy endpoints.
+
+---
+
+## 21. Vocabulary Page Fixed Columns And Board Preferences
+
+### 21.1 Objective
+
+Replace vocabulary page custom-column behavior with a fixed vocabulary word
+table contract and a simpler board-wide preference model. The Pages vocabulary
+table should remain spreadsheet-like, but the set of persisted word fields is
+no longer user-defined.
+
+### 21.2 Locked Decisions
+
+| Decision | Required Behavior |
+|---|---|
+| Fixed vocabulary columns | Pages use a fixed `vocab_words` column set: `word`, `meaning_vn`, `ipa_pronunciation`, `definition`, `word_class`, `example`, `note`, `synonyms`, and `antonyms`. |
+| Pronunciation content | `ipa_pronunciation` stores IPA-style content that may begin and end with slash characters, for example `/.../`; validation and rendering must preserve those slash characters exactly. |
+| Required fields | `word`, `meaning_vn`, `ipa_pronunciation`, `word_class`, and `example` are required. |
+| Nullable fields | `definition`, `note`, `synonyms`, and `antonyms` may be null. |
+| Word class | `word_class` remains an enum-backed field. |
+| Removed fixed fields | Remove vocabulary word fields `thesaurus`, `collocation`, `interval`, `ease_factor`, `repetitions`, `next_review_date`, and `state` from the vocabulary page contract. SRS state belongs to Review, not Vocabulary. |
+| Remove custom columns | Remove the custom-column feature from vocabulary pages. Users can no longer create arbitrary text/number columns or custom values. |
+| Removed tables | Drop `vocab_column_visibility`, `vocab_custom_columns`, and `vocab_custom_values`. |
+| Preference table | Add `vocab_board_preferences` for per-user, per-board table preferences. |
+| Preference scope | One preference row applies to all pages in the same board for that user. Different boards may have different preferences. |
+| Preference uniqueness | Enforce one active preference per `(user_id, board_id)`. |
+| Hide/show behavior | Nullable fixed columns can be hidden or shown from the frontend. Required columns remain visible. |
+| Column order | Users can drag columns to reorder them. The order is saved in `vocab_board_preferences` and reused on every page in that board. |
+| Column width | Users can resize columns by dragging column headers. Widths are saved in `vocab_board_preferences` and reused on every page in that board. |
+| Horizontal overflow | If visible columns exceed the viewport, the table scrolls horizontally instead of squeezing fields until content becomes unusable. |
+
+### 21.3 Target Vocabulary Word Shape
+
+`vocab_words` should represent page vocabulary content with these user-facing
+fields:
+
+| Field | Required | Type | Notes |
+|---|---:|---|---|
+| `word` | yes | text | Main vocabulary word or phrase. |
+| `meaning_vn` | yes | text | Vietnamese meaning. |
+| `ipa_pronunciation` | yes | text | Pronunciation text; slash characters are user content and must be preserved. |
+| `definition` | no | text | Optional definition or explanation. |
+| `word_class` | yes | enum | Existing word-class enum contract. |
+| `example` | yes | text | Example sentence. |
+| `note` | no | text | Optional learner note. |
+| `synonyms` | no | text | Optional synonym list or free text. |
+| `antonyms` | no | text | Optional antonym list or free text. |
+
+Planning may choose exact C# and TypeScript property casing, but API responses
+must stay consistent with existing FluentA DTO conventions.
+
+### 21.4 Target Preference Shape
+
+`vocab_board_preferences` stores only presentation preferences for the current
+user and board. It does not store vocabulary content.
+
+Minimum durable data:
+
+| Field | Purpose |
+|---|---|
+| `id` | Preference row identity. |
+| `user_id` | Owner scope. |
+| `board_id` | Board scope shared by all pages in the board. |
+| `hidden_columns` | Nullable fixed column keys hidden by this user for this board. |
+| `column_order` | Ordered list of fixed column keys. |
+| `column_widths` | Width by fixed column key. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last preference update timestamp. |
+
+The implementation may use JSON columns or a more structured schema if
+planning finds a stronger reason, but the public behavior must remain the same.
+
+### 21.5 API And Frontend Behavior
+
+- Loading a board's pages must also make the current user's board table
+  preferences available to the vocabulary table.
+- Updating hidden columns, column order, or column widths persists through the
+  backend for the current `(user_id, board_id)`.
+- Preference updates must be owner-scoped. A user cannot read or write another
+  user's board preferences.
+- If no preference row exists, the frontend uses the default column order and
+  default widths, then creates or upserts preferences when the user customizes
+  the table.
+- The frontend must not expose controls to create or delete custom columns.
+- Existing spreadsheet autosave remains cell-scoped for fixed vocabulary
+  fields.
+- Existing drag-to-reorder column behavior remains, but it targets the fixed
+  column list only.
+- Column resize handles must not change row content, row order, or autosave
+  semantics.
+
+### 21.6 Migration And Cleanup
+
+This feature changes durable vocabulary schema. Planning must include an EF
+migration that:
+
+- Adds the new vocabulary word fields needed by the target shape.
+- Drops or replaces removed vocabulary word fields after any required data
+  mapping decision is made.
+- Drops `vocab_column_visibility`, `vocab_custom_columns`, and
+  `vocab_custom_values`.
+- Adds `vocab_board_preferences` with owner and board foreign keys.
+- Adds the uniqueness constraint for `(user_id, board_id)`.
+- Keeps Review-owned SRS state in Review tables rather than reintroducing
+  interval/ease/repetition state to Vocabulary.
+
+Data migration for existing `thesaurus` and `collocation` content must be
+decided during planning before destructive removal. The expected mapping is:
+`thesaurus` content becomes `synonyms` where that preserves user value, and
+`collocation` has no replacement unless planning identifies an accepted target.
+
+### 21.7 Scope Boundaries
+
+Out of scope:
+
+- Arbitrary user-created vocabulary columns.
+- Custom text/number values.
+- Per-page preference differences inside the same board.
+- SRS algorithm changes.
+- Review queue or Review history changes beyond removing legacy Vocabulary
+  leakage.
+- Flashcard practice/review UX redesign.
+- Import/export changes unless required to keep existing tests compiling.
+
+### 21.8 Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Schema/data loss | EF migration review proves removed tables/columns and new preferences match the locked contract, with explicit handling for existing `thesaurus` and `collocation` data. |
+| API contract regression | Backend tests prove fixed word CRUD, cell-scoped updates, preference read/write, owner scoping, and null handling. |
+| IPA slash corruption | Unit or integration tests prove `ipa_pronunciation` preserves leading/trailing slash characters through create, edit, read, and autosave. |
+| Custom-column remnants | Static scan and frontend tests prove custom-column create/delete/value paths are removed. |
+| Table preference behavior | Frontend tests prove hide/show nullable columns, required-column visibility, drag reorder, width resize persistence, and board-wide reuse across pages. |
+| Horizontal overflow | UI or Playwright proof shows the table scrolls horizontally when visible columns exceed the viewport. |
+| Review ownership regression | Backend or static proof confirms Vocabulary no longer stores legacy interval/ease/repetition/next-review/state fields and Review remains the SRS owner. |
+
+### 21.9 Proposed Story Queue
+
+1. **US-VOCAB-006:** Replace the Vocabulary page data model and API contract.
+   This story adds the fixed `vocab_words` field set, removes legacy
+   custom-column storage and APIs, drops obsolete Vocabulary-owned review
+   fields, and adds `vocab_board_preferences`.
+2. **US-VOCAB-007:** Update the Vocabulary table frontend. This story removes
+   custom-column controls, renders only fixed columns, supports hide/show for
+   nullable columns, persists board-wide column order and widths, and provides
+   horizontal scrolling for wide tables.
+3. **US-VOCAB-008:** Run release proof across migration, word CRUD,
+   spreadsheet autosave, flashcard sync, preference persistence, owner scoping,
+   IPA slash preservation, and removed custom-column paths.
+
+### 21.10 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj --filter Vocabulary
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --filter Vocabulary
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet tool run dotnet-ef migrations script --project src/backend/FluentA.Infrastructure --startup-project src/backend/FluentA.API
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run -- VocabTable
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- vocabulary.spec.js
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```

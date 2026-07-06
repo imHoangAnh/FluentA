@@ -11,7 +11,7 @@ public sealed class ReviewSettingsConfiguration : IEntityTypeConfiguration<Revie
 {
     public void Configure(EntityTypeBuilder<ReviewSettings> builder)
     {
-        builder.ToTable("settings", "review");
+        builder.ToTable("review_settings");
         builder.HasKey(settings => settings.Id);
         builder.Property(settings => settings.Id).HasColumnName("id");
         builder.Property(settings => settings.UserId).HasColumnName("user_id").IsRequired();

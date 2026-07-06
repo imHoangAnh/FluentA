@@ -11,7 +11,7 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
 {
     public void Configure(EntityTypeBuilder<WordReviewHistory> builder)
     {
-        builder.ToTable("word_histories", "review");
+        builder.ToTable("word_review_histories");
 
         builder.HasKey(history => history.Id);
 
@@ -37,7 +37,7 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
         builder.HasIndex(history => new { history.UserId, history.SessionId })
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(history => new { history.UserId, history.ReviewedAt })
-            .HasDatabaseName("IX_word_histories_user_id_reviewed_at_active")
+            .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(history => new { history.WordId, history.ReviewedAt });
     }
