@@ -133,7 +133,7 @@ export function SettingsPage() {
       setPracticeState('saving')
     },
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'practice-settings'], settings)
+      queryClient.setQueryData(['practice', 'settings'], settings)
       queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? { ...current, practiceSettings: settings } : current)
       setPracticeState('saved')
     },
@@ -148,7 +148,7 @@ export function SettingsPage() {
       setReviewState('saving')
     },
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'settings'], settings)
+      queryClient.setQueryData(['review', 'settings'], settings)
       queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? { ...current, reviewSettings: settings } : current)
       setReviewState('saved')
     },

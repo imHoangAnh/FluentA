@@ -123,7 +123,7 @@ test('practice modes persist summaries and reset dedicated review state', async 
   await expect(pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' })).toBeVisible();
 
   const dictationSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
 
   await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
   await page.getByTestId('practice-mode-dictation').click();
@@ -176,7 +176,7 @@ test('practice modes persist summaries and reset dedicated review state', async 
   });
 
   const pronunciationSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
 
   await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
   await page.getByTestId('practice-mode-pronunciation').click();
@@ -197,7 +197,7 @@ test('practice modes persist summaries and reset dedicated review state', async 
   const decksAfterPronunciationPractice = await listDecks(page, headers);
   expect(scheduleSnapshot(decksAfterPronunciationPractice.find((deck) => deck.name === 'Practice Board - Practice Page'))).toEqual(afterPagePractice);
 
-  const inconsistentSummary = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+  const inconsistentSummary = await page.request.post('http://127.0.0.1:5000/api/v1/practice/sessions', {
     headers,
     data: {
       deckId: pageDeckBefore.id,
@@ -215,7 +215,7 @@ test('practice modes persist summaries and reset dedicated review state', async 
   const foreignDecks = await listDecks(page, foreignAuth.headers);
   const foreignPageDeck = foreignDecks.find((deck) => deck.name === 'Foreign Board - Foreign Page');
 
-  const foreignSummary = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+  const foreignSummary = await page.request.post('http://127.0.0.1:5000/api/v1/practice/sessions', {
     headers,
     data: {
       deckId: foreignPageDeck.id,

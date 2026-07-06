@@ -72,7 +72,7 @@ export function PracticeSessionPage() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const sessionQuery = useQuery({ queryKey: ['flashcard', 'deck-session', deckId], queryFn: () => flashcardApi.getDeckSession(deckId), enabled: Boolean(deckId) })
-  const practiceSettingsQuery = useQuery({ queryKey: ['flashcard', 'practice-settings'], queryFn: flashcardApi.getPracticeSettings })
+  const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: flashcardApi.getPracticeSettings })
   const saveSummaryMutation = useMutation({ mutationFn: flashcardApi.createPracticeSessionSummary })
   const addToReviewMutation = useMutation({ mutationFn: flashcardApi.addPracticeWordsToReview })
 

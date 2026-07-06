@@ -330,7 +330,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("NextReviewDate", "State");
 
-                    b.ToTable("flashcard_cards", (string)null);
+                    b.ToTable("cards", "flashcards");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", b =>
@@ -386,265 +386,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "BoardId");
 
-                    b.ToTable("flashcard_decks", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.PracticeSessionSummary", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<int>("CorrectCards")
-                        .HasColumnType("integer")
-                        .HasColumnName("correct_cards");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DeckId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deck_id");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("mode");
-
-                    b.Property<int>("TotalCards")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_cards");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<int>("WrongCards")
-                        .HasColumnType("integer")
-                        .HasColumnName("wrong_cards");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeckId", "CompletedAt");
-
-                    b.HasIndex("UserId", "CompletedAt");
-
-                    b.ToTable("practice_session_summaries", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.PracticeSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("ModeSequence")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("mode_sequence");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("practice_settings", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DailyLimit")
-                        .HasColumnType("integer")
-                        .HasColumnName("daily_limit");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("RecapAfterAnswer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("recap_after_answer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("review_settings", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.WordReviewHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<int>("LevelAfter")
-                        .HasColumnType("integer")
-                        .HasColumnName("level_after");
-
-                    b.Property<int>("LevelBefore")
-                        .HasColumnType("integer")
-                        .HasColumnName("level_before");
-
-                    b.Property<DateTime>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_review_date");
-
-                    b.Property<string>("Result")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("result");
-
-                    b.Property<DateTime>("ReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reviewed_at");
-
-                    b.Property<Guid>("SessionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("session_id");
-
-                    b.Property<int>("TimeSpentSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("time_spent_seconds");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid>("WordId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("word_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "ReviewedAt")
-                        .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
-                        .HasFilter("deleted_at IS NULL");
-
-                    b.HasIndex("UserId", "SessionId")
-                        .HasFilter("deleted_at IS NULL");
-
-                    b.HasIndex("WordId", "ReviewedAt");
-
-                    b.ToTable("word_review_histories", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.WordReviewState", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<int>("LapseCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("lapse_count");
-
-                    b.Property<DateTime?>("LastReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_reviewed_at");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer")
-                        .HasColumnName("level");
-
-                    b.Property<DateTime>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_review_date");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid>("WordId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("word_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WordId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId", "NextReviewDate")
-                        .HasFilter("deleted_at IS NULL");
-
-                    b.ToTable("word_review_states", (string)null);
+                    b.ToTable("decks", "flashcards");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", b =>
@@ -1128,6 +870,265 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("pomodoro_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("CorrectCards")
+                        .HasColumnType("integer")
+                        .HasColumnName("correct_cards");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DeckId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deck_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("TotalCards")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_cards");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("WrongCards")
+                        .HasColumnType("integer")
+                        .HasColumnName("wrong_cards");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeckId", "CompletedAt");
+
+                    b.HasIndex("UserId", "CompletedAt");
+
+                    b.ToTable("session_summaries", "practice");
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("ModeSequence")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mode_sequence");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("settings", "practice");
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DailyLimit")
+                        .HasColumnType("integer")
+                        .HasColumnName("daily_limit");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("RecapAfterAnswer")
+                        .HasColumnType("boolean")
+                        .HasColumnName("recap_after_answer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_settings_user_id1");
+
+                    b.ToTable("settings", "review");
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("LevelAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_after");
+
+                    b.Property<int>("LevelBefore")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_before");
+
+                    b.Property<DateTime>("NextReviewDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_review_date");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("result");
+
+                    b.Property<DateTime>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<int>("TimeSpentSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("time_spent_seconds");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("word_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ReviewedAt")
+                        .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("UserId", "SessionId")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("WordId", "ReviewedAt");
+
+                    b.ToTable("word_histories", "review");
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("LapseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("lapse_count");
+
+                    b.Property<DateTime?>("LastReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reviewed_at");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<DateTime>("NextReviewDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_review_date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("word_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WordId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "NextReviewDate")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("word_states", "review");
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Todo.Entities.TodoItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1528,57 +1529,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.PracticeSessionSummary", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", null)
-                        .WithMany()
-                        .HasForeignKey("DeckId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.PracticeSettings", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithOne()
-                        .HasForeignKey("FluentA.Domain.BoundedContexts.Flashcards.Entities.PracticeSettings", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithOne()
-                        .HasForeignKey("FluentA.Domain.BoundedContexts.Flashcards.Entities.ReviewSettings", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.WordReviewHistory", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
-                        .WithMany()
-                        .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.WordReviewState", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
-                        .WithMany()
-                        .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Habit.Entities.HabitEntry", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", null)
@@ -1603,6 +1553,57 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany("Columns")
                         .HasForeignKey("BoardId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", null)
+                        .WithMany()
+                        .HasForeignKey("DeckId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
+                        .WithMany()
+                        .HasForeignKey("WordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewState", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
+                        .WithMany()
+                        .HasForeignKey("WordId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

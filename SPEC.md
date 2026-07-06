@@ -28,6 +28,7 @@
 17. [Next Feature Plan — Database Performance Optimization](#17-next-feature-plan--database-performance-optimization)
 18. [Next Feature Plan — MinIO Asset Storage](#18-next-feature-plan--minio-asset-storage)
 19. [Next Feature Plan — FluentA Worker Runtime](#19-next-feature-plan--fluenta-worker-runtime)
+20. [Next Feature Plan — Backend Bounded Context Split](#20-next-feature-plan--backend-bounded-context-split)
 
 ---
 
@@ -3184,3 +3185,273 @@ git diff --check
 Release proof must show the Worker registers all existing recurring jobs,
 `/health/live` and `/health/ready` behave distinctly, API can start without the
 Worker process, and no Hangfire dashboard is exposed.
+
+---
+
+## 20. Next Feature Plan — Backend Bounded Context Split
+
+**Planning status:** Product and architecture decisions locked for high-risk
+implementation planning
+
+**Mode:** High-risk backend architecture, API contract, database schema, and
+frontend cutover refactor
+
+**Depends on:** The shipped Flashcard, Practice, and Review workflow split,
+FluentA SRS state/history, current Vocabulary-to-Flashcard synchronization,
+current review dashboard behavior, and the modular-monolith Clean Architecture
+runtime.
+
+**Source of truth:** `history/backend-bounded-context-split/CONTEXT.md`
+
+### 20.1 Current State
+
+The product already exposes separate learning workflows:
+
+- `Flashcard` is the read-only page-deck viewer.
+- `Practice` is the page-deck first-learning/re-practice workflow.
+- `Review` is the board-scoped SRS workflow.
+
+The backend still keeps most of these concerns inside the current Flashcards
+bounded context. Application service, repository, domain entities, EF
+configuration, controller methods, settings, dashboard queries, practice
+summary writes, SRS queue creation, SRS answer persistence, and Flashcard deck
+reads are coupled through the same backend module.
+
+This feature aligns backend ownership with the shipped product boundaries while
+preserving the modular monolith as the deployment model.
+
+### 20.2 Desired Outcomes
+
+- Backend code is split into three internal bounded contexts:
+  `Flashcard`, `Practice`, and `Review`.
+- Each bounded context has its own application service, application port,
+  infrastructure repository, DTOs/contracts, and domain entity ownership.
+- API routes are cut over to context-aligned endpoint surfaces.
+- Frontend API clients, routes, and tests use the new endpoint contract.
+- PostgreSQL table ownership is represented with context schemas:
+  `flashcards`, `practice`, and `review`.
+- Review owns all SRS state, SRS history, SRS scheduling, Review settings, and
+  learning dashboard/stats.
+- Practice can request Review state creation only through an explicit Review
+  application port.
+- Vocabulary-to-learning synchronization is handled by context-owned event
+  handlers while preserving current transactional guarantees.
+
+### 20.3 Locked Decisions
+
+| Decision | Required Behavior |
+|---|---|
+| Bounded context level | Split into three internal bounded contexts inside the same modular monolith. Do not create separately deployed services. |
+| API contract | Replace the mixed Flashcards API shape with context-aligned endpoints. |
+| Cutover style | Perform a one-time cutover: update frontend/tests and remove old endpoints in the same feature. |
+| SRS ownership | Review owns SRS state, SRS history, Review settings, and FluentA SRS scheduling. |
+| Practice-to-Review boundary | Practice must not write Review tables directly. Practice calls a Review application port for `Add to Review`. |
+| Dashboard ownership | Review owns learning dashboard/stats including due/overdue, retention, forecast, board stats, and new-to-review counts. |
+| Database boundary | Move learning tables into PostgreSQL schemas by bounded context. |
+| Dev migration posture | Dev/local may use destructive or reset migrations while the app is pre-production. Production/user-data deployment requires a preserve-data migration path. |
+| Frontend scope | Frontend API client, route flows, Vitest, and Playwright proof are in scope. |
+| API controllers | Use `FlashcardsController`, `PracticeController`, and `ReviewController`, each calling only its corresponding application service. |
+| Domain ownership | Move domain entities to their owning bounded context. |
+| Shared kernel | Do not create a shared Learning kernel in this feature. Duplicate small enums/value objects where needed and map through explicit contracts. |
+| Vocabulary sync | Vocabulary emits events; Flashcard handles deck/card sync; Review handles review state/history cleanup. Current atomic behavior must be preserved where required. |
+
+### 20.4 Target Backend Shape
+
+Target code ownership:
+
+```text
+FluentA.Domain/
+  BoundedContexts/
+    Flashcards/
+      Entities/
+        FlashcardDeck.cs
+        FlashcardCard.cs
+    Practice/
+      Entities/
+        PracticeSettings.cs
+        PracticeSessionSummary.cs
+    Review/
+      Entities/
+        ReviewSettings.cs
+        WordReviewState.cs
+        WordReviewHistory.cs
+      FluentAsrsScheduler.cs
+
+FluentA.Application/
+  BoundedContexts/
+    Flashcards/
+      FlashcardService.cs
+      IFlashcardRepository.cs
+      DTOs/
+    Practice/
+      PracticeService.cs
+      IPracticeRepository.cs
+      IReviewEnrollmentPort.cs
+      DTOs/
+    Review/
+      ReviewService.cs
+      IReviewRepository.cs
+      DTOs/
+
+FluentA.Infrastructure/
+  Flashcards/
+    EfFlashcardRepository.cs
+  Practice/
+    EfPracticeRepository.cs
+  Review/
+    EfReviewRepository.cs
+
+FluentA.API/
+  Controllers/
+    FlashcardsController.cs
+    PracticeController.cs
+    ReviewController.cs
+```
+
+Planning may adjust exact filenames, but ownership must stay aligned with the
+locked decisions.
+
+### 20.5 Domain Ownership
+
+| Context | Owns | Must not own |
+|---|---|---|
+| Flashcard | Page deck/card read model, deck/card synchronization from Vocabulary, viewer session reads. | Practice summaries, Practice settings, SRS state/history, Review settings, SRS scheduling. |
+| Practice | Practice settings, practice session summaries, practice workflow persistence, request to add practiced words to Review. | Direct Review table writes, SRS scheduling, due queues, dashboard stats. |
+| Review | Review settings, due queue, SRS state/history, FluentA SRS scheduling, review answer persistence, learning dashboard/stats. | Flashcard viewer behavior, Practice attempt/session summary ownership. |
+
+Review state remains linked to vocabulary words. New vocabulary words still do
+not create Review state automatically. `Add to Review` creates missing Level 0
+state through Review ownership.
+
+### 20.6 Database Target
+
+Target PostgreSQL schemas and tables:
+
+| Context | Target tables |
+|---|---|
+| Flashcard | `flashcards.decks`, `flashcards.cards` |
+| Practice | `practice.settings`, `practice.session_summaries` |
+| Review | `review.settings`, `review.word_states`, `review.word_histories` |
+
+Development/local implementation may choose a destructive reset migration while
+the product has no production users. Before deploying to any production
+environment with user data, planning must add or verify a preserve-data
+migration path that moves existing data without losing deck/card content,
+practice summaries, settings, Review state, or Review history.
+
+### 20.7 API Cutover Shape
+
+The old mixed API surface is removed in this feature. Planning must map every
+current endpoint to a context-owned endpoint before implementation. The target
+shape is:
+
+| Context | Target endpoint family | Expected ownership |
+|---|---|---|
+| Flashcard | `/api/v1/flashcards/...` | Deck list and read-only card session reads. |
+| Practice | `/api/v1/practice/...` | Practice setup, settings, session summaries, and Add to Review command. |
+| Review | `/api/v1/review/...` | Review sessions, review answers, settings, and dashboard/stats. |
+
+`Practice` may expose an `Add to Review` endpoint, but the implementation must
+call Review through an application port. `Review` owns the actual SRS state
+creation.
+
+### 20.8 Vocabulary Sync And Cleanup
+
+Vocabulary remains the source of truth for word/page/board content. Sync rules
+must stay behavior-compatible:
+
+- Creating an active vocabulary word creates or updates the related Flashcard
+  page-deck card as it does today.
+- Updating a word synchronizes copied card content.
+- Deleting a word, page, or board removes related Flashcard cards and related
+  Review state/history.
+- The existing owner-scoping and deleted-row non-disclosure behavior must be
+  preserved.
+- Current same-transaction guarantees must be preserved where the existing
+  product depends on immediate consistency.
+
+Target ownership:
+
+```text
+Vocabulary event
+  -> Flashcard handler owns deck/card sync
+  -> Review handler owns SRS state/history cleanup
+```
+
+No message broker, outbox, or asynchronous sync is required in this feature
+unless planning proves synchronous handlers cannot preserve the existing
+transaction rules.
+
+### 20.9 Scope Boundaries
+
+Out of scope:
+
+- Separate deployable services.
+- Separate databases.
+- New message broker, queue, or outbox system.
+- A shared Learning kernel.
+- User-visible workflow changes beyond endpoint-backed frontend cutover.
+- New learning modes or SRS algorithm changes.
+- Changing Practice mode semantics.
+- Changing Review random-mode semantics.
+- Preserving production user data with destructive migration. Destructive reset
+  is allowed only for dev/local before production.
+
+### 20.10 Risk And Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| API contract regression | Frontend, API tests, and Playwright prove Flashcard, Practice, Review, settings, and dashboard flows work through the new endpoint families. |
+| Context boundary leakage | Code review or architecture tests prove controllers call only their context service and Practice uses a Review application port for SRS state creation. |
+| Data loss from schema move | Dev reset migration is explicitly documented, or preserve-data migration proof exists before production/user-data deployment. |
+| SRS ownership regression | Unit/API tests prove Review remains the only owner of `word_states`, `word_histories`, settings, scheduling, and dashboard stats. |
+| Vocabulary sync breaks | Backend tests or integration smoke prove word create/update/delete still sync cards and cleanup Review state/history. |
+| Dashboard behavior changes | Focused tests prove due/overdue, retention, forecast, board stats, and new-to-review counts match pre-refactor behavior. |
+| Endpoint remnants linger | Route/API scan proves removed legacy endpoints are unreachable after cutover. |
+| Frontend stale API client | Frontend lint, Vitest, build, and E2E prove no old endpoint dependency remains. |
+| EF schema drift | Migration/model snapshot review proves tables are under the intended PostgreSQL schemas and indexes/FKs still support hot paths. |
+
+### 20.11 Proposed Story Queue
+
+1. **US-BC-001:** Map the current mixed Flashcards backend surface to target
+   Flashcard, Practice, and Review contracts, including endpoint mapping,
+   entity ownership, repository split, and migration strategy.
+2. **US-BC-002:** Split domain entities and application contracts into
+   Flashcard, Practice, and Review bounded contexts without changing runtime
+   behavior.
+3. **US-BC-003:** Split infrastructure repositories and EF configuration into
+   context-owned persistence paths.
+4. **US-BC-004:** Move tables into `flashcards`, `practice`, and `review`
+   PostgreSQL schemas, with dev reset migration allowed and production
+   preserve-data requirements documented.
+5. **US-BC-005:** Split API controllers and cut over public endpoints to the
+   new context-aligned contract.
+6. **US-BC-006:** Update frontend API clients, route flows, settings,
+   dashboard usage, and tests for the new endpoints.
+7. **US-BC-007:** Rework Vocabulary sync/cleanup handlers so Flashcard owns
+   deck/card sync and Review owns SRS cleanup while preserving atomic behavior.
+8. **US-BC-008:** Prove release behavior across Flashcard viewer, Practice,
+   Add to Review, Review sessions, dashboard/stats, settings, ownership, and
+   schema boundaries.
+
+### 20.12 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj
+dotnet test src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet tool run dotnet-ef migrations script --project src/backend/FluentA.Infrastructure --startup-project src/backend/FluentA.API
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- flashcard-viewer.spec.js practice-workflow.spec.js review-workflow.spec.js settings-profile.spec.js
+.\scripts\bin\harness-cli.exe story verify <approved-story-id>
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+Planning may split proof by story. Release proof must cover backend context
+boundaries, endpoint cutover, EF schema ownership, Vocabulary sync/cleanup,
+Review SRS ownership, Practice-to-Review port behavior, frontend API cutover,
+and no remaining dependency on removed legacy endpoints.

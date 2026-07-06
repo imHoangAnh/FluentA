@@ -8,7 +8,7 @@ public sealed class FlashcardDeckConfiguration : IEntityTypeConfiguration<Flashc
 {
     public void Configure(EntityTypeBuilder<FlashcardDeck> builder)
     {
-        builder.ToTable("flashcard_decks");
+        builder.ToTable("decks", "flashcards");
 
         builder.HasKey(deck => deck.Id);
 

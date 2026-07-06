@@ -1,5 +1,7 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
+using FluentA.Domain.BoundedContexts.Practice.Entities;
+using FluentA.Domain.BoundedContexts.Review.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -9,7 +11,7 @@ public sealed class PracticeSessionSummaryConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<PracticeSessionSummary> builder)
     {
-        builder.ToTable("practice_session_summaries");
+        builder.ToTable("session_summaries", "practice");
 
         builder.HasKey(summary => summary.Id);
 

@@ -37,115 +37,6 @@ public sealed class FlashcardsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Persists a completed practice-session summary for an owned deck.</summary>
-    [HttpPost("practice-sessions")]
-    public async Task<IActionResult> CreatePracticeSessionSummary(CreatePracticeSessionSummaryRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.CreatePracticeSessionSummaryAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeSessionSummaryDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Adds completed practice words without existing SRS state to review.</summary>
-    [HttpPost("/api/v1/practice/add-to-review")]
-    public async Task<IActionResult> AddPracticeWordsToReview(AddPracticeWordsToReviewRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.AddPracticeWordsToReviewAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<AddPracticeWordsToReviewDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Creates a server-side board review session.</summary>
-    [HttpPost("/api/v1/review/sessions")]
-    [HttpPost("sessions")]
-    public async Task<IActionResult> CreateReviewSession(CreateReviewSessionRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.CreateReviewSessionAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSessionCreatedDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Returns a completed review session summary.</summary>
-    [HttpGet("/api/v1/review/sessions/{sessionId:guid}/summary")]
-    [HttpGet("sessions/{sessionId:guid}/summary")]
-    public async Task<IActionResult> GetReviewSessionSummary(Guid sessionId, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.GetReviewSessionSummaryAsync(CurrentUserId(), sessionId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSessionSummaryDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Returns global flashcard dashboard metrics.</summary>
-    [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard([FromQuery] string? timeZoneId, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.GetDashboardAsync(CurrentUserId(), boardId: null, timeZoneId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<FlashcardDashboardDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Returns flashcard dashboard metrics scoped to one board.</summary>
-    [HttpGet("dashboard/{boardId:guid}")]
-    public async Task<IActionResult> GetBoardDashboard(Guid boardId, [FromQuery] string? timeZoneId, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.GetDashboardAsync(CurrentUserId(), boardId, timeZoneId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<FlashcardDashboardDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Returns the authenticated user's review settings.</summary>
-    [HttpGet("practice-settings")]
-    public async Task<IActionResult> GetPracticeSettings(CancellationToken cancellationToken)
-    {
-        var settings = await _flashcards.GetPracticeSettingsAsync(CurrentUserId(), cancellationToken);
-        return Ok(ApiEnvelope<PracticeSettingsDto>.Ok(settings));
-    }
-
-    /// <summary>Updates the authenticated user's practice settings.</summary>
-    [HttpPut("practice-settings")]
-    public async Task<IActionResult> UpdatePracticeSettings(UpdatePracticeSettingsRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.UpdatePracticeSettingsAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeSettingsDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Returns the authenticated user's review settings.</summary>
-    [HttpGet("settings")]
-    public async Task<IActionResult> GetReviewSettings(CancellationToken cancellationToken)
-    {
-        var settings = await _flashcards.GetReviewSettingsAsync(CurrentUserId(), cancellationToken);
-        return Ok(ApiEnvelope<ReviewSettingsDto>.Ok(settings));
-    }
-
-    /// <summary>Updates the authenticated user's review settings.</summary>
-    [HttpPut("settings")]
-    public async Task<IActionResult> UpdateReviewSettings(UpdateReviewSettingsRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.UpdateReviewSettingsAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSettingsDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Records a review answer for a card in a review session.</summary>
-    [HttpPost("/api/v1/review")]
-    [HttpPost("review")]
-    public async Task<IActionResult> SubmitReview(SubmitReviewRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _flashcards.SubmitReviewAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewResultDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
     private Guid CurrentUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -159,11 +50,23 @@ public sealed class FlashcardsController : ControllerBase
 
     private IActionResult ToErrorResult<T>(FluentA.Application.Common.OperationResult<T> result)
     {
-        if (result.Error is not FlashcardError error)
+        var error = result.Error switch
+        {
+            FlashcardError flashcardError => new ApiErrorEnvelope(flashcardError.Code, flashcardError.Message, flashcardError.Details),
+            _ => null,
+        };
+
+        var statusCode = result.Error switch
+        {
+            FlashcardError flashcardError => flashcardError.StatusCode,
+            _ => 500,
+        };
+
+        if (error is null)
         {
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
 
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
     }
 }

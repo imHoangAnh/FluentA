@@ -63,7 +63,7 @@ function findDeckCard(decks, deckName, word) {
 
 function seedDueStates(boardName) {
   const sql = `
-UPDATE word_review_states AS state
+UPDATE review.word_states AS state
 SET next_review_date = CASE word.word
     WHEN 'alpha' THEN NOW() - INTERVAL '3 days'
     WHEN 'beta' THEN NOW() - INTERVAL '2 days'
@@ -93,6 +93,7 @@ test('review workflow applies FluentA SRS transitions and rejects early review m
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
   });
+  const browserTimeZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   const { headers } = await registerAndLogin(page, 'review-workflow');
   const boardName = `Review Workflow Board ${Date.now()}`;
@@ -102,7 +103,7 @@ test('review workflow applies FluentA SRS transitions and rejects early review m
   const deck = decks.find((item) => item.name === `${boardName} - Review Workflow Page`);
   const addToReview = await page.request.post('http://127.0.0.1:5000/api/v1/practice/add-to-review', {
     headers,
-    data: { deckId: deck.id, timeZoneId: 'UTC' },
+    data: { deckId: deck.id, timeZoneId: browserTimeZone },
   });
   expect(addToReview.status()).toBe(200);
   expect((await addToReview.json()).data.addedWordCount).toBe(3);
@@ -147,7 +148,7 @@ test('review workflow applies FluentA SRS transitions and rejects early review m
       wordId: gammaBefore.wordId,
       correct: true,
       timeSpentSeconds: 1,
-      timeZoneId: 'UTC',
+      timeZoneId: browserTimeZone,
     },
   });
   expect(earlyReview.status()).toBe(404);

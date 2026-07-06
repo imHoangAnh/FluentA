@@ -78,7 +78,7 @@ export function ReviewSessionPage() {
   const cardStartedAt = useRef(0)
 
   const decksQuery = useQuery({ queryKey: ['flashcard', 'decks'], queryFn: flashcardApi.listDecks })
-  const reviewSettingsQuery = useQuery({ queryKey: ['flashcard', 'settings'], queryFn: flashcardApi.getReviewSettings })
+  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: flashcardApi.getReviewSettings })
   const boards = useMemo(() => groupBoards(decksQuery.data ?? []), [decksQuery.data])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []
