@@ -156,7 +156,7 @@ export async function createPracticeSessionSummary(input: {
   wrongCards: number
   timeZoneId: string
 }) {
-  const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/flashcards/practice-sessions', input)
+  const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/practice/sessions', input)
   return response.data.data!
 }
 
@@ -174,7 +174,7 @@ export async function getReviewSessionSummary(sessionId: string) {
 }
 
 export async function getDashboard(timeZoneId: string, boardId?: string) {
-  const path = boardId ? `/flashcards/dashboard/${boardId}` : '/flashcards/dashboard'
+  const path = boardId ? `/review/dashboard/${boardId}` : '/review/dashboard'
   const response = await apiClient.get<ApiEnvelope<FlashcardDashboard>>(path, { params: { timeZoneId } })
   return response.data.data!
 }

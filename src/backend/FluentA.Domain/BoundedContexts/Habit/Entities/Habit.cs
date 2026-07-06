@@ -1,3 +1,4 @@
+using FluentA.Domain.BoundedContexts.Habit.Enums;
 using FluentA.Domain.SeedWork;
 
 namespace FluentA.Domain.BoundedContexts.Habit.Entities;

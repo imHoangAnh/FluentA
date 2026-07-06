@@ -1,7 +1,7 @@
 using FluentA.Application.BoundedContexts.Flashcards;
+using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 using FluentA.Application.Common;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
 namespace FluentA.Application.BoundedContexts.Vocabulary;
@@ -10,11 +10,19 @@ public sealed class VocabularyService : IVocabularyService
 {
     private readonly IVocabularyRepository _repository;
     private readonly IFlashcardSyncNotifier _flashcardSyncNotifier;
+    private readonly IFlashcardVocabularySyncPort _flashcardSync;
+    private readonly IVocabularyReviewCleanupPort _reviewCleanup;
 
-    public VocabularyService(IVocabularyRepository repository, IFlashcardSyncNotifier? flashcardSyncNotifier = null)
+    public VocabularyService(
+        IVocabularyRepository repository,
+        IFlashcardSyncNotifier? flashcardSyncNotifier = null,
+        IFlashcardVocabularySyncPort? flashcardSync = null,
+        IVocabularyReviewCleanupPort? reviewCleanup = null)
     {
         _repository = repository;
         _flashcardSyncNotifier = flashcardSyncNotifier ?? NullFlashcardSyncNotifier.Instance;
+        _flashcardSync = flashcardSync ?? NullFlashcardVocabularySyncPort.Instance;
+        _reviewCleanup = reviewCleanup ?? NullVocabularyReviewCleanupPort.Instance;
     }
 
     public async Task<OperationResult<IReadOnlyList<BoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -72,7 +80,20 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<bool>.Failure(VocabularyError.NotFound());
         }
 
+        var activePages = board.Pages.Where(page => page.DeletedAt is null).ToList();
+        var words = new List<VocabWord>();
+        foreach (var page in activePages)
+        {
+            var pageWords = await _repository.ListWordsAsync(userId, boardId, page.Id, cancellationToken);
+            words.AddRange(pageWords);
+        }
+
         await _repository.SoftDeleteBoardAsync(board, cancellationToken);
+        var wordIds = words.Select(word => word.Id).ToList();
+        await _flashcardSync.RemoveCardsForWordsAsync(wordIds, cancellationToken);
+        await _reviewCleanup.RemoveWordProgressAsync(wordIds, cancellationToken);
+        await _flashcardSync.SoftDeleteDecksForBoardAsync(board.Id, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }
 
@@ -99,8 +120,9 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         var page = VocabPage.Create(board.Id, request.Name, board.Pages.Count(page => page.DeletedAt is null));
-        var deck = FlashcardDeck.CreatePageDeck(userId, board.Id, page.Id, board.Name, page.Name);
-        await _repository.AddPageWithDeckAsync(page, deck, cancellationToken);
+        await _repository.AddPageAsync(page, cancellationToken);
+        await _flashcardSync.CreatePageDeckAsync(userId, board.Id, page.Id, board.Name, page.Name, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         return OperationResult<PageDto>.Success(ToPage(page));
     }
@@ -121,6 +143,14 @@ public sealed class VocabularyService : IVocabularyService
 
         page.Update(request.Name, page.SortOrder);
         await _repository.UpdatePageAsync(page, cancellationToken);
+        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
+        if (board is null)
+        {
+            return OperationResult<PageDto>.Failure(VocabularyError.NotFound());
+        }
+
+        await _flashcardSync.RenamePageDeckAsync(page.Id, board.Name, page.Name, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         return OperationResult<PageDto>.Success(ToPage(page));
     }
 
@@ -132,7 +162,13 @@ public sealed class VocabularyService : IVocabularyService
             return OperationResult<bool>.Failure(VocabularyError.NotFound());
         }
 
+        var words = await _repository.ListWordsAsync(userId, boardId, pageId, cancellationToken);
         await _repository.SoftDeletePageAsync(page, cancellationToken);
+        var wordIds = words.Select(word => word.Id).ToList();
+        await _flashcardSync.RemoveCardsForWordsAsync(wordIds, cancellationToken);
+        await _reviewCleanup.RemoveWordProgressAsync(wordIds, cancellationToken);
+        await _flashcardSync.SoftDeleteDeckForPageAsync(page.Id, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }
 
@@ -180,6 +216,9 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         await _repository.AddWordAsync(word, customValues.Values, cancellationToken);
+        await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
         return OperationResult<WordDto>.Success(ToWord(word, customValues.Values));
     }
@@ -215,6 +254,9 @@ public sealed class VocabularyService : IVocabularyService
 
         var valuesToPersist = request.CustomValues is null ? null : customValues.Values;
         await _repository.UpdateWordAsync(word, valuesToPersist, cancellationToken);
+        await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
         var responseValues = valuesToPersist ?? await _repository.ListCustomValuesAsync([word.Id], cancellationToken);
         return OperationResult<WordDto>.Success(ToWord(word, responseValues));
@@ -261,6 +303,9 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         await _repository.UpdateFixedCellAsync(word, key, cancellationToken);
+        await _flashcardSync.UpsertCardsForWordAsync(word, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        word.ClearDomainEvents();
         await NotifyWordSavedAsync(userId, boardId, word, cancellationToken);
         var customValues = await _repository.ListCustomValuesAsync([word.Id], cancellationToken);
         return OperationResult<WordDto>.Success(ToWord(word, customValues));
@@ -275,6 +320,10 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         await _repository.SoftDeleteWordAsync(word, cancellationToken);
+        await _flashcardSync.RemoveCardsForWordsAsync([word.Id], cancellationToken);
+        await _reviewCleanup.RemoveWordProgressAsync([word.Id], cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        word.ClearDomainEvents();
         await NotifyDecksUpdatedAsync(userId, boardId, word.PageId, cancellationToken);
         return OperationResult<bool>.Success(true);
     }
@@ -364,7 +413,7 @@ public sealed class VocabularyService : IVocabularyService
 
     private async Task NotifyDecksUpdatedAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken)
     {
-        var deckIds = await _repository.ListActiveDeckIdsAsync(boardId, pageId, cancellationToken);
+        var deckIds = await _flashcardSync.ListActiveDeckIdsAsync(boardId, pageId, cancellationToken);
         await _flashcardSyncNotifier.DecksUpdatedAsync(userId, boardId, deckIds, cancellationToken);
     }
 

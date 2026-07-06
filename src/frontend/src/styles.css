@@ -2669,6 +2669,67 @@ a {
   justify-self: start;
 }
 
+.settings-saved-assets {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.settings-saved-assets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-asset-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-asset-card {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.settings-asset-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+}
+
+.settings-asset-thumb--placeholder {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--muted);
+}
+
+.settings-asset-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-asset-copy small {
+  color: var(--muted);
+}
+
+.settings-asset-delete {
+  justify-self: end;
+}
+
 .settings-sequence-list {
   display: grid;
   gap: 12px;

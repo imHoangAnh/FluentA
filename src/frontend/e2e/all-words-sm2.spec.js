@@ -49,7 +49,7 @@ test('Page Deck Normal and Shuffle reviews advance dedicated review state', asyn
   });
   const seededDecks = (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
   const seededDeck = seededDecks.find((deck) => deck.type === 'PageDeck');
-  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/practice/sessions', {
     headers,
     data: {
       deckId: seededDeck.id,

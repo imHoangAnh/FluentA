@@ -48,12 +48,9 @@ public sealed record AuthError(string Code, string Message, int StatusCode, obje
     public static AuthError GoogleAccountConflict() =>
         new("GOOGLE_ACCOUNT_CONFLICT", "This email is already linked to a different Google account.", 409);
 
-    public static AuthError AvatarStorageUnavailable() =>
-        new("AVATAR_STORAGE_UNAVAILABLE", "Avatar storage is not configured for this environment.", 503);
+    public static AuthError AssetNotFound() =>
+        new("ASSET_NOT_FOUND", "The requested asset could not be found.", 404);
 
-    public static AuthError AvatarUploadFailed() =>
-        new("AVATAR_UPLOAD_FAILED", "Avatar upload could not be completed.", 502);
-
-    public static AuthError AvatarDeleteFailed() =>
-        new("AVATAR_DELETE_FAILED", "Avatar removal could not be completed.", 502);
+    public static AuthError AvatarAssetInvalid() =>
+        new("AVATAR_ASSET_INVALID", "The selected avatar asset must be a finalized avatar upload.", 409);
 }

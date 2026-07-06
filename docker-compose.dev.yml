@@ -27,5 +27,40 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:latest
+    container_name: fluenta-minio
+    environment:
+      MINIO_ROOT_USER: fluenta_minio_local
+      MINIO_ROOT_PASSWORD: fluenta_minio_local_secret
+      MINIO_API_CORS_ALLOW_ORIGIN: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - fluenta_minio_data:/data
+
+  minio-bootstrap:
+    image: minio/mc:latest
+    container_name: fluenta-minio-bootstrap
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: fluenta_minio_local
+      MINIO_ROOT_PASSWORD: fluenta_minio_local_secret
+      MINIO_BUCKET: fluenta-assets-dev
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          echo "Waiting for MinIO..."
+          sleep 1
+        done
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set download "local/$$MINIO_BUCKET"
+
 volumes:
   fluenta_postgres_data:
+  fluenta_minio_data:

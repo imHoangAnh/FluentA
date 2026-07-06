@@ -5,6 +5,7 @@ Date: 2026-06-30
 ## Status
 
 Accepted
+Superseded by `0039-profile-avatar-cutover-to-finalized-asset-linkage.md` and `0041-remove-cloudinary-avatar-runtime-and-legacy-profile-field.md`
 
 ## Context
 
@@ -59,3 +60,11 @@ Tradeoffs:
 - Add focused E2E coverage for real profile/avatar flows once Cloudinary test
   credentials are available in the validation environment.
 - Revisit shared avatar UI components if more profile surfaces are added later.
+
+## Superseded Boundary
+
+The Cloudinary-backed multipart avatar path described here was superseded by
+the Feature 18 MinIO asset flow in `0039-profile-avatar-cutover-to-finalized-asset-linkage.md`.
+The final runtime cleanup that removed the remaining Cloudinary provider seam
+and legacy `avatar_public_id` profile field is recorded in
+`0041-remove-cloudinary-avatar-runtime-and-legacy-profile-field.md`.

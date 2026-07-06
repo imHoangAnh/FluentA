@@ -1,7 +1,10 @@
 using System.Text.RegularExpressions;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
 using FluentA.Application.Common;
 using FluentA.Application.Common.Interfaces;
+using FluentA.Domain.BoundedContexts.Assets.Entities;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 
 namespace FluentA.Application.BoundedContexts.Auth;
@@ -15,7 +18,8 @@ public sealed partial class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IGoogleOAuthClient _googleOAuthClient;
     private readonly IAccountEmailSender _accountEmailSender;
-    private readonly IAvatarStorage _avatarStorage;
+    private readonly IAssetRepository _assets;
+    private readonly IAssetObjectStorage _assetStorage;
 
     public AuthService(
         IUserRepository users,
@@ -25,7 +29,8 @@ public sealed partial class AuthService : IAuthService
         ITokenService tokenService,
         IGoogleOAuthClient googleOAuthClient,
         IAccountEmailSender accountEmailSender,
-        IAvatarStorage avatarStorage)
+        IAssetRepository assets,
+        IAssetObjectStorage assetStorage)
     {
         _users = users;
         _challengeStore = challengeStore;
@@ -34,7 +39,8 @@ public sealed partial class AuthService : IAuthService
         _tokenService = tokenService;
         _googleOAuthClient = googleOAuthClient;
         _accountEmailSender = accountEmailSender;
-        _avatarStorage = avatarStorage;
+        _assets = assets;
+        _assetStorage = assetStorage;
     }
 
     public async Task<OperationResult<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -312,73 +318,66 @@ public sealed partial class AuthService : IAuthService
             return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
         }
 
+        Asset? selectedAvatarAsset = null;
+        if (!request.RemoveAvatar && request.AvatarAssetId.HasValue)
+        {
+            selectedAvatarAsset = await _assets.GetOwnedAsync(userId, request.AvatarAssetId.Value, cancellationToken);
+            if (selectedAvatarAsset is null)
+            {
+                return OperationResult<UserProfileDto>.Failure(AuthError.AssetNotFound());
+            }
+
+            if (selectedAvatarAsset.Type != AssetType.Avatar || selectedAvatarAsset.Status != AssetStatus.Finalized)
+            {
+                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarAssetInvalid());
+            }
+        }
+
+        Asset? currentAvatarAsset = null;
+        if (user.CurrentAvatarAssetId.HasValue)
+        {
+            currentAvatarAsset = await _assets.GetOwnedAsync(userId, user.CurrentAvatarAssetId.Value, cancellationToken);
+        }
+
         var originalName = user.FullName;
         var originalBio = user.Bio;
         var originalAvatarUrl = user.AvatarUrl;
-        var originalAvatarPublicId = user.AvatarPublicId;
-        AvatarUploadResult? uploadedAvatar = null;
-
-        try
-        {
-            if (!request.RemoveAvatar && request.Avatar is not null)
-            {
-                uploadedAvatar = await _avatarStorage.UploadAsync(userId, request.Avatar, cancellationToken);
-            }
-        }
-        catch (AvatarStorageUnavailableException)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.AvatarStorageUnavailable());
-        }
-        catch (AvatarStorageOperationException)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.AvatarUploadFailed());
-        }
-
+        var originalCurrentAvatarAssetId = user.CurrentAvatarAssetId;
+        var isSelectingNewAvatarAsset = selectedAvatarAsset is not null && selectedAvatarAsset.Id != originalCurrentAvatarAssetId;
         var nextAvatarUrl = request.RemoveAvatar
             ? null
-            : uploadedAvatar?.Url ?? originalAvatarUrl;
-        var nextAvatarPublicId = request.RemoveAvatar
-            ? null
-            : uploadedAvatar?.PublicId ?? originalAvatarPublicId;
+            : selectedAvatarAsset?.PublicUrl ?? originalAvatarUrl;
+        var nextCurrentAvatarAssetId = request.RemoveAvatar
+            ? (Guid?)null
+            : selectedAvatarAsset?.Id ?? originalCurrentAvatarAssetId;
+        var retiringCurrentAvatarAsset = currentAvatarAsset is not null
+            && currentAvatarAsset.Id != nextCurrentAvatarAssetId
+            && (request.RemoveAvatar || isSelectingNewAvatarAsset);
+
+        if (retiringCurrentAvatarAsset)
+        {
+            currentAvatarAsset!.MarkDeleted(DateTime.UtcNow);
+        }
 
         try
         {
-            user.UpdateProfile(request.FullName!, request.Bio, nextAvatarUrl, nextAvatarPublicId);
+            user.UpdateProfile(request.FullName!, request.Bio, nextAvatarUrl, nextCurrentAvatarAssetId);
             await _users.UpdateAsync(user, cancellationToken);
         }
         catch
         {
-            if (uploadedAvatar is not null)
+            if (isSelectingNewAvatarAsset && selectedAvatarAsset is not null)
             {
-                await TryDeleteAsync(uploadedAvatar.PublicId, cancellationToken);
+                await TryDeleteAssetObjectAsync(selectedAvatarAsset.ObjectKey, cancellationToken);
             }
 
+            user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalCurrentAvatarAssetId);
             throw;
         }
 
-        if (request.RemoveAvatar && !string.IsNullOrWhiteSpace(originalAvatarPublicId))
+        if (retiringCurrentAvatarAsset)
         {
-            try
-            {
-                await _avatarStorage.DeleteAsync(originalAvatarPublicId, cancellationToken);
-            }
-            catch (AvatarStorageUnavailableException)
-            {
-                user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalAvatarPublicId);
-                await _users.UpdateAsync(user, cancellationToken);
-                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarStorageUnavailable());
-            }
-            catch (AvatarStorageOperationException)
-            {
-                user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalAvatarPublicId);
-                await _users.UpdateAsync(user, cancellationToken);
-                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarDeleteFailed());
-            }
-        }
-
-        if (uploadedAvatar is not null && !string.IsNullOrWhiteSpace(originalAvatarPublicId))
-        {
-            await TryDeleteAsync(originalAvatarPublicId, cancellationToken);
+            await TryDeleteAssetObjectAsync(currentAvatarAsset!.ObjectKey, cancellationToken);
         }
 
         return OperationResult<UserProfileDto>.Success(ToProfile(user));
@@ -450,49 +449,29 @@ public sealed partial class AuthService : IAuthService
             errors["bio"] = ["Bio must be 500 characters or fewer."];
         }
 
-        if (!request.RemoveAvatar && request.Avatar is not null)
+        if (request.RemoveAvatar && request.AvatarAssetId.HasValue)
         {
-            if (request.Avatar.Content.Length == 0)
-            {
-                errors["avatar"] = ["Avatar file cannot be empty."];
-            }
-            else
-            {
-                if (request.Avatar.Content.Length > 2 * 1024 * 1024)
-                {
-                    errors["avatar"] = ["Avatar file must be 2MB or smaller."];
-                }
+            errors["avatarAssetId"] = ["Avatar asset id cannot be provided when removing the current avatar."];
+        }
 
-                if (!AllowedAvatarMimeTypes.Contains(request.Avatar.ContentType))
-                {
-                    errors["avatar"] = ["Avatar file must be JPG, PNG, or WebP."];
-                }
-            }
+        if (request.AvatarAssetId.HasValue && request.AvatarAssetId.Value == Guid.Empty)
+        {
+            errors["avatarAssetId"] = ["Avatar asset id must be a non-empty GUID."];
         }
 
         return errors;
     }
 
-    private async Task TryDeleteAsync(string publicId, CancellationToken cancellationToken)
+    private async Task TryDeleteAssetObjectAsync(string objectKey, CancellationToken cancellationToken)
     {
         try
         {
-            await _avatarStorage.DeleteAsync(publicId, cancellationToken);
+            await _assetStorage.DeleteIfExistsAsync(objectKey, cancellationToken);
         }
-        catch (AvatarStorageUnavailableException)
-        {
-        }
-        catch (AvatarStorageOperationException)
+        catch (AssetStorageUnavailableException)
         {
         }
     }
-
-    private static readonly HashSet<string> AllowedAvatarMimeTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    };
 
     private static Dictionary<string, string[]> ValidateRegistration(RegisterRequest request)
     {

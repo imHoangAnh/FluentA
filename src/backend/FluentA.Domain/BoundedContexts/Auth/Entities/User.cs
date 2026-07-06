@@ -25,7 +25,7 @@ public sealed class User : BaseEntity, IAggregateRoot
     public string FullName { get; private set; }
     public string Bio { get; private set; }
     public string? AvatarUrl { get; private set; }
-    public string? AvatarPublicId { get; private set; }
+    public Guid? CurrentAvatarAssetId { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
     public bool IsEmailVerified { get; private set; }
@@ -96,7 +96,7 @@ public sealed class User : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void UpdateProfile(string fullName, string? bio, string? avatarUrl, string? avatarPublicId)
+    public void UpdateProfile(string fullName, string? bio, string? avatarUrl, Guid? currentAvatarAssetId = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -115,15 +115,24 @@ public sealed class User : BaseEntity, IAggregateRoot
             throw new ArgumentOutOfRangeException(nameof(bio), "Bio must be 500 characters or fewer.");
         }
 
-        if (string.IsNullOrWhiteSpace(avatarUrl) != string.IsNullOrWhiteSpace(avatarPublicId))
+        var hasAvatarUrl = !string.IsNullOrWhiteSpace(avatarUrl);
+        var hasCurrentAvatarAssetId = currentAvatarAssetId.HasValue && currentAvatarAssetId.Value != Guid.Empty;
+
+        if (hasCurrentAvatarAssetId && !hasAvatarUrl)
         {
-            throw new ArgumentException("Avatar URL and public id must be stored together.", nameof(avatarUrl));
+            throw new ArgumentException("Current avatar asset id requires an avatar URL.", nameof(currentAvatarAssetId));
         }
 
         FullName = normalizedName;
         Bio = normalizedBio;
-        AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
-        AvatarPublicId = string.IsNullOrWhiteSpace(avatarPublicId) ? null : avatarPublicId.Trim();
+        AvatarUrl = hasAvatarUrl ? avatarUrl!.Trim() : null;
+        CurrentAvatarAssetId = hasCurrentAvatarAssetId ? currentAvatarAssetId : null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetCurrentAvatarAsset(Guid? assetId)
+    {
+        CurrentAvatarAssetId = assetId == Guid.Empty ? null : assetId;
         UpdatedAt = DateTime.UtcNow;
     }
 

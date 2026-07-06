@@ -15,6 +15,11 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - A password-capable account can request a password reset email and choose a new password from a single-use link.
 - A logged-in user can view their current profile through `/api/v1/auth/me`.
 - A logged-in user can update their full name, optional plain-text bio, and optional avatar from the unified Settings page.
+- A logged-in user can request a presigned avatar upload target, finalize it
+  through the shared asset API, and save the finalized avatar asset through the
+  unified Settings page.
+- A logged-in user can review saved avatar assets in Settings and delete either
+  a retired avatar or the current avatar directly from that surface.
 - A logged-in user can refresh access without re-entering credentials while the refresh cookie is valid.
 - A logged-in user can log out and lose access to protected routes.
 - A user can continue with Google when local Google credentials are configured.
@@ -35,7 +40,16 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - PostgreSQL stores auth users in `auth_users` through EF Core migrations.
 - Email is normalized and unique.
 - Google subject ids are optional and unique when present.
-- User profiles store `full_name`, `bio`, `avatar_url`, and internal `avatar_public_id`.
+- User profiles store `full_name`, `bio`, and optional `avatar_url`.
+- Shared user-owned asset metadata lives in `assets`, and
+  `auth_users.current_avatar_asset_id` can point at the current avatar asset.
+- The current shipped MinIO avatar flow stores the public avatar URL on the
+  user profile and points `current_avatar_asset_id` at the owned finalized
+  avatar asset.
+- The shipped avatar runtime no longer stores or depends on any
+  Cloudinary-specific profile identifier.
+- Deleting the current avatar asset clears both `current_avatar_asset_id` and
+  `avatar_url` inside the same durable profile/asset write.
 - Redis stores FluentA refresh sessions, email verification challenges, and password reset challenges; Google refresh tokens are not stored.
 
 ## API Contract
@@ -74,8 +88,12 @@ All responses use the FluentA envelope:
 | `POST` | `/api/v1/auth/logout` | Revokes the refresh token and clears the cookie. |
 | `GET` | `/api/v1/auth/me` | Returns the current authenticated user profile. |
 | `POST` | `/api/v1/auth/google` | Exchanges a Google authorization code, creates or links the user, and returns an access token plus refresh cookie. |
-| `PUT` | `/api/v1/profile` | Updates full name, bio, and avatar for the authenticated user through multipart form data when needed. |
+| `PUT` | `/api/v1/profile` | Updates full name, bio, and avatar linkage for the authenticated user from JSON `{ fullName, bio, removeAvatar, avatarAssetId }`. |
 | `GET` | `/api/v1/settings` | Returns the authenticated profile plus Practice and Review settings for the unified Settings page. |
+| `POST` | `/api/v1/assets/presign` | Creates a pending owned avatar asset and returns a presigned direct-upload target. |
+| `POST` | `/api/v1/assets/finalize` | Verifies the uploaded object for an owned pending avatar asset and marks it finalized. |
+| `GET` | `/api/v1/assets?assetType=avatar` | Lists the authenticated user's saved owned avatar assets for Settings management. |
+| `DELETE` | `/api/v1/assets/{assetId}` | Deletes an owned avatar asset and clears the current profile avatar when needed. |
 
 ## Validation And Error Rules
 
@@ -94,8 +112,21 @@ All responses use the FluentA envelope:
 - Missing Google OAuth credentials return `501 GOOGLE_OAUTH_NOT_CONFIGURED`.
 - Invalid Google authorization codes or profile responses return `401 GOOGLE_OAUTH_FAILED`.
 - A Google subject conflict on an existing email returns `409 GOOGLE_ACCOUNT_CONFLICT`.
-- Avatar saves reject unsupported file types, files over 2MB, names outside 2-100 characters, and bios over 500 characters with `422 VALIDATION_ERROR`.
-- Avatar saves that require Cloudinary fail with `503 AVATAR_STORAGE_UNAVAILABLE` when storage credentials are missing.
+- Avatar saves reject names outside 2-100 characters, bios over 500
+  characters, and conflicting `removeAvatar + avatarAssetId` requests with
+  `422 VALIDATION_ERROR`.
+- `PUT /api/v1/profile` returns `404 ASSET_NOT_FOUND` when the selected avatar
+  asset does not exist or is not owned by the authenticated user.
+- `PUT /api/v1/profile` returns `409 AVATAR_ASSET_INVALID` when the selected
+  avatar asset is not a finalized `avatar` upload.
+- Asset presign requires `assetType=avatar` and avatar content type `image/jpeg`,
+  `image/png`, or `image/webp`.
+- Asset finalize returns `422 ASSET_UPLOAD_INVALID` when the uploaded MinIO
+  object is missing or violates avatar metadata rules.
+- Asset delete returns `404 ASSET_NOT_FOUND` when the selected asset does not
+  exist or is not owned by the authenticated user.
+- Asset presign or finalize return `503 ASSET_STORAGE_UNAVAILABLE` when shared
+  asset storage is disabled or unavailable.
 
 ## Email Challenge Delivery
 
@@ -136,7 +167,22 @@ All responses use the FluentA envelope:
 - `/me` and login/refresh responses expose the current `fullName`, optional `bio`, and optional `avatarUrl`.
 - Refresh returns a new access token while the refresh cookie is valid.
 - Logout revokes the refresh token, clears the cookie, and the protected UI no longer shows authenticated content.
-- Profile saves update Settings and the existing authenticated identity surfaces without exposing Cloudinary `publicId` to clients.
+- Profile saves update Settings and the existing authenticated identity
+  surfaces by linking a finalized owned avatar asset without exposing internal
+  asset-management identifiers to clients.
+- Settings can list saved avatar assets, delete a retired asset without
+  changing the profile, and delete the current avatar while `avatarUrl`,
+  `avatar_url`, and `current_avatar_asset_id` all clear together.
+- The shared asset API can presign an avatar upload, reject finalize before
+  upload, and finalize the uploaded object after MinIO metadata verification.
+- Replacing or removing the current avatar clears or rewires
+  `current_avatar_asset_id`, soft-deletes the retired avatar asset metadata,
+  and leaves Settings plus other authenticated identity surfaces on the new
+  durable avatar URL.
+- Abandoned pending avatar uploads are cleaned from MinIO plus shared metadata
+  by the recurring asset cleanup job.
+- Build and config proof show the shipped avatar path no longer registers or
+  depends on the legacy Cloudinary provider seam.
 - Refresh after rotation rejects the previous refresh token.
 - Refresh after logout rejects the logged-out refresh token.
 - Local Postgres migration creates the auth user table.

@@ -66,7 +66,7 @@ export function DashboardPage() {
   const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today) })
   const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
   const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
-  const flashcardDashboardQuery = useQuery({ queryKey: ['flashcard', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
+  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
     onSuccess: async () => {

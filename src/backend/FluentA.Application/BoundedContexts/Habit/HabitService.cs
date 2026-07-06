@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
 using FluentA.Application.Common;
-using FluentA.Domain.BoundedContexts.Habit.Entities;
+using FluentA.Domain.BoundedContexts.Habit.Enums;
 using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
 
 namespace FluentA.Application.BoundedContexts.Habit;

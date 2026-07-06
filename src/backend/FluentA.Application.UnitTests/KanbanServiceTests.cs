@@ -1,6 +1,7 @@
 using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Kanban.DTOs;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Kanban.Enums;
 
 namespace FluentA.Application.UnitTests;
 

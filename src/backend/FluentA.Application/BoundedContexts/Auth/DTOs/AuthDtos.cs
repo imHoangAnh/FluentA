@@ -39,12 +39,12 @@ public sealed record UpdateProfileRequest(
     string? FullName = null,
     string? Bio = null,
     bool RemoveAvatar = false,
-    AvatarUpload? Avatar = null);
+    Guid? AvatarAssetId = null);
 
 public sealed record SettingsDto(
     UserProfileDto Profile,
-    FluentA.Application.BoundedContexts.Flashcards.DTOs.PracticeSettingsDto PracticeSettings,
-    FluentA.Application.BoundedContexts.Flashcards.DTOs.ReviewSettingsDto ReviewSettings);
+    FluentA.Application.BoundedContexts.Practice.DTOs.PracticeSettingsDto PracticeSettings,
+    FluentA.Application.BoundedContexts.Review.DTOs.ReviewSettingsDto ReviewSettings);
 
 public sealed record AuthResponse(string AccessToken, UserProfileDto User, string RefreshToken);
 

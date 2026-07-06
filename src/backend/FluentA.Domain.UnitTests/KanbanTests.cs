@@ -1,4 +1,5 @@
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Kanban.Enums;
 
 namespace FluentA.Domain.UnitTests;
 

@@ -1,8 +1,12 @@
 using System.Web;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
 using FluentA.Application.Common;
 using FluentA.Application.Common.Interfaces;
+using FluentA.Domain.BoundedContexts.Assets.Entities;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
+using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Infrastructure.Auth;
 using Microsoft.Extensions.Configuration;
 
@@ -10,9 +14,11 @@ namespace FluentA.Application.UnitTests;
 
 public sealed class AuthServiceTests
 {
-    private static (AuthService Service, RecordingAccountEmailSender EmailSender, InMemoryAccountChallengeStore ChallengeStore) CreateService()
+    private static (AuthService Service, RecordingAccountEmailSender EmailSender, InMemoryAccountChallengeStore ChallengeStore, InMemoryUserRepository Users, InMemoryAssetRepository Assets, RecordingAssetObjectStorage AssetStorage) CreateService()
     {
         var users = new InMemoryUserRepository();
+        var assets = new InMemoryAssetRepository();
+        var assetStorage = new RecordingAssetObjectStorage();
         var refresh = new InMemoryRefreshTokenStore();
         var hasher = new BCryptPasswordHasher();
         var challengeStore = new InMemoryAccountChallengeStore();
@@ -23,13 +29,20 @@ public sealed class AuthServiceTests
         }).Build();
         var tokenService = new JwtTokenService(new JwtSigningKeyProvider(), config);
         var emailSender = new RecordingAccountEmailSender();
-        return (new AuthService(users, challengeStore, refresh, hasher, tokenService, new FakeGoogleOAuthClient(), emailSender, new FakeAvatarStorage()), emailSender, challengeStore);
+
+        return (
+            new AuthService(users, challengeStore, refresh, hasher, tokenService, new FakeGoogleOAuthClient(), emailSender, assets, assetStorage),
+            emailSender,
+            challengeStore,
+            users,
+            assets,
+            assetStorage);
     }
 
     [Fact]
     public async Task Register_RejectsDuplicateEmail()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var request = new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner");
 
         var first = await service.RegisterAsync(request);
@@ -43,7 +56,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Login_ReturnsAccessTokenForValidCredentials()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
 
@@ -57,7 +70,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Login_RejectsUnverifiedPasswordAccountUntilEmailVerified()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
 
         var unverified = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
@@ -74,7 +87,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task VerifyEmail_RejectsInvalidOtp()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
 
         var result = await service.VerifyEmailAsync(new VerifyEmailRequest("learner@example.com", "111111"));
@@ -86,7 +99,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task ResendVerificationOtp_RejectsCooldownWindow()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
 
         var result = await service.ResendVerificationOtpAsync(new ResendVerificationOtpRequest("learner@example.com"));
@@ -98,7 +111,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Login_RejectsInvalidCredentials()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
 
@@ -111,7 +124,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Refresh_RotatesRefreshToken()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
         var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
@@ -128,7 +141,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task GoogleLogin_CreatesAccountForVerifiedGoogleProfile()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
 
         var result = await service.GoogleLoginAsync(new GoogleLoginRequest("valid-google-code"));
 
@@ -141,7 +154,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task GoogleLogin_LinksExistingEmailAccount()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("google@example.com", "SecurePass123", "Original Name"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
 
@@ -154,7 +167,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Register_SendsVerificationOtpEmail()
     {
-        var (service, emailSender, _) = CreateService();
+        var (service, emailSender, _, _, _, _) = CreateService();
 
         var result = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
 
@@ -168,7 +181,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task ForgotPassword_ReturnsUnknownAccountWarning()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
 
         var result = await service.ForgotPasswordAsync(new ForgotPasswordRequest("missing@example.com"));
 
@@ -179,7 +192,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task ForgotPassword_RejectsGoogleOnlyAccount()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         await service.GoogleLoginAsync(new GoogleLoginRequest("valid-google-code"));
 
         var result = await service.ForgotPasswordAsync(new ForgotPasswordRequest("google@example.com"));
@@ -191,7 +204,7 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task ResetPassword_ConsumesSingleUseToken()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
         var forgotPassword = await service.ForgotPasswordAsync(new ForgotPasswordRequest("learner@example.com"));
@@ -209,28 +222,119 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task UpdateProfile_UpdatesNameBioAndAvatar()
+    public async Task UpdateProfile_LinksFinalizedAvatarAsset()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, _, assets, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
         var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+        var avatarAsset = CreateFinalizedAvatarAsset(login.Value!.User.Id, "users/current/avatar-1", "https://cdn.example.com/avatar-1.png");
+        await assets.AddAsync(avatarAsset);
 
-        var result = await service.UpdateProfileAsync(login.Value!.User.Id, new UpdateProfileRequest(
+        var result = await service.UpdateProfileAsync(login.Value.User.Id, new UpdateProfileRequest(
             "Updated Learner",
             "Studies every morning.",
-            Avatar: new AvatarUpload("avatar.png", "image/png", [1, 2, 3])));
+            AvatarAssetId: avatarAsset.Id));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Updated Learner", result.Value!.FullName);
         Assert.Equal("Studies every morning.", result.Value.Bio);
-        Assert.Equal("https://cdn.example.com/avatar.png", result.Value.AvatarUrl);
+        Assert.Equal(avatarAsset.PublicUrl, result.Value.AvatarUrl);
     }
 
     [Fact]
-    public async Task UpdateProfile_RejectsReviewFeatureAvatarValidationViolations()
+    public async Task UpdateProfile_ReplacesCurrentAvatarAndDeletesOldObject()
     {
-        var (service, _, _) = CreateService();
+        var (service, _, _, users, assets, assetStorage) = CreateService();
+        var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
+        await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
+        var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+        var userId = login.Value!.User.Id;
+        var firstAvatar = CreateFinalizedAvatarAsset(userId, "users/current/avatar-1", "https://cdn.example.com/avatar-1.png");
+        var secondAvatar = CreateFinalizedAvatarAsset(userId, "users/current/avatar-2", "https://cdn.example.com/avatar-2.png");
+        await assets.AddAsync(firstAvatar);
+        await assets.AddAsync(secondAvatar);
+
+        var firstSave = await service.UpdateProfileAsync(userId, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every morning.",
+            AvatarAssetId: firstAvatar.Id));
+        Assert.True(firstSave.IsSuccess);
+
+        var result = await service.UpdateProfileAsync(userId, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every evening.",
+            AvatarAssetId: secondAvatar.Id));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(secondAvatar.PublicUrl, result.Value!.AvatarUrl);
+        Assert.Equal(AssetStatus.Deleted, firstAvatar.Status);
+        Assert.Contains(firstAvatar.ObjectKey, assetStorage.DeletedObjectKeys);
+        var user = await users.GetByIdAsync(userId);
+        Assert.Equal(secondAvatar.Id, user!.CurrentAvatarAssetId);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RemoveAvatarClearsCurrentAvatarAndDeletesOwnedAsset()
+    {
+        var (service, _, _, users, assets, assetStorage) = CreateService();
+        var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
+        await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
+        var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+        var userId = login.Value!.User.Id;
+        var avatarAsset = CreateFinalizedAvatarAsset(userId, "users/current/avatar-1", "https://cdn.example.com/avatar-1.png");
+        await assets.AddAsync(avatarAsset);
+
+        var firstSave = await service.UpdateProfileAsync(userId, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every morning.",
+            AvatarAssetId: avatarAsset.Id));
+        Assert.True(firstSave.IsSuccess);
+
+        var result = await service.UpdateProfileAsync(userId, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every morning.",
+            RemoveAvatar: true));
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.AvatarUrl);
+        Assert.Equal(AssetStatus.Deleted, avatarAsset.Status);
+        Assert.Contains(avatarAsset.ObjectKey, assetStorage.DeletedObjectKeys);
+        var user = await users.GetByIdAsync(userId);
+        Assert.Null(user!.CurrentAvatarAssetId);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsPendingAvatarAssetSelection()
+    {
+        var (service, _, _, _, assets, _) = CreateService();
+        var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
+        await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
+        var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
+        var pendingAsset = Asset.CreatePending(
+            Guid.NewGuid(),
+            login.Value!.User.Id,
+            AssetType.Avatar,
+            "users/current/avatar-pending",
+            "https://cdn.example.com/avatar-pending.png",
+            "image/png",
+            0,
+            DateTime.UtcNow.AddHours(1));
+        await assets.AddAsync(pendingAsset);
+
+        var result = await service.UpdateProfileAsync(login.Value.User.Id, new UpdateProfileRequest(
+            "Updated Learner",
+            "Studies every morning.",
+            AvatarAssetId: pendingAsset.Id));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("AVATAR_ASSET_INVALID", Assert.IsType<AuthError>(result.Error).Code);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsProfileValidationViolations()
+    {
+        var (service, _, _, _, _, _) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
         await service.VerifyEmailAsync(new VerifyEmailRequest(registration.Value!.Email, registration.Value.DevelopmentOtp!));
         var login = await service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
@@ -238,11 +342,27 @@ public sealed class AuthServiceTests
         var result = await service.UpdateProfileAsync(login.Value!.User.Id, new UpdateProfileRequest(
             "Updated Learner",
             new string('a', 501),
-            Avatar: new AvatarUpload("avatar.gif", "image/gif", [1, 2, 3])));
+            RemoveAvatar: true,
+            AvatarAssetId: Guid.NewGuid()));
 
         Assert.False(result.IsSuccess);
         var error = Assert.IsType<AuthError>(result.Error);
         Assert.Equal("VALIDATION_ERROR", error.Code);
+    }
+
+    private static Asset CreateFinalizedAvatarAsset(Guid userId, string objectKey, string publicUrl)
+    {
+        var asset = Asset.CreatePending(
+            Guid.NewGuid(),
+            userId,
+            AssetType.Avatar,
+            objectKey,
+            publicUrl,
+            "image/png",
+            0,
+            DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload(publicUrl, "image/png", 128);
+        return asset;
     }
 
     private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
@@ -272,19 +392,6 @@ public sealed class AuthServiceTests
         {
             PasswordResetMessages.Add(message);
             return Task.FromResult(new PasswordResetEmailDeliveryResult($"http://localhost:5173{message.ResetUrl}"));
-        }
-    }
-
-    private sealed class FakeAvatarStorage : IAvatarStorage
-    {
-        public Task<AvatarUploadResult> UploadAsync(Guid userId, AvatarUpload upload, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new AvatarUploadResult("https://cdn.example.com/avatar.png", $"{userId:N}/avatar"));
-        }
-
-        public Task DeleteAsync(string publicId, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
         }
     }
 
@@ -368,5 +475,112 @@ public sealed class AuthServiceTests
         }
 
         private static string Normalize(string email) => email.Trim().ToLowerInvariant();
+    }
+
+    private sealed class InMemoryAssetRepository : IAssetRepository
+    {
+        private readonly Dictionary<Guid, Asset> _assets = new();
+
+        public Task AddAsync(Asset asset, CancellationToken cancellationToken = default)
+        {
+            _assets[asset.Id] = asset;
+            return Task.CompletedTask;
+        }
+
+        public Task<Asset?> GetByIdAsync(Guid assetId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_assets.GetValueOrDefault(assetId));
+        }
+
+        public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_assets.TryGetValue(assetId, out var asset) && asset.UserId == userId && asset.DeletedAt is null
+                ? asset
+                : null);
+        }
+
+        public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
+                .Where(asset => asset.UserId == userId && asset.DeletedAt is null)
+                .OrderByDescending(asset => asset.CreatedAt)
+                .ToList());
+        }
+
+        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
+                .Where(asset => asset.DeletedAt is null
+                    && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Expired
+                        || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Pending
+                            && asset.ExpiresAt.HasValue
+                            && asset.ExpiresAt.Value <= nowUtc)))
+                .OrderBy(asset => asset.CreatedAt)
+                .ToList());
+        }
+
+        public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default)
+        {
+            _assets[asset.Id] = asset;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class InMemoryUserRepository : IUserRepository
+    {
+        private readonly Dictionary<Guid, User> _users = new();
+
+        public Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_users.Values.Any(user => user.Email == normalizedEmail));
+        }
+
+        public Task<User?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_users.Values.FirstOrDefault(user => user.Email == normalizedEmail));
+        }
+
+        public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_users.GetValueOrDefault(userId));
+        }
+
+        public Task AddAsync(User user, CancellationToken cancellationToken = default)
+        {
+            _users[user.Id] = user;
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+        {
+            _users[user.Id] = user;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingAssetObjectStorage : IAssetObjectStorage
+    {
+        public List<string> DeletedObjectKeys { get; } = [];
+
+        public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
+        {
+            return new AssetPresignedUpload($"https://upload.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
+        }
+
+        public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<AssetObjectMetadata?>(new AssetObjectMetadata(objectKey, 128, "image/png", "etag"));
+        }
+
+        public string GetPublicUrl(string objectKey)
+        {
+            return $"https://cdn.example.com/{objectKey}";
+        }
+
+        public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            DeletedObjectKeys.Add(objectKey);
+            return Task.CompletedTask;
+        }
     }
 }

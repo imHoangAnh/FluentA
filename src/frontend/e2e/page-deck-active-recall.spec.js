@@ -51,7 +51,7 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, summar
     });
   }
 
-  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/practice-sessions', {
+  const seededPractice = await page.request.post('http://127.0.0.1:5000/api/v1/practice/sessions', {
     headers,
     data: {
       deckId: (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data[0].id,
@@ -85,7 +85,7 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, summar
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
   await pageDeck.getByRole('link', { name: 'Study this Page Deck' }).click();
   const sessionResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/sessions') && response.request().method() === 'POST'
+    response.url().endsWith('/api/v1/review/sessions') && response.request().method() === 'POST'
   );
   await page.getByTestId('start-review-session').click();
   const sessionId = (await (await sessionResponsePromise).json()).data.sessionId;
@@ -108,7 +108,7 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, summar
   await expect(page.getByTestId('review-summary').getByText('Hard')).toBeVisible();
   await expect(page.getByTestId('review-summary').getByText('Again')).toBeVisible();
 
-  const sessionSummary = await page.request.get(`http://127.0.0.1:5000/api/v1/flashcards/sessions/${sessionId}/summary`, { headers });
+  const sessionSummary = await page.request.get(`http://127.0.0.1:5000/api/v1/review/sessions/${sessionId}/summary`, { headers });
   expect(sessionSummary.status()).toBe(200);
   const sessionSummaryPayload = (await sessionSummary.json()).data;
   expect(sessionSummaryPayload.totalCardsReviewed).toBe(4);
@@ -129,7 +129,7 @@ test('Page Deck Active Recall supports keyboard review, TTS, abandonment, summar
   expect(beforeSchedule.state).not.toBe('new');
   expect(beforeSchedule.repetitions).toBeGreaterThanOrEqual(1);
   expect(beforeSchedule.interval).toBeGreaterThanOrEqual(1);
-  const recorded = await page.request.post('http://127.0.0.1:5000/api/v1/flashcards/review', {
+  const recorded = await page.request.post('http://127.0.0.1:5000/api/v1/review', {
     headers,
     data: { sessionId: crypto.randomUUID(), cardId: pageDeckCard.id, rating: 2, timeSpentSeconds: 1, timeZoneId: 'UTC' },
   });

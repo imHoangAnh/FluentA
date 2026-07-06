@@ -13,8 +13,8 @@ export function ReviewSettingsPage() {
   const [practiceDraft, setPracticeDraft] = useState<flashcardApi.PracticeSettings | null>(null)
   const [reviewDraft, setReviewDraft] = useState<flashcardApi.ReviewSettings | null>(null)
 
-  const practiceSettingsQuery = useQuery({ queryKey: ['flashcard', 'practice-settings'], queryFn: flashcardApi.getPracticeSettings })
-  const reviewSettingsQuery = useQuery({ queryKey: ['flashcard', 'settings'], queryFn: flashcardApi.getReviewSettings })
+  const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: flashcardApi.getPracticeSettings })
+  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: flashcardApi.getReviewSettings })
 
   const practiceSettings = practiceDraft ?? practiceSettingsQuery.data ?? { modeSequence: practiceModes }
   const reviewSettings = reviewDraft ?? reviewSettingsQuery.data ?? { dailyLimit: 300, recapAfterAnswer: true }
@@ -22,13 +22,13 @@ export function ReviewSettingsPage() {
   const updatePracticeSettings = useMutation({
     mutationFn: flashcardApi.updatePracticeSettings,
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'practice-settings'], settings)
+      queryClient.setQueryData(['practice', 'settings'], settings)
     },
   })
   const updateReviewSettings = useMutation({
     mutationFn: flashcardApi.updateReviewSettings,
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'settings'], settings)
+      queryClient.setQueryData(['review', 'settings'], settings)
     },
   })
 

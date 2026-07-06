@@ -12,27 +12,25 @@ test('review settings save and dashboard counts aggregate page decks', async ({ 
   await page.goto('/register');
   await page.getByLabel('Full name').fill('Spaced Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Create a password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Enter your password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const token = (await (await loginResponsePromise).json()).data.accessToken;
   const headers = { Authorization: `Bearer ${token}` };
 
-  await page.getByTestId('open-flashcards').click();
-  await page.getByRole('link', { name: 'Review settings' }).click();
-  await page.getByLabel('New cards per day').fill('1');
-  await page.getByLabel('Review cards per day').fill('1');
-  await page.getByRole('button', { name: /Save review settings/ }).click();
-  await expect(page.getByText('Review settings saved.')).toBeVisible();
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Your settings' })).toBeVisible();
+  await page.getByLabel('Daily limit').fill('1');
+  await expect(page.getByText('Saved automatically.')).toBeVisible();
 
   const board = (await (await page.request.post('http://127.0.0.1:5000/api/v1/boards', {
     headers,
@@ -65,9 +63,9 @@ test('review settings save and dashboard counts aggregate page decks', async ({ 
   await page.getByRole('link', { name: 'Flashcards' }).click();
   await expect(page.getByRole('heading', { name: 'Your page decks' })).toBeVisible();
   await expect(page.getByText('Daily Planning - Today')).toBeVisible();
-  await expect(page.getByText('Second Daily Board - Tomorrow')).toBeVisible();
+  await expect(page.getByText('Second Daily Board')).toBeVisible();
 
-  const dashboardResponse = await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/dashboard?timeZoneId=UTC', { headers });
+  const dashboardResponse = await page.request.get('http://127.0.0.1:5000/api/v1/review/dashboard?timeZoneId=UTC', { headers });
   expect(dashboardResponse.status()).toBe(200);
   const dashboard = (await dashboardResponse.json()).data;
   expect(dashboard.totalCards).toBe(3);

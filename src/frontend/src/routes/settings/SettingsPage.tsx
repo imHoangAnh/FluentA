@@ -2,6 +2,7 @@ import { ArrowLeft, Check, ImageMinus, LoaderCircle, LogOut, Save, Upload, XCirc
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import * as assetsApi from '../../lib/api/assets.api'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import * as settingsApi from '../../lib/api/settings.api'
 import { getUserAvatarUrl } from '../../lib/avatar'
@@ -15,6 +16,7 @@ type ProfileDraft = {
   bio: string
   avatarUrl: string | null
   avatarFile: File | null
+  avatarAssetId: string | null
   removeAvatar: boolean
 }
 
@@ -40,18 +42,45 @@ export function SettingsPage() {
     queryKey: ['settings'],
     queryFn: settingsApi.getSettings,
   })
+  const assetsQuery = useQuery({
+    queryKey: ['assets', 'avatar'],
+    queryFn: () => assetsApi.listAssets('avatar'),
+  })
 
   const updateProfile = useMutation({
-    mutationFn: settingsApi.updateProfile,
+    mutationFn: async (profile: ProfileDraft) => {
+      const validationError = validateProfileDraft(profile)
+      if (validationError) {
+        throw new Error(validationError)
+      }
+
+      let avatarAssetId = profile.removeAvatar ? null : profile.avatarAssetId
+      if (!profile.removeAvatar && profile.avatarFile && !avatarAssetId) {
+        const finalizedAsset = await assetsApi.uploadAvatarAsset(profile.avatarFile)
+        avatarAssetId = finalizedAsset.id
+        setProfileDraft((current) => current && current.avatarFile === profile.avatarFile
+          ? { ...current, avatarAssetId: finalizedAsset.id }
+          : current)
+      }
+
+      return settingsApi.updateProfile({
+        fullName: profile.fullName,
+        bio: profile.bio,
+        removeAvatar: profile.removeAvatar,
+        avatarAssetId,
+      })
+    },
     onSuccess: (profile) => {
       setUser(profile)
       queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? { ...current, profile } : current)
+      void queryClient.invalidateQueries({ queryKey: ['assets', 'avatar'] })
       setProfileDraft((current) => current ? {
         ...current,
         fullName: profile.fullName,
         bio: profile.bio ?? '',
         avatarUrl: profile.avatarUrl ?? null,
         avatarFile: null,
+        avatarAssetId: null,
         removeAvatar: false,
       } : current)
       setProfileMessage('Profile saved.')
@@ -62,6 +91,41 @@ export function SettingsPage() {
       setProfileError(readApiError(error, 'Unable to save profile.'))
     },
   })
+  const deleteAsset = useMutation({
+    mutationFn: async (asset: assetsApi.OwnedAssetPayload) => {
+      await assetsApi.deleteAsset(asset.id)
+      return asset
+    },
+    onSuccess: (asset) => {
+      queryClient.setQueryData(['assets', 'avatar'], (current: assetsApi.OwnedAssetPayload[] | undefined) =>
+        current ? current.filter((item) => item.id !== asset.id) : current)
+      if (asset.isCurrentAvatar && authUser) {
+        const nextUser = { ...authUser, avatarUrl: null }
+        setUser(nextUser)
+        queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? {
+          ...current,
+          profile: {
+            ...current.profile,
+            avatarUrl: null,
+          },
+        } : current)
+        setProfileDraft((current) => current ? {
+          ...current,
+          avatarUrl: null,
+          avatarFile: null,
+          avatarAssetId: null,
+          removeAvatar: false,
+        } : current)
+      }
+
+      setProfileMessage(asset.isCurrentAvatar ? 'Current avatar deleted.' : 'Saved avatar deleted.')
+      setProfileError(null)
+    },
+    onError: (error: unknown) => {
+      setProfileMessage(null)
+      setProfileError(readApiError(error, 'Unable to delete avatar.'))
+    },
+  })
 
   const updatePracticeSettings = useMutation({
     mutationFn: flashcardApi.updatePracticeSettings,
@@ -69,7 +133,7 @@ export function SettingsPage() {
       setPracticeState('saving')
     },
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'practice-settings'], settings)
+      queryClient.setQueryData(['practice', 'settings'], settings)
       queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? { ...current, practiceSettings: settings } : current)
       setPracticeState('saved')
     },
@@ -84,7 +148,7 @@ export function SettingsPage() {
       setReviewState('saving')
     },
     onSuccess: (settings) => {
-      queryClient.setQueryData(['flashcard', 'settings'], settings)
+      queryClient.setQueryData(['review', 'settings'], settings)
       queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? { ...current, reviewSettings: settings } : current)
       setReviewState('saved')
     },
@@ -100,12 +164,14 @@ export function SettingsPage() {
       bio: settingsQuery.data.profile.bio ?? '',
       avatarUrl: settingsQuery.data.profile.avatarUrl ?? null,
       avatarFile: null,
+      avatarAssetId: null,
       removeAvatar: false,
     } : null),
     [profileDraft, settingsQuery.data],
   )
   const resolvedPractice = practiceDraft ?? settingsQuery.data?.practiceSettings ?? null
   const resolvedReview = reviewDraft ?? settingsQuery.data?.reviewSettings ?? null
+  const ownedAssets = assetsQuery.data ?? []
   const avatarPreviewUrl = useMemo(
     () => resolvedProfile?.avatarFile ? URL.createObjectURL(resolvedProfile.avatarFile) : null,
     [resolvedProfile],
@@ -189,12 +255,7 @@ export function SettingsPage() {
   function saveProfile() {
     setProfileMessage(null)
     setProfileError(null)
-    updateProfile.mutate({
-      fullName: profile.fullName,
-      bio: profile.bio,
-      removeAvatar: profile.removeAvatar,
-      avatarFile: profile.removeAvatar ? null : profile.avatarFile,
-    })
+    updateProfile.mutate(profile)
   }
 
   return (
@@ -229,6 +290,7 @@ export function SettingsPage() {
                   setProfileDraft({
                     ...profile,
                     avatarFile: file,
+                    avatarAssetId: null,
                     removeAvatar: false,
                   })
                   setProfileMessage(null)
@@ -243,6 +305,7 @@ export function SettingsPage() {
                 setProfileDraft({
                     ...profile,
                     avatarFile: null,
+                    avatarAssetId: null,
                     removeAvatar: true,
                   })
                 setProfileMessage(null)
@@ -251,8 +314,45 @@ export function SettingsPage() {
             >
               <ImageMinus size={16} /> Remove avatar
             </button>
-            <small>JPG, PNG, or WebP. Max 2MB. Upload happens only when you save the profile.</small>
+            <small>JPG, PNG, or WebP. Max 2MB. Upload starts only when you save the profile.</small>
           </div>
+        </div>
+        <div className="settings-saved-assets">
+          <div className="settings-saved-assets-header">
+            <strong>Saved avatars</strong>
+            {assetsQuery.isLoading ? <span className="settings-muted">Loading...</span> : null}
+          </div>
+          {ownedAssets.length === 0 ? (
+            <p className="settings-muted">No saved avatars yet.</p>
+          ) : (
+            <div className="settings-asset-grid">
+              {ownedAssets.map((asset) => (
+                <article key={asset.id} className="settings-asset-card">
+                  {asset.status === 'finalized' ? (
+                    <img className="settings-asset-thumb" src={asset.publicUrl} alt="Saved avatar" />
+                  ) : (
+                    <div className="settings-asset-thumb settings-asset-thumb--placeholder">{asset.status}</div>
+                  )}
+                  <div className="settings-asset-copy">
+                    <strong>{asset.isCurrentAvatar ? 'Current avatar' : 'Saved avatar'}</strong>
+                    <small>{asset.status} • {formatAssetSize(asset.sizeBytes)}</small>
+                  </div>
+                  <button
+                    className="ghost-button ghost-button--inline settings-asset-delete"
+                    type="button"
+                    disabled={deleteAsset.isPending}
+                    onClick={() => {
+                      setProfileMessage(null)
+                      setProfileError(null)
+                      deleteAsset.mutate(asset)
+                    }}
+                  >
+                    <ImageMinus size={16} /> Delete
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="settings-form">
@@ -375,7 +475,23 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+function formatAssetSize(sizeBytes: number) {
+  if (sizeBytes >= 1024 * 1024) {
+    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  if (sizeBytes >= 1024) {
+    return `${Math.round(sizeBytes / 1024)} KB`
+  }
+
+  return `${sizeBytes} B`
+}
+
 function readApiError(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
     return response?.data?.error?.message ?? fallback
@@ -383,3 +499,38 @@ function readApiError(error: unknown, fallback: string) {
 
   return fallback
 }
+
+function validateProfileDraft(profile: ProfileDraft) {
+  const fullNameLength = profile.fullName.trim().length
+  if (fullNameLength < 2 || fullNameLength > 100) {
+    return 'Full name must be between 2 and 100 characters.'
+  }
+
+  if (profile.bio.trim().length > 500) {
+    return 'Bio must be 500 characters or fewer.'
+  }
+
+  if (profile.removeAvatar || !profile.avatarFile) {
+    return null
+  }
+
+  if (profile.avatarFile.size === 0) {
+    return 'Avatar file cannot be empty.'
+  }
+
+  if (profile.avatarFile.size > 2 * 1024 * 1024) {
+    return 'Avatar file must be 2MB or smaller.'
+  }
+
+  if (!allowedAvatarMimeTypes.has(profile.avatarFile.type)) {
+    return 'Avatar file must be JPG, PNG, or WebP.'
+  }
+
+  return null
+}
+
+const allowedAvatarMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+])

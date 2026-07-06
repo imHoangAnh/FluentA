@@ -44,7 +44,7 @@ function createQueryClient() {
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['vocab', 'boards'], [])
   queryClient.setQueryData(['flashcard', 'decks'], [])
-  queryClient.setQueryData(['flashcard', 'dashboard'], {
+  queryClient.setQueryData(['review', 'dashboard'], {
     boardId: null,
     boardName: null,
     totalCards: 0,
@@ -56,8 +56,8 @@ function createQueryClient() {
     newCards: 0,
     forecast: [],
   })
-  queryClient.setQueryData(['flashcard', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
-  queryClient.setQueryData(['flashcard', 'practice-settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
+  queryClient.setQueryData(['review', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
+  queryClient.setQueryData(['practice', 'settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
   queryClient.setQueryData(['settings'], {
     profile: {
       id: 'user-1',
@@ -148,7 +148,7 @@ function renderAppWithDashboardData(initialEntry: string) {
       lapseCount: 0,
     }],
   }])
-  queryClient.setQueryData(['flashcard', 'dashboard'], {
+  queryClient.setQueryData(['review', 'dashboard'], {
     boardId: null,
     boardName: null,
     totalCards: 1,
@@ -215,7 +215,7 @@ function renderAppWithDeck(initialEntry: string) {
   }
 
   queryClient.setQueryData(['flashcard', 'decks'], [deck])
-  queryClient.setQueryData(['flashcard', 'dashboard'], {
+  queryClient.setQueryData(['review', 'dashboard'], {
     boardId: null,
     boardName: null,
     totalCards: 1,
