@@ -1,4 +1,6 @@
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
+using FluentA.Domain.BoundedContexts.Practice.Entities;
+using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -9,7 +11,7 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
 {
     public void Configure(EntityTypeBuilder<WordReviewState> builder)
     {
-        builder.ToTable("word_review_states");
+        builder.ToTable("word_states", "review");
 
         builder.HasKey(state => state.Id);
 

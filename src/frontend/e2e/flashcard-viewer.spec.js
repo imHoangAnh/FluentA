@@ -78,7 +78,7 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   await page.request.delete(`http://127.0.0.1:5000/api/v1/boards/${board.id}/words/${word.id}`, {
     headers,
   });
-  await expect(page.getByText('0 synchronized words are ready in this page deck.')).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText('No synchronized cards yet.')).toBeVisible({ timeout: 3000 });
   const deleteVisibleMs = Date.now() - deleteStarted;
 
   const foreignEmail = `foreign-flashcards+${Date.now()}@example.com`;

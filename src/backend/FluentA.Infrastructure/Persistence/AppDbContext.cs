@@ -1,6 +1,8 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
+using FluentA.Domain.BoundedContexts.Practice.Entities;
+using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
 using FluentA.Domain.BoundedContexts.Notification.Entities;

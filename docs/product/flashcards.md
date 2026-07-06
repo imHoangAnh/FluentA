@@ -85,7 +85,7 @@ thesaurus, collocation, and note from their source vocabulary word.
 - Wrong answers keep the learner on the current step until correct or reveal.
 - Reveal/skip completes that step, marks the word wrong for the session, and
   advances through the remaining workflow.
-- `POST /api/v1/flashcards/practice-sessions` accepts only an owned active page
+- `POST /api/v1/practice/sessions` accepts only an owned active page
   deck, validates totals and timezone, and stores the practice summary.
 - `POST /api/v1/practice/add-to-review` adds only missing review-state rows for
   the completed deck as FluentA SRS `Level 0`.
@@ -112,9 +112,9 @@ thesaurus, collocation, and note from their source vocabulary word.
 
 ## Dashboard And Settings
 
-- `GET /api/v1/flashcards/dashboard?timeZoneId=...` returns overall stats for
+- `GET /api/v1/review/dashboard?timeZoneId=...` returns overall stats for
   the authenticated learner.
-- `GET /api/v1/flashcards/dashboard/{boardId}?timeZoneId=...` returns stats
+- `GET /api/v1/review/dashboard/{boardId}?timeZoneId=...` returns stats
   scoped to one owned board and `404`s for missing or foreign boards.
 - Dashboard totals derive from page decks plus dedicated review-state rows so
   each vocabulary word is counted once.

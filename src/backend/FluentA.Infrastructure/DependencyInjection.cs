@@ -7,6 +7,8 @@ using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Pomodoro;
+using FluentA.Application.BoundedContexts.Practice;
+using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
@@ -23,6 +25,8 @@ using FluentA.Infrastructure.Journal;
 using FluentA.Infrastructure.Kanban;
 using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Pomodoro;
+using FluentA.Infrastructure.Practice;
+using FluentA.Infrastructure.Review;
 using FluentA.Infrastructure.Todo;
 using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
@@ -96,7 +100,15 @@ public static class DependencyInjection
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFlashcardRepository, EfFlashcardRepository>();
+        services.AddScoped<IPracticeRepository, EfPracticeRepository>();
+        services.AddScoped<IReviewRepository, EfReviewRepository>();
         services.AddScoped<IFlashcardService, FlashcardService>();
+        services.AddScoped<IPracticeService, PracticeService>();
+        services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IReviewEnrollmentPort>(provider => provider.GetRequiredService<IReviewService>() as IReviewEnrollmentPort
+            ?? throw new InvalidOperationException("Review service must implement review enrollment."));
+        services.AddScoped<IFlashcardVocabularySyncPort, EfFlashcardVocabularySyncPort>();
+        services.AddScoped<IVocabularyReviewCleanupPort, EfVocabularyReviewCleanupPort>();
         services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();

@@ -1,4 +1,3 @@
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
 namespace FluentA.Application.BoundedContexts.Vocabulary;
@@ -13,9 +12,8 @@ public interface IVocabularyRepository
     Task<IReadOnlyList<VocabCustomColumn>> ListCustomColumnsAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VocabCustomValue>> ListCustomValuesAsync(IEnumerable<Guid> wordIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VocabColumnVisibility>> ListColumnVisibilityAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Guid>> ListActiveDeckIdsAsync(Guid boardId, Guid pageId, CancellationToken cancellationToken = default);
     Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default);
-    Task AddPageWithDeckAsync(VocabPage page, FlashcardDeck deck, CancellationToken cancellationToken = default);
+    Task AddPageAsync(VocabPage page, CancellationToken cancellationToken = default);
     Task AddWordAsync(VocabWord word, IReadOnlyList<VocabCustomValue>? customValues = null, CancellationToken cancellationToken = default);
     Task AddCustomColumnAsync(VocabCustomColumn column, CancellationToken cancellationToken = default);
     Task ReplaceColumnVisibilityAsync(Guid userId, Guid boardId, IReadOnlyList<VocabColumnVisibility> preferences, CancellationToken cancellationToken = default);
@@ -28,4 +26,5 @@ public interface IVocabularyRepository
     Task SoftDeleteBoardAsync(VocabBoard board, CancellationToken cancellationToken = default);
     Task SoftDeletePageAsync(VocabPage page, CancellationToken cancellationToken = default);
     Task SoftDeleteWordAsync(VocabWord word, CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

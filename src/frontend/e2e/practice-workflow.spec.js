@@ -132,7 +132,7 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   await completeMeaningToWordPractice(page);
 
   const finishSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Finish' }).click();
   const finishSummaryPayload = (await (await finishSummaryResponsePromise).json()).data;
   expect(finishSummaryPayload.totalCards).toBe(2);
@@ -147,7 +147,7 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   await completeMeaningToWordPractice(page);
 
   const addSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/flashcards/practice-sessions') && response.request().method() === 'POST');
+    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
   const addToReviewResponsePromise = page.waitForResponse((response) =>
     response.url().endsWith('/api/v1/practice/add-to-review') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Add to Review' }).click();
