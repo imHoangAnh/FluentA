@@ -18,6 +18,7 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
         builder.Property(state => state.Id).HasColumnName("id");
         builder.Property(state => state.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(state => state.WordId).HasColumnName("word_id").IsRequired();
+        builder.Property(state => state.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(state => state.Level).HasColumnName("level").IsRequired();
         builder.Property(state => state.NextReviewDate).HasColumnName("next_review_date").IsRequired();
         builder.Property(state => state.LapseCount).HasColumnName("lapse_count").IsRequired();
@@ -31,7 +32,7 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
             .HasForeignKey(state => state.WordId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(state => state.WordId).IsUnique();
+        builder.HasIndex(state => new { state.UserId, state.WordId }).IsUnique();
         builder.HasIndex(state => new { state.UserId, state.NextReviewDate })
             .HasFilter("deleted_at IS NULL");
     }

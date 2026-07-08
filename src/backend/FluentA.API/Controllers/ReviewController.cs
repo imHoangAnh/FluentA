@@ -80,6 +80,22 @@ public sealed class ReviewController : ControllerBase
             : ToErrorResult(result);
     }
 
+    [HttpGet("level-five")]
+    public async Task<IActionResult> ListLevelFiveWords(CancellationToken cancellationToken)
+    {
+        var items = await _review.ListLevelFiveWordsAsync(CurrentUserId(), cancellationToken);
+        return Ok(ApiEnvelope<IReadOnlyList<LevelFiveReviewItemDto>>.Ok(items));
+    }
+
+    [HttpPost("level-five/remove")]
+    public async Task<IActionResult> RemoveLevelFiveWords(RemoveLevelFiveWordsRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _review.RemoveLevelFiveWordsAsync(CurrentUserId(), request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<int>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     private Guid CurrentUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

@@ -7,7 +7,7 @@ public interface IPracticeRepository
 {
     Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
         PracticeMode mode,
         int totalCards,
         int correctCards,

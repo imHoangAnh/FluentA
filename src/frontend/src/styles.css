@@ -749,17 +749,21 @@ a {
   outline: none;
 }
 .journal-editor-inner .journal-toolbar {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 .journal-editor-inner .journal-rich-text-content {
   padding: 0;
   min-height: 400px;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .journal-toolbar {
+  align-items: center;
   display: flex;
   gap: 4px;
+  row-gap: 8px;
 }
 
 .journal-toolbar-button {
@@ -776,6 +780,23 @@ a {
   padding: 6px;
 }
 
+.journal-toolbar-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.journal-toolbar-zoom {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 32px;
+  min-width: 48px;
+  padding: 6px 8px;
+}
+
 .journal-toolbar-button:hover,
 .journal-toolbar-button--active {
   background: #ffffff;
@@ -790,10 +811,14 @@ a {
 
 .journal-rich-text-content {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 500;
+  font-family: "Open Sans", "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.7;
   outline: none;
+  transform: scale(var(--journal-editor-zoom, 1));
+  transform-origin: top left;
+  width: calc(100% / var(--journal-editor-zoom, 1));
 }
 
 .journal-rich-text-content > :first-child {
@@ -806,8 +831,27 @@ a {
 
 .journal-rich-text-content h1,
 .journal-rich-text-content h2,
-.journal-rich-text-content h3 {
+.journal-rich-text-content h3,
+.journal-rich-text-content h4 {
   line-height: 1.2;
+}
+
+.journal-rich-text-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.journal-rich-text-content ul[data-type="taskList"] li {
+  display: flex;
+  gap: 10px;
+}
+
+.journal-rich-text-content ul[data-type="taskList"] li > label {
+  margin-top: 3px;
+}
+
+.journal-rich-text-content ul[data-type="taskList"] li > div {
+  flex: 1;
 }
 
 .journal-rich-text-content blockquote {
@@ -5810,7 +5854,7 @@ a {
   border-color: var(--teal);
 }
 
-.kanban-card-tags-row {
+.kanban-card-meta-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;

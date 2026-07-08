@@ -123,6 +123,8 @@ public sealed class VocabularyTests
         var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
         var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), nextReviewDate);
 
+        Assert.Equal(WordReviewStatus.Active, state.Status);
+
         var reviewedAt = DateTime.UtcNow;
         state.ApplyResult(1, nextReviewDate.AddDays(1), 0, reviewedAt);
 
@@ -131,20 +133,35 @@ public sealed class VocabularyTests
     }
 
     [Fact]
+    public void WordReviewState_ReactivatesInactiveWordsAtLevelZero()
+    {
+        var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
+        var reactivatedDate = nextReviewDate.AddDays(3);
+        var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), nextReviewDate);
+
+        state.ApplyResult(4, nextReviewDate.AddDays(10), 2, DateTime.UtcNow);
+        state.Deactivate();
+        state.ReactivateLevelZero(reactivatedDate);
+
+        Assert.Equal(WordReviewStatus.Active, state.Status);
+        Assert.Equal(0, state.Level);
+        Assert.Equal(reactivatedDate, state.NextReviewDate);
+        Assert.Null(state.LastReviewedAt);
+    }
+
+    [Fact]
     public void TodoItem_ValidatesAndTracksLifecycle()
     {
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
-        var today = DateTime.UtcNow.Date;
-        var item = TodoItem.Create(Guid.NewGuid(), " Review IELTS ", yesterday, " Unit 3 ", 0);
+        var item = TodoItem.Create(Guid.NewGuid(), " Review IELTS ", yesterday, " Unit 3 ");
 
         item.Rename("Review HSK");
         item.UpdateNote("tones");
         item.SetCompleted(true, DateTime.UtcNow);
         item.SetCompleted(false, DateTime.UtcNow);
-        var carried = item.CarryOver(today);
 
         Assert.Equal("Review HSK", item.Title);
         Assert.Equal("tones", item.Note);
-        Assert.True(carried);
+        Assert.False(item.IsCompleted);
     }
 }

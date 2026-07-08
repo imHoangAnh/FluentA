@@ -2,7 +2,6 @@ using System.Globalization;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Review;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Infrastructure.Persistence;
@@ -21,60 +20,59 @@ public sealed class EfReviewRepository : IReviewRepository
 
     public async Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
+        Guid wordId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var deck = await (
-            from flashcardDeck in _dbContext.FlashcardDecks
-            join board in _dbContext.Boards on flashcardDeck.BoardId equals board.Id
-            where flashcardDeck.Id == deckId
-                && flashcardDeck.UserId == userId
-                && flashcardDeck.Type == DeckType.PageDeck
-                && flashcardDeck.DeletedAt == null
+        var pageWord = await (
+            from word in _dbContext.Words
+            join pageEntity in _dbContext.Pages on word.PageId equals pageEntity.Id
+            join board in _dbContext.Boards on pageEntity.BoardId equals board.Id
+            where pageEntity.Id == pageId
+                && word.Id == wordId
+                && board.UserId == userId
+                && word.DeletedAt == null
+                && pageEntity.DeletedAt == null
                 && board.DeletedAt == null
             select new
             {
-                flashcardDeck.Id,
-                flashcardDeck.UserId,
+                pageEntity.Id,
+                WordId = word.Id,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (deck is null)
+        if (pageWord is null)
         {
             return null;
         }
 
-        var wordIds = await _dbContext.FlashcardCards
-            .AsNoTracking()
-            .Where(card => card.DeckId == deck.Id && card.DeletedAt == null)
-            .Select(card => card.WordId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (wordIds.Count == 0)
-        {
-            return new AddPracticeWordsToReviewDto(deck.Id, 0, ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone));
-        }
-
-        var existingWordIds = await _dbContext.WordReviewStates
-            .Where(state => state.UserId == userId && state.DeletedAt == null && wordIds.Contains(state.WordId))
-            .Select(state => state.WordId)
-            .ToListAsync(cancellationToken);
-
-        var missingWordIds = wordIds.Except(existingWordIds).ToList();
         var nextReviewDate = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
-
-        foreach (var wordId in missingWordIds)
-        {
-            await _dbContext.WordReviewStates.AddAsync(
-                WordReviewState.CreateLevelZero(userId, wordId, nextReviewDate),
+        var existingState = await _dbContext.WordReviewStates
+            .SingleOrDefaultAsync(
+                state => state.UserId == userId
+                    && state.WordId == pageWord.WordId
+                    && state.DeletedAt == null,
                 cancellationToken);
+
+        if (existingState is not null)
+        {
+            if (existingState.Status == WordReviewStatus.Active)
+            {
+                return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "alreadyInReview", existingState.NextReviewDate);
+            }
+
+            existingState.ReactivateLevelZero(nextReviewDate);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
         }
 
+        await _dbContext.WordReviewStates.AddAsync(
+            WordReviewState.CreateLevelZero(userId, pageWord.WordId, nextReviewDate),
+            cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return new AddPracticeWordsToReviewDto(deck.Id, missingWordIds.Count, nextReviewDate);
+        return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
     }
 
     public async Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
@@ -82,6 +80,7 @@ public sealed class EfReviewRepository : IReviewRepository
         Guid boardId,
         string orderType,
         string mode,
+        string startBehavior,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         Guid sessionId,
@@ -103,6 +102,57 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
+        var localToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
+        var sessionDate = DateOnly.FromDateTime(localToday);
+        var activeSession = await _dbContext.ReviewSessions
+            .SingleOrDefaultAsync(
+                session => session.UserId == userId
+                    && session.BoardId == boardId
+                    && session.Status == ReviewSessionStatus.Active
+                    && session.DeletedAt == null,
+                cancellationToken);
+
+        if (activeSession is not null)
+        {
+            if (activeSession.SessionDate == sessionDate)
+            {
+                var remainingCount = await CountRemainingSessionItemsAsync(activeSession.Id, cancellationToken);
+                if (startBehavior == "prompt")
+                {
+                    return new ReviewSessionCreatedDto(
+                        activeSession.Id,
+                        board.Id,
+                        board.Name,
+                        activeSession.OrderType,
+                        mode,
+                        "prompt",
+                        activeSession.StartedAt,
+                        remainingCount,
+                        new ReviewStartOptionsDto(true, activeSession.Id, remainingCount, true),
+                        []);
+                }
+
+                if (startBehavior == "continue")
+                {
+                    return await BuildSessionDtoAsync(
+                        activeSession,
+                        board.Name,
+                        board.Language,
+                        mode,
+                        includeReviewed: false,
+                        startDisposition: "continued",
+                        startOptions: new ReviewStartOptionsDto(true, activeSession.Id, remainingCount, false),
+                        cancellationToken);
+                }
+
+                activeSession.Replace();
+            }
+            else
+            {
+                activeSession.Replace();
+            }
+        }
+
         var (_, endUtc) = ReviewTime.LocalDayBoundsUtc(utcNow, timeZone);
         var settings = await _dbContext.ReviewSettings
             .AsNoTracking()
@@ -113,31 +163,29 @@ public sealed class EfReviewRepository : IReviewRepository
             from state in _dbContext.WordReviewStates
             join word in _dbContext.Words on state.WordId equals word.Id
             join page in _dbContext.Pages on word.PageId equals page.Id
-            join deck in _dbContext.FlashcardDecks on page.Id equals deck.PageId
-            join card in _dbContext.FlashcardCards on new { DeckId = deck.Id, WordId = word.Id } equals new { card.DeckId, card.WordId }
+            join boardEntity in _dbContext.Boards on page.BoardId equals boardEntity.Id
             where page.BoardId == boardId
                 && state.UserId == userId
-                && deck.UserId == userId
-                && deck.Type == DeckType.PageDeck
+                && boardEntity.UserId == userId
                 && state.DeletedAt == null
+                && state.Status == WordReviewStatus.Active
                 && word.DeletedAt == null
                 && page.DeletedAt == null
-                && deck.DeletedAt == null
-                && card.DeletedAt == null
+                && boardEntity.DeletedAt == null
                 && state.NextReviewDate < endUtc
             select new
             {
                 state,
-                card.WordId,
-                card.Word,
-                card.WordClass,
-                card.MeaningVn,
-                card.MeaningEn,
-                card.Example,
-                card.Thesaurus,
-                card.Collocation,
-                card.Note,
-                card.CreatedAt
+                WordId = word.Id,
+                word.Word,
+                WordClass = word.Class,
+                MeaningVn = word.MeaningVn,
+                MeaningEn = word.Definition,
+                word.Example,
+                Thesaurus = word.Synonyms,
+                Collocation = word.Antonyms,
+                word.Note,
+                word.CreatedAt
             })
             .OrderBy(item => item.state.NextReviewDate)
             .ThenBy(item => item.CreatedAt)
@@ -161,10 +209,28 @@ public sealed class EfReviewRepository : IReviewRepository
             kept = kept.OrderBy(_ => Random.Shared.Next()).ToList();
         }
 
+        var reviewSession = ReviewSession.CreateActive(
+            userId,
+            board.Id,
+            orderType,
+            sessionDate,
+            utcNow);
+        await _dbContext.ReviewSessions.AddAsync(reviewSession, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var item in kept)
+        {
+            await _dbContext.ReviewSessionItems.AddAsync(
+                ReviewSessionItem.Create(reviewSession.Id, item.WordId),
+                cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
         var assignedModes = kept.Select(item => new ReviewSessionWordDto(
             item.WordId,
             item.Word,
-            item.WordClass,
+            item.WordClass.ToString(),
             item.MeaningVn,
             item.MeaningEn,
             item.Example,
@@ -174,12 +240,15 @@ public sealed class EfReviewRepository : IReviewRepository
             mode == "random" ? PickRandomReviewMode() : mode)).ToList();
 
         return new ReviewSessionCreatedDto(
-            sessionId,
+            reviewSession.Id,
             board.Id,
             board.Name,
             orderType,
             mode,
+            "started",
+            reviewSession.StartedAt,
             assignedModes.Count,
+            new ReviewStartOptionsDto(false, null, assignedModes.Count, false),
             assignedModes);
     }
 
@@ -275,11 +344,11 @@ public sealed class EfReviewRepository : IReviewRepository
 
         var (startUtc, endUtc) = ReviewTime.LocalDayBoundsUtc(utcNow, timeZone);
         var localToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
-        var pageDeckCards = QueryActivePageDeckCards(userId, boardId);
+        var activeWords = QueryActiveBoardWords(userId, boardId);
         var reviewStates = QueryActiveReviewStates(userId, boardId);
         var reviews = QueryActiveReviewHistories(userId, boardId);
 
-        var totalCards = await pageDeckCards.CountAsync(cancellationToken);
+        var totalCards = await activeWords.CountAsync(cancellationToken);
         var reviewStateCount = await reviewStates.CountAsync(cancellationToken);
         var overdue = await reviewStates.CountAsync(state => state.NextReviewDate < startUtc, cancellationToken);
         var dueToday = await reviewStates.CountAsync(
@@ -357,10 +426,39 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
+        var reviewSession = await _dbContext.ReviewSessions
+            .SingleOrDefaultAsync(
+                session => session.Id == sessionId
+                    && session.UserId == userId
+                    && session.Status == ReviewSessionStatus.Active
+                    && session.DeletedAt == null,
+                cancellationToken);
+        if (reviewSession is null)
+        {
+            return null;
+        }
+
+        var sessionItem = await _dbContext.ReviewSessionItems
+            .SingleOrDefaultAsync(
+                item => item.ReviewSessionId == sessionId
+                    && item.VocabWordId == wordId
+                    && !item.IsReviewed
+                    && item.DeletedAt == null,
+                cancellationToken);
+        if (sessionItem is null)
+        {
+            return null;
+        }
+
         var reviewedAt = DateTime.UtcNow;
         var (_, endUtc) = ReviewTime.LocalDayBoundsUtc(reviewedAt, timeZone);
         var reviewState = await _dbContext.WordReviewStates
-            .SingleOrDefaultAsync(state => state.UserId == userId && state.WordId == owned.WordId && state.DeletedAt == null, cancellationToken);
+            .SingleOrDefaultAsync(
+                state => state.UserId == userId
+                    && state.WordId == owned.WordId
+                    && state.DeletedAt == null
+                    && state.Status == WordReviewStatus.Active,
+                cancellationToken);
         if (reviewState is null || reviewState.NextReviewDate >= endUtc)
         {
             return null;
@@ -384,6 +482,24 @@ public sealed class EfReviewRepository : IReviewRepository
             schedule.LevelAfter,
             nextReviewDate);
         await _dbContext.WordReviewHistories.AddAsync(review, cancellationToken);
+        sessionItem.MarkReviewed();
+
+        var remainingItems = await _dbContext.ReviewSessionItems
+            .CountAsync(
+                item => item.ReviewSessionId == sessionId
+                    && !item.IsReviewed
+                    && item.DeletedAt == null,
+                cancellationToken);
+        if (remainingItems == 0)
+        {
+            await DeferRemainingDueWordsAsync(
+                reviewSession.UserId,
+                reviewSession.BoardId,
+                reviewSession.SessionDate,
+                cancellationToken);
+            reviewSession.Complete(reviewedAt);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return new ReviewResultDto(
@@ -394,6 +510,58 @@ public sealed class EfReviewRepository : IReviewRepository
             schedule.LevelAfter,
             schedule.LapseCountAfter,
             nextReviewDate);
+    }
+
+    public async Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await (
+            from state in _dbContext.WordReviewStates.AsNoTracking()
+            join word in _dbContext.Words.AsNoTracking() on state.WordId equals word.Id
+            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+            where state.UserId == userId
+                && state.DeletedAt == null
+                && state.Level == 5
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.DeletedAt == null
+            orderby state.Status == WordReviewStatus.Active descending, state.LastReviewedAt descending
+            select new LevelFiveReviewItemDto(
+                word.Id,
+                word.Word,
+                board.Id,
+                board.Name,
+                page.Id,
+                page.Name,
+                state.Status == WordReviewStatus.Active ? "active" : "inactive",
+                state.LastReviewedAt))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> RemoveLevelFiveWordsAsync(
+        Guid userId,
+        IReadOnlyList<Guid> wordIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = wordIds.Distinct().ToList();
+        var states = await _dbContext.WordReviewStates
+            .Where(state =>
+                state.UserId == userId
+                && state.DeletedAt == null
+                && state.Level == 5
+                && state.Status == WordReviewStatus.Active
+                && ids.Contains(state.WordId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var state in states)
+        {
+            state.Deactivate();
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return states.Count;
     }
 
     private static string PickRandomReviewMode()
@@ -407,17 +575,124 @@ public sealed class EfReviewRepository : IReviewRepository
         };
     }
 
-    private IQueryable<FlashcardCard> QueryActivePageDeckCards(Guid userId, Guid? boardId) =>
-        from card in _dbContext.FlashcardCards.AsNoTracking()
-        join deck in _dbContext.FlashcardDecks.AsNoTracking() on card.DeckId equals deck.Id
-        join board in _dbContext.Boards.AsNoTracking() on deck.BoardId equals board.Id
-        where deck.UserId == userId
-            && deck.Type == DeckType.PageDeck
-            && deck.DeletedAt == null
-            && card.DeletedAt == null
+    private async Task<ReviewSessionCreatedDto> BuildSessionDtoAsync(
+        ReviewSession session,
+        string boardName,
+        string boardLanguage,
+        string mode,
+        bool includeReviewed,
+        string startDisposition,
+        ReviewStartOptionsDto startOptions,
+        CancellationToken cancellationToken)
+    {
+        var itemsQuery =
+            from item in _dbContext.ReviewSessionItems.AsNoTracking()
+            join word in _dbContext.Words.AsNoTracking() on item.VocabWordId equals word.Id
+            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+            where item.ReviewSessionId == session.Id
+                && item.DeletedAt == null
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.DeletedAt == null
+                && (includeReviewed || !item.IsReviewed)
+            select new
+            {
+                item.Id,
+                item.IsReviewed,
+                WordId = word.Id,
+                word.Word,
+                WordClass = word.Class,
+                MeaningVn = word.MeaningVn,
+                MeaningEn = word.Definition,
+                word.Example,
+                Thesaurus = word.Synonyms,
+                Collocation = word.Antonyms,
+                word.Note,
+            };
+
+        var items = await itemsQuery.ToListAsync(cancellationToken);
+        var orderedItems = session.OrderType == "shuffle"
+            ? items.OrderBy(_ => Random.Shared.Next()).ToList()
+            : items;
+
+        var words = orderedItems.Select(item => new ReviewSessionWordDto(
+            item.WordId,
+            item.Word,
+            item.WordClass.ToString(),
+            item.MeaningVn,
+            item.MeaningEn ?? string.Empty,
+            item.Example,
+            item.Thesaurus,
+            item.Collocation,
+            item.Note,
+            mode == "random" ? PickRandomReviewMode() : mode)).ToList();
+
+        return new ReviewSessionCreatedDto(
+            session.Id,
+            session.BoardId,
+            boardName,
+            session.OrderType,
+            mode,
+            startDisposition,
+            session.StartedAt,
+            words.Count,
+            startOptions,
+            words);
+    }
+
+    private Task<int> CountRemainingSessionItemsAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        _dbContext.ReviewSessionItems
+            .AsNoTracking()
+            .CountAsync(
+                item => item.ReviewSessionId == sessionId
+                    && !item.IsReviewed
+                    && item.DeletedAt == null,
+                cancellationToken);
+
+    private async Task DeferRemainingDueWordsAsync(
+        Guid userId,
+        Guid boardId,
+        DateOnly sessionDate,
+        CancellationToken cancellationToken)
+    {
+        var tomorrow = sessionDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var states = await (
+            from state in _dbContext.WordReviewStates
+            join word in _dbContext.Words on state.WordId equals word.Id
+            join page in _dbContext.Pages on word.PageId equals page.Id
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where state.UserId == userId
+                && board.Id == boardId
+                && state.DeletedAt == null
+                && state.Status == WordReviewStatus.Active
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.DeletedAt == null
+            select state)
+            .ToListAsync(cancellationToken);
+
+        foreach (var state in states)
+        {
+            var localTime = TimeOnly.FromDateTime(state.NextReviewDate);
+            var moved = DateTime.SpecifyKind(tomorrow.Add(localTime.ToTimeSpan()), DateTimeKind.Utc);
+            if (state.NextReviewDate < moved)
+            {
+                state.MoveDueDate(moved);
+            }
+        }
+    }
+
+    private IQueryable<Guid> QueryActiveBoardWords(Guid userId, Guid? boardId) =>
+        from word in _dbContext.Words.AsNoTracking()
+        join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+        join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+        where board.UserId == userId
+            && word.DeletedAt == null
+            && page.DeletedAt == null
             && board.DeletedAt == null
-            && (!boardId.HasValue || deck.BoardId == boardId.Value)
-        select card;
+            && (!boardId.HasValue || board.Id == boardId.Value)
+        select word.Id;
 
     private IQueryable<WordReviewState> QueryActiveReviewStates(Guid userId, Guid? boardId) =>
         from state in _dbContext.WordReviewStates.AsNoTracking()
@@ -427,6 +702,7 @@ public sealed class EfReviewRepository : IReviewRepository
         where board.UserId == userId
             && state.UserId == userId
             && state.DeletedAt == null
+            && state.Status == WordReviewStatus.Active
             && word.DeletedAt == null
             && page.DeletedAt == null
             && board.DeletedAt == null

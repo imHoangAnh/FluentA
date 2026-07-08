@@ -17,12 +17,13 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 
     public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
+        Guid wordId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        return _repository.AddPracticeWordsToReviewAsync(userId, deckId, timeZone, utcNow, cancellationToken);
+        return _repository.AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
     }
 
     public async Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
@@ -46,6 +47,11 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             errors["mode"] = ["Mode must be dictation, pronunciation, meaningToWord, or random."];
         }
 
+        if (!IsAllowedStartBehavior(request.StartBehavior))
+        {
+            errors["startBehavior"] = ["Start behavior must be prompt, continue, or replace."];
+        }
+
         if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
         {
             errors["timeZoneId"] = ["A valid browser timezone id is required."];
@@ -61,6 +67,7 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             request.BoardId,
             request.OrderType,
             request.Mode,
+            request.StartBehavior,
             timeZone!,
             DateTime.UtcNow,
             Guid.NewGuid(),
@@ -179,6 +186,28 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
         return OperationResult<ReviewResultDto>.Success(result);
     }
 
+    public Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        _repository.ListLevelFiveWordsAsync(userId, cancellationToken);
+
+    public async Task<OperationResult<int>> RemoveLevelFiveWordsAsync(
+        Guid userId,
+        RemoveLevelFiveWordsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.WordIds is null || request.WordIds.Count == 0)
+        {
+            return OperationResult<int>.Failure(ReviewError.Validation(new Dictionary<string, string[]>
+            {
+                ["wordIds"] = ["At least one Level 5 word is required."]
+            }));
+        }
+
+        var removed = await _repository.RemoveLevelFiveWordsAsync(userId, request.WordIds, cancellationToken);
+        return OperationResult<int>.Success(removed);
+    }
+
     private static Dictionary<string, string[]> ValidateSettings(UpdateReviewSettingsRequest request)
     {
         var errors = new Dictionary<string, string[]>();
@@ -195,4 +224,7 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 
     private static bool IsAllowedReviewMode(string? value) =>
         value is "dictation" or "pronunciation" or "meaningToWord" or "random";
+
+    private static bool IsAllowedStartBehavior(string? value) =>
+        value is "prompt" or "continue" or "replace";
 }

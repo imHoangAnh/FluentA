@@ -1,6 +1,5 @@
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +17,7 @@ public sealed class EfPracticeRepository : IPracticeRepository
 
     public async Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
         PracticeMode mode,
         int totalCards,
         int correctCards,
@@ -27,44 +26,56 @@ public sealed class EfPracticeRepository : IPracticeRepository
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var deck = await (
-            from flashcardDeck in _dbContext.FlashcardDecks
-            join board in _dbContext.Boards on flashcardDeck.BoardId equals board.Id
-            where flashcardDeck.Id == deckId
-                && flashcardDeck.UserId == userId
-                && flashcardDeck.Type == DeckType.PageDeck
-                && flashcardDeck.DeletedAt == null
+        var page = await (
+            from pageEntity in _dbContext.Pages
+            join board in _dbContext.Boards on pageEntity.BoardId equals board.Id
+            where pageEntity.Id == pageId
+                && board.UserId == userId
+                && pageEntity.DeletedAt == null
                 && board.DeletedAt == null
             select new
             {
-                flashcardDeck.Id,
-                flashcardDeck.UserId,
+                pageEntity.Id,
+                board.UserId,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (deck is null)
+        if (page is null)
         {
-            return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.DeckNotFound, null);
+            return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.PageNotFound, null);
         }
 
-        var actualCardCount = await _dbContext.FlashcardCards
+        var actualCardCount = await _dbContext.Words
             .AsNoTracking()
-            .CountAsync(card => card.DeckId == deck.Id && card.DeletedAt == null, cancellationToken);
+            .CountAsync(word => word.PageId == page.Id && word.DeletedAt == null, cancellationToken);
 
         if (actualCardCount != totalCards || correctCards < 0 || wrongCards < 0 || correctCards + wrongCards != totalCards)
         {
             return new PracticeSessionSummarySaveResult(PracticeSessionSummarySaveStatus.InconsistentSummary, null);
         }
 
-        var summary = PracticeSessionSummary.Create(
-            deck.UserId,
-            deck.Id,
-            mode,
-            totalCards,
-            correctCards,
-            wrongCards,
-            DateTime.UtcNow);
-        await _dbContext.PracticeSessionSummaries.AddAsync(summary, cancellationToken);
+        var summary = await _dbContext.PracticeSessionSummaries
+            .Where(item => item.UserId == userId && item.PageId == page.Id && item.DeletedAt == null)
+            .OrderBy(item => item.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (summary is null)
+        {
+            summary = PracticeSessionSummary.Create(
+                page.UserId,
+                page.Id,
+                mode,
+                totalCards,
+                correctCards,
+                wrongCards,
+                utcNow);
+            await _dbContext.PracticeSessionSummaries.AddAsync(summary, cancellationToken);
+        }
+        else
+        {
+            summary.UpdateCompletion(mode, totalCards, correctCards, wrongCards, utcNow);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return new PracticeSessionSummarySaveResult(
@@ -72,7 +83,7 @@ public sealed class EfPracticeRepository : IPracticeRepository
             new PracticeSessionSummaryDto(
                 summary.Id,
                 summary.UserId,
-                summary.DeckId,
+                summary.PageId,
                 summary.Mode switch
                 {
                     PracticeMode.Dictation => "dictation",

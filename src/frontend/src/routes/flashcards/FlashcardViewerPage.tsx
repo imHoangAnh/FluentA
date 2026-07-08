@@ -7,22 +7,22 @@ import { getLanguageProfile } from '../../lib/language'
 import { useAuthStore } from '../../stores/authStore'
 
 export function FlashcardViewerPage() {
-  const { deckId = '' } = useParams()
-  return <FlashcardViewerPageContent key={deckId} deckId={deckId} />
+  const { pageId = '' } = useParams()
+  return <FlashcardViewerPageContent key={pageId} pageId={pageId} />
 }
 
-function FlashcardViewerPageContent({ deckId }: { deckId: string }) {
+function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
   const logout = useAuthStore((state) => state.logout)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
 
   const sessionQuery = useQuery({
-    queryKey: ['flashcard', 'deck-session', deckId],
-    queryFn: () => flashcardApi.getDeckSession(deckId),
-    enabled: Boolean(deckId),
+    queryKey: ['flashcard', 'page-session', pageId],
+    queryFn: () => flashcardApi.getPageSession(pageId),
+    enabled: Boolean(pageId),
   })
 
-  const cards = sessionQuery.data?.cards ?? []
+  const cards = sessionQuery.data?.words ?? []
   const currentCard = cards[currentIndex] ?? null
   const secondaryMeaningLabel = getLanguageProfile(sessionQuery.data?.boardLanguage).secondaryMeaningLabel
   const isFinalCard = currentIndex + 1 >= cards.length
@@ -63,13 +63,13 @@ function FlashcardViewerPageContent({ deckId }: { deckId: string }) {
       </header>
 
       {sessionQuery.isLoading ? <p className="flashcard-status">Loading flashcard viewer...</p> : null}
-      {sessionQuery.isError ? <p className="flashcard-status flashcard-status--error">This deck is unavailable.</p> : null}
+      {sessionQuery.isError ? <p className="flashcard-status flashcard-status--error">This page is unavailable.</p> : null}
 
       {sessionQuery.data && cards.length === 0 ? (
         <section className="review-setup">
           <span className="preview-label">Flashcard viewer</span>
-          <h1>{sessionQuery.data.deckName}</h1>
-          <p>This page deck has no synchronized words yet.</p>
+          <h1>{sessionQuery.data.pageName}</h1>
+          <p>This page has no words yet.</p>
           <Link className="primary-button" to="/flashcards">Finish</Link>
         </section>
       ) : null}
@@ -86,8 +86,8 @@ function FlashcardViewerPageContent({ deckId }: { deckId: string }) {
 
           <div className="flashcard-viewer__header">
             <div>
-              <span className="preview-label">Page deck</span>
-              <h1>{sessionQuery.data.deckName}</h1>
+              <span className="preview-label">Vocabulary Page</span>
+              <h1>{sessionQuery.data.pageName}</h1>
             </div>
             <p>Click the card to flip between prompt and answer.</p>
           </div>
@@ -137,7 +137,7 @@ function FlashcardViewerPageContent({ deckId }: { deckId: string }) {
             {isFinalCard ? (
               <div className="flashcard-viewer__final-actions">
                 <Link className="secondary-button" to="/flashcards">Finish</Link>
-                <Link className="primary-button" to={`/flashcards/decks/${deckId}/practice`}>Let's practice</Link>
+                <Link className="primary-button" to={`/flashcards/pages/${pageId}/practice`}>Let's practice</Link>
               </div>
             ) : (
               <button className="primary-button" type="button" onClick={goNext}>

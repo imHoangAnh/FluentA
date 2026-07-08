@@ -21,9 +21,9 @@ public sealed class PracticeService : IPracticeService
         CancellationToken cancellationToken = default)
     {
         var errors = new Dictionary<string, string[]>();
-        if (request.DeckId == Guid.Empty)
+        if (request.PageId == Guid.Empty)
         {
-            errors["deckId"] = ["Deck id is required."];
+            errors["pageId"] = ["Page id is required."];
         }
 
         if (!TryParsePracticeMode(request.Mode, out var mode))
@@ -63,7 +63,7 @@ public sealed class PracticeService : IPracticeService
 
         var result = await _repository.CreatePracticeSessionSummaryAsync(
             userId,
-            request.DeckId,
+            request.PageId,
             mode,
             request.TotalCards,
             request.CorrectCards,
@@ -75,7 +75,7 @@ public sealed class PracticeService : IPracticeService
         return result.Status switch
         {
             PracticeSessionSummarySaveStatus.Success => OperationResult<PracticeSessionSummaryDto>.Success(result.Summary!),
-            PracticeSessionSummarySaveStatus.DeckNotFound => OperationResult<PracticeSessionSummaryDto>.Failure(PracticeError.DeckOrCardNotFound()),
+            PracticeSessionSummarySaveStatus.PageNotFound => OperationResult<PracticeSessionSummaryDto>.Failure(PracticeError.DeckOrCardNotFound()),
             PracticeSessionSummarySaveStatus.InconsistentSummary => OperationResult<PracticeSessionSummaryDto>.Failure(PracticeError.Validation(new Dictionary<string, string[]>
             {
                 ["summary"] = ["Practice summary does not match the owned active deck."]
@@ -93,9 +93,14 @@ public sealed class PracticeService : IPracticeService
         CancellationToken cancellationToken = default)
     {
         var errors = new Dictionary<string, string[]>();
-        if (request.DeckId == Guid.Empty)
+        if (request.PageId == Guid.Empty)
         {
-            errors["deckId"] = ["Deck id is required."];
+            errors["pageId"] = ["Page id is required."];
+        }
+
+        if (request.WordId == Guid.Empty)
+        {
+            errors["wordId"] = ["Word id is required."];
         }
 
         if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
@@ -110,7 +115,8 @@ public sealed class PracticeService : IPracticeService
 
         var result = await _reviewEnrollment.EnrollMissingPracticeWordsAsync(
             userId,
-            request.DeckId,
+            request.PageId,
+            request.WordId,
             timeZone!,
             DateTime.UtcNow,
             cancellationToken);

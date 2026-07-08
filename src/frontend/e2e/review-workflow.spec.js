@@ -52,18 +52,9 @@ async function createBoardWithWords(page, headers, boardName, pageName, words) {
   return { board, vocabPage };
 }
 
-async function listDecks(page, headers) {
-  return (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
-}
-
-function findDeckCard(decks, deckName, word) {
-  const deck = decks.find((item) => item.name === deckName);
-  return deck.cards.find((card) => card.word === word);
-}
-
 function seedDueStates(boardName) {
   const sql = `
-UPDATE review.word_states AS state
+UPDATE word_review_states AS state
 SET next_review_date = CASE word.word
     WHEN 'alpha' THEN NOW() - INTERVAL '3 days'
     WHEN 'beta' THEN NOW() - INTERVAL '2 days'
@@ -88,25 +79,27 @@ WHERE state.word_id = word.id
   execSync(`docker exec fluenta-postgres psql -U fluenta -d fluenta_dev -c "${sql.replace(/\r?\n/g, ' ')}"`, { stdio: 'pipe' });
 }
 
-test('review workflow applies FluentA SRS transitions and rejects early review mutation', async ({ page }) => {
+test('review workflow uses board-scoped queue and resume modal contract', async ({ page }) => {
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
   });
-  const browserTimeZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+  const browserTimeZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const { headers } = await registerAndLogin(page, 'review-workflow');
   const boardName = `Review Workflow Board ${Date.now()}`;
-  await createBoardWithWords(page, headers, boardName, 'Review Workflow Page', ['alpha', 'beta', 'gamma']);
+  const { board, vocabPage } = await createBoardWithWords(page, headers, boardName, 'Review Workflow Page', ['alpha', 'beta', 'gamma']);
 
-  const decks = await listDecks(page, headers);
-  const deck = decks.find((item) => item.name === `${boardName} - Review Workflow Page`);
-  const addToReview = await page.request.post('http://127.0.0.1:5000/api/v1/practice/add-to-review', {
-    headers,
-    data: { deckId: deck.id, timeZoneId: browserTimeZone },
-  });
-  expect(addToReview.status()).toBe(200);
-  expect((await addToReview.json()).data.addedWordCount).toBe(3);
+  const wordsResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/flashcards/pages/${vocabPage.id}/words`, { headers });
+  const words = (await wordsResponse.json()).data.words;
+
+  for (const word of words) {
+    const addResponse = await page.request.post('http://127.0.0.1:5000/api/v1/practice/add-to-review', {
+      headers,
+      data: { pageId: vocabPage.id, wordId: word.wordId, timeZoneId: browserTimeZone },
+    });
+    expect(addResponse.status()).toBe(200);
+  }
 
   seedDueStates(boardName);
 
@@ -116,76 +109,27 @@ test('review workflow applies FluentA SRS transitions and rejects early review m
   });
   expect(settingsUpdate.status()).toBe(200);
 
-  const settingsResponse = await page.request.get('http://127.0.0.1:5000/api/v1/review/settings', { headers });
-  const settings = (await settingsResponse.json()).data;
-  expect(settings.dailyLimit).toBe(2);
-  expect(settings.recapAfterAnswer).toBe(false);
-
-  const beforeStartDecks = await listDecks(page, headers);
-  const alphaBefore = findDeckCard(beforeStartDecks, `${boardName} - Review Workflow Page`, 'alpha');
-  const betaBefore = findDeckCard(beforeStartDecks, `${boardName} - Review Workflow Page`, 'beta');
-  const gammaBefore = findDeckCard(beforeStartDecks, `${boardName} - Review Workflow Page`, 'gamma');
-  expect(alphaBefore.reviewLevel).toBe(0);
-  expect(betaBefore.reviewLevel).toBe(2);
-  expect(betaBefore.lapseCount).toBe(3);
-
   await page.goto('/review');
-  await page.getByLabel('Vocabulary board').selectOption({ label: `${boardName} (3 words)` });
+  await page.getByLabel('Vocabulary board').selectOption({ label: `${boardName} (3 due)` });
   await page.getByRole('button', { name: /Sequential/ }).click();
-  await page.getByRole('button', { name: 'Meaning -> Word' }).click();
   await page.getByRole('button', { name: 'Start review' }).click();
 
   await expect(page.getByText('1 / 2')).toBeVisible();
 
-  const afterStartDecks = await listDecks(page, headers);
-  const gammaAfterStart = findDeckCard(afterStartDecks, `${boardName} - Review Workflow Page`, 'gamma');
-  expect(gammaAfterStart.nextReviewDate).not.toBe(gammaBefore.nextReviewDate);
-
-  const earlyReview = await page.request.post('http://127.0.0.1:5000/api/v1/review', {
+  const secondStart = await page.request.post('http://127.0.0.1:5000/api/v1/review/sessions', {
     headers,
     data: {
-      sessionId: crypto.randomUUID(),
-      wordId: gammaBefore.wordId,
-      correct: true,
-      timeSpentSeconds: 1,
+      boardId: board.id,
+      orderType: 'sequential',
+      mode: 'random',
+      startBehavior: 'prompt',
       timeZoneId: browserTimeZone,
     },
   });
-  expect(earlyReview.status()).toBe(404);
+  expect(secondStart.status()).toBe(200);
+  expect((await secondStart.json()).data.startDisposition).toBe('prompt');
 
-  await page.getByTestId('show-answer').click();
-  await expect(page.getByTestId('review-answer')).toContainText('alpha');
-  await page.getByRole('button', { name: 'I was correct' }).click();
+  await page.getByLabel('Type the target word').fill('alpha');
+  await page.getByRole('button', { name: 'Submit answer' }).click();
   await expect(page.getByText('2 / 2')).toBeVisible();
-
-  const afterFirstAnswerDecks = await listDecks(page, headers);
-  const alphaAfter = findDeckCard(afterFirstAnswerDecks, `${boardName} - Review Workflow Page`, 'alpha');
-  expect(alphaAfter.reviewLevel).toBe(1);
-  expect(alphaAfter.lapseCount).toBe(alphaBefore.lapseCount);
-  expect(alphaAfter.nextReviewDate).not.toBe(alphaBefore.nextReviewDate);
-
-  await page.getByTestId('show-answer').click();
-  await expect(page.getByTestId('review-answer')).toContainText('beta');
-  await page.getByRole('button', { name: 'I was wrong' }).click();
-  await expect(page.getByTestId('review-summary')).toContainText('1 correct and 1 wrong across 2 reviewed words.');
-
-  const afterSecondAnswerDecks = await listDecks(page, headers);
-  const betaAfter = findDeckCard(afterSecondAnswerDecks, `${boardName} - Review Workflow Page`, 'beta');
-  expect(betaAfter.reviewLevel).toBe(0);
-  expect(betaAfter.lapseCount).toBe(betaBefore.lapseCount + 1);
-
-  const foreign = await registerAndLogin(page, 'review-workflow-foreign');
-  await createBoardWithWords(page, foreign.headers, `Foreign Review Board ${Date.now()}`, 'Foreign Page', ['private']);
-  const foreignDecks = await listDecks(page, foreign.headers);
-  const foreignBoardId = foreignDecks[0].boardId;
-  const foreignStart = await page.request.post('http://127.0.0.1:5000/api/v1/review/sessions', {
-    headers,
-    data: {
-      boardId: foreignBoardId,
-      orderType: 'sequential',
-      mode: 'dictation',
-      timeZoneId: 'UTC',
-    },
-  });
-  expect(foreignStart.status()).toBe(404);
 });

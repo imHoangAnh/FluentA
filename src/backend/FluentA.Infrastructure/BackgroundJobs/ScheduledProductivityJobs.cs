@@ -4,6 +4,8 @@ using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
+using FluentA.Domain.BoundedContexts.Countdown.Entities;
 
 namespace FluentA.Infrastructure.BackgroundJobs;
 
@@ -12,24 +14,20 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
     private readonly IAssetService _assetService;
+    private readonly IAssetObjectStorage _assetStorage;
 
-    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService)
+    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService, IAssetObjectStorage assetStorage)
     {
         _dbContext = dbContext;
         _logger = logger;
         _assetService = assetService;
+        _assetStorage = assetStorage;
     }
 
     public async Task CarryOverTodosAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
-        var items = await _dbContext.TodoItems
-            .Where(item => item.DeletedAt == null && !item.IsCompleted && item.Date < today)
-            .ToListAsync(cancellationToken);
-
-        var changed = items.Count(item => item.CarryOver(today));
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("TodoCarryOverJob carried over {Count} tasks to {Date}.", changed, today);
+        await Task.CompletedTask;
+        _logger.LogInformation("TodoCarryOverJob skipped because carry-over is no longer part of the current Todo contract.");
     }
 
     public async Task SendHabitRemindersAsync(CancellationToken cancellationToken = default)
@@ -62,24 +60,83 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     public async Task ProcessCountdownAlertsAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        var countdowns = await _dbContext.CountdownEvents
-            .Where(countdown => countdown.DeletedAt == null
-                && countdown.AlertedAt == null
-                && countdown.TargetDate <= now)
+        var alerts = await _dbContext.CountdownAlerts
+            .Where(alert => alert.DeletedAt == null
+                && alert.FiredAtUtc == null
+                && alert.ScheduledAtUtc <= now)
             .ToListAsync(cancellationToken);
 
-        foreach (var countdown in countdowns)
+        var countdownIds = alerts.Select(alert => alert.CountdownId).Distinct().ToArray();
+        var countdowns = await _dbContext.CountdownEvents
+            .Where(countdown => countdown.DeletedAt == null && countdownIds.Contains(countdown.Id))
+            .ToDictionaryAsync(countdown => countdown.Id, cancellationToken);
+
+        foreach (var alert in alerts)
         {
-            _dbContext.Notifications.Add(Notification.Create(countdown.UserId, "CountdownAlert", "Countdown complete",
-                $"{countdown.Name} has reached its target time.", $"countdown:{countdown.Id}"));
-            countdown.MarkAlerted(now);
+            if (!countdowns.TryGetValue(alert.CountdownId, out var countdown))
+            {
+                continue;
+            }
+
+            _dbContext.Notifications.Add(Notification.Create(countdown.UserId, "CountdownAlert", "Countdown reminder",
+                $"{countdown.Name} - {alert.AlertDay} at {alert.AlertTime}.", $"countdown:{countdown.Id}:alert:{alert.Id}"));
+            alert.MarkFired(now);
             _logger.LogInformation(
-                "CountdownAlert notification queued for user {UserId}, countdown {CountdownId}.",
-                countdown.UserId, countdown.Id);
+                "CountdownAlert notification queued for user {UserId}, countdown {CountdownId}, alert {AlertId}.",
+                countdown.UserId, countdown.Id, alert.Id);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("CountdownAlertJob marked {Count} countdowns complete.", countdowns.Count);
+        _logger.LogInformation("CountdownAlertJob fired {Count} countdown alerts.", alerts.Count);
+    }
+
+    public async Task CleanupRetiredCountdownsAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var countdowns = await _dbContext.CountdownEvents
+            .Include(countdown => countdown.Alerts)
+            .Where(countdown => countdown.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+
+        var retired = 0;
+        foreach (var countdown in countdowns.Where(countdown => countdown.ShouldRetireAt(now)))
+        {
+            countdown.SoftDelete(now);
+
+            if (countdown.CoverAssetId.HasValue)
+            {
+                var asset = await _dbContext.Assets.FirstOrDefaultAsync(
+                    entity => entity.Id == countdown.CoverAssetId.Value
+                        && entity.UserId == countdown.UserId
+                        && entity.DeletedAt == null,
+                    cancellationToken);
+
+                if (asset is not null)
+                {
+                    asset.MarkDeleted(now);
+                    if (asset.Status == AssetStatus.Deleted)
+                    {
+                        try
+                        {
+                            await _assetStorage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
+                        }
+                        catch (AssetStorageUnavailableException)
+                        {
+                        }
+                    }
+                }
+            }
+
+            retired++;
+            _logger.LogInformation("Countdown retirement queued for user {UserId}, countdown {CountdownId}.", countdown.UserId, countdown.Id);
+        }
+
+        if (retired > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("CountdownRetirementJob retired {Count} countdowns.", retired);
     }
 
     public async Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default)
@@ -96,6 +153,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         deleted += await _dbContext.HabitEntries.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.Habits.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.TodoItems.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
+        deleted += await _dbContext.CountdownAlerts.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.CountdownEvents.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.JournalEntries.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.KanbanCards.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);

@@ -1,19 +1,27 @@
 namespace FluentA.Application.BoundedContexts.Countdown.DTOs;
 
-public sealed record CreateCountdownEventRequest(string Name, string TargetDate, string? Color = null, string? Icon = null);
+public sealed record CreateCountdownAlertRequest(string AlertDay, string AlertTime);
 
-public sealed record UpdateCountdownEventRequest(
-    string? Name = null,
-    string? TargetDate = null,
-    string? Color = null,
-    string? Icon = null);
+public sealed record CreateCountdownEventRequest(
+    string Name,
+    string TargetDate,
+    IReadOnlyList<CreateCountdownAlertRequest> Alerts,
+    Guid? CoverAssetId = null);
+
+public sealed record CountdownAlertDto(
+    Guid Id,
+    string AlertDay,
+    string AlertTime,
+    DateTime ScheduledAtUtc,
+    DateTime? FiredAtUtc);
 
 public sealed record CountdownEventDto(
     Guid Id,
     string Name,
     string TargetDate,
-    string? Color,
-    string? Icon,
+    Guid? CoverAssetId,
+    string? CoverUrl,
     bool IsCompleted,
+    IReadOnlyList<CountdownAlertDto> Alerts,
     DateTime CreatedAt,
     DateTime UpdatedAt);

@@ -11,24 +11,26 @@ public sealed record FlashcardCardDto(
     string? Thesaurus,
     string? Collocation,
     string? Note,
+    bool IsInReview,
     int? ReviewLevel,
     DateTime? NextReviewDate,
     int LapseCount);
 
-public sealed record FlashcardDeckDto(
-    Guid Id,
+public sealed record FlashcardPageDto(
+    Guid PageId,
+    string PageName,
+    bool IsPracticed,
+    IReadOnlyList<FlashcardCardDto> Words);
+
+public sealed record FlashcardBoardDto(
     Guid BoardId,
     string BoardName,
     string BoardLanguage,
-    Guid? PageId,
-    string Name,
-    string Type,
-    IReadOnlyList<FlashcardCardDto> Cards);
+    IReadOnlyList<FlashcardPageDto> Pages);
 
-public sealed record DeckSessionDto(
-    Guid DeckId,
+public sealed record PageSessionDto(
+    Guid PageId,
     Guid BoardId,
-    string DeckName,
-    string DeckType,
+    string PageName,
     string BoardLanguage,
-    IReadOnlyList<FlashcardCardDto> Cards);
+    IReadOnlyList<FlashcardCardDto> Words);

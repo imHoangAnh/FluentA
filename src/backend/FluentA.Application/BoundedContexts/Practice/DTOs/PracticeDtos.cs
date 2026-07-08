@@ -1,7 +1,7 @@
 namespace FluentA.Application.BoundedContexts.Practice.DTOs;
 
 public sealed record CreatePracticeSessionSummaryRequest(
-    Guid DeckId,
+    Guid PageId,
     string Mode,
     int TotalCards,
     int CorrectCards,
@@ -9,18 +9,20 @@ public sealed record CreatePracticeSessionSummaryRequest(
     string TimeZoneId);
 
 public sealed record AddPracticeWordsToReviewRequest(
-    Guid DeckId,
+    Guid PageId,
+    Guid WordId,
     string TimeZoneId);
 
 public sealed record AddPracticeWordsToReviewDto(
-    Guid DeckId,
-    int AddedWordCount,
+    Guid PageId,
+    Guid WordId,
+    string Status,
     DateTime NextReviewDate);
 
 public sealed record PracticeSessionSummaryDto(
     Guid Id,
     Guid UserId,
-    Guid DeckId,
+    Guid PageId,
     string Mode,
     int TotalCards,
     int CorrectCards,
@@ -34,7 +36,7 @@ public sealed record UpdatePracticeSettingsRequest(IReadOnlyList<string> ModeSeq
 public enum PracticeSessionSummarySaveStatus
 {
     Success = 0,
-    DeckNotFound = 1,
+    PageNotFound = 1,
     InconsistentSummary = 2,
 }
 

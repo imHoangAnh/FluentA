@@ -12,6 +12,7 @@ import { FlashcardViewerPage } from './routes/flashcards/FlashcardViewerPage'
 import { PracticeSessionPage } from './routes/flashcards/PracticeSessionPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
 import { SettingsPage } from './routes/settings/SettingsPage'
+import { LevelFiveSettingsPage } from './routes/settings/LevelFiveSettingsPage'
 import { TodoPage } from './routes/todo/TodoPage'
 import { CountdownPage } from './routes/countdown/CountdownPage'
 import { HabitPage } from './routes/habits/HabitPage'
@@ -56,7 +57,7 @@ export default function App() {
         }
       />
       <Route
-        path="/countdown"
+        path="/countdowns"
         element={
           <ProtectedRoute>
             <CountdownPage />
@@ -131,9 +132,17 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/settings/level5"
+        element={
+          <ProtectedRoute>
+            <LevelFiveSettingsPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/settings/review" element={<Navigate to="/settings" replace />} />
       <Route
-        path="/flashcards/decks/:deckId"
+        path="/flashcards/pages/:pageId"
         element={
           <ProtectedRoute>
             <FlashcardViewerPage />
@@ -149,7 +158,7 @@ export default function App() {
         }
       />
       <Route
-        path="/flashcards/decks/:deckId/practice"
+        path="/flashcards/pages/:pageId/practice"
         element={
           <ProtectedRoute>
             <PracticeSessionPage />

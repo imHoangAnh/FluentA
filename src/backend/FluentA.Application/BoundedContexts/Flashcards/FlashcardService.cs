@@ -12,19 +12,19 @@ public sealed class FlashcardService : IFlashcardService
         _repository = repository;
     }
 
-    public Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<FlashcardBoardDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return _repository.ListDecksAsync(userId, cancellationToken);
+        return _repository.ListBoardsAsync(userId, cancellationToken);
     }
 
-    public async Task<OperationResult<DeckSessionDto>> GetDeckSessionAsync(
+    public async Task<OperationResult<PageSessionDto>> GetPageSessionAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
         CancellationToken cancellationToken = default)
     {
-        var session = await _repository.GetDeckSessionAsync(userId, deckId, cancellationToken);
+        var session = await _repository.GetPageSessionAsync(userId, pageId, cancellationToken);
         return session is null
-            ? OperationResult<DeckSessionDto>.Failure(FlashcardError.DeckOrCardNotFound())
-            : OperationResult<DeckSessionDto>.Success(session);
+            ? OperationResult<PageSessionDto>.Failure(FlashcardError.DeckOrCardNotFound())
+            : OperationResult<PageSessionDto>.Success(session);
     }
 }

@@ -32,4 +32,13 @@ public interface IReviewService
         Guid userId,
         SubmitReviewRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationResult<int>> RemoveLevelFiveWordsAsync(
+        Guid userId,
+        RemoveLevelFiveWordsRequest request,
+        CancellationToken cancellationToken = default);
 }

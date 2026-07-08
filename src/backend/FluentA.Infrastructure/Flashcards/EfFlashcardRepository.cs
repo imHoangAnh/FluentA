@@ -1,6 +1,5 @@
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Flashcards.DTOs;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,146 +15,155 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FlashcardBoardDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var decks = await (
-            from deck in _dbContext.FlashcardDecks.AsNoTracking()
-            join board in _dbContext.Boards.AsNoTracking() on deck.BoardId equals board.Id
-            where deck.UserId == userId
-                && deck.Type == DeckType.PageDeck
-                && deck.DeletedAt == null
-                && board.DeletedAt == null
-            orderby board.CreatedAt, board.Name, deck.Name
-            select new
-            {
-                deck.Id,
-                deck.BoardId,
-                BoardName = board.Name,
-                BoardLanguage = board.Language,
-                deck.PageId,
-                deck.Name,
-                deck.Type
-            })
-            .ToListAsync(cancellationToken);
-
-        var deckIds = decks.Select(deck => deck.Id).ToList();
-        var cards = await _dbContext.FlashcardCards
+        var boards = await _dbContext.Boards
             .AsNoTracking()
-            .Where(card => deckIds.Contains(card.DeckId))
-            .OrderBy(card => card.Word)
-            .ThenBy(card => card.CreatedAt)
-            .Select(card => new
+            .Where(board => board.UserId == userId && board.DeletedAt == null)
+            .OrderByDescending(board => board.CreatedAt)
+            .Select(board => new
             {
-                card.DeckId,
-                card.Id,
-                card.WordId,
-                card.Word,
-                card.WordClass,
-                card.MeaningVn,
-                card.MeaningEn,
-                card.Example,
-                card.Thesaurus,
-                card.Collocation,
-                card.Note
+                board.Id,
+                board.Name,
+                board.Language,
             })
             .ToListAsync(cancellationToken);
 
-        var reviewStates = await LoadReviewStatesAsync(userId, cards.Select(card => card.WordId), cancellationToken);
-        var cardsByDeck = cards
-            .GroupBy(card => card.DeckId)
+        var boardIds = boards.Select(board => board.Id).ToList();
+        var pages = await _dbContext.Pages
+            .AsNoTracking()
+            .Where(page => boardIds.Contains(page.BoardId) && page.DeletedAt == null)
+            .OrderByDescending(page => page.CreatedAt)
+            .Select(page => new
+            {
+                page.Id,
+                page.BoardId,
+                page.Name,
+            })
+            .ToListAsync(cancellationToken);
+
+        var pageIds = pages.Select(page => page.Id).ToList();
+        var words = await _dbContext.Words
+            .AsNoTracking()
+            .Where(word => pageIds.Contains(word.PageId) && word.DeletedAt == null)
+            .OrderBy(word => word.CreatedAt)
+            .Select(word => new
+            {
+                word.Id,
+                word.PageId,
+                word.Word,
+                WordClass = word.Class,
+                MeaningVn = word.MeaningVn,
+                MeaningEn = word.Definition,
+                word.Example,
+                Thesaurus = word.Synonyms,
+                Collocation = word.Antonyms,
+                word.Note,
+            })
+            .ToListAsync(cancellationToken);
+
+        var reviewStates = await LoadReviewStatesAsync(userId, words.Select(word => word.Id), cancellationToken);
+        var practicedPageIds = await LoadPracticedPageIdsAsync(userId, pageIds, cancellationToken);
+        var wordsByPage = words
+            .GroupBy(word => word.PageId)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyList<FlashcardCardDto>)group.Select(card => ToCardDto(
-                    new ProjectedCard(
-                        card.Id,
-                        card.WordId,
-                        card.Word,
-                        card.WordClass,
-                        card.MeaningVn,
-                        card.MeaningEn,
-                        card.Example,
-                        card.Thesaurus,
-                        card.Collocation,
-                        card.Note),
-                    reviewStates.GetValueOrDefault(card.WordId))).ToList());
+                group => (IReadOnlyList<FlashcardCardDto>)group
+                    .Select(word => ToWordDto(
+                        word.Id,
+                        word.Word,
+                        word.WordClass.ToString(),
+                        word.MeaningVn,
+                        word.MeaningEn ?? string.Empty,
+                        word.Example,
+                        word.Thesaurus,
+                        word.Collocation,
+                        word.Note,
+                        reviewStates.ContainsKey(word.Id),
+                        reviewStates.GetValueOrDefault(word.Id)))
+                    .ToList());
 
-        return decks
-            .Select(deck => new FlashcardDeckDto(
-                deck.Id,
-                deck.BoardId,
-                deck.BoardName,
-                deck.BoardLanguage,
-                deck.PageId,
-                deck.Name,
-                deck.Type.ToString(),
-                cardsByDeck.GetValueOrDefault(deck.Id) ?? []))
+        var pagesByBoard = pages
+            .GroupBy(page => page.BoardId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<FlashcardPageDto>)group
+                    .Select(page => new FlashcardPageDto(
+                        page.Id,
+                        page.Name,
+                        practicedPageIds.Contains(page.Id),
+                        wordsByPage.GetValueOrDefault(page.Id) ?? []))
+                    .ToList());
+
+        return boards
+            .Select(board => new FlashcardBoardDto(
+                board.Id,
+                board.Name,
+                board.Language,
+                pagesByBoard.GetValueOrDefault(board.Id) ?? []))
             .ToList();
     }
 
-    public async Task<DeckSessionDto?> GetDeckSessionAsync(Guid userId, Guid deckId, CancellationToken cancellationToken = default)
+    public async Task<PageSessionDto?> GetPageSessionAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
     {
-        var deck = await (
-            from flashcardDeck in _dbContext.FlashcardDecks.AsNoTracking()
-            join board in _dbContext.Boards.AsNoTracking() on flashcardDeck.BoardId equals board.Id
-            where flashcardDeck.Id == deckId
-                && flashcardDeck.UserId == userId
-                && flashcardDeck.Type == DeckType.PageDeck
-                && flashcardDeck.DeletedAt == null
+        var page = await (
+            from pageEntity in _dbContext.Pages.AsNoTracking()
+            join board in _dbContext.Boards.AsNoTracking() on pageEntity.BoardId equals board.Id
+            where pageEntity.Id == pageId
+                && board.UserId == userId
+                && pageEntity.DeletedAt == null
                 && board.DeletedAt == null
             select new
             {
-                flashcardDeck.Id,
-                flashcardDeck.BoardId,
-                flashcardDeck.Name,
-                flashcardDeck.Type,
-                board.Language
+                PageId = pageEntity.Id,
+                BoardId = board.Id,
+                PageName = pageEntity.Name,
+                BoardLanguage = board.Language,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (deck is null)
+        if (page is null)
         {
             return null;
         }
 
-        var cards = await _dbContext.FlashcardCards
+        var words = await _dbContext.Words
             .AsNoTracking()
-            .Where(card => card.DeckId == deck.Id)
-            .OrderBy(card => card.CreatedAt)
-            .Select(card => new
+            .Where(word => word.PageId == page.PageId && word.DeletedAt == null)
+            .OrderBy(word => word.CreatedAt)
+            .Select(word => new
             {
-                card.Id,
-                card.WordId,
-                card.Word,
-                card.WordClass,
-                card.MeaningVn,
-                card.MeaningEn,
-                card.Example,
-                card.Thesaurus,
-                card.Collocation,
-                card.Note
+                word.Id,
+                word.Word,
+                WordClass = word.Class,
+                MeaningVn = word.MeaningVn,
+                MeaningEn = word.Definition,
+                word.Example,
+                Thesaurus = word.Synonyms,
+                Collocation = word.Antonyms,
+                word.Note,
             })
             .ToListAsync(cancellationToken);
 
-        var reviewStates = await LoadReviewStatesAsync(userId, cards.Select(card => card.WordId), cancellationToken);
-        return new DeckSessionDto(
-            deck.Id,
-            deck.BoardId,
-            deck.Name,
-            deck.Type.ToString(),
-            deck.Language,
-            cards.Select(card => ToCardDto(
-                new ProjectedCard(
-                    card.Id,
-                    card.WordId,
-                    card.Word,
-                    card.WordClass,
-                    card.MeaningVn,
-                    card.MeaningEn,
-                    card.Example,
-                    card.Thesaurus,
-                    card.Collocation,
-                    card.Note),
-                reviewStates.GetValueOrDefault(card.WordId))).ToList());
+        var reviewStates = await LoadReviewStatesAsync(userId, words.Select(word => word.Id), cancellationToken);
+        return new PageSessionDto(
+            page.PageId,
+            page.BoardId,
+            page.PageName,
+            page.BoardLanguage,
+            words.Select(word => ToWordDto(
+                word.Id,
+                word.Word,
+                word.WordClass.ToString(),
+                word.MeaningVn,
+                word.MeaningEn ?? string.Empty,
+                word.Example,
+                word.Thesaurus,
+                word.Collocation,
+                word.Note,
+                reviewStates.ContainsKey(word.Id),
+                reviewStates.GetValueOrDefault(word.Id)))
+                .ToList());
     }
 
     private async Task<Dictionary<Guid, WordReviewState>> LoadReviewStatesAsync(
@@ -171,35 +179,56 @@ public sealed class EfFlashcardRepository : IFlashcardRepository
 
         return await _dbContext.WordReviewStates
             .AsNoTracking()
-            .Where(state => state.UserId == userId && state.DeletedAt == null && ids.Contains(state.WordId))
+            .Where(state => state.UserId == userId && state.DeletedAt == null && state.Status == WordReviewStatus.Active && ids.Contains(state.WordId))
             .ToDictionaryAsync(state => state.WordId, cancellationToken);
     }
 
-    private static FlashcardCardDto ToCardDto(ProjectedCard card, WordReviewState? reviewState) =>
+    private async Task<HashSet<Guid>> LoadPracticedPageIdsAsync(
+        Guid userId,
+        IEnumerable<Guid> pageIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = pageIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var practiced = await _dbContext.PracticeSessionSummaries
+            .AsNoTracking()
+            .Where(summary => summary.UserId == userId && summary.DeletedAt == null && ids.Contains(summary.PageId))
+            .Select(summary => summary.PageId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return [.. practiced];
+    }
+
+    private static FlashcardCardDto ToWordDto(
+        Guid wordId,
+        string word,
+        string wordClass,
+        string meaningVn,
+        string meaningEn,
+        string example,
+        string? thesaurus,
+        string? collocation,
+        string? note,
+        bool isInReview,
+        WordReviewState? reviewState) =>
         new(
-            card.Id,
-            card.WordId,
-            card.Word,
-            card.WordClass,
-            card.MeaningVn,
-            card.MeaningEn,
-            card.Example,
-            card.Thesaurus,
-            card.Collocation,
-            card.Note,
+            wordId,
+            wordId,
+            word,
+            wordClass,
+            meaningVn,
+            meaningEn,
+            example,
+            thesaurus,
+            collocation,
+            note,
+            isInReview,
             reviewState?.Level,
             reviewState?.NextReviewDate,
             reviewState?.LapseCount ?? 0);
-
-    private sealed record ProjectedCard(
-        Guid Id,
-        Guid WordId,
-        string Word,
-        string WordClass,
-        string MeaningVn,
-        string MeaningEn,
-        string Example,
-        string? Thesaurus,
-        string? Collocation,
-        string? Note);
 }

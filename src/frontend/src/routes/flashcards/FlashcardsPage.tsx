@@ -9,21 +9,10 @@ import {
 import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { getUserAvatarUrl } from '../../lib/avatar'
 import * as flashcardApi from '../../lib/api/flashcard.api'
-import type { FlashcardDeck } from '../../lib/api/flashcard.api'
+import type { FlashcardBoard } from '../../lib/api/flashcard.api'
 import { useFlashcardSync } from '../../lib/realtime/useFlashcardSync'
 import { useAuthStore } from '../../stores/authStore'
 import '../dashboard/DashboardPage.css'
-
-function groupByBoard(decks: FlashcardDeck[]) {
-  const groups = new Map<string, { name: string; decks: FlashcardDeck[] }>()
-  for (const deck of decks) {
-    const group = groups.get(deck.boardId) ?? { name: deck.boardName, decks: [] }
-    group.decks.push(deck)
-    groups.set(deck.boardId, group)
-  }
-
-  return [...groups.entries()]
-}
 
 type FlashcardsPageProps = {
   entryMode?: 'flashcards' | 'practice'
@@ -38,11 +27,11 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
 
   useFlashcardSync()
   const decksQuery = useQuery({
-    queryKey: ['flashcard', 'decks'],
-    queryFn: flashcardApi.listDecks,
+    queryKey: ['flashcard', 'boards'],
+    queryFn: flashcardApi.listBoards,
     refetchInterval: 1500,
   })
-  const boardGroups = useMemo(() => groupByBoard(decksQuery.data ?? []), [decksQuery.data])
+  const boardGroups = useMemo<FlashcardBoard[]>(() => decksQuery.data ?? [], [decksQuery.data])
 
   const practiceEntry = entryMode === 'practice'
 
@@ -52,7 +41,7 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
   const toggleBoard = useCallback(
     (boardId: string) => {
       setExpandedBoards((prev) => {
-        const next = prev !== null ? new Set(prev) : (boardGroups.length > 0 ? new Set([boardGroups[0][0]]) : new Set<string>())
+        const next = prev !== null ? new Set(prev) : (boardGroups.length > 0 ? new Set([boardGroups[0].boardId]) : new Set<string>())
         if (next.has(boardId)) {
           next.delete(boardId)
         } else {
@@ -92,7 +81,7 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
@@ -131,7 +120,7 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
         <div className="fc-expand-content">
           {/* Header Section */}
           <div className="fc-expand-header">
-            <h2 className="fc-expand-title">{practiceEntry ? 'Choose a page deck to practice' : 'Your page decks'}</h2>
+            <h2 className="fc-expand-title">{practiceEntry ? 'Choose a page to practice' : 'Your pages'}</h2>
           </div>
 
           {/* Loading / Error States */}
@@ -140,15 +129,16 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
           {!decksQuery.isLoading && !decksQuery.isError && boardGroups.length === 0 ? (
             <div className="empty-panel flashcard-empty">
               <BookOpen size={28} />
-              <h2>No decks yet</h2>
-              <p>Create a vocabulary board and page, then add words to see synchronized cards here.</p>
+              <h2>No pages yet</h2>
+              <p>Create a vocabulary board and page, then add words to see live learning content here.</p>
               <Link className="primary-button flashcard-empty__link" to="/vocabulary">Open vocabulary</Link>
             </div>
           ) : null}
 
           {/* Boards Container */}
           <div className="fc-expand-boards">
-            {boardGroups.map(([boardId, board], index) => {
+            {boardGroups.map((board, index) => {
+              const boardId = board.boardId
               const expanded = expandedBoards !== null ? expandedBoards.has(boardId) : index === 0
               return (
                 <section className="fc-expand-board" key={boardId}>
@@ -163,11 +153,11 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
                       <Layers className="fc-expand-board__icon" size={20} />
                       <div>
                         <span className="fc-expand-board__label">Vocabulary Board</span>
-                        <h3 className="fc-expand-board__name">{board.name}</h3>
+                        <h3 className="fc-expand-board__name">{board.boardName}</h3>
                       </div>
                     </div>
                     <div className="fc-expand-board__meta">
-                      <span className="fc-expand-board__count">{board.decks.length} {board.decks.length === 1 ? 'deck' : 'decks'}</span>
+                      <span className="fc-expand-board__count">{board.pages.length} {board.pages.length === 1 ? 'page' : 'pages'}</span>
                       <span className="fc-expand-board__chevron">
                         {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </span>
@@ -178,50 +168,51 @@ export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps
                   {expanded ? (
                     <div className="fc-expand-board__content">
                       <div className="fc-expand-decks-grid">
-                        {board.decks.map((deck) => (
+                        {board.pages.map((page) => (
                           <article
-                            className={`fc-expand-deck${deck.cards.length > 0 ? ' fc-expand-deck--has-cards' : ''}`}
-                            key={deck.id}
-                            data-testid={`flashcard-deck-${deck.id}`}
+                            className={`fc-expand-deck${page.words.length > 0 ? ' fc-expand-deck--has-cards' : ''}`}
+                            key={page.pageId}
+                            data-testid={`flashcard-page-${page.pageId}`}
                           >
                             {/* Top accent bar for decks with cards */}
-                            {deck.cards.length > 0 ? <div className="fc-expand-deck__accent" /> : null}
+                            {page.words.length > 0 ? <div className="fc-expand-deck__accent" /> : null}
 
                             <div className="fc-expand-deck__header">
                               <div>
-                                <span className="fc-expand-deck__type">Page Deck</span>
-                                <h4 className="fc-expand-deck__name">{deck.name}</h4>
+                                <span className="fc-expand-deck__type">Vocabulary Page</span>
+                                <h4 className="fc-expand-deck__name">{page.pageName}</h4>
+                                {practiceEntry && page.isPracticed ? <span className="preview-label">Practiced</span> : null}
                               </div>
-                              <div className={`fc-expand-deck__badge${deck.cards.length > 0 ? ' fc-expand-deck__badge--active' : ''}`}>
-                                {deck.cards.length}
+                              <div className={`fc-expand-deck__badge${page.words.length > 0 ? ' fc-expand-deck__badge--active' : ''}`}>
+                                {page.words.length}
                               </div>
                             </div>
 
                             <p className="fc-expand-deck__desc">
-                              {deck.cards.length > 0
-                                ? `${deck.cards.length} synchronized words are ready in this page deck.`
-                                : 'No synchronized cards yet.'}
+                              {page.words.length > 0
+                                ? `${page.words.length} words are ready in this page.`
+                                : 'No words yet.'}
                             </p>
 
                             <div className="fc-expand-deck__actions">
-                              {deck.cards.length > 0 ? (
+                              {page.words.length > 0 ? (
                                 <>
                                   {practiceEntry ? (
                                     <>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/decks/${deck.id}/practice`}>
-                                        Practice this Page Deck
+                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/pages/${page.pageId}/practice`}>
+                                        {page.isPracticed ? 'Practice again' : 'Practice'}
                                       </Link>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/decks/${deck.id}`}>
+                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/pages/${page.pageId}`}>
                                         Open Flashcards
                                       </Link>
                                     </>
                                   ) : (
                                     <>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/decks/${deck.id}`}>
+                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/pages/${page.pageId}`}>
                                         Open Flashcards
                                       </Link>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/decks/${deck.id}/practice`}>
-                                        Practice this Page Deck
+                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/pages/${page.pageId}/practice`}>
+                                        Practice this Page
                                       </Link>
                                     </>
                                   )}

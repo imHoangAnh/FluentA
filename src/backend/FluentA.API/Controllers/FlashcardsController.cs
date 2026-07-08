@@ -19,21 +19,21 @@ public sealed class FlashcardsController : ControllerBase
         _flashcards = flashcards;
     }
 
-    /// <summary>Lists synchronized flashcard decks for the authenticated user.</summary>
-    [HttpGet("decks")]
-    public async Task<IActionResult> ListDecks(CancellationToken cancellationToken)
+    /// <summary>Lists vocabulary boards and pages for the authenticated user.</summary>
+    [HttpGet("pages")]
+    public async Task<IActionResult> ListBoards(CancellationToken cancellationToken)
     {
-        var decks = await _flashcards.ListDecksAsync(CurrentUserId(), cancellationToken);
-        return Ok(ApiEnvelope<IReadOnlyList<FlashcardDeckDto>>.Ok(decks));
+        var boards = await _flashcards.ListBoardsAsync(CurrentUserId(), cancellationToken);
+        return Ok(ApiEnvelope<IReadOnlyList<FlashcardBoardDto>>.Ok(boards));
     }
 
-    /// <summary>Returns cards for a review deck session setup.</summary>
-    [HttpGet("decks/{deckId:guid}/cards")]
-    public async Task<IActionResult> GetDeckSession(Guid deckId, CancellationToken cancellationToken)
+    /// <summary>Returns live page words for a flashcard/practice session setup.</summary>
+    [HttpGet("pages/{pageId:guid}/words")]
+    public async Task<IActionResult> GetPageSession(Guid pageId, CancellationToken cancellationToken)
     {
-        var result = await _flashcards.GetDeckSessionAsync(CurrentUserId(), deckId, cancellationToken);
+        var result = await _flashcards.GetPageSessionAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<DeckSessionDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<PageSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

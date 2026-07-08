@@ -12,33 +12,38 @@ export type FlashcardCard = {
   thesaurus?: string | null
   collocation?: string | null
   note?: string | null
+  isInReview: boolean
   reviewLevel?: number | null
   nextReviewDate?: string | null
   lapseCount: number
 }
 
-export type FlashcardDeck = {
-  id: string
+export type FlashcardPage = {
+  pageId: string
+  pageName: string
+  isPracticed: boolean
+  words: FlashcardCard[]
+}
+
+export type FlashcardBoard = {
   boardId: string
   boardName: string
   boardLanguage: string
-  pageId?: string | null
-  name: string
-  type: 'PageDeck'
-  cards: FlashcardCard[]
+  pages: FlashcardPage[]
 }
 
-export type DeckSession = {
-  deckId: string
+export type PageSession = {
+  pageId: string
   boardId: string
-  deckName: string
-  deckType: 'PageDeck'
+  pageName: string
   boardLanguage: string
-  cards: FlashcardCard[]
+  words: FlashcardCard[]
 }
 
 export type ReviewMode = 'dictation' | 'meaningToWord' | 'pronunciation' | 'random'
 export type ReviewOrderType = 'sequential' | 'shuffle'
+export type ReviewStartBehavior = 'prompt' | 'continue' | 'replace'
+export type ReviewStartDisposition = 'prompt' | 'started' | 'continued'
 
 export type ReviewSessionWord = {
   wordId: string
@@ -53,13 +58,23 @@ export type ReviewSessionWord = {
   mode: ReviewMode | Exclude<ReviewMode, 'random'>
 }
 
+export type ReviewStartOptions = {
+  hasActiveSameDaySession: boolean
+  existingSessionId?: string | null
+  remainingWords: number
+  requiresDecision: boolean
+}
+
 export type ReviewSessionCreated = {
   sessionId: string
   boardId: string
   boardName: string
   orderType: ReviewOrderType
   mode: ReviewMode
+  startDisposition: ReviewStartDisposition
+  startedAt: string
   totalWords: number
+  startOptions: ReviewStartOptions
   words: ReviewSessionWord[]
 }
 
@@ -88,6 +103,17 @@ export type ReviewSettings = {
   recapAfterAnswer: boolean
 }
 
+export type LevelFiveReviewItem = {
+  wordId: string
+  word: string
+  boardId: string
+  boardName: string
+  pageId: string
+  pageName: string
+  status: 'active' | 'inactive'
+  lastReviewDate?: string | null
+}
+
 export type DashboardForecastPoint = {
   date: string
   dueCount: number
@@ -114,7 +140,7 @@ export type PracticeSettings = {
 export type PracticeSessionSummary = {
   id: string
   userId: string
-  deckId: string
+  pageId: string
   mode: PracticeMode
   totalCards: number
   correctCards: number
@@ -123,18 +149,19 @@ export type PracticeSessionSummary = {
 }
 
 export type AddPracticeWordsToReviewResult = {
-  deckId: string
-  addedWordCount: number
+  pageId: string
+  wordId: string
+  status: 'added' | 'alreadyInReview'
   nextReviewDate: string
 }
 
-export async function listDecks() {
-  const response = await apiClient.get<ApiEnvelope<FlashcardDeck[]>>('/flashcards/decks')
+export async function listBoards() {
+  const response = await apiClient.get<ApiEnvelope<FlashcardBoard[]>>('/flashcards/pages')
   return response.data.data ?? []
 }
 
-export async function getDeckSession(deckId: string) {
-  const response = await apiClient.get<ApiEnvelope<DeckSession>>(`/flashcards/decks/${deckId}/cards`)
+export async function getPageSession(pageId: string) {
+  const response = await apiClient.get<ApiEnvelope<PageSession>>(`/flashcards/pages/${pageId}/words`)
   return response.data.data!
 }
 
@@ -142,6 +169,7 @@ export async function createReviewSession(input: {
   boardId: string
   orderType: ReviewOrderType
   mode: ReviewMode
+  startBehavior: ReviewStartBehavior
   timeZoneId: string
 }) {
   const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/review/sessions', input)
@@ -149,7 +177,7 @@ export async function createReviewSession(input: {
 }
 
 export async function createPracticeSessionSummary(input: {
-  deckId: string
+  pageId: string
   mode: PracticeMode
   totalCards: number
   correctCards: number
@@ -161,7 +189,8 @@ export async function createPracticeSessionSummary(input: {
 }
 
 export async function addPracticeWordsToReview(input: {
-  deckId: string
+  pageId: string
+  wordId: string
   timeZoneId: string
 }) {
   const response = await apiClient.post<ApiEnvelope<AddPracticeWordsToReviewResult>>('/practice/add-to-review', input)
@@ -208,4 +237,14 @@ export async function submitReview(input: {
 }) {
   const response = await apiClient.post<ApiEnvelope<ReviewResult>>('/review', input)
   return response.data.data!
+}
+
+export async function listLevelFiveWords() {
+  const response = await apiClient.get<ApiEnvelope<LevelFiveReviewItem[]>>('/review/level-five')
+  return response.data.data ?? []
+}
+
+export async function removeLevelFiveWords(wordIds: string[]) {
+  const response = await apiClient.post<ApiEnvelope<number>>('/review/level-five/remove', { wordIds })
+  return response.data.data ?? 0
 }

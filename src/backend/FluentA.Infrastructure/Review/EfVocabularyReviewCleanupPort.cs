@@ -28,7 +28,11 @@ public sealed class EfVocabularyReviewCleanupPort : IVocabularyReviewCleanupPort
             .Where(history => ids.Contains(history.WordId))
             .ToListAsync(cancellationToken);
 
-        _dbContext.WordReviewStates.RemoveRange(states);
+        foreach (var state in states)
+        {
+            state.Deactivate();
+        }
+
         _dbContext.WordReviewHistories.RemoveRange(histories);
     }
 }

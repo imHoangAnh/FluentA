@@ -1,7 +1,7 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
+using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,7 +17,7 @@ public sealed class PracticeSessionSummaryConfiguration : IEntityTypeConfigurati
 
         builder.Property(summary => summary.Id).HasColumnName("id");
         builder.Property(summary => summary.UserId).HasColumnName("user_id").IsRequired();
-        builder.Property(summary => summary.DeckId).HasColumnName("deck_id").IsRequired();
+        builder.Property(summary => summary.PageId).HasColumnName("page_id").IsRequired();
         builder.Property(summary => summary.Mode).HasColumnName("mode").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(summary => summary.TotalCards).HasColumnName("total_cards").IsRequired();
         builder.Property(summary => summary.CorrectCards).HasColumnName("correct_cards").IsRequired();
@@ -32,12 +32,12 @@ public sealed class PracticeSessionSummaryConfiguration : IEntityTypeConfigurati
             .HasForeignKey(summary => summary.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne<FlashcardDeck>()
+        builder.HasOne<VocabPage>()
             .WithMany()
-            .HasForeignKey(summary => summary.DeckId)
+            .HasForeignKey(summary => summary.PageId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(summary => new { summary.UserId, summary.CompletedAt });
-        builder.HasIndex(summary => new { summary.DeckId, summary.CompletedAt });
+        builder.HasIndex(summary => new { summary.PageId, summary.CompletedAt });
     }
 }

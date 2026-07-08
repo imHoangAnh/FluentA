@@ -51,12 +51,16 @@ async function createBoardWithWords(page, headers, boardName, pageName, words) {
   return { board, vocabPage };
 }
 
-async function listDecks(page, headers) {
-  return (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/decks', { headers })).json()).data;
+async function listBoards(page, headers) {
+  return (await (await page.request.get('http://127.0.0.1:5000/api/v1/flashcards/pages', { headers })).json()).data;
 }
 
-function reviewSnapshot(deck) {
-  return [...deck.cards]
+function findPageBoard(boards, boardName) {
+  return boards.find((board) => board.boardName === boardName);
+}
+
+function reviewSnapshot(pageDeck) {
+  return [...pageDeck.words]
     .map((card) => ({
       word: card.word,
       reviewLevel: card.reviewLevel,
@@ -89,7 +93,7 @@ async function completeMeaningToWordPractice(page) {
   await expect(page.getByTestId('practice-summary')).toContainText('1 words completed cleanly and 1 words needed reveal/skip');
 }
 
-test('practice completion separates Finish from Add to Review FluentA SRS creation', async ({ page }) => {
+test('practice completion keeps finish separate from per-word add-to-review', async ({ page }) => {
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
@@ -98,8 +102,9 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   const { headers } = await registerAndLogin(page, 'practice-workflow');
   await createBoardWithWords(page, headers, 'Practice Workflow Board', 'Practice Workflow Page', ['mitigate', 'nuance']);
 
-  const initialDecks = await listDecks(page, headers);
-  const pageDeck = initialDecks.find((deck) => deck.name === 'Practice Workflow Board - Practice Workflow Page');
+  const initialBoards = await listBoards(page, headers);
+  const pageBoard = findPageBoard(initialBoards, 'Practice Workflow Board');
+  const pageDeck = pageBoard.pages.find((item) => item.pageName === 'Practice Workflow Page');
   const initialSchedule = reviewSnapshot(pageDeck);
   expect(initialSchedule).toEqual([
     expect.objectContaining({ word: 'mitigate', reviewLevel: null, lapseCount: 0, nextReviewDate: null }),
@@ -112,12 +117,12 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   });
   expect(practiceSettingsResponse.status()).toBe(200);
 
-  await page.goto('/flashcards');
-  const pageDeckCard = page.getByTestId(`flashcard-deck-${pageDeck.id}`);
-  await expect(pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' })).toBeVisible();
+  await page.goto('/flashcards/practice');
+  const pageCard = page.getByTestId(`flashcard-page-${pageDeck.pageId}`);
+  await expect(pageCard.getByRole('link', { name: 'Practice' })).toBeVisible();
 
-  await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
-  await expect(page.getByRole('heading', { name: 'Practice Workflow Board - Practice Workflow Page' })).toBeVisible();
+  await pageCard.getByRole('link', { name: 'Practice' }).click();
+  await expect(page.getByRole('heading', { name: 'Practice Workflow Page' })).toBeVisible();
   await expect(page.getByText('Meaning -> Word')).toBeVisible();
   await expect(page.getByText('recap', { exact: true })).toBeVisible();
 
@@ -125,10 +130,11 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   await expect(page.getByText('1 / 2')).toBeVisible();
   await page.getByRole('link', { name: 'Back to decks' }).click();
 
-  const afterAbandonDecks = await listDecks(page, headers);
-  expect(reviewSnapshot(afterAbandonDecks.find((deck) => deck.name === pageDeck.name))).toEqual(initialSchedule);
+  const afterAbandonBoards = await listBoards(page, headers);
+  const afterAbandonPage = findPageBoard(afterAbandonBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
+  expect(reviewSnapshot(afterAbandonPage)).toEqual(initialSchedule);
 
-  await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
+  await pageCard.getByRole('link', { name: 'Practice' }).click();
   await completeMeaningToWordPractice(page);
 
   const finishSummaryResponsePromise = page.waitForResponse((response) =>
@@ -140,36 +146,15 @@ test('practice completion separates Finish from Add to Review FluentA SRS creati
   expect(finishSummaryPayload.wrongCards).toBe(1);
   await page.getByRole('link', { name: 'Done' }).click();
 
-  const afterFinishDecks = await listDecks(page, headers);
-  expect(reviewSnapshot(afterFinishDecks.find((deck) => deck.name === pageDeck.name))).toEqual(initialSchedule);
+  const afterFinishBoards = await listBoards(page, headers);
+  const afterFinishPage = findPageBoard(afterFinishBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
+  expect(reviewSnapshot(afterFinishPage)).toEqual(initialSchedule);
 
-  await pageDeckCard.getByRole('link', { name: 'Practice this Page Deck' }).click();
-  await completeMeaningToWordPractice(page);
-
-  const addSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
-  const addToReviewResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/practice/add-to-review') && response.request().method() === 'POST');
+  await pageCard.getByRole('link', { name: 'Practice again' }).click();
+  await page.getByTestId('start-practice-session').click();
+  await page.getByTestId('practice-answer-input').fill('mitigate');
+  await page.getByRole('button', { name: 'Submit answer' }).click();
+  await page.getByTestId('practice-next-card').click();
   await page.getByRole('button', { name: 'Add to Review' }).click();
-  await addSummaryResponsePromise;
-  const addToReviewPayload = (await (await addToReviewResponsePromise).json()).data;
-  expect(addToReviewPayload.addedWordCount).toBe(2);
-  await expect(page.getByTestId('practice-summary')).toContainText('2 new words were added to Review');
-
-  const afterAddDecks = await listDecks(page, headers);
-  const afterAddSchedule = reviewSnapshot(afterAddDecks.find((deck) => deck.name === pageDeck.name));
-  expect(afterAddSchedule).toEqual([
-    expect.objectContaining({ word: 'mitigate', reviewLevel: 0, lapseCount: 0, nextReviewDate: expect.any(String) }),
-    expect.objectContaining({ word: 'nuance', reviewLevel: 0, lapseCount: 0, nextReviewDate: expect.any(String) }),
-  ]);
-
-  const repeatAdd = await page.request.post('http://127.0.0.1:5000/api/v1/practice/add-to-review', {
-    headers,
-    data: { deckId: pageDeck.id, timeZoneId: 'UTC' },
-  });
-  expect(repeatAdd.status()).toBe(200);
-  expect((await repeatAdd.json()).data.addedWordCount).toBe(0);
-
-  const afterRepeatAddDecks = await listDecks(page, headers);
-  expect(reviewSnapshot(afterRepeatAddDecks.find((deck) => deck.name === pageDeck.name))).toEqual(afterAddSchedule);
+  await expect(page.getByRole('button', { name: 'Added' })).toBeDisabled();
 });

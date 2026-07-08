@@ -16,7 +16,14 @@ public sealed record CreateReviewSessionRequest(
     Guid BoardId,
     string OrderType,
     string Mode,
+    string StartBehavior,
     string TimeZoneId);
+
+public sealed record ReviewStartOptionsDto(
+    bool HasActiveSameDaySession,
+    Guid? ExistingSessionId,
+    int RemainingWords,
+    bool RequiresDecision);
 
 public sealed record ReviewSessionCreatedDto(
     Guid SessionId,
@@ -24,7 +31,10 @@ public sealed record ReviewSessionCreatedDto(
     string BoardName,
     string OrderType,
     string Mode,
+    string StartDisposition,
+    DateTime StartedAt,
     int TotalWords,
+    ReviewStartOptionsDto StartOptions,
     IReadOnlyList<ReviewSessionWordDto> Words);
 
 public sealed record ReviewSessionSummaryDto(
@@ -69,3 +79,15 @@ public sealed record ReviewResultDto(
     int LevelAfter,
     int LapseCount,
     DateTime NextReviewDate);
+
+public sealed record LevelFiveReviewItemDto(
+    Guid WordId,
+    string Word,
+    Guid BoardId,
+    string BoardName,
+    Guid PageId,
+    string PageName,
+    string Status,
+    DateTime? LastReviewDate);
+
+public sealed record RemoveLevelFiveWordsRequest(IReadOnlyList<Guid> WordIds);

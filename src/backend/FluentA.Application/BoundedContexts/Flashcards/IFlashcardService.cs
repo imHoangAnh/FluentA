@@ -5,8 +5,8 @@ namespace FluentA.Application.BoundedContexts.Flashcards;
 
 public interface IFlashcardService
 {
-    /// <summary>Lists synchronized flashcard decks for a user.</summary>
-    Task<IReadOnlyList<FlashcardDeckDto>> ListDecksAsync(Guid userId, CancellationToken cancellationToken = default);
-    /// <summary>Returns cards and metadata for a deck review session.</summary>
-    Task<OperationResult<DeckSessionDto>> GetDeckSessionAsync(Guid userId, Guid deckId, CancellationToken cancellationToken = default);
+    /// <summary>Lists vocabulary boards and pages for Flashcard/Practice.</summary>
+    Task<IReadOnlyList<FlashcardBoardDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default);
+    /// <summary>Returns words and metadata for a page-scoped learning session.</summary>
+    Task<OperationResult<PageSessionDto>> GetPageSessionAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default);
 }

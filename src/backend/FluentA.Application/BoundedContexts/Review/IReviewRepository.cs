@@ -7,7 +7,8 @@ public interface IReviewRepository
 {
     Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
+        Guid wordId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
@@ -17,6 +18,7 @@ public interface IReviewRepository
         Guid boardId,
         string orderType,
         string mode,
+        string startBehavior,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         Guid sessionId,
@@ -49,5 +51,14 @@ public interface IReviewRepository
         bool correct,
         int timeSpentSeconds,
         TimeZoneInfo timeZone,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<int> RemoveLevelFiveWordsAsync(
+        Guid userId,
+        IReadOnlyList<Guid> wordIds,
         CancellationToken cancellationToken = default);
 }

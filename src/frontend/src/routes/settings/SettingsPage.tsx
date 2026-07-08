@@ -267,6 +267,7 @@ export function SettingsPage() {
         </div>
         <nav className="workspace-nav" aria-label="Settings navigation">
           <Link className="ghost-button ghost-button--inline" to="/flashcards"><ArrowLeft size={17} /> Flashcards</Link>
+          <Link className="ghost-button ghost-button--inline" to="/settings/level5">Level 5</Link>
           <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout"><LogOut size={18} /></button>
         </nav>
       </header>

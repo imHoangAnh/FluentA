@@ -7,7 +7,7 @@ type LearningNavLinksProps = {
 
 function isActive(pathname: string, href: string) {
   if (href === '/flashcards') {
-    return pathname === '/flashcards' || pathname.startsWith('/flashcards/decks/')
+    return pathname === '/flashcards' || pathname.startsWith('/flashcards/pages/')
   }
 
   return pathname === href

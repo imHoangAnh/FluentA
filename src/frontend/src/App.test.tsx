@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -43,7 +43,7 @@ function createQueryClient() {
   queryClient.setQueryData(['todo', 'items', today], [])
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['vocab', 'boards'], [])
-  queryClient.setQueryData(['flashcard', 'decks'], [])
+  queryClient.setQueryData(['flashcard', 'boards'], [])
   queryClient.setQueryData(['review', 'dashboard'], {
     boardId: null,
     boardName: null,
@@ -121,21 +121,18 @@ function renderAppWithDashboardData(initialEntry: string) {
     note: null,
     date: today,
     isCompleted: false,
-    sortOrder: 1,
-    isCarriedOver: false,
-    carriedOverFromDate: null,
+    completedAt: null,
     createdAt: '2026-06-11T00:00:00Z',
     updatedAt: '2026-06-11T00:00:00Z',
   }])
-  queryClient.setQueryData(['flashcard', 'decks'], [{
-    id: 'deck-1',
+  queryClient.setQueryData(['flashcard', 'boards'], [{
     boardId: 'board-1',
     boardName: 'IELTS',
     boardLanguage: 'en',
-    pageId: 'page-1',
-    name: 'IELTS - Unit 1',
-    type: 'PageDeck',
-    cards: [{
+    pages: [{
+      pageId: 'page-1',
+      pageName: 'IELTS - Unit 1',
+      words: [{
       id: 'card-1',
       wordId: 'word-1',
       word: 'hello',
@@ -143,9 +140,12 @@ function renderAppWithDashboardData(initialEntry: string) {
       meaningVn: 'xin chao',
       meaningEn: 'hello',
       example: 'hello',
+      isInReview: false,
       reviewLevel: null,
       nextReviewDate: null,
       lapseCount: 0,
+      }],
+      isPracticed: false,
     }],
   }])
   queryClient.setQueryData(['review', 'dashboard'], {
@@ -192,15 +192,14 @@ function renderAppWithDashboardData(initialEntry: string) {
 function renderAppWithDeck(initialEntry: string) {
   const queryClient = createQueryClient()
 
-  const deck = {
-    id: 'deck-1',
+  const board = {
     boardId: 'board-1',
     boardName: 'HSK',
     boardLanguage: 'zh',
-    pageId: 'page-1',
-    name: 'HSK - Unit 1',
-    type: 'PageDeck',
-    cards: [{
+    pages: [{
+      pageId: 'page-1',
+      pageName: 'HSK - Unit 1',
+      words: [{
       id: 'card-1',
       wordId: 'word-1',
       word: '你好',
@@ -208,13 +207,16 @@ function renderAppWithDeck(initialEntry: string) {
       meaningVn: 'xin chào',
       meaningEn: 'ni hao',
       example: '你好！',
+      isInReview: false,
       reviewLevel: null,
       nextReviewDate: null,
       lapseCount: 0,
+      }],
+      isPracticed: false,
     }],
   }
 
-  queryClient.setQueryData(['flashcard', 'decks'], [deck])
+  queryClient.setQueryData(['flashcard', 'boards'], [board])
   queryClient.setQueryData(['review', 'dashboard'], {
     boardId: null,
     boardName: null,
@@ -227,13 +229,12 @@ function renderAppWithDeck(initialEntry: string) {
     newCards: 1,
     forecast: [{ date: '2026-06-10', dueCount: 1 }],
   })
-  queryClient.setQueryData(['flashcard', 'deck-session', 'deck-1'], {
-    deckId: deck.id,
-    boardId: deck.boardId,
-    deckName: deck.name,
-    deckType: deck.type,
-    boardLanguage: deck.boardLanguage,
-    cards: deck.cards,
+  queryClient.setQueryData(['flashcard', 'page-session', 'page-1'], {
+    pageId: 'page-1',
+    boardId: board.boardId,
+    pageName: 'HSK - Unit 1',
+    boardLanguage: board.boardLanguage,
+    words: board.pages[0].words,
   })
 
   return renderWithClient(queryClient, initialEntry)
@@ -281,7 +282,7 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/review')
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
-    expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdown')
+    expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
     expect(screen.getByRole('link', { name: 'Kanban' })).toHaveAttribute('href', '/kanban')
     expect(screen.getByRole('link', { name: 'Pomodoro' })).toHaveAttribute('href', '/pomodoro')
@@ -316,13 +317,13 @@ describe('FluentA app routes', () => {
 
     renderApp('/flashcards')
 
-    expect(screen.getByRole('heading', { name: 'Your page decks' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your pages' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No pages yet' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open vocabulary' })).toHaveAttribute('href', '/vocabulary')
   })
 
   it('protects practice sessions when anonymous', () => {
-    renderApp('/flashcards/decks/deck-1/practice')
+    renderApp('/flashcards/pages/page-1/practice')
 
     expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
   })
@@ -336,11 +337,11 @@ describe('FluentA app routes', () => {
 
     const { unmount } = renderAppWithDeck('/flashcards')
 
-    expect(screen.getByRole('link', { name: 'Practice this Page Deck' })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
-    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/decks/deck-1')
+    expect(screen.getByRole('link', { name: 'Practice this Page' })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
+    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/pages/page-1')
 
     unmount()
-    renderAppWithDeck('/flashcards/decks/deck-1/practice')
+    renderAppWithDeck('/flashcards/pages/page-1/practice')
 
     expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
     expect(screen.getByText('dictation')).toBeInTheDocument()
@@ -358,9 +359,10 @@ describe('FluentA app routes', () => {
 
     renderAppWithDeck('/flashcards/practice')
 
-    expect(screen.getByRole('heading', { name: 'Choose a page deck to practice' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Practice this Page Deck' })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
-    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/decks/deck-1')
+    expect(screen.getByRole('heading', { name: 'Choose a page to practice' })).toBeInTheDocument()
+    const pageCard = screen.getByTestId('flashcard-page-page-1')
+    expect(within(pageCard).getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
+    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/pages/page-1')
   })
 
   it('renders the one-card flashcard viewer route from cached data', () => {
@@ -370,12 +372,12 @@ describe('FluentA app routes', () => {
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    renderAppWithDeck('/flashcards/decks/deck-1')
+    renderAppWithDeck('/flashcards/pages/page-1')
 
     expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
     expect(screen.getByText('1 / 1')).toBeInTheDocument()
     expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/flashcards/decks/deck-1/practice')
+    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
   })
 
   it('renders protected settings from cached data', () => {

@@ -10,7 +10,7 @@ public sealed class PracticeSessionSummary : BaseEntity
 
     private PracticeSessionSummary(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
         PracticeMode mode,
         int totalCards,
         int correctCards,
@@ -18,7 +18,7 @@ public sealed class PracticeSessionSummary : BaseEntity
         DateTime completedAt)
     {
         UserId = userId;
-        DeckId = deckId;
+        PageId = pageId;
         Mode = mode;
         TotalCards = totalCards;
         CorrectCards = correctCards;
@@ -27,7 +27,7 @@ public sealed class PracticeSessionSummary : BaseEntity
     }
 
     public Guid UserId { get; private set; }
-    public Guid DeckId { get; private set; }
+    public Guid PageId { get; private set; }
     public PracticeMode Mode { get; private set; }
     public int TotalCards { get; private set; }
     public int CorrectCards { get; private set; }
@@ -36,16 +36,16 @@ public sealed class PracticeSessionSummary : BaseEntity
 
     public static PracticeSessionSummary Create(
         Guid userId,
-        Guid deckId,
+        Guid pageId,
         PracticeMode mode,
         int totalCards,
         int correctCards,
         int wrongCards,
         DateTime completedAt)
     {
-        if (userId == Guid.Empty || deckId == Guid.Empty)
+        if (userId == Guid.Empty || pageId == Guid.Empty)
         {
-            throw new ArgumentException("User id and deck id are required.");
+            throw new ArgumentException("User id and page id are required.");
         }
 
         if (totalCards <= 0 || correctCards < 0 || wrongCards < 0 || correctCards + wrongCards != totalCards)
@@ -53,6 +53,26 @@ public sealed class PracticeSessionSummary : BaseEntity
             throw new ArgumentException("Practice summary counts are invalid.");
         }
 
-        return new PracticeSessionSummary(userId, deckId, mode, totalCards, correctCards, wrongCards, completedAt);
+        return new PracticeSessionSummary(userId, pageId, mode, totalCards, correctCards, wrongCards, completedAt);
+    }
+
+    public void UpdateCompletion(
+        PracticeMode mode,
+        int totalCards,
+        int correctCards,
+        int wrongCards,
+        DateTime completedAt)
+    {
+        if (totalCards <= 0 || correctCards < 0 || wrongCards < 0 || correctCards + wrongCards != totalCards)
+        {
+            throw new ArgumentException("Practice summary counts are invalid.");
+        }
+
+        Mode = mode;
+        TotalCards = totalCards;
+        CorrectCards = correctCards;
+        WrongCards = wrongCards;
+        CompletedAt = completedAt;
+        UpdatedAt = DateTime.UtcNow;
     }
 }
