@@ -67,6 +67,10 @@ function buildBoardOptions(boards: flashcardApi.FlashcardBoard[]) {
   })
 }
 
+function modeLabel(mode: flashcardApi.ReviewSessionWord['mode']) {
+  return mode === 'meaningToWord' ? 'Meaning -> Word' : mode
+}
+
 export function ReviewSessionPage() {
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
@@ -293,6 +297,8 @@ export function ReviewSessionPage() {
   const completed = Boolean(session) && currentIndex + 1 >= words.length && (lastOutcome !== null || !currentWord)
   const noBoardSelected = !boardId
   const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0 && !resumeModalSession?.startOptions.hasActiveSameDaySession
+  const isMeaningToWord = currentWord?.mode === 'meaningToWord'
+  const isPronunciation = currentWord?.mode === 'pronunciation'
 
   return (
     <div className="dashboard-layout">
@@ -457,7 +463,7 @@ export function ReviewSessionPage() {
             <div className="review-progress">
               <div>
                 <span className="preview-label">
-                  {currentWord.mode === 'meaningToWord' ? 'Meaning -> Word' : currentWord.mode} · {session.orderType}
+                  {modeLabel(currentWord.mode)} · {session.orderType}
                 </span>
                 <strong>{currentIndex + 1} / {words.length}</strong>
               </div>
@@ -466,16 +472,26 @@ export function ReviewSessionPage() {
 
             <article className="review-card" data-testid="active-review-card">
               <div className="review-card__front">
-                <span>{currentWord.wordClass}</span>
-                <h1>{currentWord.mode === 'meaningToWord' ? currentWord.meaningVn : currentWord.word}</h1>
-                <button className="icon-button" type="button" aria-label="Play pronunciation" onClick={() => speakWord(currentWord.word, currentLanguage)}>
-                  <Volume2 size={18} />
-                </button>
+                <span>{modeLabel(currentWord.mode)}</span>
+                {isMeaningToWord ? (
+                  <>
+                    <h1>{currentWord.meaningVn || currentWord.meaningEn}</h1>
+                    {currentWord.meaningVn && currentWord.meaningEn ? <p>{currentWord.meaningEn}</p> : null}
+                  </>
+                ) : (
+                  <>
+                    <h1>{currentWord.mode === 'dictation' ? 'Listen, then type the word' : currentWord.word}</h1>
+                    <p>{currentWord.wordClass}</p>
+                    <button className="icon-button" type="button" aria-label="Play pronunciation" onClick={() => speakWord(currentWord.word, currentLanguage)}>
+                      <Volume2 size={18} />
+                    </button>
+                  </>
+                )}
               </div>
 
               {!showRecap ? (
                 <div className="practice-answer-panel">
-                  {currentWord.mode === 'pronunciation' ? (
+                  {isPronunciation ? (
                     <>
                       <label className="practice-label" htmlFor="review-transcript">Transcript</label>
                       <textarea
@@ -498,11 +514,14 @@ export function ReviewSessionPage() {
                     </>
                   ) : (
                     <>
-                      <label className="practice-label" htmlFor="review-answer-input">Type the target word</label>
+                      <label className="practice-label" htmlFor="review-answer-input">
+                        {isMeaningToWord ? 'Type the word for this meaning' : 'Type what you hear'}
+                      </label>
                       <input
                         id="review-answer-input"
                         className="practice-input"
                         value={typedAnswer}
+                        placeholder={isMeaningToWord ? 'Enter the target word' : 'Enter the spoken word'}
                         onChange={(event) => setTypedAnswer(event.target.value)}
                       />
                       <button className="primary-button" type="button" onClick={checkTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0}>
