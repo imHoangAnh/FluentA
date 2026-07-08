@@ -17,6 +17,7 @@ public sealed class EfCountdownRepository : ICountdownRepository
     public async Task<IReadOnlyList<CountdownEventEntity>> ListAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.CountdownEvents
+            .Include(countdownEvent => countdownEvent.Alerts)
             .Where(countdownEvent => countdownEvent.UserId == userId && countdownEvent.DeletedAt == null)
             .OrderBy(countdownEvent => countdownEvent.TargetDate)
             .ThenBy(countdownEvent => countdownEvent.CreatedAt)
@@ -26,6 +27,7 @@ public sealed class EfCountdownRepository : ICountdownRepository
     public Task<CountdownEventEntity?> GetAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
     {
         return _dbContext.CountdownEvents
+            .Include(countdownEvent => countdownEvent.Alerts)
             .FirstOrDefaultAsync(
                 countdownEvent => countdownEvent.Id == countdownId
                     && countdownEvent.UserId == userId

@@ -173,21 +173,28 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("auth_users", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime?>("AlertedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alerted_at");
+                    b.Property<string>("AlertDay")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("alert_day");
 
-                    b.Property<string>("Color")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("color");
+                    b.Property<string>("AlertTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("alert_time");
+
+                    b.Property<Guid>("CountdownId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("countdown_id");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -197,10 +204,43 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<string>("Icon")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("icon");
+                    b.Property<DateTime?>("FiredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fired_at_utc");
+
+                    b.Property<DateTime>("ScheduledAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_at_utc");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountdownId", "ScheduledAtUtc");
+
+                    b.ToTable("countdown_alerts", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("CoverAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cover_asset_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -209,7 +249,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnName("name");
 
                     b.Property<DateTime>("TargetDate")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("date")
                         .HasColumnName("target_date");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -224,7 +264,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "TargetDate");
 
-                    b.ToTable("countdown_events", (string)null);
+                    b.ToTable("countdowns", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
@@ -516,24 +556,13 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
-
-                    b.Property<DateTime?>("LearningDate")
-                        .HasColumnType("date")
-                        .HasColumnName("learning_date");
-
-                    b.Property<string>("PlainTextContent")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("plain_text_content");
-
-                    b.Property<string>("Preview")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("preview");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -553,9 +582,9 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "CreatedAt");
 
-                    b.HasIndex("UserId", "LearningDate");
+                    b.HasIndex("UserId", "Date");
 
-                    b.ToTable("journal_entries", (string)null);
+                    b.ToTable("journal", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanBoard", b =>
@@ -633,11 +662,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer")
                         .HasColumnName("sort_order");
-
-                    b.PrimitiveCollection<string[]>("Tags")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("tags");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1153,10 +1177,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<bool>("IsCarriedOver")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_carried_over");
-
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_completed");
@@ -1165,14 +1185,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("note");
-
-                    b.Property<DateTime?>("OriginalDate")
-                        .HasColumnType("date")
-                        .HasColumnName("original_date");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1191,8 +1203,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "Date");
-
-                    b.HasIndex("UserId", "Date", "SortOrder");
 
                     b.HasIndex("UserId", "IsCompleted", "Date");
 
@@ -1426,6 +1436,15 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", null)
+                        .WithMany("Alerts")
+                        .HasForeignKey("CountdownId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", null)
@@ -1529,6 +1548,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
+                {
+                    b.Navigation("Alerts");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanBoard", b =>

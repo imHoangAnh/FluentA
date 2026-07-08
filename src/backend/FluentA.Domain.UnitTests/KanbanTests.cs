@@ -27,14 +27,12 @@ public sealed class KanbanTests
             "  Write plan  ",
             CardPriority.High,
             deadline,
-            2,
-            [" Study ", "study", "Project"]);
+            2);
 
         Assert.Equal("Draft lesson", card.Title);
         Assert.Equal("Write plan", card.Description);
         Assert.Equal(CardPriority.High, card.Priority);
         Assert.Equal(new DateTime(2026, 6, 18, 0, 0, 0, DateTimeKind.Utc), card.Deadline);
-        Assert.Equal(["Study", "Project"], card.Tags);
 
         card.MoveToColumn(targetColumnId, 0);
 
@@ -48,11 +46,10 @@ public sealed class KanbanTests
         Assert.Throws<ArgumentException>(() => KanbanBoard.Create(Guid.Empty, "Board"));
         Assert.Throws<ArgumentException>(() => KanbanBoard.Create(Guid.NewGuid(), ""));
         Assert.Throws<ArgumentException>(() => KanbanColumn.Create(Guid.NewGuid(), new string('x', 181), 0));
-        Assert.Throws<ArgumentException>(() => KanbanCard.Create(Guid.NewGuid(), "", null, CardPriority.Low, null, 0, []));
-        Assert.Throws<ArgumentException>(() => KanbanCard.Create(Guid.NewGuid(), "Card", null, CardPriority.Low, null, 0, Enumerable.Range(0, 13).Select(index => $"tag-{index}").ToArray()));
+        Assert.Throws<ArgumentException>(() => KanbanCard.Create(Guid.NewGuid(), "", null, CardPriority.Low, null, 0));
 
         var board = KanbanBoard.Create(Guid.NewGuid(), "Board");
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
 
         board.SoftDelete();
 

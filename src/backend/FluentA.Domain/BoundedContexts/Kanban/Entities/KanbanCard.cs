@@ -8,7 +8,6 @@ public sealed class KanbanCard : BaseEntity
     private KanbanCard()
     {
         Title = string.Empty;
-        Tags = [];
     }
 
     private KanbanCard(
@@ -17,8 +16,7 @@ public sealed class KanbanCard : BaseEntity
         string? description,
         CardPriority priority,
         DateTime? deadline,
-        int sortOrder,
-        IReadOnlyList<string> tags)
+        int sortOrder)
     {
         if (columnId == Guid.Empty)
         {
@@ -31,7 +29,6 @@ public sealed class KanbanCard : BaseEntity
         Priority = priority;
         Deadline = NormalizeDeadline(deadline);
         SortOrder = ValidateSortOrder(sortOrder);
-        Tags = CleanTags(tags);
     }
 
     public Guid ColumnId { get; private set; }
@@ -40,18 +37,15 @@ public sealed class KanbanCard : BaseEntity
     public CardPriority Priority { get; private set; }
     public DateTime? Deadline { get; private set; }
     public int SortOrder { get; private set; }
-    public string[] Tags { get; private set; }
-
     public static KanbanCard Create(
         Guid columnId,
         string title,
         string? description,
         CardPriority priority,
         DateTime? deadline,
-        int sortOrder,
-        IReadOnlyList<string> tags)
+        int sortOrder)
     {
-        return new KanbanCard(columnId, title, description, priority, deadline, sortOrder, tags);
+        return new KanbanCard(columnId, title, description, priority, deadline, sortOrder);
     }
 
     public void Update(
@@ -59,7 +53,6 @@ public sealed class KanbanCard : BaseEntity
         string? description,
         CardPriority? priority,
         DateTime? deadline,
-        IReadOnlyList<string>? tags,
         bool clearDeadline)
     {
         if (title is not null)
@@ -84,11 +77,6 @@ public sealed class KanbanCard : BaseEntity
         else if (deadline is not null)
         {
             Deadline = NormalizeDeadline(deadline);
-        }
-
-        if (tags is not null)
-        {
-            Tags = CleanTags(tags);
         }
 
         Touch();
@@ -155,26 +143,5 @@ public sealed class KanbanCard : BaseEntity
         return sortOrder < 0
             ? throw new ArgumentOutOfRangeException(nameof(sortOrder), "Sort order must be zero or greater.")
             : sortOrder;
-    }
-
-    private static string[] CleanTags(IReadOnlyList<string> tags)
-    {
-        var cleaned = tags
-            .Select(tag => tag.Trim())
-            .Where(tag => tag.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (cleaned.Length > 12)
-        {
-            throw new ArgumentException("A Kanban card can have at most 12 tags.", nameof(tags));
-        }
-
-        if (cleaned.Any(tag => tag.Length > 40))
-        {
-            throw new ArgumentException("Kanban card tags must be at most 40 characters.", nameof(tags));
-        }
-
-        return cleaned;
     }
 }

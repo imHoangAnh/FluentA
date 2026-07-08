@@ -5,43 +5,41 @@ namespace FluentA.Domain.UnitTests;
 public sealed class JournalEntryTests
 {
     [Fact]
-    public void Create_CleansUnicodeFieldsAndBuildsBoundedPreview()
+    public void Create_NormalizesTitleContentAndDate()
     {
         var entry = JournalEntry.Create(
             Guid.NewGuid(),
-            " Học tiếng Việt ",
-            "<p>Xin chào thế giới</p>",
-            "  Xin chào\n\nthế giới " + new string('a', 120),
-            new DateTime(2026, 6, 11, 16, 30, 0));
+            " Hoc tieng Viet ",
+            new DateTime(2026, 6, 11, 16, 30, 0, DateTimeKind.Local),
+            "<p>Xin chao the gioi</p>");
 
-        Assert.Equal("Học tiếng Việt", entry.Title);
-        Assert.StartsWith("Xin chào thế giới", entry.Preview);
-        Assert.Equal(100, entry.Preview.Length);
-        Assert.Equal(DateTimeKind.Utc, entry.LearningDate!.Value.Kind);
-        Assert.Equal(new DateTime(2026, 6, 11), entry.LearningDate.Value.Date);
+        Assert.Equal("Hoc tieng Viet", entry.Title);
+        Assert.Equal("<p>Xin chao the gioi</p>", entry.Content);
+        Assert.Equal(DateTimeKind.Utc, entry.Date.Kind);
+        Assert.Equal(new DateTime(2026, 6, 11, 0, 0, 0, DateTimeKind.Utc), entry.Date);
     }
 
     [Fact]
-    public void UpdateContent_RebuildsPreviewAndSupportsEmptyContent()
+    public void UpdateContentAndDate_ReplaceStoredValues()
     {
-        var entry = JournalEntry.Create(Guid.NewGuid(), "Entry", "<p>Original</p>", "Original");
+        var entry = JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), "<p>Original</p>");
 
-        entry.UpdateContent("<p>Updated content</p>", " Updated content ");
+        entry.UpdateContent("<p>Updated content</p>");
+        entry.UpdateDate(new DateTime(2026, 6, 12, 14, 0, 0, DateTimeKind.Local));
+
         Assert.Equal("<p>Updated content</p>", entry.Content);
-        Assert.Equal(" Updated content ", entry.PlainTextContent);
-        Assert.Equal("Updated content", entry.Preview);
+        Assert.Equal(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc), entry.Date);
 
-        entry.UpdateContent(string.Empty, string.Empty);
+        entry.UpdateContent(string.Empty);
+
         Assert.Empty(entry.Content);
-        Assert.Empty(entry.Preview);
     }
 
     [Fact]
     public void Create_RejectsMissingOwnerAndInvalidFields()
     {
-        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.Empty, "Entry"));
-        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), " "));
-        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), "Entry", new string('a', 100_001)));
-        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), "Entry", string.Empty, new string('a', 100_001)));
+        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.Empty, "Entry", new DateTime(2026, 6, 11)));
+        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), " ", new DateTime(2026, 6, 11)));
+        Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), new string('a', 100_001)));
     }
 }

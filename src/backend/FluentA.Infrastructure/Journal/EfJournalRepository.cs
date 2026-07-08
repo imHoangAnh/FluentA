@@ -23,8 +23,7 @@ public sealed class EfJournalRepository : IJournalRepository
             .Select(entry => new JournalEntryListItem(
                 entry.Id,
                 entry.Title,
-                entry.Preview,
-                entry.LearningDate,
+                entry.Date,
                 entry.CreatedAt,
                 entry.UpdatedAt))
             .AsNoTracking()
@@ -46,15 +45,14 @@ public sealed class EfJournalRepository : IJournalRepository
             .Where(entry =>
                 entry.UserId == userId &&
                 entry.DeletedAt == null &&
-                EF.Functions.ILike(entry.PlainTextContent, pattern, @"\"))
+                EF.Functions.ILike(entry.Title, pattern, @"\"))
             .OrderByDescending(entry => entry.CreatedAt)
             .ThenByDescending(entry => entry.Id)
             .Take(50)
             .Select(entry => new JournalEntrySearchItem(
                 entry.Id,
                 entry.Title,
-                entry.PlainTextContent,
-                entry.LearningDate,
+                entry.Date,
                 entry.CreatedAt,
                 entry.UpdatedAt))
             .AsNoTracking()
@@ -71,10 +69,9 @@ public sealed class EfJournalRepository : IJournalRepository
             .Where(entry =>
                 entry.UserId == userId &&
                 entry.DeletedAt == null &&
-                entry.LearningDate != null &&
-                entry.LearningDate >= monthStart &&
-                entry.LearningDate < monthEnd)
-            .GroupBy(entry => entry.LearningDate!.Value)
+                entry.Date >= monthStart &&
+                entry.Date < monthEnd)
+            .GroupBy(entry => entry.Date)
             .OrderBy(group => group.Key)
             .Select(group => new JournalCalendarDayItem(group.Key, group.Count()))
             .AsNoTracking()

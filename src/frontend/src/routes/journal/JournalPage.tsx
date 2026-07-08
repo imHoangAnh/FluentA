@@ -60,18 +60,22 @@ function buildCalendarDates(month: string) {
 
 function HighlightedPreview({ entry }: { entry: journalApi.JournalEntrySummary | journalApi.JournalSearchResult }) {
   if (!('highlights' in entry) || entry.highlights.length === 0) {
-    return <>{entry.preview || 'No content yet.'}</>
+    return <>{entry.title}</>
   }
 
   const parts: React.ReactNode[] = []
   let position = 0
   for (const range of entry.highlights) {
-    if (range.start > position) parts.push(entry.preview.slice(position, range.start))
-    parts.push(<mark key={`${range.start}-${range.length}`}>{entry.preview.slice(range.start, range.start + range.length)}</mark>)
+    if (range.start > position) parts.push(entry.title.slice(position, range.start))
+    parts.push(<mark key={`${range.start}-${range.length}`}>{entry.title.slice(range.start, range.start + range.length)}</mark>)
     position = range.start + range.length
   }
-  if (position < entry.preview.length) parts.push(entry.preview.slice(position))
+  if (position < entry.title.length) parts.push(entry.title.slice(position))
   return <>{parts}</>
+}
+
+function hasHighlights(entry: journalApi.JournalEntrySummary | journalApi.JournalSearchResult): entry is journalApi.JournalSearchResult {
+  return 'highlights' in entry
 }
 
 export function JournalPage() {
@@ -85,7 +89,7 @@ export function JournalPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [learningDate, setLearningDate] = useState('')
+  const [entryDate, setEntryDate] = useState(() => toDateInput(new Date()))
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openFailed, setOpenFailed] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
@@ -136,7 +140,7 @@ export function JournalPage() {
     setSelectedId(null)
     setTitle('')
     setContent('')
-    setLearningDate('')
+    setEntryDate(toDateInput(new Date()))
     setIsDirty(false)
     setSaveStatus('idle')
   }
@@ -148,7 +152,7 @@ export function JournalPage() {
     setSelectedId(null)
     setTitle(`Learning notes for ${date}`)
     setContent('')
-    setLearningDate(date)
+    setEntryDate(date)
     setIsDirty(false)
     setSaveStatus('idle')
   }
@@ -157,7 +161,7 @@ export function JournalPage() {
     setSelectedId(entry.id)
     setTitle(entry.title)
     setContent(entry.content)
-    setLearningDate(entry.learningDate ?? '')
+    setEntryDate(entry.date)
     setIsDirty(false)
     setSaveStatus('saved')
   }
@@ -188,7 +192,7 @@ export function JournalPage() {
   }
 
   const openCalendarDate = (date: string) => {
-    const matchingEntry = (entriesQuery.data ?? []).find((entry) => entry.learningDate === date)
+    const matchingEntry = (entriesQuery.data ?? []).find((entry) => entry.date === date)
     if (matchingEntry) {
       void openEntry(matchingEntry)
       return
@@ -244,22 +248,22 @@ export function JournalPage() {
 
     const version = draftVersionRef.current
     const timer = window.setTimeout(() => {
-      saveEntry({ id: selectedId, patch: { title, content, learningDate }, version })
+      saveEntry({ id: selectedId, patch: { title, content, date: entryDate }, version })
     }, 2_000)
 
     return () => window.clearTimeout(timer)
-  }, [content, isDirty, isOpening, isUpdatePending, learningDate, saveEntry, selectedId, title])
+  }, [content, entryDate, isDirty, isOpening, isUpdatePending, saveEntry, selectedId, title])
 
   function submitEntry(event: FormEvent) {
     event.preventDefault()
     if (!title.trim()) return
 
     if (selectedId) {
-      saveEntry({ id: selectedId, patch: { title, content, learningDate }, version: draftVersionRef.current })
+      saveEntry({ id: selectedId, patch: { title, content, date: entryDate }, version: draftVersionRef.current })
       return
     }
 
-    createEntry.mutate({ title, content, learningDate: learningDate || null })
+    createEntry.mutate({ title, content, date: entryDate })
   }
 
   const textContent = useMemo(() => {
@@ -300,7 +304,7 @@ export function JournalPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
@@ -343,9 +347,9 @@ export function JournalPage() {
         <div className="journal-header-actions">
           <label className="journal-search">
             <Search size={17} />
-            <span className="sr-only">Search journal content</span>
+            <span className="sr-only">Search journal title</span>
             <input
-              aria-label="Search journal content"
+              aria-label="Search journal title"
               data-testid="journal-search-input"
               maxLength={100}
               placeholder="Search journal..."
@@ -367,7 +371,7 @@ export function JournalPage() {
 
       <div className="journal-content">
         <div className="journal-sidebar">
-          <section className="journal-calendar-card" aria-label="Learning date calendar">
+          <section className="journal-calendar-card" aria-label="Journal date calendar">
             <header>
               <strong>{monthLabel(calendarMonth)}</strong>
               <div style={{ display: 'flex', gap: '4px' }}>
@@ -385,7 +389,7 @@ export function JournalPage() {
             <div className="journal-calendar-grid">
               {calendarDates.map((day) => {
                 const count = calendarCounts.get(day.value) ?? 0
-                const isSelected = learningDate === day.value
+                const isSelected = entryDate === day.value
                 return (
                   <button
                     aria-label={`${day.value}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
@@ -437,11 +441,11 @@ export function JournalPage() {
                   aria-label={`Open journal ${entry.title}`}
                 >
                   <div className="journal-entry-card-top">
-                    <span className="journal-entry-badge">{entry.learningDate ? 'LEARNING' : 'NOTE'}</span>
-                    <span className="journal-entry-date">{formatDate(entry.createdAt)}</span>
+                    <span className="journal-entry-badge">ENTRY</span>
+                    <span className="journal-entry-date">{formatDate(entry.date)}</span>
                   </div>
                   <strong>{entry.title}</strong>
-                  <p><HighlightedPreview entry={entry} /></p>
+                  {hasHighlights(entry) && entry.highlights.length > 0 ? <p><HighlightedPreview entry={entry} /></p> : null}
                 </button>
               ))}
             </div>
@@ -478,15 +482,15 @@ export function JournalPage() {
               <div className="journal-date-display">
                 <CalendarDays size={18} />
                 <input
-                  data-testid="journal-learning-date-input"
+                  data-testid="journal-date-input"
                   disabled={isOpening}
-                  value={learningDate}
+                  value={entryDate}
                   type="date"
                   onChange={(event) => {
-                    setLearningDate(event.target.value)
+                    setEntryDate(event.target.value)
                     markChanged()
                   }}
-                  aria-label="Learning date"
+                  aria-label="Journal date"
                 />
               </div>
 

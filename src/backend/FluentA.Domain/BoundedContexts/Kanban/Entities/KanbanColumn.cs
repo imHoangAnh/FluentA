@@ -39,10 +39,9 @@ public sealed class KanbanColumn : BaseEntity
         string? description,
         CardPriority priority,
         DateTime? deadline,
-        int sortOrder,
-        IReadOnlyList<string> tags)
+        int sortOrder)
     {
-        var card = KanbanCard.Create(Id, title, description, priority, deadline, sortOrder, tags);
+        var card = KanbanCard.Create(Id, title, description, priority, deadline, sortOrder);
         _cards.Add(card);
         Touch();
         return card;

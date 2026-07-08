@@ -40,6 +40,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
+    public DbSet<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert> CountdownAlerts => Set<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
     public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();

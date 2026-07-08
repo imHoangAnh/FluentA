@@ -43,6 +43,15 @@ export async function presignAvatarUpload(contentType: string) {
   return response.data.data!
 }
 
+export async function presignCountdownCoverUpload(contentType: string) {
+  const response = await apiClient.post<ApiEnvelope<PresignedAssetUploadPayload>>('/assets/presign', {
+    assetType: 'countdown-cover',
+    contentType,
+  })
+
+  return response.data.data!
+}
+
 export async function finalizeAsset(assetId: string) {
   const response = await apiClient.post<ApiEnvelope<AssetPayload>>('/assets/finalize', { assetId })
   return response.data.data!
@@ -54,6 +63,15 @@ export async function deleteAsset(assetId: string) {
 
 export async function uploadAvatarAsset(file: File) {
   const presigned = await presignAvatarUpload(file.type)
+  return uploadAssetFromPresign(file, presigned, 'Avatar upload could not be completed.')
+}
+
+export async function uploadCountdownCoverAsset(file: File) {
+  const presigned = await presignCountdownCoverUpload(file.type)
+  return uploadAssetFromPresign(file, presigned, 'Countdown cover upload could not be completed.')
+}
+
+async function uploadAssetFromPresign(file: File, presigned: PresignedAssetUploadPayload, errorMessage: string) {
   const upload = await fetch(presigned.uploadUrl, {
     method: presigned.method ?? 'PUT',
     headers: {
@@ -63,7 +81,7 @@ export async function uploadAvatarAsset(file: File) {
   })
 
   if (!upload.ok) {
-    throw new Error('Avatar upload could not be completed.')
+    throw new Error(errorMessage)
   }
 
   return finalizeAsset(presigned.asset.id)

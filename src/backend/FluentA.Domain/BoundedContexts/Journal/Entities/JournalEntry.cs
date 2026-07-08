@@ -1,21 +1,16 @@
 using FluentA.Domain.SeedWork;
-using System.Globalization;
 
 namespace FluentA.Domain.BoundedContexts.Journal.Entities;
 
 public sealed class JournalEntry : BaseEntity, IAggregateRoot
 {
-    private const int PreviewLength = 100;
-
     private JournalEntry()
     {
         Title = string.Empty;
         Content = string.Empty;
-        PlainTextContent = string.Empty;
-        Preview = string.Empty;
     }
 
-    private JournalEntry(Guid userId, string title, string? content, string? plainTextContent, DateTime? learningDate)
+    private JournalEntry(Guid userId, string title, string? content, DateTime date)
     {
         if (userId == Guid.Empty)
         {
@@ -25,26 +20,17 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         UserId = userId;
         Title = CleanTitle(title);
         Content = CleanContent(content);
-        PlainTextContent = CleanPlainTextContent(plainTextContent);
-        Preview = BuildPreview(PlainTextContent);
-        LearningDate = NormalizeLearningDate(learningDate);
+        Date = NormalizeDate(date);
     }
 
     public Guid UserId { get; private set; }
     public string Title { get; private set; }
     public string Content { get; private set; }
-    public string PlainTextContent { get; private set; }
-    public string Preview { get; private set; }
-    public DateTime? LearningDate { get; private set; }
+    public DateTime Date { get; private set; }
 
-    public static JournalEntry Create(
-        Guid userId,
-        string title,
-        string? content = null,
-        string? plainTextContent = null,
-        DateTime? learningDate = null)
+    public static JournalEntry Create(Guid userId, string title, DateTime date, string? content = null)
     {
-        return new JournalEntry(userId, title, content, plainTextContent, learningDate);
+        return new JournalEntry(userId, title, content, date);
     }
 
     public void Rename(string title)
@@ -53,17 +39,15 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void UpdateContent(string? content, string? plainTextContent)
+    public void UpdateContent(string? content)
     {
         Content = CleanContent(content);
-        PlainTextContent = CleanPlainTextContent(plainTextContent);
-        Preview = BuildPreview(PlainTextContent);
         Touch();
     }
 
-    public void UpdateLearningDate(DateTime? learningDate)
+    public void UpdateDate(DateTime date)
     {
-        LearningDate = NormalizeLearningDate(learningDate);
+        Date = NormalizeDate(date);
         Touch();
     }
 
@@ -100,26 +84,8 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         return cleaned;
     }
 
-    private static string CleanPlainTextContent(string? content)
+    private static DateTime NormalizeDate(DateTime date)
     {
-        var cleaned = content ?? string.Empty;
-        if (cleaned.Length > 100_000)
-        {
-            throw new ArgumentException("Journal plain text content must be at most 100000 characters.", nameof(content));
-        }
-
-        return cleaned;
-    }
-
-    private static string BuildPreview(string content)
-    {
-        var normalized = string.Join(' ', content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        var textElements = StringInfo.ParseCombiningCharacters(normalized);
-        return textElements.Length <= PreviewLength ? normalized : normalized[..textElements[PreviewLength]];
-    }
-
-    private static DateTime? NormalizeLearningDate(DateTime? learningDate)
-    {
-        return learningDate is null ? null : DateTime.SpecifyKind(learningDate.Value.Date, DateTimeKind.Utc);
+        return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
     }
 }

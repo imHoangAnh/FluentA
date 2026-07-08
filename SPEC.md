@@ -29,6 +29,9 @@
 18. [Next Feature Plan — MinIO Asset Storage](#18-next-feature-plan--minio-asset-storage)
 19. [Next Feature Plan — FluentA Worker Runtime](#19-next-feature-plan--fluenta-worker-runtime)
 20. [Next Feature Plan — Backend Bounded Context Split](#20-next-feature-plan--backend-bounded-context-split)
+21. [Next Feature Plan — Vocabulary Page Fixed Columns And Board Preferences](#21-vocabulary-page-fixed-columns-and-board-preferences)
+22. [Next Feature Plan — Productivity Schema Cleanup And Countdowns Redesign](#22-next-feature-plan--productivity-schema-cleanup-and-countdowns-redesign)
+23. [Next Feature Plan — Flashcard, Practice, And Review Source-Of-Truth Redesign](#23-next-feature-plan--flashcard-practice-and-review-source-of-truth-redesign)
 
 ---
 
@@ -3619,6 +3622,637 @@ npm --prefix src/frontend run lint
 npm --prefix src/frontend run test:run -- VocabTable
 npm --prefix src/frontend run build
 npm --prefix src/frontend run test:e2e -- vocabulary.spec.js
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+## 22. Next Feature Plan — Productivity Schema Cleanup And Countdowns Redesign
+
+### 22.1 Objective
+
+This is the first follow-up feature after the current vocabulary work. It
+cleans up legacy schema and UI contracts in Todo, Kanban, and Journal, then
+rebuilds Countdowns around a richer but tighter model: date-based events,
+multiple alerts, optional MinIO-backed cover art, and explicit create/delete
+ownership.
+
+This feature also requires full codebase cleanup. Removing a column or table is
+not enough by itself. Planning and implementation must remove or rewrite every
+dependent DTO, validator, repository query, frontend state path, test, and
+product document that still assumes the old fields exist.
+
+### 22.2 Feature Boundary
+
+In scope:
+
+- Remove `todo_items.sort_order`, `todo_items.is_carried_over`, and
+  `todo_items.original_date`, plus all drag-reorder, move-between-days, and
+  carry-over logic tied to those fields.
+- Remove `kanban_cards.tags`, tag filtering, and title-search-only card
+  filtering paths that depend on the previous card metadata shape.
+- Rename `journal_entries` to `journal`, rename `learning_date` to `date`,
+  remove `plain_text_content`, remove preview-based list/search behavior, and
+  extend the existing TipTap editor to the new toolbar contract.
+- Rename `countdown_events` to `countdowns` and redesign the feature around
+  create/delete only, optional cover upload, and 1-5 scheduled alerts.
+- Synchronize the new names through database, domain entities, repositories,
+  API DTOs, frontend routes, labels, tests, and product docs where reasonable.
+
+Out of scope:
+
+- Flashcard, Practice, and Review redesign.
+- `flashcard_decks.type` removal and any deck/card ownership redesign tied to
+  the later Flashcard/Practice/Review feature.
+- Habit, Pomodoro, Dashboard, or broader notification-center redesign beyond
+  the countdown notifications needed for this contract.
+
+### 22.3 Locked Product Decisions
+
+The full stable decision ledger lives in
+`history/productivity-schema-cleanup-and-countdowns-redesign/CONTEXT.md`.
+Implementation must preserve those decision IDs. At a high level, the locked
+product shape is:
+
+- Todo keeps day and week planning, but loses carry-over, drag reorder,
+  move-to-another-day editing, and sort-order persistence.
+- Kanban keeps boards, columns, card move/reorder, priority, deadline, and
+  description, but removes tags and board-level title search.
+- Journal keeps list, detail, autosave, calendar, title search, and rich-text
+  editing, but removes preview/plain-text-content behavior and standardizes on a
+  required writing `date`.
+- Countdowns become a create/delete-only flow with optional immutable cover
+  media, fixed Vietnam timezone alert scheduling, and auto-retirement after the
+  target lifecycle ends.
+
+### 22.4 Todo Target Contract
+
+#### Outcomes
+
+- A logged-in user can open `/todo` and view only their own tasks.
+- Day view still defaults to the selected date and remains the primary task
+  workspace.
+- Desktop week view still shows Monday-Sunday columns and supports creating
+  tasks for any day in the visible week.
+- Todo list items show only the task title. Optional note content remains
+  editable in create/detail surfaces but is not shown in the compact list row.
+- Completed tasks remain visible in the same day/week list instead of
+  disappearing after toggle.
+
+#### Behavioral Rules
+
+- `sort_order`, `is_carried_over`, and `original_date` are removed from schema
+  and behavior.
+- Todo reads must no longer mutate records as a side effect. Fetching a day or
+  week cannot carry tasks forward.
+- A task always stays bound to the date chosen at creation time.
+- Task date cannot be changed after creation. Moving a task to another date
+  requires delete-and-recreate.
+- Week view is create/view only. It does not support drag reorder, drag move,
+  bulk create, or bulk move.
+- Incomplete tasks appear first and sort by `created_at desc`.
+- Completed tasks appear after incomplete tasks and sort by
+  `completed_at desc`.
+- Existing `completed_at` remains the source of truth for completion ordering;
+  this feature must not add a replacement completion timestamp.
+
+#### API Implications
+
+- `PATCH /api/v1/todos/{id}` no longer accepts `date` or `sortOrder`.
+- Day and week list endpoints return tasks grouped by their stored assigned
+  date, without carry-over mutation.
+
+### 22.5 Kanban Target Contract
+
+#### Outcomes
+
+- A logged-in user can continue to manage owned boards, columns, and cards on
+  `/kanban`.
+- Board cards display only `title`, `priority`, and `deadline`.
+- Card `description` remains supported for create/edit/detail behavior, but it
+  is no longer rendered in the compact board card.
+
+#### Behavioral Rules
+
+- `tags` is removed from `kanban_cards` and from all API/frontend contracts.
+- Board-level title search is removed with the old lightweight search bar
+  behavior.
+- Client-side filtering remains available only for `priority` and `deadline`.
+- Existing card move/reorder and column management behavior stays intact unless
+  a code path depends directly on removed tag/search state.
+
+#### API Implications
+
+- Card create/update DTOs no longer accept or return tag collections.
+- Any tag-filter or title-search query parameter, selector, badge list, or test
+  fixture must be removed instead of left dormant.
+
+### 22.6 Journal Target Contract
+
+#### Outcomes
+
+- A logged-in user can open `/journal`, list owned entries, open one entry,
+  edit it, autosave it, delete it, search by title, and browse the calendar by
+  writing date.
+- Journal list cards show only `title` and `date`.
+- Creating an entry requires `title` and writing `date`; `content` remains
+  optional.
+- `date` means the learner's writing date (`ngay viet`) and may differ from
+  `created_at`.
+
+#### Behavioral Rules
+
+- `journal_entries` is renamed to `journal`.
+- `learning_date` is renamed to `date`.
+- `plain_text_content` is removed from schema and no replacement preview column
+  is introduced in this feature.
+- Journal search remains, but it targets title only. Content search and
+  highlighted preview snippets are removed.
+- Autosave remains for existing entries after explicit creation.
+- Calendar behavior remains keyed by `date`, not by `created_at`.
+- Content stays as sanitized rich text and is still optional.
+
+#### Editor Contract
+
+- Continue using TipTap rather than replacing the editor stack.
+- Required editor capabilities for this feature are Heading 1-4, undo, redo,
+  bullet list, ordered list, task list, bold, italic, underline, highlight,
+  text alignment (left, center, right, justify), and view-only zoom control.
+- Default journal font is `Open Sans`.
+- Default journal font size is `14`.
+- Task list is rich-text checklist content only and does not create or sync Todo
+  tasks.
+
+#### API And Route Implications
+
+- The target API surface is singular where reasonable: `/api/v1/journal`.
+- Frontend continues to use `/journal`.
+- Legacy plural naming must be removed or compatibility-wrapped deliberately
+  during implementation; it must not remain by accident.
+
+### 22.7 Countdowns Target Contract
+
+#### Outcomes
+
+- A logged-in user can open `/countdowns`, see only their own active or
+  recently completed countdowns, create a countdown, and delete a countdown.
+- Countdown edit is removed from the product contract. Any change requires
+  deleting and recreating the countdown.
+- Countdown cards are sorted with active/upcoming items first by nearest
+  `target_date`, followed by completed items.
+- If a cover exists, the list card uses that cover as the background image with
+  overlaid text. If no cover exists, the card falls back to a light preset
+  visual treatment.
+
+#### Core Model Rules
+
+- `countdown_events` is renamed to `countdowns`.
+- Frontend route is renamed from `/countdown` to `/countdowns`; the old route
+  is removed rather than kept as a parallel long-term contract.
+- Countdown stores `target_date` as a calendar `date`, not a timestamp.
+- `target_date` must be today or a future date.
+- `color` and `icon` are removed.
+- A countdown may have zero or one cover. Cover is optional.
+- If a countdown is created with a cover, that cover cannot later be replaced
+  or removed because edit is not supported.
+- If a countdown is created without a cover, a cover cannot be added later.
+
+#### Alert Rules
+
+- Every countdown must have at least one alert and at most five alerts.
+- Each alert creates one separate in-app notification.
+- Allowed alert day values are fixed enums:
+  `OnTargetDay`, `1DayBefore`, `3DaysBefore`, and `7DaysBefore`.
+- `alert_time` is user-chosen local clock time such as `09:00`.
+- Duplicate alerts with the same alert-day enum and the same alert time are
+  rejected.
+- Reusing the same alert-day enum with different alert times is allowed as long
+  as the countdown stays within the 1-5 alert cap.
+- Countdown creation fails if any computed alert would already be in the past
+  at the moment of creation.
+- Notification content should stay intentionally simple: countdown name plus the
+  alert milestone.
+
+#### Scheduling And Lifecycle Rules
+
+- Countdown alert business time is fixed to `Asia/Ho_Chi_Minh` for this app.
+  There is no user-configurable countdown timezone setting in this feature.
+- Backend persists the durable event target as `target_date`, stores local
+  `alert_time`, and computes `scheduled_at_utc` so worker/jobs run reliably.
+- Manual delete cancels future, not-yet-fired alerts. Notifications already
+  created in the inbox remain.
+- A completed countdown stays in the main list for seven days after
+  `target_date`.
+- After that seven-day window, the countdown is soft-deleted automatically.
+
+### 22.8 Cover Upload And Asset Lifecycle
+
+- Countdown cover upload must reuse the same shared asset pattern already used
+  for avatar: presign -> direct browser upload -> finalize -> link by durable
+  asset metadata.
+- Countdown create UI includes an explicit upload button rather than asking the
+  user for a raw URL.
+- Allowed formats are `jpg`, `png`, and `webp`.
+- Maximum file size is 2MB.
+- Frontend should resize and lightly compress large images before upload to
+  improve form responsiveness while leaving final validation to the backend.
+- Backend stores the final public cover URL in Countdown-facing data, while the
+  shared asset system remains the source of truth for ownership, upload status,
+  and MinIO object cleanup.
+- Manual countdown deletion and seven-day automatic countdown retirement must
+  also retire the linked cover asset through the same cleanup flow.
+
+### 22.9 Cleanup And Rename Requirements
+
+- Schema cleanup must be matched by repository/query cleanup, DTO cleanup,
+  validator cleanup, API-client cleanup, frontend state cleanup, and test-fixture
+  cleanup.
+- Any code path that only existed for removed fields must be deleted, not left
+  behind as unreachable compatibility code, unless planning explicitly records a
+  temporary migration shim.
+- Table renames must be synchronized with entity names, DbSet names, mappings,
+  route labels, and product docs where that rename improves clarity.
+- The implementation pass must include a static scan for removed identifiers
+  such as `sortOrder`, `IsCarriedOver`, `OriginalDate`, `tags`,
+  `plainTextContent`, `learningDate`, `countdownEvents`, `color`, and `icon`.
+
+### 22.10 Scope Boundaries
+
+Out of scope for this feature:
+
+- Review, SRS, flashcard card ownership, practice flow, and deck redesign.
+- Adding countdown edit-back after the create/delete simplification.
+- Todo recurrence, Kanban subtasks, Journal AI writing tools, or a richer
+  notification inbox UX.
+- User-configurable multi-timezone behavior.
+
+### 22.11 Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Schema/contract drift | EF migration review proves removed columns/tables, table renames, and countdown alert storage match the target contract exactly. |
+| Dead-code residue | Static scan proves removed fields and old route names no longer leak through backend DTOs, frontend API clients, forms, selectors, or tests. |
+| Todo regression | Backend/frontend proof shows day/week planning still works without carry-over or sort-order logic, and completed ordering uses `completed_at`. |
+| Kanban regression | UI/API proof shows tag/search removal does not break board load, card CRUD, move, priority filter, or deadline filter behavior. |
+| Journal regression | Proof shows title-only search, required writing date, autosave, calendar, and the extended TipTap toolbar all work without preview/plain-text-content storage. |
+| Countdown scheduling bugs | Backend tests prove fixed `Asia/Ho_Chi_Minh` alert calculation, duplicate rejection, past-alert rejection, 1-5 alert limits, and `scheduled_at_utc` persistence. |
+| Asset lifecycle leaks | Proof shows countdown cover upload/finalize/link works through shared assets, and cover cleanup runs on manual delete plus seven-day auto-retirement. |
+
+### 22.12 Proposed Story Queue
+
+1. **US-PROD-001:** Clean up Todo, Kanban, and Journal schema/contracts.
+   Remove the retired fields, rename Journal durable data, and rewrite the
+   affected API/frontend behavior to the new compact contracts.
+2. **US-PROD-002:** Redesign Countdowns around create/delete, multi-alert
+   scheduling, and optional shared-asset cover upload.
+3. **US-PROD-003:** Run cleanup proof across migrations, route renames, removed
+   identifiers, asset lifecycle, notification scheduling, and product-doc
+   synchronization.
+
+### 22.13 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj --filter "Todo|Kanban|Journal|Countdown|Asset"
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --filter "Todo|Kanban|Journal|Countdown|Asset"
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet tool run dotnet-ef migrations script --project src/backend/FluentA.Infrastructure --startup-project src/backend/FluentA.API
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run -- Todo Kanban Journal Countdown
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- productivity.spec.js
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+## 23. Next Feature Plan — Flashcard, Practice, And Review Source-Of-Truth Redesign
+
+### 23.1 Objective
+
+Redesign the learning stack so Flashcard, Practice, and Review all read from
+`vocab_words` directly instead of relying on synchronized `flashcard_decks` and
+`flashcard_cards`, while Review keeps a separate dedicated SRS state owned by
+each `vocab_word`.
+
+The feature must remove duplicated learning data, preserve the user's intended
+three-part workflow, and replace the older "page deck sync + practice summary +
+review history" model with a cleaner page-scoped Practice layer and
+board-scoped Review layer.
+
+### 23.2 Feature Boundary
+
+This feature delivers:
+
+- Flashcard as a read-only recap flow scoped to one `vocab_page`.
+- Practice as page-scoped drills plus per-word `Add to Review`.
+- Review as board-scoped SRS over active `review_state` rows linked directly to
+  `vocab_words`.
+- Minimal `practice_sessions` and `review_sessions` persistence needed for
+  practiced badges and resumable same-day review sessions.
+- Cleanup of duplicate learning tables and stale logic that still depends on
+  synchronized flashcard deck/card ownership.
+
+This feature does not add resumable Flashcard sessions, practice-history UI,
+review-history UI, AI pronunciation scoring, fuzzy matching, or per-session
+mode overrides beyond the already existing global Practice settings and Review
+settings surfaces.
+
+### 23.3 Locked Product Decisions
+
+- `vocab_words` is the single source of truth for learning content.
+- `flashcard_decks` and `flashcard_cards` are removed from the target model.
+- Each `vocab_page` is the learner-facing deck for Flashcard and Practice.
+- Review is board-scoped and pulls words through `board -> page -> vocab_word`.
+- Learning ownership is per `vocab_word.id`; equal surface text in different
+  rows remains separate learning items.
+- A user can create review state only by pressing `Add to Review` from Practice.
+- New `review_state` starts at `level 0`, `status = active`, due tomorrow.
+- Re-adding an inactive word reuses the same `review_state` row, resets it to
+  `level 0`, sets `status = active`, resets `last_review_date` to `null`, and
+  schedules tomorrow.
+- `review_state` uses `active` and `inactive` only; no extra inactive-reason
+  enum is added.
+- Review uses the current FluentA level ladder `1 / 2 / 4 / 14 / 39 / 60`
+  days.
+- Correct review answers increase one level up to `5`.
+- Wrong review answers decrease one level down to `0`.
+- Level `5` words stay in Review every `60` days until the learner manually
+  removes them.
+- Daily-limit and due-date business logic uses fixed local day
+  `Asia/Ho_Chi_Minh`.
+- Durable datetimes still store UTC in the database.
+
+### 23.4 Shared Learning Content Contract
+
+- Flashcard front shows `word`, optional `definition`, `class`, and `ipa`.
+- Flashcard back shows optional `meaning_vn`, `example`, `synonyms`, `note`,
+  and `antonyms`.
+- Practice recap and Review recap use the same content contract.
+- Empty optional fields stay hidden.
+- Flashcard, Practice recap, and Review recap always read the latest live
+  `vocab_word` content rather than snapshots.
+- Board and page labels always use the latest live vocabulary names.
+
+### 23.5 Flashcard Contract
+
+- Flashcard list stays grouped by board with expand/collapse page sections like
+  the current frontend pattern.
+- Boards sort by `board.created_at desc`.
+- Pages inside a board sort by `page.created_at desc`.
+- Pages with no words still appear and show `No words yet`.
+- Pages with words expose `Start Flashcard`.
+- Pages with no words disable the action.
+- Flashcard list does not show `Practiced` or `Viewed` badges.
+- Flashcard route is page-based rather than deck-based.
+- Opening a page always starts from the first word of that page.
+- Flashcard does not persist partial progress or completion state.
+- The final Flashcard screen shows `Let's practice` and `Back to decks`.
+- `Let's practice` opens Practice for that exact page.
+- `Back to decks` returns to the Flashcard list.
+
+### 23.6 Practice Contract
+
+- Practice is scoped to one selected `vocab_page`.
+- Practice includes every active `vocab_word` in that page, even if a word is
+  already in Review.
+- Practice order supports `Sequential` and `Shuffle`.
+- Sequential uses `vocab_word.created_at asc`.
+- Shuffle randomizes the selected page queue only.
+- Practice keeps the current global mode-sequence setting using the existing
+  three modes: `dictation`, `meaningToWord`, and `pronunciation`.
+- Matching for typed answers uses exact `trim + lowercase`.
+- Practice pronunciation may retry indefinitely until correct or `Reveal/Skip`.
+- `Reveal/Skip` completes the current step and the session continues.
+- Unsupported browser speech recognition does not block Practice start; the
+  pronunciation step shows unsupported state and still allows `Reveal/Skip`.
+- Each word completes the configured exercises first, then shows recap.
+- Practice recap actions are `Previous`, `Add to Review` or
+  `Already in Review` / `Added`, and `Next`.
+- Clicking `Add to Review` does not auto-advance.
+- If the word already has active review state, recap shows disabled
+  `Already in Review`.
+- If the word was added earlier in the same Practice session, recap shows
+  disabled `Added`.
+- Practice does not resume. Reopening a page starts from the beginning.
+- Review-state changes already made through `Add to Review` stay durable even
+  if the learner exits Practice before finishing the page.
+- Practice end screen has `Finish` only.
+- Practice has no completion summary screen and no immediate CTA to Review.
+
+### 23.7 Practiced State Contract
+
+- `practice_sessions` is a minimal page-level marker, not a history feed.
+- One row exists per `user_id + page_id`.
+- The row is created only when the learner finishes the whole page and presses
+  `Finish`.
+- Re-completing the same page updates `last_completed_at`.
+- `created_at` keeps the first completed timestamp.
+- Practice list alone shows the practiced state.
+- Page with words and no row: action `Practice`, no badge.
+- Page with words and a row: badge `Practiced`, action `Practice again`.
+- Page with no words and no row: disabled action, `No words yet`, no badge.
+- Page with no words and a row: disabled action, `No words yet`, badge
+  `Practiced`.
+- Flashcard does not read or display practiced state.
+
+### 23.8 Review Queue Contract
+
+- Review starts from a chosen board and uses active `review_state` rows linked
+  to active words in that board.
+- Due words mean words whose `next_review_date` falls on today or any earlier
+  local day in `Asia/Ho_Chi_Minh`.
+- Review daily limit is a global user setting.
+- Queue selection first filters active due words, then prioritizes lower
+  `level`, then older `vocab_word.created_at`.
+- Sequential uses that prioritized order.
+- Shuffle first selects that prioritized limited queue, then shuffles inside
+  the selected queue.
+- Review mode is fixed to `random`; each queued word randomly receives one of
+  `dictation`, `meaningToWord`, or `pronunciation`.
+- Review matching for typed answers uses exact `trim + lowercase`.
+- Review has no `Reveal/Skip`.
+- Dictation and Meaning-to-Word allow one graded submission only.
+- Pronunciation allows at most two transcript checks; after that, the word is
+  graded wrong.
+- Each word appears at most once per session.
+- Correct or wrong, the word leaves the session immediately after grading.
+- If `recapAfterAnswer = true`, recap appears after grading and offers `Next`
+  only.
+- If `recapAfterAnswer = false`, the session advances immediately.
+- When a Review session finishes, every word in the same board that is still
+  due on that business day is moved to tomorrow, not only the words excluded
+  from the initial queue.
+- Review summary shows only `Correct / Wrong / Total`.
+- Summary counts only words the learner actually answered.
+
+### 23.9 Review Session Contract
+
+- Review supports resumable same-day sessions per `user + board`.
+- `review_sessions.status` uses `active`, `completed`, and `replaced`.
+- At most one `active` session may exist for the same `user + board` at a
+  time.
+- The session stores `order_type`, `session_date`, `started_at`, and optional
+  `completed_at`.
+- `session_date` is the local Vietnam date when the learner pressed
+  `Start Review`.
+- Queue membership persists in `review_session_items`.
+- Each item stores one `vocab_word_id`, `is_reviewed`, and `created_at`.
+- Within one session, the same `vocab_word.id` cannot appear twice.
+- `Start Review` on the same board and same local day opens a modal if an
+  unfinished session exists.
+- The modal actions are `Continue Review`, `Start New Session`, and `Cancel`.
+- `Cancel`, outside click, and `Esc` only close the modal.
+- `Start New Session` immediately marks the old same-day session as `replaced`
+  and builds a new queue.
+- If an unfinished session belongs to a previous local day, no modal appears;
+  that old session becomes `replaced` and a new session starts for today.
+- Continuing a session uses only items where `is_reviewed = false`.
+- Continuing a sequential session rebuilds the remaining queue by the normal
+  review priority rules.
+- Continuing a shuffle session shuffles the remaining items again.
+- The session uses its original `started_at` when resumed.
+- A `replaced` session keeps `completed_at = null`.
+- Replacing a session does not mutate unfinished item rows to `is_reviewed = true`;
+  they remain historical session facts.
+- If all remaining items are unavailable, the learner sees an empty state and
+  can press `Finish`, which marks the session `completed`.
+- If a session crosses midnight, the due-date deferral rule still treats
+  tomorrow as the day after `session_date`, not the wall-clock finish date.
+- Review sessions are kept in the database for internal use only; there is no
+  session-history UI in this feature.
+
+### 23.10 Review State Contract
+
+- `review_state` is unique per `user_id + vocab_word_id`.
+- The table stores `status`, `level`, `created_at`, `last_review_date`, and
+  `next_review_date`.
+- `created_at` means the latest add-or-readd moment into Review, not the first
+  lifetime appearance.
+- New add or re-add sets `last_review_date = null`.
+- `last_review_date` updates immediately after each reviewed word.
+- `last_review_date` stores datetime, not date-only.
+- `next_review_date` stores datetime, keeps the answer-time clock component,
+  and is still judged by local day rather than exact time.
+- When a due word is moved to tomorrow because it remains due after finishing a
+  Review session, the clock component of `next_review_date` stays unchanged.
+- Changing a row to `inactive` keeps its existing `level`, `created_at`,
+  `last_review_date`, and `next_review_date`.
+
+### 23.11 Level 5 Management Contract
+
+- Level `5` management lives under a second-level Settings route.
+- Settings should expose routes for Profile, Level 5, Review settings, and
+  Practice settings.
+- Level 5 list is global across the app, not board-scoped.
+- Default filter is `All`, with `Active` and `Inactive` filters.
+- Search filters by `word`.
+- Sort order is active first, then inactive, with more recently level-5-reviewed
+  words first inside each group.
+- Each row shows `word`, `board/page`, `status`, and the latest level-5
+  `last_review_date`.
+- Active items can be removed one-by-one or in bulk.
+- Inactive items are view-only.
+- Remove action changes `status` to `inactive`; it does not delete the row and
+  does not reset `level 5`.
+- If an inactive level-5 word is re-added from Practice, it becomes `active`,
+  resets to `level 0`, and schedules tomorrow.
+
+### 23.12 Review List And Empty-State Contract
+
+- Review board picker shows all boards.
+- Board label format is `Board name (N due)`.
+- Boards sort by `due count desc`, then `board.created_at desc`.
+- Review page defaults to no board selected.
+- With no board selected, the page shows an empty state such as
+  `Select a board to start review`.
+- After choosing a board with no due words and no active session, the page
+  shows `No words due today` and disables `Start Review`.
+- If a board has an active same-day session, `Start Review` remains enabled
+  even when due count is `0`, because it may open the continue modal.
+- The board picker shows only due count; there is no separate `In progress`
+  badge.
+- Returning from Review summary resets the page to its default unselected
+  state.
+
+### 23.13 Cleanup, Soft Delete, And Restore Contract
+
+- Removing duplicated learning data means implementation must delete old sync,
+  DTO, repository, query, controller, API-client, and frontend logic that
+  exists only for `flashcard_decks`, `flashcard_cards`, old practice summaries,
+  and legacy review-history behavior.
+- The redesign must remove practice-summary history UI and per-answer
+  review-history persistence from the target model.
+- Soft-deleting a single `vocab_word` changes its `review_state` to
+  `inactive`, hides it from Review queues and due counts, and hides it from
+  Level 5 UI while the word stays deleted.
+- Soft-deleting a `page` changes review states for words in that page to
+  `inactive`, deletes related `practice_sessions`, and causes matching
+  `review_session_items` to be treated as already handled in any active board
+  session.
+- Soft-deleting a `board` changes review states for words in that board to
+  `inactive`, deletes related `practice_sessions`, and deletes related
+  `review_sessions` plus `review_session_items`.
+- While a word, page, or board source stays deleted, related Level 5 entries
+  stay hidden from Settings.
+- If an item becomes inactive or deleted while a same-day review session is
+  still active, continuing the session should skip it by marking the session
+  item handled.
+- If a page or board is restored later, its old `review_state` rows remain
+  `inactive` until the learner re-adds those words from Practice.
+- If a soft-deleted word is restored later and had level `5`, it reappears in
+  Level 5 UI as `inactive`.
+- Restoring a page does not restore deleted `practice_sessions`; the page is
+  considered not practiced.
+
+### 23.14 Scope Boundaries
+
+Out of scope for this feature:
+
+- Flashcard resume/bookmark state.
+- Practice session history screens or analytics.
+- Review session history screens or analytics.
+- Per-answer review-history browsing.
+- Fuzzy answer matching, typo tolerance, or AI speech scoring.
+- Automatic restoration of review activity when deleted vocabulary content is
+  restored.
+- Additional review modes beyond `dictation`, `meaningToWord`, and
+  `pronunciation`.
+
+### 23.15 Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Duplicate learning data remains alive | Migration review plus static scans prove `flashcard_decks`, `flashcard_cards`, old practice-summary usage, and review-history usage are fully removed from active learning paths. |
+| Content contract drift | Backend/frontend proof shows Flashcard, Practice recap, and Review recap all render the same live `vocab_word` fields and hide empty optional values. |
+| Practice-to-Review state bugs | Tests prove per-word `Add to Review`, `Already in Review`, re-add from inactive, no Practice resume, and practiced badge persistence. |
+| Review queue and overflow bugs | Tests prove due filtering by Vietnam-local day, low-level priority, shuffle selection, same-day resume, and end-of-session due-date deferral. |
+| Soft-delete lifecycle bugs | Tests prove word/page/board deletion and restore behavior for `review_state`, `review_sessions`, `review_session_items`, `practice_sessions`, and Level 5 visibility. |
+| Session ambiguity | Tests prove same-day continue modal, previous-day replacement, unique active session per board, and empty-session finish behavior. |
+| Settings regression | UI/API proof shows Review settings, Practice settings, and Level 5 management align with the new source-of-truth model. |
+
+### 23.16 Proposed Story Queue
+
+1. **US-LEARN-001:** Replace synchronized flashcard deck/card reads with
+   page-word source-of-truth reads for Flashcard and Practice.
+2. **US-LEARN-002:** Introduce the new Review domain model
+   (`review_state`, `review_sessions`, `review_session_items`) and remove old
+   review-history/session-summary behavior.
+3. **US-LEARN-003:** Rebuild Practice around per-word `Add to Review`,
+   practiced badges, and inactive re-add flow.
+4. **US-LEARN-004:** Rebuild Review around board-level due queues, same-day
+   resume modal, overflow handling, and Level 5 management.
+5. **US-LEARN-005:** Run cleanup proof across migrations, API routes, frontend
+   routes, settings navigation, and stale identifier removal.
+
+### 23.17 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj --filter "Flashcard|Practice|Review|Vocabulary|Srs"
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --filter "Flashcard|Practice|Review|Vocabulary|Srs"
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet tool run dotnet-ef migrations script --project src/backend/FluentA.Infrastructure --startup-project src/backend/FluentA.API
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run -- Flashcard Practice Review Settings
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- learning-navigation.spec.js practice-workflow.spec.js review-workflow.spec.js
 .\scripts\bin\harness-cli.exe query matrix
 git diff --check
 ```

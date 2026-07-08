@@ -3,8 +3,9 @@
 ## Product Boundary
 
 Assets are user-owned uploaded files managed through a shared authenticated API.
-Feature 18 introduces the first asset type, `avatar`, backed by MinIO in local
-development. Other asset-consuming surfaces remain deferred.
+Feature 18 introduced the first asset type, `avatar`, backed by MinIO in local
+development. Feature 22 adds `countdown-cover` as a second shared image asset
+type.
 
 ## User Outcomes
 
@@ -13,6 +14,8 @@ development. Other asset-consuming surfaces remain deferred.
   credentials.
 - The authenticated user finalizes the uploaded avatar asset only after the
   backend verifies MinIO object metadata.
+- The authenticated user can finalize one optional countdown cover asset during
+  countdown create after the backend verifies MinIO object metadata.
 - Finalized avatar assets expose a public URL that the frontend can render
   immediately after the authenticated profile save links the asset as the
   current avatar.
@@ -22,13 +25,15 @@ development. Other asset-consuming surfaces remain deferred.
 ## Ownership And Lifecycle Rules
 
 - Assets are owned by the authenticated user only.
-- The first supported `assetType` is `avatar`.
+- Supported `assetType` values are `avatar` and `countdown-cover`.
 - Presign creates a pending asset record with a 1-hour expiry.
 - Finalize requires the owned asset to still be pending and unexpired.
 - Finalize verifies the MinIO object exists at the pending key, has an allowed
-  avatar content type, and is at most 2MB.
+  image content type for the selected asset type, and is at most 2MB.
 - `PUT /api/v1/profile` can link an owned finalized avatar asset as the
   current profile avatar.
+- `POST /api/v1/countdowns` can link one owned finalized `countdown-cover`
+  asset as the countdown cover during create only.
 - `GET /api/v1/assets?assetType=avatar` returns the authenticated user's
   non-deleted owned avatar assets, newest first, and flags which one is the
   current profile avatar.
@@ -40,6 +45,8 @@ development. Other asset-consuming surfaces remain deferred.
   avatar asset metadata after the durable profile update succeeds.
 - Pending avatar uploads that are never finalized expire after 1 hour and are
   cleaned automatically by a recurring cleanup job.
+- Countdown cover assets retire when the owning countdown is manually deleted
+  or auto-retired after the seven-day completed window.
 
 ## Persistence Rules
 
@@ -71,8 +78,8 @@ All responses use the FluentA envelope.
 
 ## Validation And Error Rules
 
-- Presign requires `assetType=avatar`.
-- Presign requires avatar content type `image/jpeg`, `image/png`, or
+- Presign requires `assetType=avatar` or `assetType=countdown-cover`.
+- Presign requires image content type `image/jpeg`, `image/png`, or
   `image/webp`.
 - Finalize returns `404 ASSET_NOT_FOUND` when the asset is not owned by the
   authenticated user or does not exist.

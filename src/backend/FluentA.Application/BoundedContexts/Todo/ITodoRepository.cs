@@ -6,10 +6,7 @@ public interface ITodoRepository
 {
     Task<IReadOnlyList<TodoItem>> ListByDateAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TodoItem>> ListByRangeAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<TodoItem>> ListCarryOverCandidatesAsync(Guid userId, DateTime today, CancellationToken cancellationToken = default);
     Task<TodoItem?> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
-    Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default);
     Task AddAsync(TodoItem item, CancellationToken cancellationToken = default);
     Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default);
-    Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default);
 }

@@ -15,16 +15,14 @@ public interface IJournalRepository
 public sealed record JournalEntryListItem(
     Guid Id,
     string Title,
-    string Preview,
-    DateTime? LearningDate,
+    DateTime Date,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
 public sealed record JournalEntrySearchItem(
     Guid Id,
     string Title,
-    string PlainTextContent,
-    DateTime? LearningDate,
+    DateTime Date,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 

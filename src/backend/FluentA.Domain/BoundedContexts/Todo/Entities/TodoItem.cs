@@ -9,7 +9,7 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Title = string.Empty;
     }
 
-    private TodoItem(Guid userId, string title, DateTime date, string? note, int sortOrder)
+    private TodoItem(Guid userId, string title, DateTime date, string? note)
     {
         if (userId == Guid.Empty)
         {
@@ -20,7 +20,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Title = CleanTitle(title);
         Date = NormalizeDate(date);
         Note = CleanNote(note);
-        SortOrder = ValidateSortOrder(sortOrder);
     }
 
     public Guid UserId { get; private set; }
@@ -29,13 +28,9 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
     public DateTime Date { get; private set; }
     public bool IsCompleted { get; private set; }
     public DateTime? CompletedAt { get; private set; }
-    public int SortOrder { get; private set; }
-    public bool IsCarriedOver { get; private set; }
-    public DateTime? OriginalDate { get; private set; }
-
-    public static TodoItem Create(Guid userId, string title, DateTime date, string? note, int sortOrder = 0)
+    public static TodoItem Create(Guid userId, string title, DateTime date, string? note)
     {
-        return new TodoItem(userId, title, date, note, sortOrder);
+        return new TodoItem(userId, title, date, note);
     }
 
     public void Rename(string title)
@@ -50,18 +45,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void Reschedule(DateTime date)
-    {
-        Date = NormalizeDate(date);
-        Touch();
-    }
-
-    public void Reorder(int sortOrder)
-    {
-        SortOrder = ValidateSortOrder(sortOrder);
-        Touch();
-    }
-
     public void SetCompleted(bool isCompleted, DateTime nowUtc)
     {
         if (IsCompleted == isCompleted)
@@ -72,21 +55,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         IsCompleted = isCompleted;
         CompletedAt = isCompleted ? nowUtc : null;
         Touch(nowUtc);
-    }
-
-    public bool CarryOver(DateTime today)
-    {
-        var normalizedToday = NormalizeDate(today);
-        if (IsCompleted || DeletedAt is not null || Date >= normalizedToday)
-        {
-            return false;
-        }
-
-        OriginalDate ??= Date;
-        Date = normalizedToday;
-        IsCarriedOver = true;
-        Touch();
-        return true;
     }
 
     public void SoftDelete()
@@ -132,10 +100,4 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         return cleaned;
     }
 
-    private static int ValidateSortOrder(int sortOrder)
-    {
-        return sortOrder < 0
-            ? throw new ArgumentOutOfRangeException(nameof(sortOrder), "Sort order must be zero or greater.")
-            : sortOrder;
-    }
 }

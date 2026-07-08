@@ -34,7 +34,7 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
-    public async Task ListByDate_CarriesOverIncompletePastTasksOnce()
+    public async Task ListByDate_DoesNotCarryOverIncompletePastTasks()
     {
         var repository = new FakeTodoRepository();
         var service = new TodoService(repository);
@@ -48,12 +48,9 @@ public sealed class TodoServiceTests
         var first = await service.ListByDateAsync(userId, today);
         var second = await service.ListByDateAsync(userId, today);
 
-        var carried = Assert.Single(first.Value!);
-        Assert.Equal(incomplete.Value!.Id, carried.Id);
-        Assert.True(carried.IsCarriedOver);
-        Assert.Equal(yesterday, carried.OriginalDate);
-        Assert.Single(second.Value!);
-        Assert.Equal(1, repository.RangeUpdateCount);
+        Assert.Empty(first.Value!);
+        Assert.Empty(second.Value!);
+        Assert.NotNull(incomplete.Value);
     }
 
     [Fact]
@@ -74,23 +71,20 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
-    public async Task Update_DateAndSortOrder_PreserveUnrelatedFields()
+    public async Task Update_Completion_PreserveUnrelatedFields()
     {
         var repository = new FakeTodoRepository();
         var service = new TodoService(repository);
         var userId = Guid.NewGuid();
         var date = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
-        var nextDate = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
         var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep"));
-        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
 
-        var updated = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest(Date: nextDate, SortOrder: 4));
+        var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
 
         Assert.True(updated.IsSuccess);
         Assert.Equal("Task", updated.Value!.Title);
         Assert.Equal("keep", updated.Value.Note);
-        Assert.Equal(nextDate, updated.Value.Date);
-        Assert.Equal(4, updated.Value.SortOrder);
+        Assert.Equal(date, updated.Value.Date);
         Assert.True(updated.Value.IsCompleted);
     }
 
@@ -127,13 +121,12 @@ public sealed class TodoServiceTests
     {
         private readonly List<TodoItem> _items = [];
 
-        public int RangeUpdateCount { get; private set; }
-
         public Task<IReadOnlyList<TodoItem>> ListByDateAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<TodoItem>>(_items
                 .Where(item => item.UserId == userId && item.Date == date.Date && item.DeletedAt is null)
-                .OrderBy(item => item.SortOrder)
+                .OrderBy(item => item.IsCompleted)
+                .ThenBy(item => item.CompletedAt ?? item.CreatedAt)
                 .ToList());
         }
 
@@ -142,25 +135,14 @@ public sealed class TodoServiceTests
             return Task.FromResult<IReadOnlyList<TodoItem>>(_items
                 .Where(item => item.UserId == userId && item.Date >= startDate.Date && item.Date <= endDate.Date && item.DeletedAt is null)
                 .OrderBy(item => item.Date)
-                .ThenBy(item => item.SortOrder)
-                .ToList());
-        }
-
-        public Task<IReadOnlyList<TodoItem>> ListCarryOverCandidatesAsync(Guid userId, DateTime today, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<TodoItem>>(_items
-                .Where(item => item.UserId == userId && item.Date < today.Date && !item.IsCompleted && item.DeletedAt is null)
+                .ThenBy(item => item.IsCompleted)
+                .ThenBy(item => item.CompletedAt ?? item.CreatedAt)
                 .ToList());
         }
 
         public Task<TodoItem?> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_items.FirstOrDefault(item => item.UserId == userId && item.Id == todoId && item.DeletedAt is null));
-        }
-
-        public Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_items.Count(item => item.UserId == userId && item.Date == date.Date && item.DeletedAt is null));
         }
 
         public Task AddAsync(TodoItem item, CancellationToken cancellationToken = default)
@@ -171,12 +153,6 @@ public sealed class TodoServiceTests
 
         public Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
-        {
-            RangeUpdateCount++;
             return Task.CompletedTask;
         }
     }

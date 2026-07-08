@@ -27,7 +27,6 @@ public sealed class TodoService : ITodoService
             return OperationResult<IReadOnlyList<TodoItemDto>>.Failure(TodoError.Validation(errors));
         }
 
-        await CarryOverAsync(userId, cancellationToken);
         var items = await _repository.ListByDateAsync(userId, parsedDate, cancellationToken);
         return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(ToDto).ToList());
     }
@@ -59,7 +58,6 @@ public sealed class TodoService : ITodoService
             return OperationResult<IReadOnlyList<TodoItemDto>>.Failure(TodoError.Validation(validation));
         }
 
-        await CarryOverAsync(userId, cancellationToken);
         var items = await _repository.ListByRangeAsync(userId, parsedStart, parsedEnd, cancellationToken);
         return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(ToDto).ToList());
     }
@@ -75,8 +73,7 @@ public sealed class TodoService : ITodoService
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
         }
 
-        var sortOrder = await _repository.NextSortOrderAsync(userId, validation.Date, cancellationToken);
-        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note, sortOrder);
+        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(ToDto(item));
     }
@@ -94,9 +91,9 @@ public sealed class TodoService : ITodoService
         }
 
         var validation = ValidateUpdate(request);
-        if (validation.Errors.Count > 0)
+        if (validation.Count > 0)
         {
-            return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
+            return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation));
         }
 
         var completionBefore = item.IsCompleted;
@@ -108,16 +105,6 @@ public sealed class TodoService : ITodoService
         if (request.Note is not null)
         {
             item.UpdateNote(request.Note);
-        }
-
-        if (validation.Date is not null)
-        {
-            item.Reschedule(validation.Date.Value);
-        }
-
-        if (request.SortOrder is not null)
-        {
-            item.Reorder(request.SortOrder.Value);
         }
 
         if (request.IsCompleted is not null)
@@ -147,17 +134,6 @@ public sealed class TodoService : ITodoService
         return OperationResult<bool>.Success(true);
     }
 
-    private async Task CarryOverAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        var today = DateTime.UtcNow.Date;
-        var candidates = await _repository.ListCarryOverCandidatesAsync(userId, today, cancellationToken);
-        var changed = candidates.Where(item => item.CarryOver(today)).ToList();
-        if (changed.Count > 0)
-        {
-            await _repository.UpdateRangeAsync(changed, cancellationToken);
-        }
-    }
-
     private static (Dictionary<string, string[]> Errors, DateTime Date) ValidateCreate(CreateTodoItemRequest request)
     {
         var errors = ValidateTitleAndNote(request.Title, request.Note);
@@ -169,7 +145,7 @@ public sealed class TodoService : ITodoService
         return (errors, date);
     }
 
-    private static (Dictionary<string, string[]> Errors, DateTime? Date) ValidateUpdate(UpdateTodoItemRequest request)
+    private static Dictionary<string, string[]> ValidateUpdate(UpdateTodoItemRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
@@ -186,25 +162,7 @@ public sealed class TodoService : ITodoService
             errors["note"] = ["Note must be at most 4000 characters."];
         }
 
-        DateTime? date = null;
-        if (request.Date is not null)
-        {
-            if (TryParseDate(request.Date, "date", out var parsed, out var dateErrors))
-            {
-                date = parsed;
-            }
-            else
-            {
-                errors["date"] = dateErrors["date"];
-            }
-        }
-
-        if (request.SortOrder is < 0)
-        {
-            errors["sortOrder"] = ["Sort order must be zero or greater."];
-        }
-
-        return (errors, date);
+        return errors;
     }
 
     private static Dictionary<string, string[]> ValidateTitleAndNote(string title, string? note)
@@ -250,9 +208,6 @@ public sealed class TodoService : ITodoService
             FormatDate(item.Date),
             item.IsCompleted,
             item.CompletedAt,
-            item.SortOrder,
-            item.IsCarriedOver,
-            item.OriginalDate is null ? null : FormatDate(item.OriginalDate.Value),
             item.CreatedAt,
             item.UpdatedAt);
     }

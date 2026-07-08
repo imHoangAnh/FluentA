@@ -289,7 +289,7 @@ export function HabitPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>

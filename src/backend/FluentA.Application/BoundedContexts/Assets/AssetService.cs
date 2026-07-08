@@ -38,8 +38,9 @@ public sealed class AssetService : IAssetService
         var user = await _users.GetByIdAsync(userId, cancellationToken);
         var currentAvatarAssetId = user?.CurrentAvatarAssetId;
 
+        var requestedType = ParseAssetType(request.AssetType ?? "avatar");
         return OperationResult<IReadOnlyList<OwnedAssetDto>>.Success(assets
-            .Where(asset => asset.Type == AssetType.Avatar)
+            .Where(asset => asset.Type == requestedType)
             .Select(asset => ToOwnedDto(asset, currentAvatarAssetId))
             .ToList());
     }
@@ -218,7 +219,7 @@ public sealed class AssetService : IAssetService
 
         if (string.IsNullOrWhiteSpace(request.ContentType) || !AllowedAvatarMimeTypes.Contains(request.ContentType.Trim()))
         {
-            errors["contentType"] = ["Avatar uploads must be JPG, PNG, or WebP."];
+            errors["contentType"] = ["Uploads must be JPG, PNG, or WebP."];
         }
 
         return errors;
@@ -227,9 +228,11 @@ public sealed class AssetService : IAssetService
     private static Dictionary<string, string[]> ValidateAssetTypeRequest(string? assetType)
     {
         var errors = new Dictionary<string, string[]>();
-        if (!string.Equals(assetType?.Trim() ?? "avatar", "avatar", StringComparison.OrdinalIgnoreCase))
+        var value = assetType?.Trim() ?? "avatar";
+        if (!string.Equals(value, "avatar", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(value, "countdown-cover", StringComparison.OrdinalIgnoreCase))
         {
-            errors["assetType"] = ["Only the avatar asset type is currently supported."];
+            errors["assetType"] = ["Supported asset types are avatar and countdown-cover."];
         }
 
         return errors;
@@ -239,7 +242,9 @@ public sealed class AssetService : IAssetService
     {
         return string.Equals(assetType.Trim(), "avatar", StringComparison.OrdinalIgnoreCase)
             ? AssetType.Avatar
-            : throw new InvalidOperationException("Unsupported asset type.");
+            : string.Equals(assetType.Trim(), "countdown-cover", StringComparison.OrdinalIgnoreCase)
+                ? AssetType.CountdownCover
+                : throw new InvalidOperationException("Unsupported asset type.");
     }
 
     private static string BuildObjectKey(Guid userId, AssetType type, Guid assetId)

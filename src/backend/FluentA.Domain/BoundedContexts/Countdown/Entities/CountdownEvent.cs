@@ -4,12 +4,14 @@ namespace FluentA.Domain.BoundedContexts.Countdown.Entities;
 
 public sealed class CountdownEvent : BaseEntity, IAggregateRoot
 {
+    private readonly List<CountdownAlert> _alerts = [];
+
     private CountdownEvent()
     {
         Name = string.Empty;
     }
 
-    private CountdownEvent(Guid userId, string name, DateTime targetDate, string? color, string? icon)
+    private CountdownEvent(Guid userId, string name, DateTime targetDate, Guid? coverAssetId)
     {
         if (userId == Guid.Empty)
         {
@@ -18,68 +20,75 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
 
         UserId = userId;
         Name = CleanName(name);
-        TargetDate = NormalizeUtc(targetDate);
-        Color = CleanOptional(color, 7, nameof(color));
-        Icon = CleanOptional(icon, 16, nameof(icon));
+        TargetDate = NormalizeDate(targetDate);
+        CoverAssetId = ValidateCoverAssetId(coverAssetId);
     }
 
     public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public DateTime TargetDate { get; private set; }
-    public string? Color { get; private set; }
-    public string? Icon { get; private set; }
-    public DateTime? AlertedAt { get; private set; }
-    public bool IsCompleted => IsCompletedAt(DateTime.UtcNow);
+    public Guid? CoverAssetId { get; private set; }
+    public IReadOnlyList<CountdownAlert> Alerts => _alerts.AsReadOnly();
 
-    public static CountdownEvent Create(Guid userId, string name, DateTime targetDate, string? color = null, string? icon = null)
+    public static CountdownEvent Create(Guid userId, string name, DateTime targetDate, Guid? coverAssetId = null)
     {
-        return new CountdownEvent(userId, name, targetDate, color, icon);
+        return new CountdownEvent(userId, name, targetDate, coverAssetId);
     }
 
-    public void Rename(string name)
+    public void AddAlert(string alertDay, string alertTime, DateTime scheduledAtUtc)
     {
-        Name = CleanName(name);
-        Touch();
-    }
-
-    public void Reschedule(DateTime targetDate)
-    {
-        TargetDate = NormalizeUtc(targetDate);
-        Touch();
-    }
-
-    public void UpdateColor(string? color)
-    {
-        Color = CleanOptional(color, 7, nameof(color));
-        Touch();
-    }
-
-    public void UpdateIcon(string? icon)
-    {
-        Icon = CleanOptional(icon, 16, nameof(icon));
+        _alerts.Add(CountdownAlert.Create(Id, alertDay, alertTime, scheduledAtUtc));
         Touch();
     }
 
     public bool IsCompletedAt(DateTime utcNow)
     {
-        return DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) >= TargetDate;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam());
+        return vietnamNow.Date > TargetDate.Date;
     }
 
-    public void MarkAlerted(DateTime utcNow)
+    public bool IsVisibleAt(DateTime utcNow)
     {
-        AlertedAt ??= NormalizeUtc(utcNow);
-        Touch();
+        if (!IsCompletedAt(utcNow))
+        {
+            return true;
+        }
+
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam()).Date;
+        return vietnamNow <= TargetDate.Date.AddDays(7);
     }
 
-    public void SoftDelete()
+    public bool ShouldRetireAt(DateTime utcNow)
     {
-        DeletedAt = DateTime.UtcNow;
-        UpdatedAt = DeletedAt.Value;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam()).Date;
+        return vietnamNow > TargetDate.Date.AddDays(7);
+    }
+
+    public void SoftDelete(DateTime? nowUtc = null, bool deleteAlerts = true)
+    {
+        var now = nowUtc ?? DateTime.UtcNow;
+        DeletedAt = now;
+        UpdatedAt = now;
+
+        if (!deleteAlerts)
+        {
+            return;
+        }
+
+        foreach (var alert in _alerts.Where(alert => alert.DeletedAt is null))
+        {
+            alert.SoftDelete(now);
+        }
     }
 
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static DateTime NormalizeDate(DateTime targetDate)
+    {
+        return DateTime.SpecifyKind(targetDate.Date, DateTimeKind.Utc);
     }
 
     private static DateTime NormalizeUtc(DateTime targetDate)
@@ -103,19 +112,13 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
         return cleaned;
     }
 
-    private static string? CleanOptional(string? value, int maxLength, string paramName)
+    private static Guid? ValidateCoverAssetId(Guid? coverAssetId)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        if (coverAssetId == Guid.Empty)
         {
-            return null;
+            throw new ArgumentException("Countdown cover asset id must be a non-empty GUID.", nameof(coverAssetId));
         }
 
-        var cleaned = value.Trim();
-        if (cleaned.Length > maxLength)
-        {
-            throw new ArgumentException($"Countdown {paramName} must be at most {maxLength} characters.", paramName);
-        }
-
-        return cleaned;
+        return coverAssetId;
     }
 }

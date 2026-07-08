@@ -35,7 +35,6 @@ export type KanbanCard = {
   priority: 'Low' | 'Medium' | 'High' | 'Critical'
   deadline?: string | null
   sortOrder: number
-  tags: string[]
   createdAt: string
   updatedAt: string
 }
@@ -46,7 +45,6 @@ export type CreateKanbanCardInput = {
   description?: string | null
   priority?: string | null
   deadline?: string | null
-  tags?: string[]
 }
 
 export type UpdateKanbanCardInput = {
@@ -54,7 +52,6 @@ export type UpdateKanbanCardInput = {
   description?: string
   priority?: string
   deadline?: string
-  tags?: string[]
 }
 
 export async function listBoards() {

@@ -20,7 +20,7 @@ public sealed class CountdownsController : ControllerBase
         _countdowns = countdowns;
     }
 
-    /// <summary>Lists countdown events for the authenticated user.</summary>
+    /// <summary>Lists countdowns for the authenticated user.</summary>
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken)
     {
@@ -30,7 +30,7 @@ public sealed class CountdownsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Creates a countdown event for the authenticated user.</summary>
+    /// <summary>Creates a countdown for the authenticated user.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateCountdownEventRequest request, CancellationToken cancellationToken)
     {
@@ -40,23 +40,13 @@ public sealed class CountdownsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Updates supplied fields on an owned countdown event.</summary>
-    [HttpPatch("{countdownId:guid}")]
-    public async Task<IActionResult> Update(Guid countdownId, UpdateCountdownEventRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _countdowns.UpdateAsync(CurrentUserId(), countdownId, request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<CountdownEventDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Soft-deletes an owned countdown event.</summary>
+    /// <summary>Soft-deletes an owned countdown.</summary>
     [HttpDelete("{countdownId:guid}")]
     public async Task<IActionResult> Delete(Guid countdownId, CancellationToken cancellationToken)
     {
         var result = await _countdowns.DeleteAsync(CurrentUserId(), countdownId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Countdown event deleted." }))
+            ? Ok(ApiEnvelope<object>.Ok(new { message = "Countdown deleted." }))
             : ToErrorResult(result);
     }
 

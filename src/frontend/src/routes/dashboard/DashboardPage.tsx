@@ -74,7 +74,13 @@ export function DashboardPage() {
     },
   })
 
-  const todos = useMemo(() => (todosQuery.data ?? []).toSorted((left, right) => Number(left.isCompleted) - Number(right.isCompleted) || left.sortOrder - right.sortOrder), [todosQuery.data])
+  const todos = useMemo(
+    () => (todosQuery.data ?? []).toSorted((left, right) =>
+      Number(left.isCompleted) - Number(right.isCompleted)
+      || (left.completedAt ?? left.createdAt).localeCompare(right.completedAt ?? right.createdAt),
+    ),
+    [todosQuery.data],
+  )
   const visibleTodos = todos.slice(0, 3)
 
   const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 2), [habitsQuery.data])
@@ -114,7 +120,7 @@ export function DashboardPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''} onMouseEnter={preloadJournalEditor}>
@@ -258,7 +264,7 @@ export function DashboardPage() {
                   <p className="next-event-label">No upcoming events</p>
                 </div>
               )}
-              <Link to="/countdown" style={{textDecoration: 'none', marginTop: 'auto'}}>
+              <Link to="/countdowns" style={{textDecoration: 'none', marginTop: 'auto'}}>
                 <button className="btn-outline">Open Countdowns</button>
               </Link>
             </div>

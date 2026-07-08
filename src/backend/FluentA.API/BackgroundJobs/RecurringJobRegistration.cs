@@ -8,6 +8,7 @@ public static class RecurringJobRegistration
     public const string TodoCarryOverId = "todo-carry-over";
     public const string HabitReminderId = "habit-reminders";
     public const string CountdownAlertId = "countdown-alerts";
+    public const string CountdownRetirementId = "countdown-retirement";
     public const string PendingAssetCleanupId = "pending-asset-cleanup";
     public const string DatabaseCleanupId = "database-cleanup";
 
@@ -19,6 +20,8 @@ public static class RecurringJobRegistration
             HabitReminderId, job => job.SendHabitRemindersAsync(CancellationToken.None), "0 20 * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             CountdownAlertId, job => job.ProcessCountdownAlertsAsync(CancellationToken.None), "*/5 * * * *");
+        jobs.AddOrUpdate<IScheduledProductivityJobs>(
+            CountdownRetirementId, job => job.CleanupRetiredCountdownsAsync(CancellationToken.None), "10 0 * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             PendingAssetCleanupId, job => job.CleanupExpiredPendingAssetsAsync(CancellationToken.None), "15 * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(

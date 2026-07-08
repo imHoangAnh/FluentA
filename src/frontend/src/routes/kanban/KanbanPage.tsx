@@ -15,13 +15,6 @@ const priorities = ['Low', 'Medium', 'High', 'Critical'] as const
 const today = new Date()
 const todayInput = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
 
-function splitTags(value: string) {
-  return value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-}
-
 function deadlineState(deadline?: string | null) {
   if (!deadline) return 'none'
   if (deadline < todayInput) return 'overdue'
@@ -31,10 +24,7 @@ function deadlineState(deadline?: string | null) {
   return deadlineDate <= weekEnd ? 'this-week' : 'later'
 }
 
-function cardMatches(card: kanbanApi.KanbanCard, filters: { search: string; tag: string; priority: string; deadline: string }) {
-  const query = filters.search.trim().toLowerCase()
-  if (query && !card.title.toLowerCase().includes(query)) return false
-  if (filters.tag && !card.tags.some((tag) => tag.toLowerCase() === filters.tag.toLowerCase())) return false
+function cardMatches(card: kanbanApi.KanbanCard, filters: { priority: string; deadline: string }) {
   if (filters.priority && card.priority !== filters.priority) return false
   if (filters.deadline === 'has' && !card.deadline) return false
   if (filters.deadline === 'overdue' && deadlineState(card.deadline) !== 'overdue') return false
@@ -49,7 +39,6 @@ function emptyCardForm(columnId = '') {
     description: '',
     priority: 'Medium',
     deadline: '',
-    tags: '',
   }
 }
 
@@ -66,7 +55,7 @@ export function KanbanPage() {
   const [columnName, setColumnName] = useState('')
   const [editingCard, setEditingCard] = useState<kanbanApi.KanbanCard | null>(null)
   const [editForm, setEditForm] = useState(() => emptyCardForm())
-  const [filters, setFilters] = useState({ search: '', tag: '', priority: '', deadline: '' })
+  const [filters] = useState({ priority: '', deadline: '' })
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -191,7 +180,6 @@ export function KanbanPage() {
       description: card.description ?? '',
       priority: card.priority,
       deadline: card.deadline ?? '',
-      tags: card.tags.join(', '),
     })
   }
 
@@ -206,7 +194,6 @@ export function KanbanPage() {
         description: editForm.description || null,
         priority: editForm.priority,
         deadline: editForm.deadline || null,
-        tags: splitTags(editForm.tags),
       }, {
         onSuccess: () => setEditingCard(null)
       })
@@ -220,7 +207,6 @@ export function KanbanPage() {
         description: editForm.description,
         priority: editForm.priority,
         deadline: editForm.deadline,
-        tags: splitTags(editForm.tags),
       },
     })
   }
@@ -261,7 +247,7 @@ export function KanbanPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
@@ -300,13 +286,7 @@ export function KanbanPage() {
         <header className="kanban-header">
           <div className="kanban-search-wrapper">
             <Search size={20} className="kanban-search-icon" />
-            <input 
-              className="kanban-search-input" 
-              placeholder="Search projects, tasks, or words..." 
-              value={filters.search} 
-              onChange={(event) => setFilters({ ...filters, search: event.target.value })} 
-              data-testid="kanban-search-input" 
-            />
+            <input className="kanban-search-input" placeholder="Priority and deadline filters only" disabled />
           </div>
           <div className="kanban-header-actions">
             <button className="dashboard-notification-btn">
@@ -422,8 +402,7 @@ export function KanbanPage() {
                           data-testid={`kanban-card-${card.title}`}
                           onClick={() => openEditor(card)}
                         >
-                          <div className="kanban-card-tags-row">
-                            <span className="kanban-tag">{card.tags[0] || 'Task'}</span>
+                          <div className="kanban-card-meta-row">
                             <span className={`kanban-priority kanban-priority--${card.priority.toLowerCase()}`}>
                               {card.priority === 'High' || card.priority === 'Critical' ? <AlertCircle size={12}/> : <ArrowDown size={12}/>}
                               {card.priority}
@@ -447,7 +426,7 @@ export function KanbanPage() {
                       <button 
                         className="kanban-add-card-btn" 
                         onClick={() => {
-                          setEditingCard({ id: 'new', columnId: column.id, title: '', description: null, priority: 'Medium', deadline: null, tags: [], sortOrder: column.cards.length, createdAt: new Date().toISOString() } as unknown as kanbanApi.KanbanCard)
+                          setEditingCard({ id: 'new', columnId: column.id, title: '', description: null, priority: 'Medium', deadline: null, sortOrder: column.cards.length, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as kanbanApi.KanbanCard)
                           setEditForm(emptyCardForm(column.id))
                         }}
                       >
@@ -507,10 +486,6 @@ export function KanbanPage() {
                     <input type="date" value={editForm.deadline} onChange={(event) => setEditForm({ ...editForm, deadline: event.target.value })} />
                   </label>
                 </div>
-                <label>
-                  Tags
-                  <input value={editForm.tags} onChange={(event) => setEditForm({ ...editForm, tags: event.target.value })} placeholder="Comma separated" />
-                </label>
               </div>
               <footer className="kanban-modal-footer">
                 {editingCard.id !== 'new' && (

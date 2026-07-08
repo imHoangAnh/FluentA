@@ -83,7 +83,7 @@ export function TodoPage() {
   })
 
   const todos = useMemo(
-    () => (todosQuery.data ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt)),
+    () => [...(todosQuery.data ?? [])],
     [todosQuery.data],
   )
 
@@ -119,23 +119,6 @@ export function TodoPage() {
       for (const [key, value] of context?.previous ?? []) {
         queryClient.setQueryData(key, value)
       }
-    },
-    onSettled: async () => {
-      await refresh()
-    },
-  })
-
-  const updateLayout = useMutation({
-    mutationFn: (input: { items: todoApi.TodoItem[]; updates: Array<{ id: string; date: string; sortOrder: number }> }) =>
-      todoApi.updateTodoLayout(input.updates),
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: weekKey })
-      const previous = queryClient.getQueryData<todoApi.TodoItem[]>(weekKey)
-      queryClient.setQueryData(weekKey, input.items)
-      return { previous }
-    },
-    onError: (_error, _input, context) => {
-      queryClient.setQueryData(weekKey, context?.previous)
     },
     onSettled: async () => {
       await refresh()
@@ -189,7 +172,7 @@ export function TodoPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
@@ -384,7 +367,6 @@ export function TodoPage() {
                     <div className="todo-section-v2__list">
                       {openTasks.map((item) => (
                         <article className="todo-card-v2" key={item.id}>
-                          {item.isCarriedOver && <div className="todo-card-v2__carried-bar" />}
                           <div className="todo-card-v2__checkbox">
                             <input
                               aria-label={`Complete ${item.title}`}
@@ -396,15 +378,6 @@ export function TodoPage() {
                           <div className="todo-card-v2__body">
                             <div className="todo-card-v2__title-row">
                               <h5 className="todo-card-v2__title">{item.title}</h5>
-                              {item.isCarriedOver && item.originalDate ? (
-                                <span className="todo-card-v2__badge todo-card-v2__badge--carried">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="1 4 1 10 7 10" />
-                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                                  </svg>
-                                  Carried over from {item.originalDate}
-                                </span>
-                              ) : null}
                             </div>
                             {item.note ? <p className="todo-card-v2__note">{item.note}</p> : null}
                           </div>
@@ -501,7 +474,6 @@ export function TodoPage() {
               items={weekTodos}
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
-              onLayoutChange={(items, updates) => updateLayout.mutate({ items, updates })}
               onToggle={(item, isCompleted) => updateTodo.mutate({ id: item.id, patch: { isCompleted } })}
               onDelete={(item) => deleteTodo.mutate(item.id)}
             />

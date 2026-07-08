@@ -4,10 +4,8 @@ public sealed record CreateTodoItemRequest(string Title, string Date, string? No
 
 public sealed record UpdateTodoItemRequest(
     string? Title = null,
-    string? Date = null,
     string? Note = null,
-    bool? IsCompleted = null,
-    int? SortOrder = null);
+    bool? IsCompleted = null);
 
 public sealed record TodoItemDto(
     Guid Id,
@@ -16,8 +14,5 @@ public sealed record TodoItemDto(
     string Date,
     bool IsCompleted,
     DateTime? CompletedAt,
-    int SortOrder,
-    bool IsCarriedOver,
-    string? OriginalDate,
     DateTime CreatedAt,
     DateTime UpdatedAt);

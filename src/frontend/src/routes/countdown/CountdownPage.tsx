@@ -1,159 +1,114 @@
-import { 
-  Plus, Edit3, Trash2, X,
-  CalendarClock, Settings, Columns3, BookOpen, LogOut, NotebookPen, Repeat2, Kanban, Timer, Globe, HelpCircle, FileText, GraduationCap, ClipboardList, CheckSquare, MapPin
+import {
+  Plus, Trash2, X,
+  CalendarClock, Settings, Columns3, BookOpen, LogOut, NotebookPen, Repeat2, Kanban, Timer, Globe, HelpCircle, CheckSquare, ImagePlus
 } from 'lucide-react'
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import { getUserAvatarUrl } from '../../lib/avatar'
 import { LearningNavLinks } from '../../components/LearningNavLinks'
+import * as assetsApi from '../../lib/api/assets.api'
 import * as countdownApi from '../../lib/api/countdown.api'
 import { useAuthStore } from '../../stores/authStore'
 import './CountdownPage.css'
 
-function toLocalInput(date: Date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  const hours = `${date.getHours()}`.padStart(2, '0')
-  const minutes = `${date.getMinutes()}`.padStart(2, '0')
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
+const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
 
 function defaultTargetDate() {
   const date = new Date()
   date.setDate(date.getDate() + 7)
-  date.setHours(9, 0, 0, 0)
-  return toLocalInput(date)
+  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
 }
 
-function toUtcIso(localValue: string) {
-  return new Date(localValue).toISOString()
+function defaultAlert() {
+  return { alertDay: '1DayBefore', alertTime: '09:00' }
 }
 
 function formatTargetDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: '2-digit',
-    year: 'numeric'
-  }).format(new Date(value))
+    year: 'numeric',
+  }).format(new Date(`${value}T00:00:00`))
+}
+
+function statusText(item: countdownApi.CountdownEvent) {
+  if (item.isCompleted) {
+    return 'Completed'
+  }
+
+  const diff = Math.ceil((new Date(`${item.targetDate}T00:00:00`).getTime() - new Date().getTime()) / 86_400_000)
+  return diff <= 0 ? 'Today' : `${diff} day${diff === 1 ? '' : 's'} left`
 }
 
 export function CountdownPage() {
   const queryClient = useQueryClient()
   const location = useLocation()
-  const [now, setNow] = useState(() => new Date())
-  
-  // Modal / Sidebar state
-  const [showDetailSidebar, setShowDetailSidebar] = useState(false)
-  const [showFormModal, setShowFormModal] = useState(false)
-  
-  // Selection
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-
-  // Form state
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [targetDate, setTargetDate] = useState(defaultTargetDate)
-  const [color, setColor] = useState('#0D9488') // Teal default
-  const [icon, setIcon] = useState('ClipboardList') // Default icon string
-
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const displayName = user?.fullName?.split(' ')[0] || 'User'
   const avatarUrl = getUserAvatarUrl(user, displayName)
 
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
+  const [showFormModal, setShowFormModal] = useState(false)
+  const [name, setName] = useState('')
+  const [targetDate, setTargetDate] = useState(defaultTargetDate)
+  const [alerts, setAlerts] = useState<Array<{ alertDay: string; alertTime: string }>>([defaultAlert()])
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const countdownsQuery = useQuery({
     queryKey: ['countdown', 'events'],
     queryFn: countdownApi.listCountdowns,
   })
 
-  const countdowns = useMemo(
-    () => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()),
-    [countdownsQuery.data],
-  )
-
-  const selectedEvent = countdowns.find(c => c.id === selectedEventId) || countdowns[0]
+  const countdowns = useMemo(() => countdownsQuery.data ?? [], [countdownsQuery.data])
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['countdown', 'events'] })
   }
 
   const resetForm = () => {
-    setEditingId(null)
     setName('')
     setTargetDate(defaultTargetDate())
-    setColor('#0D9488')
-    setIcon('ClipboardList')
+    setAlerts([defaultAlert()])
+    setCoverFile(null)
+    setFormError(null)
     setShowFormModal(false)
   }
 
   const createCountdown = useMutation({
-    mutationFn: countdownApi.createCountdown,
-    onSuccess: async () => {
-      resetForm()
-      await refresh()
-    },
-  })
+    mutationFn: async () => {
+      let coverAssetId: string | null = null
+      if (coverFile) {
+        const asset = await assetsApi.uploadCountdownCoverAsset(coverFile)
+        coverAssetId = asset.id
+      }
 
-  const updateCountdown = useMutation({
-    mutationFn: (input: { id: string; patch: countdownApi.UpdateCountdownInput }) => countdownApi.updateCountdown(input.id, input.patch),
+      return countdownApi.createCountdown({
+        name,
+        targetDate,
+        alerts,
+        coverAssetId,
+      })
+    },
     onSuccess: async () => {
       resetForm()
       await refresh()
     },
+    onError: () => setFormError('Countdown could not be created.'),
   })
 
   const deleteCountdown = useMutation({
     mutationFn: countdownApi.deleteCountdown,
     onSuccess: async () => {
       await refresh()
-      setShowDetailSidebar(false)
     },
   })
 
   function submitCountdown(event: FormEvent) {
     event.preventDefault()
-    if (!name.trim() || !targetDate) return
-
-    const payload = {
-      name,
-      targetDate: toUtcIso(targetDate),
-      color: color.trim() ? color : null,
-      icon: icon.trim() ? icon : null,
-    }
-
-    if (editingId) {
-      updateCountdown.mutate({ id: editingId, patch: payload })
-    } else {
-      createCountdown.mutate(payload)
-    }
-  }
-
-  function editCountdown(item: countdownApi.CountdownEvent) {
-    setEditingId(item.id)
-    setName(item.name)
-    setTargetDate(toLocalInput(new Date(item.targetDate)))
-    setColor(item.color ?? '#0D9488')
-    setIcon(item.icon ?? 'ClipboardList')
-    setShowFormModal(true)
-  }
-
-  function confirmDelete(item: countdownApi.CountdownEvent) {
-    if (window.confirm(`Delete "${item.name}"?`)) {
-      deleteCountdown.mutate(item.id)
-    }
-  }
-
-  const IconMap: Record<string, React.ReactNode> = {
-    'ClipboardList': <ClipboardList size={28} />,
-    'FileText': <FileText size={28} />,
-    'GraduationCap': <GraduationCap size={28} />
+    if (!name.trim()) return
+    createCountdown.mutate()
   }
 
   return (
@@ -183,7 +138,7 @@ export function CountdownPage() {
           <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
             <Repeat2 size={20} /> Habits
           </Link>
-          <Link to="/countdown" className={location.pathname === '/countdown' ? 'active' : ''}>
+          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
             <CalendarClock size={20} /> Countdowns
           </Link>
           <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
@@ -199,14 +154,10 @@ export function CountdownPage() {
 
         <div className="dashboard-user-section">
           <div className="dashboard-user-card">
-            <img 
-              className="dashboard-user-avatar" 
-              src={avatarUrl}
-              alt="User" 
-            />
+            <img className="dashboard-user-avatar" src={avatarUrl} alt="User" />
             <div className="dashboard-user-info">
               <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Premium User</p>
+              <p className="dashboard-user-level">Learner Profile</p>
             </div>
           </div>
           <div className="dashboard-user-links">
@@ -221,214 +172,110 @@ export function CountdownPage() {
         <header className="countdown-header">
           <div className="countdown-header-title">
             <h2>Countdowns</h2>
+            <p>Date-based milestones with fixed Vietnam-local alerts.</p>
           </div>
+          <button className="add-event-btn" onClick={() => setShowFormModal(true)}>
+            <Plus size={20} />
+            <span>New Countdown</span>
+          </button>
         </header>
 
         <div className="countdown-canvas">
-          {/* Main List Area */}
           <section className="countdown-list-area">
             <div className="countdown-list-container">
-              
-              {/* Page Header */}
-              <div className="countdown-page-header">
-                <div>
-                  <h2 className="countdown-page-title">Important Dates</h2>
-                  <p className="countdown-page-subtitle">{countdowns.length} tracked events</p>
-                </div>
-                <button 
-                  className="add-event-btn"
-                  onClick={() => setShowFormModal(true)}
-                >
-                  <Plus size={20} />
-                  <span>Add Event</span>
-                </button>
-              </div>
-
-              {/* Stats Cards */}
-              <div className="countdown-stats-grid">
-                <div className="stat-card">
-                  <p className="stat-label">Total Events</p>
-                  <p className="stat-value">{String(countdowns.length).padStart(2, '0')}</p>
-                </div>
-                <div className="stat-card">
-                  <p className="stat-label">Next Event</p>
-                  {countdowns.length > 0 ? (() => {
-                    const diff = new Date(countdowns[0].targetDate).getTime() - now.getTime()
-                    const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
-                    return <p className="stat-value-sm">{days} Days Left</p>
-                  })() : <p className="stat-value-sm">--</p>}
-                </div>
-                <div className="stat-card">
-                  <p className="stat-label">Completion Rate</p>
-                  <p className="stat-value-sm">--</p>
-                </div>
-              </div>
-
-              {/* Event List */}
               <div className="countdown-events-wrapper">
-                {countdowns.map((item) => {
-                  const isActive = selectedEventId === item.id
-                  const diff = new Date(item.targetDate).getTime() - now.getTime()
-                  const isCompleted = diff <= 0
-                  const days = isCompleted ? 0 : Math.floor(diff / (1000 * 60 * 60 * 24))
-
-                  return (
-                    <div 
-                      key={item.id} 
-                      className={`event-list-item ${isActive ? 'active' : ''}`}
-                      onClick={() => {
-                        setSelectedEventId(item.id)
-                        setShowDetailSidebar(true)
-                      }}
-                    >
-                      <div className="event-icon-box">
-                        {IconMap[item.icon || 'ClipboardList'] || <ClipboardList size={28} />}
-                      </div>
-                      <div className="event-info">
-                        <h4 className="event-title">{item.name}</h4>
-                        <p className="event-subtitle">{item.icon || 'Event'}</p>
-                      </div>
-                      <div className="event-meta">
-                        <p className={`event-days ${isCompleted ? 'event-days-completed' : ''}`}>{days}d</p>
-                        <p className="event-date">{formatTargetDate(item.targetDate)}</p>
-                      </div>
+                {countdowns.map((item) => (
+                  <article key={item.id} className="event-list-item active">
+                    <div className="event-icon-box">
+                      {item.coverUrl ? <img src={item.coverUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }} /> : <CalendarClock size={28} />}
                     </div>
-                  )
-                })}
+                    <div className="event-info">
+                      <h4 className="event-title">{item.name}</h4>
+                      <p className="event-subtitle">{item.alerts.length} alert{item.alerts.length === 1 ? '' : 's'} · {formatTargetDate(item.targetDate)}</p>
+                      <p className="event-subtitle">{item.alerts.map((alert) => `${alert.alertDay} ${alert.alertTime}`).join(' • ')}</p>
+                    </div>
+                    <div className="event-meta">
+                      <p className={`event-days ${item.isCompleted ? 'event-days-completed' : ''}`}>{statusText(item)}</p>
+                      <button
+                        className="kanban-danger-btn"
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${item.name}"?`)) deleteCountdown.mutate(item.id)
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
 
-                {countdowns.length === 0 && (
+                {!countdownsQuery.isLoading && countdowns.length === 0 ? (
                   <div className="empty-panel">
                     <CalendarClock size={32} />
                     <h3>No countdowns yet</h3>
-                    <p>Add an exam, deadline, or milestone.</p>
+                    <p>Create an exam, deadline, or milestone with one to five alerts.</p>
                   </div>
-                )}
+                ) : null}
+
+                {countdownsQuery.isLoading ? <p className="flashcard-status">Loading countdowns...</p> : null}
+                {countdownsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load countdowns.</p> : null}
               </div>
             </div>
           </section>
-
-          {/* Right Detail Sidebar */}
-          {showDetailSidebar && selectedEvent && (
-            <aside className="countdown-detail-sidebar">
-              <div className="detail-sidebar-header">
-                <h3>Event Details</h3>
-                <div className="detail-actions">
-                  <button onClick={() => editCountdown(selectedEvent)}><Edit3 size={18} /></button>
-                  <button className="btn-delete" onClick={() => confirmDelete(selectedEvent)}><Trash2 size={18} /></button>
-                  <button onClick={() => setShowDetailSidebar(false)}><X size={18} /></button>
-                </div>
-              </div>
-
-              <div className="detail-content">
-                {/* Visual Circle */}
-                <div className="detail-visual">
-                  <div className="visual-ring">
-                    <svg viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="42" className="ring-bg" />
-                      <circle cx="50" cy="50" r="42" className="ring-progress" style={{ strokeDashoffset: 66 }} />
-                    </svg>
-                    <div className="visual-text">
-                      <span className="days-number">
-                        {Math.max(0, Math.floor((new Date(selectedEvent.targetDate).getTime() - now.getTime()) / 86400000))}
-                      </span>
-                      <span className="days-label">Days Left</span>
-                    </div>
-                  </div>
-                  <h2 className="detail-title">{selectedEvent.name}</h2>
-                  <div className="detail-location">
-                    <MapPin size={16} />
-                    <span>General Event</span>
-                  </div>
-                </div>
-
-                {/* Grid */}
-                <div className="detail-grid">
-                  <div className="grid-item">
-                    <span className="grid-label">Target Date</span>
-                    <span className="grid-value">{formatTargetDate(selectedEvent.targetDate)}</span>
-                  </div>
-                  <div className="grid-item">
-                    <span className="grid-label">Status</span>
-                    <div className="status-flex">
-                      <div className="status-dot"></div>
-                      <span className="grid-value">On Track</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div className="detail-notes">
-                  <label>Preparation Notes</label>
-                  <div className="notes-box">
-                    <ul>
-                      <li>Review relevant study material</li>
-                      <li>Double check time and location</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Checklist (Mock) */}
-                <div className="detail-progress">
-                  <div className="progress-header">
-                    <label>Preparation Progress</label>
-                    <span>0%</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: '0%' }}></div>
-                  </div>
-                </div>
-
-                <button className="related-tasks-btn">
-                  <div className="left">
-                    <CheckSquare size={18} />
-                    <span>0 Preparation Tasks</span>
-                  </div>
-                </button>
-              </div>
-            </aside>
-          )}
         </div>
 
-        {/* Modal Form */}
-        {showFormModal && (
+        {showFormModal ? (
           <div className="modal-overlay">
             <div className="modal-content">
               <div className="modal-header">
-                <h3>{editingId ? 'Edit Event' : 'Add New Event'}</h3>
+                <h3>Create Countdown</h3>
                 <button onClick={resetForm}><X size={20} /></button>
               </div>
               <form onSubmit={submitCountdown}>
                 <label>
-                  Event Name
-                  <input required value={name} onChange={e => setName(e.target.value)} placeholder="E.g., JLPT N2 Exam" />
+                  Countdown name
+                  <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="E.g., JLPT N2 Exam" />
                 </label>
                 <label>
-                  Target Date & Time
-                  <input type="datetime-local" required value={targetDate} onChange={e => setTargetDate(e.target.value)} />
+                  Target date
+                  <input type="date" required value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
                 </label>
                 <label>
-                  Icon Symbol
-                  <select value={icon} onChange={e => setIcon(e.target.value)}>
-                    <option value="ClipboardList">Clipboard</option>
-                    <option value="FileText">Document</option>
-                    <option value="GraduationCap">Graduation</option>
-                  </select>
-                </label>
-                <label>
-                  Accent Color
+                  Cover image (optional)
                   <div className="color-picker-wrapper">
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)} />
-                    <span className="color-picker-text">{color}</span>
+                    <ImagePlus size={18} />
+                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)} />
                   </div>
                 </label>
+                <div className="detail-notes">
+                  <label>Alerts</label>
+                  <div className="notes-box" style={{ display: 'grid', gap: '12px' }}>
+                    {alerts.map((alert, index) => (
+                      <div key={`${alert.alertDay}-${index}`} style={{ display: 'grid', gap: '8px' }}>
+                        <select value={alert.alertDay} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertDay: event.target.value } : item))}>
+                          {alertDayOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+                        </select>
+                        <input type="time" value={alert.alertTime} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))} />
+                        <button type="button" className="btn-cancel" onClick={() => setAlerts((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={alerts.length === 1}>
+                          Remove alert
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className="add-event-btn" onClick={() => setAlerts((current) => current.length >= 5 ? current : [...current, defaultAlert()])}>
+                      <Plus size={18} />
+                      <span>Add alert</span>
+                    </button>
+                  </div>
+                </div>
+                {formError ? <p className="flashcard-status flashcard-status--error">{formError}</p> : null}
                 <div className="modal-actions">
                   <button type="button" className="btn-cancel" onClick={resetForm}>Cancel</button>
-                  <button type="submit" className="btn-submit">Save Event</button>
+                  <button type="submit" className="btn-submit" disabled={createCountdown.isPending}>Create Countdown</button>
                 </div>
               </form>
             </div>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   )

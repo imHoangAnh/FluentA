@@ -1,26 +1,57 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
-using FluentA.Application.BoundedContexts.Countdown.DTOs;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.Common;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
+using FluentA.Domain.BoundedContexts.Countdown.Entities;
+using FluentA.Application.BoundedContexts.Countdown.DTOs;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
 
 namespace FluentA.Application.BoundedContexts.Countdown;
 
-public sealed partial class CountdownService : ICountdownService
+public sealed class CountdownService : ICountdownService
 {
+    private const string DateFormat = "yyyy-MM-dd";
     private readonly ICountdownRepository _repository;
+    private readonly IAssetRepository? _assets;
+    private readonly IAssetObjectStorage? _assetStorage;
 
-    public CountdownService(ICountdownRepository repository)
+    public CountdownService(
+        ICountdownRepository repository,
+        IAssetRepository? assets = null,
+        IAssetObjectStorage? assetStorage = null)
     {
         _repository = repository;
+        _assets = assets;
+        _assetStorage = assetStorage;
     }
 
     public async Task<OperationResult<IReadOnlyList<CountdownEventDto>>> ListAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
+        var nowUtc = DateTime.UtcNow;
         var events = await _repository.ListAsync(userId, cancellationToken);
-        return OperationResult<IReadOnlyList<CountdownEventDto>>.Success(events.Select(ToDto).ToList());
+        var visibleEvents = events
+            .Where(countdown => countdown.DeletedAt is null && countdown.IsVisibleAt(nowUtc))
+            .OrderBy(countdown => countdown.IsCompletedAt(nowUtc))
+            .ThenBy(countdown => countdown.TargetDate)
+            .ThenBy(countdown => countdown.CreatedAt)
+            .ToList();
+
+        var visible = new List<CountdownEventDto>(visibleEvents.Count);
+        foreach (var countdown in visibleEvents)
+        {
+            string? coverUrl = null;
+            if (countdown.CoverAssetId.HasValue && _assets is not null)
+            {
+                var asset = await _assets.GetByIdAsync(countdown.CoverAssetId.Value, cancellationToken);
+                coverUrl = asset?.DeletedAt is null ? asset?.PublicUrl : null;
+            }
+
+            visible.Add(ToDto(countdown, coverUrl));
+        }
+
+        return OperationResult<IReadOnlyList<CountdownEventDto>>.Success(visible);
     }
 
     public async Task<OperationResult<CountdownEventDto>> CreateAsync(
@@ -28,123 +59,67 @@ public sealed partial class CountdownService : ICountdownService
         CreateCountdownEventRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validation = ValidateCreate(request);
+        var validation = await ValidateCreateAsync(userId, request, cancellationToken);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<CountdownEventDto>.Failure(CountdownError.Validation(validation.Errors));
         }
 
-        var countdownEvent = CountdownEventEntity.Create(userId, request.Name, validation.TargetDate, request.Color, request.Icon);
-        await _repository.AddAsync(countdownEvent, cancellationToken);
-        return OperationResult<CountdownEventDto>.Success(ToDto(countdownEvent));
-    }
-
-    public async Task<OperationResult<CountdownEventDto>> UpdateAsync(
-        Guid userId,
-        Guid countdownId,
-        UpdateCountdownEventRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var countdownEvent = await _repository.GetAsync(userId, countdownId, cancellationToken);
-        if (countdownEvent is null)
+        var countdown = CountdownEventEntity.Create(userId, request.Name, validation.TargetDate, request.CoverAssetId);
+        foreach (var alert in validation.Alerts)
         {
-            return OperationResult<CountdownEventDto>.Failure(CountdownError.NotFound());
+            countdown.AddAlert(alert.AlertDay, alert.AlertTime, alert.ScheduledAtUtc);
         }
 
-        var validation = ValidateUpdate(request);
-        if (validation.Errors.Count > 0)
-        {
-            return OperationResult<CountdownEventDto>.Failure(CountdownError.Validation(validation.Errors));
-        }
-
-        if (request.Name is not null)
-        {
-            countdownEvent.Rename(request.Name);
-        }
-
-        if (validation.TargetDate is not null)
-        {
-            countdownEvent.Reschedule(validation.TargetDate.Value);
-        }
-
-        if (request.Color is not null)
-        {
-            countdownEvent.UpdateColor(request.Color);
-        }
-
-        if (request.Icon is not null)
-        {
-            countdownEvent.UpdateIcon(request.Icon);
-        }
-
-        await _repository.UpdateAsync(countdownEvent, cancellationToken);
-        return OperationResult<CountdownEventDto>.Success(ToDto(countdownEvent));
+        await _repository.AddAsync(countdown, cancellationToken);
+        return OperationResult<CountdownEventDto>.Success(ToDto(countdown, validation.CoverUrl));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
     {
-        var countdownEvent = await _repository.GetAsync(userId, countdownId, cancellationToken);
-        if (countdownEvent is null)
+        var countdown = await _repository.GetAsync(userId, countdownId, cancellationToken);
+        if (countdown is null)
         {
             return OperationResult<bool>.Failure(CountdownError.NotFound());
         }
 
-        countdownEvent.SoftDelete();
-        await _repository.UpdateAsync(countdownEvent, cancellationToken);
+        countdown.SoftDelete();
+        await _repository.UpdateAsync(countdown, cancellationToken);
+
+        if (countdown.CoverAssetId.HasValue && _assets is not null)
+        {
+            var asset = await _assets.GetOwnedAsync(userId, countdown.CoverAssetId.Value, cancellationToken);
+            if (asset is not null && asset.DeletedAt is null)
+            {
+                asset.MarkDeleted(DateTime.UtcNow);
+                await _assets.UpdateAsync(asset, cancellationToken);
+
+                if (_assetStorage is not null)
+                {
+                    try
+                    {
+                        await _assetStorage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
+                    }
+                    catch (AssetStorageUnavailableException)
+                    {
+                    }
+                }
+            }
+        }
+
         return OperationResult<bool>.Success(true);
     }
 
-    private static (Dictionary<string, string[]> Errors, DateTime TargetDate) ValidateCreate(CreateCountdownEventRequest request)
+    private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts, string? CoverUrl)> ValidateCreateAsync(
+        Guid userId,
+        CreateCountdownEventRequest request,
+        CancellationToken cancellationToken)
     {
-        var errors = ValidateNameColorIcon(request.Name, request.Color, request.Icon);
-        if (!TryParseTargetDate(request.TargetDate, out var targetDate, out var targetDateErrors))
-        {
-            errors["targetDate"] = targetDateErrors["targetDate"];
-        }
-
-        return (errors, targetDate);
-    }
-
-    private static (Dictionary<string, string[]> Errors, DateTime? TargetDate) ValidateUpdate(UpdateCountdownEventRequest request)
-    {
-        var errors = new Dictionary<string, string[]>();
-        if (request.Name is not null)
-        {
-            Merge(errors, ValidateName(request.Name));
-        }
-
-        if (request.Color is not null)
-        {
-            Merge(errors, ValidateColor(request.Color));
-        }
-
-        if (request.Icon is not null)
-        {
-            Merge(errors, ValidateIcon(request.Icon));
-        }
-
-        DateTime? targetDate = null;
-        if (request.TargetDate is not null)
-        {
-            if (TryParseTargetDate(request.TargetDate, out var parsed, out var targetDateErrors))
-            {
-                targetDate = parsed;
-            }
-            else
-            {
-                errors["targetDate"] = targetDateErrors["targetDate"];
-            }
-        }
-
-        return (errors, targetDate);
-    }
-
-    private static Dictionary<string, string[]> ValidateNameColorIcon(string name, string? color, string? icon)
-    {
-        var errors = ValidateName(name);
-        Merge(errors, ValidateColor(color));
-        Merge(errors, ValidateIcon(icon));
-        return errors;
+        var errors = ValidateName(request.Name);
+        var targetDate = ParseTargetDate(request.TargetDate, errors);
+        var alerts = ValidateAlerts(request.Alerts, targetDate, errors);
+        var coverUrl = await ValidateCoverAssetAsync(userId, request.CoverAssetId, errors, cancellationToken);
+        return (errors, targetDate, alerts, coverUrl);
     }
 
     private static Dictionary<string, string[]> ValidateName(string name)
@@ -162,67 +137,132 @@ public sealed partial class CountdownService : ICountdownService
         return errors;
     }
 
-    private static Dictionary<string, string[]> ValidateColor(string? color)
+    private static DateTime ParseTargetDate(string? value, Dictionary<string, string[]> errors)
     {
-        var errors = new Dictionary<string, string[]>();
-        if (!string.IsNullOrWhiteSpace(color) && !HexColorRegex().IsMatch(color.Trim()))
+        if (string.IsNullOrWhiteSpace(value)
+            || !DateTime.TryParseExact(value, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
         {
-            errors["color"] = ["Color must be a hex value like #4F46E5."];
+            errors["targetDate"] = ["Target date must be in YYYY-MM-DD format."];
+            return DateTime.MinValue;
         }
 
-        return errors;
-    }
-
-    private static Dictionary<string, string[]> ValidateIcon(string? icon)
-    {
-        var errors = new Dictionary<string, string[]>();
-        if (!string.IsNullOrWhiteSpace(icon) && icon.Trim().Length > 16)
+        var targetDate = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+        var vietnamToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, CountdownTimeZone.Vietnam()).Date;
+        if (targetDate.Date < vietnamToday)
         {
-            errors["icon"] = ["Icon must be at most 16 characters."];
+            errors["targetDate"] = ["Target date cannot be in the past."];
         }
 
-        return errors;
+        return targetDate;
     }
 
-    private static bool TryParseTargetDate(string? value, out DateTime targetDate, out Dictionary<string, string[]> errors)
+    private static List<ValidatedAlert> ValidateAlerts(
+        IReadOnlyList<CreateCountdownAlertRequest>? alerts,
+        DateTime targetDate,
+        Dictionary<string, string[]> errors)
     {
-        errors = [];
-        if (!DateTimeOffset.TryParse(
-            value,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-            out var parsed))
+        var validated = new List<ValidatedAlert>();
+        if (alerts is null || alerts.Count is < 1 or > 5)
         {
-            targetDate = default;
-            errors["targetDate"] = ["targetDate must be an ISO date-time value."];
-            return false;
+            errors["alerts"] = ["Create requires between 1 and 5 alerts."];
+            return validated;
         }
 
-        targetDate = parsed.UtcDateTime;
-        return true;
-    }
-
-    private static void Merge(Dictionary<string, string[]> target, Dictionary<string, string[]> source)
-    {
-        foreach (var (key, value) in source)
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var alert in alerts)
         {
-            target[key] = value;
+            if (!TimeOnly.TryParseExact(alert.AlertTime, "HH:mm", out var localTime))
+            {
+                errors["alerts"] = ["Alert times must use HH:mm format."];
+                continue;
+            }
+
+            if (alert.AlertDay is not ("OnTargetDay" or "1DayBefore" or "3DaysBefore" or "7DaysBefore"))
+            {
+                errors["alerts"] = ["Alert day must be OnTargetDay, 1DayBefore, 3DaysBefore, or 7DaysBefore."];
+                continue;
+            }
+
+            var key = $"{alert.AlertDay}|{alert.AlertTime}";
+            if (!seen.Add(key))
+            {
+                errors["alerts"] = ["Duplicate alerts with the same alert day and alert time are not allowed."];
+                continue;
+            }
+
+            var scheduledAtUtc = BuildScheduledAtUtc(targetDate, alert.AlertDay, localTime);
+            if (scheduledAtUtc <= DateTime.UtcNow)
+            {
+                errors["alerts"] = ["Alerts that are already in the past cannot be created."];
+                continue;
+            }
+
+            validated.Add(new ValidatedAlert(alert.AlertDay, alert.AlertTime, scheduledAtUtc));
         }
+
+        return validated;
     }
 
-    private static CountdownEventDto ToDto(CountdownEventEntity countdownEvent)
+    private async Task<string?> ValidateCoverAssetAsync(
+        Guid userId,
+        Guid? coverAssetId,
+        Dictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
+    {
+        if (!coverAssetId.HasValue)
+        {
+            return null;
+        }
+
+        if (_assets is null)
+        {
+            errors["coverAssetId"] = ["Cover assets are unavailable in the current runtime."];
+            return null;
+        }
+
+        var asset = await _assets.GetOwnedAsync(userId, coverAssetId.Value, cancellationToken);
+        if (asset is null || asset.Type != AssetType.CountdownCover || asset.Status != AssetStatus.Finalized)
+        {
+            errors["coverAssetId"] = ["Cover asset must be an owned finalized countdown-cover asset."];
+            return null;
+        }
+
+        return asset.PublicUrl;
+    }
+
+    private static DateTime BuildScheduledAtUtc(DateTime targetDate, string alertDay, TimeOnly localTime)
+    {
+        var localDate = alertDay switch
+        {
+            "OnTargetDay" => targetDate.Date,
+            "1DayBefore" => targetDate.Date.AddDays(-1),
+            "3DaysBefore" => targetDate.Date.AddDays(-3),
+            "7DaysBefore" => targetDate.Date.AddDays(-7),
+            _ => throw new InvalidOperationException("Unsupported alert day."),
+        };
+
+        var unspecificLocal = localDate.Add(localTime.ToTimeSpan());
+        var local = DateTime.SpecifyKind(unspecificLocal, DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(local, CountdownTimeZone.Vietnam());
+    }
+
+    private static CountdownEventDto ToDto(CountdownEventEntity countdownEvent, string? coverUrlOverride = null)
     {
         return new CountdownEventDto(
             countdownEvent.Id,
             countdownEvent.Name,
-            countdownEvent.TargetDate.ToString("O", CultureInfo.InvariantCulture),
-            countdownEvent.Color,
-            countdownEvent.Icon,
-            countdownEvent.IsCompleted,
+            countdownEvent.TargetDate.ToString(DateFormat, CultureInfo.InvariantCulture),
+            countdownEvent.CoverAssetId,
+            coverUrlOverride,
+            countdownEvent.IsCompletedAt(DateTime.UtcNow),
+            countdownEvent.Alerts
+                .Where(alert => alert.DeletedAt is null)
+                .OrderBy(alert => alert.ScheduledAtUtc)
+                .Select(alert => new CountdownAlertDto(alert.Id, alert.AlertDay, alert.AlertTime, alert.ScheduledAtUtc, alert.FiredAtUtc))
+                .ToList(),
             countdownEvent.CreatedAt,
             countdownEvent.UpdatedAt);
     }
 
-    [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
-    private static partial Regex HexColorRegex();
+    private sealed record ValidatedAlert(string AlertDay, string AlertTime, DateTime ScheduledAtUtc);
 }

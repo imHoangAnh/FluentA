@@ -33,13 +33,12 @@ public sealed class KanbanServiceTests
         var result = await service.CreateCardAsync(
             userId,
             board.Id,
-            new CreateKanbanCardRequest(board.Columns[0].Id, " Build outline ", "Draft", "High", "2026-06-20", ["Study", "study"]));
+            new CreateKanbanCardRequest(board.Columns[0].Id, " Build outline ", "Draft", "High", "2026-06-20"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Build outline", result.Value!.Title);
         Assert.Equal("High", result.Value.Priority);
         Assert.Equal("2026-06-20", result.Value.Deadline);
-        Assert.Equal(["Study"], result.Value.Tags);
     }
 
     [Fact]
@@ -48,7 +47,7 @@ public sealed class KanbanServiceTests
         var repository = new FakeKanbanRepository();
         var userId = Guid.NewGuid();
         var board = SeedBoard(repository, userId);
-        board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
         var service = new KanbanService(repository);
 
         var result = await service.DeleteColumnAsync(userId, board.Id, board.Columns[0].Id);
@@ -68,7 +67,7 @@ public sealed class KanbanServiceTests
         var foreignId = Guid.NewGuid();
         var board = SeedBoard(repository, ownerId);
         var foreignBoard = SeedBoard(repository, foreignId);
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
         var service = new KanbanService(repository, notifier);
 
         var foreignMove = await service.MoveCardAsync(ownerId, card.Id, new MoveKanbanCardRequest(foreignBoard.Columns[0].Id, 0));
@@ -97,7 +96,7 @@ public sealed class KanbanServiceTests
         var foreignId = Guid.NewGuid();
         var board = SeedBoard(repository, ownerId);
         var foreignBoard = SeedBoard(repository, foreignId);
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
         var service = new KanbanService(repository, notifier);
 
         var result = await service.MoveCardAsync(ownerId, card.Id, new MoveKanbanCardRequest(foreignBoard.Columns[0].Id, 0));
@@ -113,7 +112,7 @@ public sealed class KanbanServiceTests
         var ownerId = Guid.NewGuid();
         var foreignId = Guid.NewGuid();
         var board = SeedBoard(repository, ownerId);
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
         var service = new KanbanService(repository);
 
         var getBoard = await service.GetBoardAsync(foreignId, board.Id);
@@ -132,7 +131,7 @@ public sealed class KanbanServiceTests
         var repository = new FakeKanbanRepository();
         var userId = Guid.NewGuid();
         var board = SeedBoard(repository, userId);
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0, []);
+        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
         var service = new KanbanService(repository);
 
         var result = await service.UpdateCardAsync(userId, card.Id, new UpdateKanbanCardRequest(Title: "", Priority: "Urgent", Deadline: "June"));
@@ -229,7 +228,7 @@ public sealed class KanbanServiceTests
         public Task AddCardAsync(KanbanCard card, CancellationToken cancellationToken = default)
         {
             var column = Boards.SelectMany(board => board.Columns).First(column => column.Id == card.ColumnId);
-            column.AddCard(card.Title, card.Description, card.Priority, card.Deadline, card.SortOrder, card.Tags);
+            column.AddCard(card.Title, card.Description, card.Priority, card.Deadline, card.SortOrder);
             return Task.CompletedTask;
         }
 

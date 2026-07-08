@@ -19,8 +19,7 @@ Dashboard aggregation are separate future stories.
 - Deleting a column is allowed only when the column has no active cards.
 - A logged-in user can add, edit, move, reorder, and delete cards on an owned
   board.
-- Cards support a required title, optional description, priority, deadline, and
-  tags.
+- Cards support a required title, optional description, priority, and deadline.
 - The board UI displays priority badges and overdue deadline state.
 - Board filters are client-side after a board detail request loads all active
   columns and cards.
@@ -63,8 +62,6 @@ All responses use the FluentA envelope.
   trimming.
 - Card priority must be `Low`, `Medium`, `High`, or `Critical`.
 - Card deadline, when supplied, must parse as a date in `YYYY-MM-DD` format.
-- Tags are optional, trimmed, deduplicated case-insensitively, and limited to
-  12 tags of 40 characters each.
 - Sort order values must be zero or greater.
 - Validation failures return `422 VALIDATION_ERROR`.
 - Missing ownership returns `404 KANBAN_NOT_FOUND`.
@@ -78,9 +75,10 @@ All responses use the FluentA envelope.
 - Card movement can be completed with explicit Move controls in addition to
   pointer drag behavior, so keyboard and narrow-screen users have a reliable
   path.
-- Search filters cards by title.
 - Priority and deadline filters are client-side.
-- Tag filtering is client-side using tags present in the loaded board.
+- There is no title-search or tag-filter UI in the current contract.
+- Board cards show only title, priority, and deadline.
+- Card description remains available in create/edit detail only.
 
 ## Real-Time Rules
 

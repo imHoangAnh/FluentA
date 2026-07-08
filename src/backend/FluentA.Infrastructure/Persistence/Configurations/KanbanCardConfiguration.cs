@@ -19,7 +19,6 @@ public sealed class KanbanCardConfiguration : IEntityTypeConfiguration<KanbanCar
         builder.Property(card => card.Priority).HasColumnName("priority").HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(card => card.Deadline).HasColumnName("deadline").HasColumnType("date");
         builder.Property(card => card.SortOrder).HasColumnName("sort_order").IsRequired();
-        builder.Property(card => card.Tags).HasColumnName("tags").HasColumnType("text[]").IsRequired();
         builder.Property(card => card.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(card => card.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(card => card.DeletedAt).HasColumnName("deleted_at");

@@ -165,7 +165,7 @@ public sealed class KanbanService : IKanbanService
         }
 
         var sortOrder = await _repository.NextCardSortOrderAsync(column.Id, cancellationToken);
-        var card = KanbanCard.Create(column.Id, request.Title, request.Description, validation.Priority, validation.Deadline, sortOrder, request.Tags ?? []);
+        var card = KanbanCard.Create(column.Id, request.Title, request.Description, validation.Priority, validation.Deadline, sortOrder);
         await _repository.AddCardAsync(card, cancellationToken);
         return OperationResult<KanbanCardDto>.Success(ToCardDto(card));
     }
@@ -184,7 +184,7 @@ public sealed class KanbanService : IKanbanService
             return OperationResult<KanbanCardDto>.Failure(KanbanError.Validation(validation.Errors));
         }
 
-        card.Update(request.Title, request.Description, validation.Priority, validation.Deadline, request.Tags, request.Deadline == string.Empty);
+        card.Update(request.Title, request.Description, validation.Priority, validation.Deadline, request.Deadline == string.Empty);
         await _repository.UpdateCardAsync(card, cancellationToken);
         return OperationResult<KanbanCardDto>.Success(ToCardDto(card));
     }
@@ -236,7 +236,7 @@ public sealed class KanbanService : IKanbanService
 
     private static (Dictionary<string, string[]> Errors, CardPriority Priority, DateTime? Deadline) ValidateCardCreate(CreateKanbanCardRequest request)
     {
-        var errors = ValidateCardCommon(request.Title, request.Description, request.Priority, request.Deadline, request.Tags, titleRequired: true, out var priority, out var deadline);
+        var errors = ValidateCardCommon(request.Title, request.Description, request.Priority, request.Deadline, titleRequired: true, out var priority, out var deadline);
         if (request.ColumnId == Guid.Empty)
         {
             errors["columnId"] = ["Column id is required."];
@@ -247,7 +247,7 @@ public sealed class KanbanService : IKanbanService
 
     private static (Dictionary<string, string[]> Errors, CardPriority? Priority, DateTime? Deadline) ValidateCardUpdate(UpdateKanbanCardRequest request)
     {
-        var errors = ValidateCardCommon(request.Title, request.Description, request.Priority, request.Deadline, request.Tags, titleRequired: false, out var priority, out var deadline);
+        var errors = ValidateCardCommon(request.Title, request.Description, request.Priority, request.Deadline, titleRequired: false, out var priority, out var deadline);
         return (errors, priority, deadline);
     }
 
@@ -256,7 +256,6 @@ public sealed class KanbanService : IKanbanService
         string? description,
         string? priorityText,
         string? deadlineText,
-        IReadOnlyList<string>? tags,
         bool titleRequired,
         out CardPriority? priority,
         out DateTime? deadline)
@@ -303,19 +302,6 @@ public sealed class KanbanService : IKanbanService
             else
             {
                 errors["deadline"] = ["Deadline must be a date in YYYY-MM-DD format."];
-            }
-        }
-
-        if (tags is not null)
-        {
-            var cleanedTags = tags.Select(tag => tag.Trim()).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (cleanedTags.Count > 12)
-            {
-                errors["tags"] = ["A card can have at most 12 tags."];
-            }
-            else if (cleanedTags.Any(tag => tag.Length > 40))
-            {
-                errors["tags"] = ["Tags must be at most 40 characters."];
             }
         }
 
@@ -390,7 +376,6 @@ public sealed class KanbanService : IKanbanService
             card.Priority.ToString(),
             card.Deadline is null ? null : card.Deadline.Value.ToString(DateFormat, CultureInfo.InvariantCulture),
             card.SortOrder,
-            card.Tags,
             card.CreatedAt,
             card.UpdatedAt);
     }

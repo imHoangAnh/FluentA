@@ -5,13 +5,18 @@ export type JournalEntry = {
   id: string
   title: string
   content: string
-  preview: string
-  learningDate?: string | null
+  date: string
   createdAt: string
   updatedAt: string
 }
 
-export type JournalEntrySummary = Omit<JournalEntry, 'content'>
+export type JournalEntrySummary = {
+  id: string
+  title: string
+  date: string
+  createdAt: string
+  updatedAt: string
+}
 
 export type JournalHighlightRange = {
   start: number
@@ -29,50 +34,50 @@ export type JournalCalendarDay = {
 
 export type CreateJournalEntryInput = {
   title: string
+  date: string
   content?: string | null
-  learningDate?: string | null
 }
 
 export type UpdateJournalEntryInput = {
   title?: string
   content?: string
-  learningDate?: string
+  date?: string
 }
 
 export async function listJournalEntries() {
-  const response = await apiClient.get<ApiEnvelope<JournalEntrySummary[]>>('/journals')
+  const response = await apiClient.get<ApiEnvelope<JournalEntrySummary[]>>('/journal')
   return response.data.data ?? []
 }
 
 export async function searchJournalEntries(query: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalSearchResult[]>>('/journals/search', {
+  const response = await apiClient.get<ApiEnvelope<JournalSearchResult[]>>('/journal/search', {
     params: { q: query },
   })
   return response.data.data ?? []
 }
 
 export async function getJournalCalendar(month: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalCalendarDay[]>>('/journals/calendar', {
+  const response = await apiClient.get<ApiEnvelope<JournalCalendarDay[]>>('/journal/calendar', {
     params: { month },
   })
   return response.data.data ?? []
 }
 
 export async function getJournalEntry(id: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalEntry>>(`/journals/${id}`)
+  const response = await apiClient.get<ApiEnvelope<JournalEntry>>(`/journal/${id}`)
   return response.data.data!
 }
 
 export async function createJournalEntry(input: CreateJournalEntryInput) {
-  const response = await apiClient.post<ApiEnvelope<JournalEntry>>('/journals', input)
+  const response = await apiClient.post<ApiEnvelope<JournalEntry>>('/journal', input)
   return response.data.data!
 }
 
 export async function updateJournalEntry(id: string, input: UpdateJournalEntryInput) {
-  const response = await apiClient.patch<ApiEnvelope<JournalEntry>>(`/journals/${id}`, input)
+  const response = await apiClient.patch<ApiEnvelope<JournalEntry>>(`/journal/${id}`, input)
   return response.data.data!
 }
 
 export async function deleteJournalEntry(id: string) {
-  await apiClient.delete(`/journals/${id}`)
+  await apiClient.delete(`/journal/${id}`)
 }

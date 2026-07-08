@@ -10,7 +10,7 @@ namespace FluentA.API.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/v1/journals")]
+[Route("api/v1/journal")]
 public sealed class JournalsController : ControllerBase
 {
     private readonly IJournalService _journals;
@@ -30,7 +30,7 @@ public sealed class JournalsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Searches active owned journal entry plain-text content.</summary>
+    /// <summary>Searches active owned journal entry titles.</summary>
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery(Name = "q")] string? query, CancellationToken cancellationToken)
     {
@@ -40,7 +40,7 @@ public sealed class JournalsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Gets learning dates that have active owned journal entries in a month.</summary>
+    /// <summary>Gets writing dates that have active owned journal entries in a month.</summary>
     [HttpGet("calendar")]
     public async Task<IActionResult> Calendar([FromQuery] string? month, CancellationToken cancellationToken)
     {

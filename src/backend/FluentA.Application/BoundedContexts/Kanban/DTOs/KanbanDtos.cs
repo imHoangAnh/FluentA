@@ -14,7 +14,6 @@ public sealed record KanbanCardDto(
     string Priority,
     string? Deadline,
     int SortOrder,
-    IReadOnlyList<string> Tags,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -29,14 +28,12 @@ public sealed record CreateKanbanCardRequest(
     string Title,
     string? Description = null,
     string? Priority = null,
-    string? Deadline = null,
-    IReadOnlyList<string>? Tags = null);
+    string? Deadline = null);
 
 public sealed record UpdateKanbanCardRequest(
     string? Title = null,
     string? Description = null,
     string? Priority = null,
-    string? Deadline = null,
-    IReadOnlyList<string>? Tags = null);
+    string? Deadline = null);
 
 public sealed record MoveKanbanCardRequest(Guid ColumnId, int SortOrder);

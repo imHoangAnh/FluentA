@@ -8,7 +8,7 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
 {
     public void Configure(EntityTypeBuilder<JournalEntry> builder)
     {
-        builder.ToTable("journal_entries");
+        builder.ToTable("journal");
 
         builder.HasKey(entry => entry.Id);
 
@@ -16,14 +16,12 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
         builder.Property(entry => entry.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(entry => entry.Title).HasColumnName("title").HasMaxLength(240).IsRequired();
         builder.Property(entry => entry.Content).HasColumnName("content").HasColumnType("text").IsRequired();
-        builder.Property(entry => entry.PlainTextContent).HasColumnName("plain_text_content").HasColumnType("text").IsRequired();
-        builder.Property(entry => entry.Preview).HasColumnName("preview").HasMaxLength(100).IsRequired();
-        builder.Property(entry => entry.LearningDate).HasColumnName("learning_date").HasColumnType("date");
+        builder.Property(entry => entry.Date).HasColumnName("date").HasColumnType("date").IsRequired();
         builder.Property(entry => entry.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(entry => entry.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(entry => entry.DeletedAt).HasColumnName("deleted_at");
 
         builder.HasIndex(entry => new { entry.UserId, entry.CreatedAt });
-        builder.HasIndex(entry => new { entry.UserId, entry.LearningDate });
+        builder.HasIndex(entry => new { entry.UserId, entry.Date });
     }
 }

@@ -8,9 +8,6 @@ export type TodoItem = {
   date: string
   isCompleted: boolean
   completedAt?: string | null
-  sortOrder: number
-  isCarriedOver: boolean
-  originalDate?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -23,10 +20,8 @@ export type CreateTodoInput = {
 
 export type UpdateTodoInput = {
   title?: string
-  date?: string
   note?: string
   isCompleted?: boolean
-  sortOrder?: number
 }
 
 export async function listByDate(date: string) {
@@ -47,10 +42,6 @@ export async function createTodo(input: CreateTodoInput) {
 export async function updateTodo(id: string, input: UpdateTodoInput) {
   const response = await apiClient.patch<ApiEnvelope<TodoItem>>(`/todos/${id}`, input)
   return response.data.data!
-}
-
-export async function updateTodoLayout(updates: Array<{ id: string; date: string; sortOrder: number }>) {
-  return Promise.all(updates.map(({ id, ...patch }) => updateTodo(id, patch)))
 }
 
 export async function deleteTodo(id: string) {

@@ -5,25 +5,30 @@ export type CountdownEvent = {
   id: string
   name: string
   targetDate: string
-  color?: string | null
-  icon?: string | null
+  coverAssetId?: string | null
+  coverUrl?: string | null
   isCompleted: boolean
+  alerts: CountdownAlert[]
   createdAt: string
   updatedAt: string
+}
+
+export type CountdownAlert = {
+  id: string
+  alertDay: string
+  alertTime: string
+  scheduledAtUtc: string
+  firedAtUtc?: string | null
 }
 
 export type CreateCountdownInput = {
   name: string
   targetDate: string
-  color?: string | null
-  icon?: string | null
-}
-
-export type UpdateCountdownInput = {
-  name?: string
-  targetDate?: string
-  color?: string | null
-  icon?: string | null
+  alerts: Array<{
+    alertDay: string
+    alertTime: string
+  }>
+  coverAssetId?: string | null
 }
 
 export async function listCountdowns() {
@@ -33,11 +38,6 @@ export async function listCountdowns() {
 
 export async function createCountdown(input: CreateCountdownInput) {
   const response = await apiClient.post<ApiEnvelope<CountdownEvent>>('/countdowns', input)
-  return response.data.data!
-}
-
-export async function updateCountdown(id: string, input: UpdateCountdownInput) {
-  const response = await apiClient.patch<ApiEnvelope<CountdownEvent>>(`/countdowns/${id}`, input)
   return response.data.data!
 }
 

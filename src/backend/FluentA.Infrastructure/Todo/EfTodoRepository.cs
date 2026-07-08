@@ -19,8 +19,9 @@ public sealed class EfTodoRepository : ITodoRepository
         var normalized = NormalizeDate(date);
         return await _dbContext.TodoItems
             .Where(item => item.UserId == userId && item.Date == normalized && item.DeletedAt == null)
-            .OrderBy(item => item.SortOrder)
-            .ThenBy(item => item.CreatedAt)
+            .OrderBy(item => item.IsCompleted)
+            .ThenByDescending(item => item.IsCompleted ? item.CompletedAt : item.CreatedAt)
+            .ThenByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
@@ -31,19 +32,9 @@ public sealed class EfTodoRepository : ITodoRepository
         return await _dbContext.TodoItems
             .Where(item => item.UserId == userId && item.Date >= start && item.Date <= end && item.DeletedAt == null)
             .OrderBy(item => item.Date)
-            .ThenBy(item => item.SortOrder)
-            .ThenBy(item => item.CreatedAt)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<TodoItem>> ListCarryOverCandidatesAsync(Guid userId, DateTime today, CancellationToken cancellationToken = default)
-    {
-        var normalized = NormalizeDate(today);
-        return await _dbContext.TodoItems
-            .Where(item => item.UserId == userId
-                && item.DeletedAt == null
-                && !item.IsCompleted
-                && item.Date < normalized)
+            .ThenBy(item => item.IsCompleted)
+            .ThenByDescending(item => item.IsCompleted ? item.CompletedAt : item.CreatedAt)
+            .ThenByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
@@ -51,16 +42,6 @@ public sealed class EfTodoRepository : ITodoRepository
     {
         return _dbContext.TodoItems
             .FirstOrDefaultAsync(item => item.Id == todoId && item.UserId == userId && item.DeletedAt == null, cancellationToken);
-    }
-
-    public async Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
-    {
-        var normalized = NormalizeDate(date);
-        var maxSortOrder = await _dbContext.TodoItems
-            .Where(item => item.UserId == userId && item.Date == normalized && item.DeletedAt == null)
-            .Select(item => (int?)item.SortOrder)
-            .MaxAsync(cancellationToken);
-        return (maxSortOrder ?? -1) + 1;
     }
 
     public async Task AddAsync(TodoItem item, CancellationToken cancellationToken = default)
@@ -74,13 +55,6 @@ public sealed class EfTodoRepository : ITodoRepository
         _dbContext.TodoItems.Update(item);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
-
-    public async Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
-    {
-        _dbContext.TodoItems.UpdateRange(items);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
     private static DateTime NormalizeDate(DateTime date)
     {
         return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);

@@ -6,5 +6,8 @@ public sealed record CountdownError(string Code, string Message, int StatusCode,
         new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);
 
     public static CountdownError NotFound() =>
-        new("COUNTDOWN_NOT_FOUND", "The requested countdown event could not be found.", 404);
+        new("COUNTDOWN_NOT_FOUND", "The requested countdown could not be found.", 404);
+
+    public static CountdownError CoverAssetInvalid() =>
+        new("COUNTDOWN_COVER_ASSET_INVALID", "The selected cover asset must be an owned finalized countdown-cover upload.", 409);
 }
