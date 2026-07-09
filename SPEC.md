@@ -32,6 +32,7 @@
 21. [Next Feature Plan — Vocabulary Page Fixed Columns And Board Preferences](#21-vocabulary-page-fixed-columns-and-board-preferences)
 22. [Next Feature Plan — Productivity Schema Cleanup And Countdowns Redesign](#22-next-feature-plan--productivity-schema-cleanup-and-countdowns-redesign)
 23. [Next Feature Plan — Flashcard, Practice, And Review Source-Of-Truth Redesign](#23-next-feature-plan--flashcard-practice-and-review-source-of-truth-redesign)
+24. [Next Feature Plan — Settings Route Split](#24-next-feature-plan--settings-route-split)
 
 ---
 
@@ -4253,6 +4254,143 @@ npm --prefix src/frontend run lint
 npm --prefix src/frontend run test:run -- Flashcard Practice Review Settings
 npm --prefix src/frontend run build
 npm --prefix src/frontend run test:e2e -- learning-navigation.spec.js practice-workflow.spec.js review-workflow.spec.js
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+## 24. Next Feature Plan — Settings Route Split
+
+### 24.1 Objective
+
+Redesign Settings so Profile, Review settings, Practice settings, and Level 5
+management live as separate second-level Settings routes instead of one
+combined settings page. The goal is to make settings easier to navigate,
+prepare the UI for future settings growth, and align all settings surfaces with
+the route pattern already introduced by Level 5 management.
+
+### 24.2 Feature Boundary
+
+This feature delivers the Settings route split, desktop settings navigation,
+and manual save behavior for the existing Profile, Review, Practice, and Level
+5 settings surfaces.
+
+This feature does not add new Practice behavior, new Review behavior, new Level
+5 list logic, mobile-specific settings navigation, or changes to the underlying
+profile/avatar, practice-settings, review-settings, or Level 5 API contracts
+unless planning finds a small compatibility adjustment required by the route
+split.
+
+### 24.3 Locked Product Decisions
+
+- `/settings` redirects to `/settings/profile`.
+- Settings exposes these second-level routes:
+  - `/settings/profile`
+  - `/settings/review`
+  - `/settings/practice`
+  - `/settings/level5`
+- A fixed desktop sidebar is the primary Settings navigation.
+- The sidebar contains `Profile`, `Review`, `Practice`, and `Level 5`.
+- Level 5 must move into the same settings layout and sidebar as the other
+  routes.
+- Mobile responsive behavior is deferred to a later feature.
+- All three editable settings routes use explicit manual save behavior.
+- Profile, Review, and Practice must not autosave in this feature.
+
+### 24.4 Profile Settings Contract
+
+- `/settings/profile` keeps the full current profile feature set.
+- The route includes avatar preview, avatar upload, avatar removal, saved
+  avatars, full name, read-only email, and bio.
+- Avatar upload still starts only when the user saves the profile.
+- Profile save validates the same full-name, bio, file-size, and file-type
+  rules as the current profile settings implementation.
+- Successful save updates the authenticated user profile and current Settings
+  cache.
+- Failed save keeps the user's draft visible and shows an error state.
+
+### 24.5 Practice Settings Contract
+
+- `/settings/practice` configures only the existing global Practice mode
+  sequence.
+- The configurable modes remain `dictation`, `meaningToWord`, and
+  `pronunciation`.
+- The user can include or exclude modes, but at least one mode must remain
+  enabled.
+- The user can reorder the active mode sequence.
+- Changes are draft-only until the user presses the route's save action.
+- This feature does not add default Practice session order, per-mode advanced
+  settings, or new Practice modes.
+
+### 24.6 Review Settings Contract
+
+- `/settings/review` configures only the existing Review settings:
+  `dailyLimit` and `recapAfterAnswer`.
+- Changes are draft-only until the user presses the route's save action.
+- This feature does not add default review order, due-date policy controls,
+  overflow controls, or Level 5 advanced options.
+
+### 24.7 Level 5 Settings Contract
+
+- `/settings/level5` keeps the existing Level 5 management behavior from
+  Section 23.
+- Level 5 remains global across the app, not board-scoped.
+- Default filter remains `All`, with `Active` and `Inactive` filters.
+- Search continues to filter by `word`.
+- Active level-5 items can still be removed one-by-one or in bulk.
+- Inactive items remain view-only.
+- This feature changes Level 5 layout/navigation only; it does not change
+  Level 5 state transitions or list semantics.
+
+### 24.8 Navigation And Layout Contract
+
+- Each Settings route renders inside one shared desktop settings shell.
+- The shared shell owns the fixed left sidebar and route content area.
+- The active sidebar item is visually indicated.
+- Settings routes should keep the existing authenticated workspace header
+  affordances that are still useful, including logout.
+- Navigation between Settings routes must not discard saved server state.
+- Unsaved local drafts may be route-local; this feature does not require
+  cross-route draft preservation after navigating away.
+
+### 24.9 Scope Boundaries
+
+Out of scope for this feature:
+
+- Mobile-specific responsive navigation for Settings.
+- New profile fields.
+- New avatar asset lifecycle behavior.
+- New Review settings beyond `dailyLimit` and `recapAfterAnswer`.
+- New Practice settings beyond mode inclusion and ordering.
+- New Level 5 filters, sorting, state transitions, or bulk actions.
+- Reworking Flashcard, Practice, or Review session behavior.
+
+### 24.10 Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Route regression | Browser proof shows `/settings` redirects to `/settings/profile`, and all four second-level routes load behind authentication. |
+| Settings save regression | Frontend/API proof shows Profile, Review, and Practice save only after explicit save actions and no longer autosave while editing. |
+| Profile/avatar regression | Proof shows avatar preview/upload/remove, saved avatars, full-name edit, read-only email, and bio save still work on `/settings/profile`. |
+| Practice settings regression | Proof shows mode inclusion, at-least-one-mode guard, reordering, save, reload, and error state behavior on `/settings/practice`. |
+| Review settings regression | Proof shows daily limit, recap toggle, save, reload, and validation/error behavior on `/settings/review`. |
+| Level 5 layout regression | Proof shows Level 5 remains functional inside the shared settings sidebar without changing list filters, search, single remove, or bulk remove semantics. |
+
+### 24.11 Proposed Story Queue
+
+1. **US-SETTINGS-002:** Introduce the shared Settings shell, sidebar, route
+   split, and `/settings` redirect.
+2. **US-SETTINGS-003:** Move Profile, Practice settings, Review settings, and
+   Level 5 into the split Settings routes with manual save behavior.
+3. **US-SETTINGS-004:** Run settings regression proof across routing,
+   profile/avatar save, practice save, review save, and Level 5 management.
+
+### 24.12 Verification Ladder
+
+```powershell
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run -- Settings
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- learning-navigation.spec.js
 .\scripts\bin\harness-cli.exe query matrix
 git diff --check
 ```

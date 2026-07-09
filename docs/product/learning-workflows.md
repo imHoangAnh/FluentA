@@ -82,8 +82,12 @@ target behavior for that split and the data ownership rules that support it.
 - When due words exceed the daily limit, Review selects the oldest due words
   first and moves the overflow due dates to tomorrow when the session starts.
 - Review has a separate global `recap after answer` setting.
-- Practice settings and Review settings are separate, but FluentA edits them
-  together from the unified authenticated `/settings` page.
+- Practice settings and Review settings are separate and live under
+  authenticated Settings routes `/settings/practice` and `/settings/review`,
+  and both routes save only when the learner clicks their explicit save action.
+- Level 5 management lives alongside them at `/settings/level5` inside the
+  shared Settings shell and keeps its existing global filter/search/remove
+  behavior.
 
 ## FluentA SRS
 

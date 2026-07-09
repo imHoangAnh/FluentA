@@ -14,12 +14,16 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - A registered user can log in with email and password.
 - A password-capable account can request a password reset email and choose a new password from a single-use link.
 - A logged-in user can view their current profile through `/api/v1/auth/me`.
-- A logged-in user can update their full name, optional plain-text bio, and optional avatar from the unified Settings page.
+- A logged-in user can update their full name, optional plain-text bio, and optional avatar from Settings profile at `/settings/profile`.
 - A logged-in user can request a presigned avatar upload target, finalize it
   through the shared asset API, and save the finalized avatar asset through the
-  unified Settings page.
-- A logged-in user can review saved avatar assets in Settings and delete either
+  split Settings routes rooted at `/settings/profile`,
+  `/settings/practice`, and `/settings/review`.
+- A logged-in user can review saved avatar assets in Settings profile and delete either
   a retired avatar or the current avatar directly from that surface.
+- A logged-in user can move between `/settings/profile`, `/settings/practice`,
+  `/settings/review`, and `/settings/level5` inside one protected shared
+  Settings shell.
 - A logged-in user can refresh access without re-entering credentials while the refresh cookie is valid.
 - A logged-in user can log out and lose access to protected routes.
 - A user can continue with Google when local Google credentials are configured.
@@ -89,7 +93,7 @@ All responses use the FluentA envelope:
 | `GET` | `/api/v1/auth/me` | Returns the current authenticated user profile. |
 | `POST` | `/api/v1/auth/google` | Exchanges a Google authorization code, creates or links the user, and returns an access token plus refresh cookie. |
 | `PUT` | `/api/v1/profile` | Updates full name, bio, and avatar linkage for the authenticated user from JSON `{ fullName, bio, removeAvatar, avatarAssetId }`. |
-| `GET` | `/api/v1/settings` | Returns the authenticated profile plus Practice and Review settings for the unified Settings page. |
+| `GET` | `/api/v1/settings` | Returns the authenticated profile plus Practice and Review settings for the split Settings routes rooted at `/settings/profile`, `/settings/practice`, and `/settings/review`. |
 | `POST` | `/api/v1/assets/presign` | Creates a pending owned avatar asset and returns a presigned direct-upload target. |
 | `POST` | `/api/v1/assets/finalize` | Verifies the uploaded object for an owned pending avatar asset and marks it finalized. |
 | `GET` | `/api/v1/assets?assetType=avatar` | Lists the authenticated user's saved owned avatar assets for Settings management. |

@@ -11,7 +11,10 @@ import { FlashcardsPage } from './routes/flashcards/FlashcardsPage'
 import { FlashcardViewerPage } from './routes/flashcards/FlashcardViewerPage'
 import { PracticeSessionPage } from './routes/flashcards/PracticeSessionPage'
 import { ReviewSessionPage } from './routes/flashcards/ReviewSessionPage'
+import { SettingsLayout } from './routes/settings/SettingsLayout'
 import { SettingsPage } from './routes/settings/SettingsPage'
+import { SettingsPracticePage } from './routes/settings/SettingsPracticePage'
+import { SettingsReviewPage } from './routes/settings/SettingsReviewPage'
 import { LevelFiveSettingsPage } from './routes/settings/LevelFiveSettingsPage'
 import { TodoPage } from './routes/todo/TodoPage'
 import { CountdownPage } from './routes/countdown/CountdownPage'
@@ -128,19 +131,16 @@ export default function App() {
         path="/settings"
         element={
           <ProtectedRoute>
-            <SettingsPage />
+            <SettingsLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/settings/level5"
-        element={
-          <ProtectedRoute>
-            <LevelFiveSettingsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/settings/review" element={<Navigate to="/settings" replace />} />
+      >
+        <Route index element={<Navigate to="profile" replace />} />
+        <Route path="profile" element={<SettingsPage />} />
+        <Route path="practice" element={<SettingsPracticePage />} />
+        <Route path="review" element={<SettingsReviewPage />} />
+        <Route path="level5" element={<LevelFiveSettingsPage />} />
+      </Route>
       <Route
         path="/flashcards/pages/:pageId"
         element={

@@ -57,6 +57,7 @@ function createQueryClient() {
     forecast: [],
   })
   queryClient.setQueryData(['review', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
+  queryClient.setQueryData(['review', 'level-five'], [])
   queryClient.setQueryData(['practice', 'settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
   queryClient.setQueryData(['settings'], {
     profile: {
@@ -389,10 +390,34 @@ describe('FluentA app routes', () => {
 
     renderApp('/settings')
 
-    expect(screen.getByRole('heading', { name: 'Your settings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/settings/profile')
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
+    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
+    expect(screen.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
+    expect(screen.getAllByRole('heading', { name: 'Your settings' })).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('heading', { name: 'Practice mode sequence' })).not.toBeInTheDocument()
+  })
+
+  it('renders split settings routes inside the shared shell', () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    let view = renderApp('/settings/practice')
     expect(screen.getByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
+
+    view.unmount()
+    view = renderApp('/settings/review')
     expect(screen.getByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Daily limit')).toHaveValue(300)
-    expect(screen.getByRole('checkbox', { name: 'Recap after each correct answer' })).toBeChecked()
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
+
+    view.unmount()
+    renderApp('/settings/level5')
+    expect(screen.getByRole('heading', { name: 'Manage Level 5 words' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Level 5' })).toHaveAttribute('aria-current', 'page')
   })
 })

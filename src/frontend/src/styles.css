@@ -2581,21 +2581,90 @@ a {
   margin: 28px 0 18px;
 }
 
-.settings-workspace {
-  max-width: 920px;
+.settings-shell {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px;
+  width: 100%;
 }
 
-.settings-panel {
-  max-width: 680px;
-  margin: 48px auto;
-  padding: 34px;
+.settings-shell__body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.settings-sidebar {
+  position: sticky;
+  top: 20px;
+  display: grid;
+  gap: 20px;
+  padding: 24px 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #ffffff;
   box-shadow: var(--shadow);
 }
 
-.settings-panel h1 {
+.settings-sidebar__copy h1 {
+  margin: 10px 0 12px;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1;
+}
+
+.settings-sidebar__copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.settings-sidebar__nav {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-sidebar__link {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.settings-sidebar__link:hover {
+  border-color: var(--teal);
+  background: var(--surface-strong);
+}
+
+.settings-sidebar__link--active {
+  border-color: var(--teal);
+  background: var(--surface-strong);
+  color: var(--teal-dark);
+}
+
+.settings-shell__content {
+  min-width: 0;
+}
+
+.settings-panel {
+  max-width: 760px;
+  margin: 0 auto 24px;
+  padding: 34px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.settings-panel h1,
+.settings-panel h2 {
   margin: 8px 0;
   font-size: clamp(34px, 6vw, 54px);
 }
@@ -2803,6 +2872,13 @@ a {
 
 .settings-workspace--loading {
   min-height: 60vh;
+  display: grid;
+  place-items: center;
+  justify-items: center;
+}
+
+.settings-panel--loading {
+  min-height: 320px;
   display: grid;
   place-items: center;
   justify-items: center;
@@ -5262,6 +5338,22 @@ a {
 }
 
 @media (max-width: 880px) {
+  .settings-shell {
+    padding: 14px;
+  }
+
+  .settings-shell__body {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-sidebar {
+    position: static;
+  }
+
+  .settings-sidebar__nav {
+    grid-template-columns: 1fr;
+  }
+
   .auth-shell,
   .workspace-hero,
   .workspace-grid,
