@@ -54,3 +54,7 @@ target/
 
 # Scripts and Harness CLI
 scripts/
+
+# Harness durable layer
+scripts/bin/harness-cli
+scripts/bin/harness-cli.exe
