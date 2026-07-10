@@ -499,6 +499,13 @@ public sealed class AuthServiceTests
                 : null);
         }
 
+        public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
+                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .ToList());
+        }
+
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values

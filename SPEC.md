@@ -33,6 +33,7 @@
 22. [Next Feature Plan — Productivity Schema Cleanup And Countdowns Redesign](#22-next-feature-plan--productivity-schema-cleanup-and-countdowns-redesign)
 23. [Next Feature Plan — Flashcard, Practice, And Review Source-Of-Truth Redesign](#23-next-feature-plan--flashcard-practice-and-review-source-of-truth-redesign)
 24. [Next Feature Plan — Settings Route Split](#24-next-feature-plan--settings-route-split)
+25. [Next Feature Plan — Note Workspace](#25-next-feature-plan--note-workspace)
 
 ---
 
@@ -4391,6 +4392,192 @@ npm --prefix src/frontend run lint
 npm --prefix src/frontend run test:run -- Settings
 npm --prefix src/frontend run build
 npm --prefix src/frontend run test:e2e -- learning-navigation.spec.js
+.\scripts\bin\harness-cli.exe query matrix
+git diff --check
+```
+
+## 25. Next Feature Plan — Note Workspace
+
+### 25.1 Objective
+
+Add a new Note menu to FluentA for board-organized rich-text documents. Note
+uses the familiar Vocabulary-style board and page navigation, but each page is
+a single rich-text document instead of a table. The goal is to let users keep
+long-lived study notes, references, and personal knowledge pages in a structured
+workspace that feels close to Vocabulary organization and reuses the Journal
+editor experience.
+
+### 25.2 Feature Boundary
+
+This feature delivers a new authenticated `/notes` surface with Note boards,
+Note pages, a rich-text editor for the selected page, blur-based autosave, and
+paste/drop image upload through the existing asset storage runtime.
+
+This feature does not add Note search, tags, sharing, calendar UI, file-picker
+uploads, standalone attachment lists, offline editing, note templates, or
+cross-feature linking in the first release.
+
+### 25.3 Locked Product Decisions
+
+- Note is a new main protected navigation item, alongside Vocabulary, Journal,
+  Kanban, Pomodoro, and other workspace routes.
+- Note follows the Vocabulary organization model: boards contain pages.
+- Each Note page is one rich-text document.
+- Page name is the note title. There is no separate editor title field.
+- Board name remains the parent grouping label.
+- Each note page stores its created date as metadata.
+- Note editor behavior should reuse the Journal rich-text editor experience and
+  its current extensions where practical.
+- Note content autosaves when the user blurs the editor, not continuously while
+  typing.
+- Save state is visible to the user with clear Saving, Saved, and Error states.
+- Note content is sanitized on the server before persistence.
+- Paste/drop images are supported inside the editor from the first release.
+- Pasted or dropped images upload through the existing asset storage boundary
+  and are inserted into editor content by URL.
+- Note content must not store base64 image payloads inside persisted HTML.
+- Search is deferred and is not part of this feature.
+
+### 25.4 Navigation And Layout Contract
+
+- `/notes` opens the Note workspace behind authentication.
+- The main app navigation includes a `Note` item and highlights it when the
+  current route is inside the Note workspace.
+- The Note workspace uses a two-level board/page navigation pattern similar to
+  Vocabulary.
+- Users can create, rename, select, and delete Note boards.
+- Users can create, rename, select, and delete Note pages inside a board.
+- Selecting a page opens that page's rich-text document in the main content
+  area.
+- Empty Note state offers a clear path to create the first board and first
+  page.
+- Empty board state offers a clear path to create the first page.
+- Deleting a board deletes or soft-deletes its pages according to the data
+  lifecycle selected during implementation planning.
+- Deleting a page removes it from the active workspace and must not expose it
+  through normal list or get endpoints.
+
+### 25.5 Editor Contract
+
+- The editor supports the same rich-text writing affordances currently used by
+  Journal where practical, including headings, bold, italic, underline,
+  highlight, lists, alignment, links, and other already-shipped extensions.
+- The editor stores sanitized HTML as the durable content format unless
+  planning finds that the current Journal implementation already uses a
+  stronger internal representation that should be reused.
+- Blurring the editor triggers autosave for changed content.
+- Renaming the page updates the note title because page name is the title.
+- The editor shows save status for the latest attempted content save.
+- A failed autosave keeps the user's current draft visible and shows an error
+  state.
+- Opening another page should load that page's latest persisted content.
+- Unsaved content behavior during page switches must be made explicit during
+  story planning before implementation.
+
+### 25.6 Image Upload Contract
+
+- Users can paste or drop image files into the Note editor.
+- Supported image types and size limits should follow the existing asset
+  storage policy unless planning identifies a Note-specific limit.
+- The frontend uploads the image through the existing asset storage flow before
+  inserting it into the editor content.
+- Persisted note content stores the resolved image URL or durable asset
+  reference needed to render the image after reload.
+- Base64 image content is rejected or stripped before persistence.
+- Upload failure does not corrupt existing note content and must show a clear
+  error state near the editor.
+- Image ownership follows the authenticated user boundary.
+- Deleted or replaced Note images should be considered during implementation
+  planning so orphaned assets do not become unbounded storage growth.
+
+### 25.7 Data And Ownership Contract
+
+- Every Note board belongs to exactly one authenticated user.
+- Every Note page belongs to exactly one Note board owned by the same user.
+- Every Note page has a name, content, created date, created timestamp, updated
+  timestamp, and deletion lifecycle fields consistent with the rest of the
+  app.
+- Board and page names are user-visible and should be trimmed before
+  persistence.
+- Missing, deleted, or foreign-user Note boards and pages return `404 Not
+  Found` where the app uses non-disclosure for owned resources.
+- Note list and get endpoints return only active records owned by the
+  authenticated user.
+- Server-side validation protects content size, name length, image payload
+  metadata, and HTML sanitization.
+
+### 25.8 API Contract
+
+Exact endpoint names may be refined during planning, but the feature should
+provide a Note-owned API surface equivalent to:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/notes/boards` | List owned active Note boards with page summaries. |
+| `POST` | `/api/v1/notes/boards` | Create a Note board. |
+| `PATCH` | `/api/v1/notes/boards/{boardId}` | Rename or update a Note board. |
+| `DELETE` | `/api/v1/notes/boards/{boardId}` | Delete or soft-delete a Note board. |
+| `POST` | `/api/v1/notes/boards/{boardId}/pages` | Create a Note page in a board. |
+| `GET` | `/api/v1/notes/pages/{pageId}` | Get one owned active Note page with content. |
+| `PATCH` | `/api/v1/notes/pages/{pageId}` | Update page name and/or content. |
+| `DELETE` | `/api/v1/notes/pages/{pageId}` | Delete or soft-delete a Note page. |
+
+Image upload should reuse the existing asset API where possible instead of
+creating a Note-specific binary upload endpoint.
+
+### 25.9 Scope Boundaries
+
+Out of scope for this feature:
+
+- Search by page title, board name, or content.
+- Tags or secondary classification beyond boards and pages.
+- Calendar UI or date-based browsing.
+- User-selected note date editing.
+- File attachments such as PDF, DOCX, ZIP, or audio files.
+- File picker upload and attachment-list management.
+- Sharing, collaboration, comments, or public links.
+- AI writing tools, summaries, or note templates.
+- Linking Note pages to Vocabulary, Review, Journal, Todo, or Kanban records.
+- Mobile-specific Note navigation beyond maintaining a usable responsive
+  baseline.
+
+### 25.10 Validation Plan
+
+| Risk | Required Proof Before Release |
+|---|---|
+| Navigation regression | Browser proof shows the new Note menu opens `/notes`, highlights correctly, and does not break existing protected navigation. |
+| Board/page ownership bugs | Backend/API proof shows owned board and page CRUD works and foreign or deleted records return `404 Not Found`. |
+| Editor regression | Frontend proof shows Journal-style editor extensions render and persist inside Note pages. |
+| Autosave ambiguity | Tests prove content saves on editor blur, exposes Saving/Saved/Error states, and preserves the visible draft on save failure. |
+| Sanitization gap | Backend tests prove unsafe HTML is sanitized or rejected before persistence. |
+| Image persistence bug | Browser/API proof shows pasted or dropped images upload through asset storage, render after reload, and do not persist base64 HTML payloads. |
+| Storage lifecycle risk | Planning or implementation proof covers ownership and cleanup expectations for images inserted into Note content. |
+
+### 25.11 Proposed Story Queue
+
+1. **US-NOTE-001:** Add Note domain, persistence, API, and ownership-safe board
+   and page CRUD.
+2. **US-NOTE-002:** Add the Note workspace route, main navigation item, and
+   Vocabulary-style board/page shell.
+3. **US-NOTE-003:** Reuse the Journal rich-text editor for Note pages with
+   blur-based autosave and save-state feedback.
+4. **US-NOTE-004:** Add paste/drop image upload through the existing asset
+   storage runtime and persist reload-safe image references.
+5. **US-NOTE-005:** Run release proof for navigation, board/page CRUD,
+   editor persistence, sanitization, image upload, and asset lifecycle
+   expectations.
+
+### 25.12 Verification Ladder
+
+```powershell
+dotnet test src/backend/FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj --filter Note
+dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --filter Note
+dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore
+dotnet tool run dotnet-ef migrations script --project src/backend/FluentA.Infrastructure --startup-project src/backend/FluentA.API
+npm --prefix src/frontend run lint
+npm --prefix src/frontend run test:run -- Note Journal
+npm --prefix src/frontend run build
+npm --prefix src/frontend run test:e2e -- notes.spec.js
 .\scripts\bin\harness-cli.exe query matrix
 git diff --check
 ```

@@ -22,6 +22,7 @@ import { HabitPage } from './routes/habits/HabitPage'
 import { HabitStatsPage } from './routes/habits/HabitStatsPage'
 import { JournalPage } from './routes/journal/JournalPage'
 import { KanbanPage } from './routes/kanban/KanbanPage'
+import { NotesPage } from './routes/notes/NotesPage'
 import { PomodoroPage } from './routes/pomodoro/PomodoroPage'
 import { NotificationsPage } from './routes/notifications/NotificationsPage'
 import { ProtectedRoute } from './lib/auth/ProtectedRoute'
@@ -104,6 +105,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <JournalPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notes"
+        element={
+          <ProtectedRoute>
+            <NotesPage />
           </ProtectedRoute>
         }
       />

@@ -215,6 +215,13 @@ public sealed class AssetServiceTests
             return Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId && asset.UserId == userId && asset.DeletedAt == null));
         }
 
+        public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Asset>>(Assets
+                .Where(asset => asset.UserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
+                .ToList());
+        }
+
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UserId == userId && asset.DeletedAt == null).OrderByDescending(asset => asset.CreatedAt).ToList());

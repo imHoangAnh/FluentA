@@ -74,6 +74,7 @@ function createQueryClient() {
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
+  queryClient.setQueryData(['note', 'boards'], [])
   queryClient.setQueryData(['kanban', 'boards'], [])
   queryClient.setQueryData(['pomodoro', 'config'], {
     id: 'pomodoro-config-1',
@@ -285,8 +286,16 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
+    expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
     expect(screen.getByRole('link', { name: 'Kanban' })).toHaveAttribute('href', '/kanban')
     expect(screen.getByRole('link', { name: 'Pomodoro' })).toHaveAttribute('href', '/pomodoro')
+  })
+
+  it('protects the notes route when anonymous', () => {
+    renderApp('/notes')
+
+    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
   it('renders cached dashboard widgets across domains', () => {

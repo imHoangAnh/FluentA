@@ -3,6 +3,7 @@ using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Note.Entities;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
@@ -44,6 +45,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
     public DbSet<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert> CountdownAlerts => Set<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<NoteBoard> NoteBoards => Set<NoteBoard>();
+    public DbSet<NotePage> NotePages => Set<NotePage>();
     public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
     public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();
     public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();

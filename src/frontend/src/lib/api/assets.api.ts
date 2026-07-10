@@ -52,6 +52,15 @@ export async function presignCountdownCoverUpload(contentType: string) {
   return response.data.data!
 }
 
+export async function presignNoteImageUpload(contentType: string) {
+  const response = await apiClient.post<ApiEnvelope<PresignedAssetUploadPayload>>('/assets/presign', {
+    assetType: 'note-image',
+    contentType,
+  })
+
+  return response.data.data!
+}
+
 export async function finalizeAsset(assetId: string) {
   const response = await apiClient.post<ApiEnvelope<AssetPayload>>('/assets/finalize', { assetId })
   return response.data.data!
@@ -69,6 +78,11 @@ export async function uploadAvatarAsset(file: File) {
 export async function uploadCountdownCoverAsset(file: File) {
   const presigned = await presignCountdownCoverUpload(file.type)
   return uploadAssetFromPresign(file, presigned, 'Countdown cover upload could not be completed.')
+}
+
+export async function uploadNoteImageAsset(file: File) {
+  const presigned = await presignNoteImageUpload(file.type)
+  return uploadAssetFromPresign(file, presigned, 'Note image upload could not be completed.')
 }
 
 async function uploadAssetFromPresign(file: File, presigned: PresignedAssetUploadPayload, errorMessage: string) {

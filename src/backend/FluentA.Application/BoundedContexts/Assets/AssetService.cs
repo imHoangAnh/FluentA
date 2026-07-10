@@ -8,7 +8,7 @@ namespace FluentA.Application.BoundedContexts.Assets;
 public sealed class AssetService : IAssetService
 {
     private static readonly TimeSpan PendingLifetime = TimeSpan.FromHours(1);
-    private static readonly HashSet<string> AllowedAvatarMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> AllowedImageMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg",
         "image/png",
@@ -217,7 +217,7 @@ public sealed class AssetService : IAssetService
 
         Merge(errors, ValidateAssetTypeRequest(request.AssetType));
 
-        if (string.IsNullOrWhiteSpace(request.ContentType) || !AllowedAvatarMimeTypes.Contains(request.ContentType.Trim()))
+        if (string.IsNullOrWhiteSpace(request.ContentType) || !AllowedImageMimeTypes.Contains(request.ContentType.Trim()))
         {
             errors["contentType"] = ["Uploads must be JPG, PNG, or WebP."];
         }
@@ -230,9 +230,10 @@ public sealed class AssetService : IAssetService
         var errors = new Dictionary<string, string[]>();
         var value = assetType?.Trim() ?? "avatar";
         if (!string.Equals(value, "avatar", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(value, "countdown-cover", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(value, "countdown-cover", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(value, "note-image", StringComparison.OrdinalIgnoreCase))
         {
-            errors["assetType"] = ["Supported asset types are avatar and countdown-cover."];
+            errors["assetType"] = ["Supported asset types are avatar, countdown-cover, and note-image."];
         }
 
         return errors;
@@ -240,16 +241,18 @@ public sealed class AssetService : IAssetService
 
     private static AssetType ParseAssetType(string assetType)
     {
-        return string.Equals(assetType.Trim(), "avatar", StringComparison.OrdinalIgnoreCase)
-            ? AssetType.Avatar
-            : string.Equals(assetType.Trim(), "countdown-cover", StringComparison.OrdinalIgnoreCase)
-                ? AssetType.CountdownCover
-                : throw new InvalidOperationException("Unsupported asset type.");
+        return NormalizeAssetType(assetType) switch
+        {
+            "avatar" => AssetType.Avatar,
+            "countdown-cover" => AssetType.CountdownCover,
+            "note-image" => AssetType.NoteImage,
+            _ => throw new InvalidOperationException("Unsupported asset type."),
+        };
     }
 
     private static string BuildObjectKey(Guid userId, AssetType type, Guid assetId)
     {
-        return $"users/{userId:N}/{type.ToString().ToLowerInvariant()}/{assetId:N}";
+        return $"users/{userId:N}/{ToAssetTypeValue(type)}/{assetId:N}";
     }
 
     private static AssetError? ValidateUploadedObject(Asset asset, AssetObjectMetadata metadata)
@@ -259,7 +262,7 @@ public sealed class AssetService : IAssetService
             return AssetError.InvalidUploadedObject("The uploaded object key does not match the pending asset.");
         }
 
-        if (!AllowedAvatarMimeTypes.Contains(metadata.ContentType))
+        if (!AllowedImageMimeTypes.Contains(metadata.ContentType))
         {
             return AssetError.InvalidUploadedObject("The uploaded object must be JPG, PNG, or WebP.");
         }
@@ -282,6 +285,22 @@ public sealed class AssetService : IAssetService
         return null;
     }
 
+    private static string NormalizeAssetType(string? assetType)
+    {
+        return assetType?.Trim().ToLowerInvariant() ?? "avatar";
+    }
+
+    private static string ToAssetTypeValue(AssetType type)
+    {
+        return type switch
+        {
+            AssetType.Avatar => "avatar",
+            AssetType.CountdownCover => "countdown-cover",
+            AssetType.NoteImage => "note-image",
+            _ => throw new InvalidOperationException("Unsupported asset type."),
+        };
+    }
+
     private async Task TryDeleteUploadedObjectAsync(string objectKey, CancellationToken cancellationToken)
     {
         try
@@ -297,7 +316,7 @@ public sealed class AssetService : IAssetService
     {
         return new AssetDto(
             asset.Id,
-            asset.Type.ToString().ToLowerInvariant(),
+            ToAssetTypeValue(asset.Type),
             asset.Status.ToString().ToLowerInvariant(),
             asset.PublicUrl,
             asset.ContentType,
@@ -311,7 +330,7 @@ public sealed class AssetService : IAssetService
     {
         return new OwnedAssetDto(
             asset.Id,
-            asset.Type.ToString().ToLowerInvariant(),
+            ToAssetTypeValue(asset.Type),
             asset.Status.ToString().ToLowerInvariant(),
             asset.PublicUrl,
             asset.ContentType,

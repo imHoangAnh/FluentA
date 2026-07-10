@@ -1,4 +1,4 @@
-import { BookOpen, Layers, PenSquare } from 'lucide-react'
+import { BookOpen, FilePenLine, Layers, PenSquare } from 'lucide-react'
 import { Link, type LinkProps, useLocation } from 'react-router-dom'
 
 type LearningNavLinksProps = {
@@ -8,6 +8,10 @@ type LearningNavLinksProps = {
 function isActive(pathname: string, href: string) {
   if (href === '/flashcards') {
     return pathname === '/flashcards' || pathname.startsWith('/flashcards/pages/')
+  }
+
+  if (href === '/notes') {
+    return pathname === '/notes' || pathname.startsWith('/notes/')
   }
 
   return pathname === href
@@ -38,6 +42,9 @@ export function LearningNavLinks({ className }: LearningNavLinksProps) {
       </NavLink>
       <NavLink to="/review" className={className}>
         <BookOpen size={20} /> Review
+      </NavLink>
+      <NavLink to="/notes" className={className}>
+        <FilePenLine size={20} /> Notes
       </NavLink>
     </>
   )

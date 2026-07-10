@@ -32,6 +32,18 @@ public sealed class EfAssetRepository : IAssetRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.Assets
+            .Where(asset => asset.UserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Assets

@@ -147,6 +147,11 @@ public sealed class CountdownServiceTests
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default) =>
             Task.FromResult(Assets.FirstOrDefault(asset => asset.UserId == userId && asset.Id == assetId && asset.DeletedAt is null));
 
+        public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Asset>>(Assets
+                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .ToList());
+
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UserId == userId && asset.DeletedAt is null).ToList());
 
