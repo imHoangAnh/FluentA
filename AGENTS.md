@@ -1,6 +1,12 @@
 # Agent Instructions
-
-Add project-specific agent instructions here.
+- Read `README.md`, relevant `docs/`, and the Harness matrix before making changes.
+- Respect existing contracts; do not change APIs, database schemas, or architecture without approval.
+- Keep changes within the requested scope and preserve unrelated worktree changes.
+- For cross-layer or migration work, update code, tests, and product documentation together.
+- Run relevant tests and builds; clearly report pre-existing or unresolved failures.
+- Do not use destructive Git commands, commit, or push unless explicitly requested.
+- Stop and ask before making ambiguous, destructive, or compatibility-breaking changes.
+- Your answer is too abstract. Please explain it with concrete examples and step-by-step cause and effect.
 
 <!-- HARNESS:BEGIN -->
 ## Harness
