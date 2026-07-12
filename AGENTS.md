@@ -6,6 +6,7 @@
 - Run relevant tests and builds; clearly report pre-existing or unresolved failures.
 - Do not use destructive Git commands, commit, or push unless explicitly requested.
 - Stop and ask before making ambiguous, destructive, or compatibility-breaking changes.
+
 - Your answer is too abstract. Please explain it with concrete examples and step-by-step cause and effect.
 
 <!-- HARNESS:BEGIN -->
