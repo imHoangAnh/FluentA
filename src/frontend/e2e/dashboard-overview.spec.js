@@ -22,7 +22,7 @@ async function registerAndLogin(page) {
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Dashboard Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
@@ -32,7 +32,7 @@ async function registerAndLogin(page) {
 
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const loginPayload = await (await loginResponsePromise).json();

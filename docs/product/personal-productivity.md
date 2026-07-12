@@ -26,6 +26,20 @@ and mobile drag-and-drop are separate future stories.
 - Dashboard navigation links remain available for Vocabulary, Flashcards, Todo,
   Habits, Countdown, and logout.
 
+## Dashboard Presentation Contract
+
+- `/` renders inside the shared FluentA desktop/tablet AppShell with a full
+  sidebar on desktop and an icon-only collapsed sidebar at tablet widths.
+- Dashboard uses the shared light-theme teal tokens, self-hosted Geist Sans
+  Variable typography, accessible focus states, and subtle reduced-motion-safe
+  transitions.
+- The review queue, daily Todo, next Countdown, and Habit tracker use shared
+  card/button/badge primitives while preserving their existing data and
+  mutation contracts.
+- Loading uses structured skeletons; empty states retain explanatory text and
+  the relevant navigation action.
+- Chrome and Edge are the blocking browsers for this presentation contract.
+
 ## Dashboard Data Rules
 
 - Dashboard data is derived from existing user-owned Todo, Habit, Countdown,

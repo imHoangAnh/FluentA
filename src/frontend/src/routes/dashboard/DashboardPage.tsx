@@ -1,20 +1,20 @@
-import {
-  Bell, BookOpen, CalendarClock, CheckSquare,
-  Columns3, Flame, Globe, HelpCircle, LogOut, NotebookPen, Repeat2, Settings,
-  Search, CheckCircle2, Circle, Kanban, Timer, TrendingUp
-} from 'lucide-react'
+import { CalendarClock, Check, CheckCircle2, Circle, Flame, Search, Sparkles, Timer, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import * as countdownApi from '../../lib/api/countdown.api'
-import * as flashcardApi from '../../lib/api/flashcard.api'
-import * as habitApi from '../../lib/api/habit.api'
-import * as todoApi from '../../lib/api/todo.api'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
-import { useAuthStore } from '../../stores/authStore'
-import { HabitIconGlyph } from '../../lib/habit-icons'
-import './DashboardPage.css'
+import { Link } from 'react-router-dom'
+import { AppShell } from '@/components/AppShell'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import * as countdownApi from '@/lib/api/countdown.api'
+import * as flashcardApi from '@/lib/api/flashcard.api'
+import * as habitApi from '@/lib/api/habit.api'
+import * as todoApi from '@/lib/api/todo.api'
+import { HabitIconGlyph } from '@/lib/habit-icons'
+import { useAuthStore } from '@/stores/authStore'
+import { cn } from '@/lib/utils'
 
 const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
 
@@ -30,10 +30,10 @@ function toDateInput(date: Date) {
 }
 
 function greeting(hour: number, name: string) {
-  if (hour >= 5 && hour < 12) return `Good morning, ${name}! 👋`
-  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}! 👋`
-  if (hour >= 17 && hour < 21) return `Good evening, ${name}! 👋`
-  return `Burning midnight oil, ${name}? 🌙`
+  if (hour >= 5 && hour < 12) return `Good morning, ${name}`
+  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}`
+  if (hour >= 17 && hour < 21) return `Good evening, ${name}`
+  return `Burning midnight oil, ${name}?`
 }
 
 function remainingText(targetDate: string, now: Date) {
@@ -48,18 +48,15 @@ function remainingText(targetDate: string, now: Date) {
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
-  const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
-  const location = useLocation()
   const [now, setNow] = useState(() => new Date())
-  
+
   const today = useMemo(() => toDateInput(new Date()), [])
   const timeZoneId = useMemo(() => browserTimeZone(), [])
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setNow(new Date()), 1000)
+    const intervalId = window.setInterval(() => setNow(new Date()), 60_000)
     void preloadJournalEditor()
     return () => window.clearInterval(intervalId)
   }, [])
@@ -68,233 +65,140 @@ export function DashboardPage() {
   const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
   const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
   const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
+
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['todo'] })
-    },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['todo'] }) },
+  })
+
+  const habitToggle = useMutation({
+    mutationFn: (habit: habitApi.Habit) => habitApi.toggleHabitEntry(habit.id, today, timeZoneId),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['habit'] }) },
   })
 
   const todos = useMemo(
     () => (todosQuery.data ?? []).toSorted((left, right) =>
       Number(left.isCompleted) - Number(right.isCompleted)
-      || (left.completedAt ?? left.createdAt).localeCompare(right.completedAt ?? right.createdAt),
-    ),
+      || (left.completedAt ?? left.createdAt).localeCompare(right.completedAt ?? right.createdAt)),
     [todosQuery.data],
   )
   const visibleTodos = todos.slice(0, 3)
-
-  const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 2), [habitsQuery.data])
-
+  const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 3), [habitsQuery.data])
   const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
-
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueCards = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0) + (flashcardDashboard?.newCards ?? 0)
-  const totalCards = dueCards > 0 ? dueCards + 20 : 100 // Mock total for ring
-  const ringPercentage = dueCards > 0 ? (dueCards / totalCards) * 251.2 : 0
+  const dueReview = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)
+  const ringProgress = Math.min(100, dueCards * 5)
+  const isLoading = todosQuery.isLoading || habitsQuery.isLoading || countdownsQuery.isLoading || flashcardDashboardQuery.isLoading
 
   return (
-    <div className="dashboard-layout">
-      {/* SideNavBar */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
+    <AppShell
+      title="Dashboard"
+    >
+      <section className="mb-6 flex flex-wrap items-end justify-between gap-4" aria-labelledby="welcome-heading">
+        <div>
+          <Badge className="mb-3"><Sparkles className="mr-1 size-3" /> Today</Badge>
+          <h2 id="welcome-heading" className="m-0 text-3xl font-semibold tracking-[-0.035em] text-foreground">{greeting(now.getHours(), displayName)}</h2>
+          <p className="m-0 mt-2 text-sm text-muted-foreground">
+            {new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}
+          </p>
         </div>
+        <Card className="min-w-48">
+          <CardContent className="flex items-center gap-3 p-3.5">
+            <div className="grid size-10 place-items-center rounded-lg bg-amber-100 text-amber-700"><Flame className="size-5" /></div>
+            <div><p className="m-0 text-xs font-medium text-muted-foreground">Current streak</p><p className="m-0 mt-0.5 text-lg font-semibold">{flashcardDashboard?.streakDays ?? 0} days</p></div>
+          </CardContent>
+        </Card>
+      </section>
 
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''} onMouseEnter={preloadJournalEditor}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img 
-              className="dashboard-user-avatar" 
-              src={avatarUrl}
-              alt="User" 
-            />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
+      {isLoading ? (
+        <div className="grid grid-cols-12 gap-4" aria-label="Loading dashboard" aria-busy="true">
+          <Skeleton className="col-span-8 h-80 max-xl:col-span-12" />
+          <Skeleton className="col-span-4 h-80 max-xl:col-span-12" />
+          <Skeleton className="col-span-6 h-56 max-xl:col-span-12" />
+          <Skeleton className="col-span-6 h-56 max-xl:col-span-12" />
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="dashboard-main">
-        {/* TopAppBar */}
-        <header className="dashboard-header">
-          <div className="dashboard-search">
-            <Search size={20} color="#6d7a77" />
-            <input type="text" placeholder="Search vocabulary..." />
-          </div>
-          <div className="dashboard-header-actions">
-            <button className="dashboard-notification-btn">
-              <Bell size={24} />
-              <span className="dashboard-notification-dot"></span>
-            </button>
-          </div>
-        </header>
-
-        {/* Dashboard Canvas */}
-        <div className="dashboard-content">
-          {/* Welcome Header */}
-          <section className="dashboard-welcome">
-            <div className="dashboard-welcome-text">
-              <h2>{greeting(now.getHours(), displayName)}</h2>
-              <p>Today is <span>{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}</span></p>
-            </div>
-            
-            <div className="dashboard-streak-card">
-              <div className="dashboard-streak-icon">
-                <Flame size={28} />
+      ) : (
+        <div className="grid grid-cols-12 gap-4">
+          <Card className="col-span-8 max-xl:col-span-12">
+            <CardHeader className="flex-row items-start justify-between">
+              <div><CardTitle>Review queue</CardTitle><CardDescription>Cards ready for your next focused session.</CardDescription></div>
+              <Badge variant={dueCards > 0 ? 'default' : 'outline'}>{dueCards} due</Badge>
+            </CardHeader>
+            <CardContent className="grid grid-cols-[180px_1fr] items-center gap-8 max-md:grid-cols-1">
+              <div className="relative mx-auto size-40" aria-label={`${dueCards} cards due today`}>
+                <svg className="size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--ds-muted)" strokeWidth="9" />
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--ds-primary)" strokeWidth="9" strokeLinecap="round" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - ringProgress} />
+                </svg>
+                <div className="absolute inset-0 grid place-content-center text-center"><strong className="text-3xl">{dueCards}</strong><span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Due today</span></div>
               </div>
-              <div className="dashboard-streak-info">
-                <p className="dashboard-streak-label">Current Streak</p>
-                <p className="dashboard-streak-value">{flashcardDashboard?.streakDays ?? 0} Days</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Bento Grid Section */}
-          <div className="dashboard-bento-grid">
-            {/* Review Queue Card */}
-            <div className="bento-card card-col-8">
-              <div className="bento-card-header">
-                <h3 className="bento-card-title">Review Queue</h3>
-              </div>
-              <div className="review-queue-content">
-                <div className="review-chart-container">
-                  <div className="review-chart">
-                    <svg viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#eceef0" strokeWidth="10"></circle>
-                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#0D9488" strokeDasharray="251.2" strokeDashoffset={251.2 - ringPercentage} strokeLinecap="round" strokeWidth="10"></circle>
-                      <circle cx="50" cy="50" fill="transparent" r="40" stroke="#6bd8cb" strokeDasharray="251.2" strokeDashoffset={251.2 - (ringPercentage * 0.4)} strokeLinecap="round" strokeWidth="10"></circle>
-                    </svg>
-                    <div className="review-chart-center">
-                      <span className="count">{dueCards}</span>
-                      <span className="label">DUE TODAY</span>
-                    </div>
-                  </div>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border bg-background p-4"><p className="m-0 text-xs text-muted-foreground">Review</p><p className="m-0 mt-1 text-2xl font-semibold">{dueReview}</p></div>
+                  <div className="rounded-lg border border-border bg-background p-4"><p className="m-0 text-xs text-muted-foreground">Learning</p><p className="m-0 mt-1 text-2xl font-semibold">{flashcardDashboard?.newCards ?? 0}</p></div>
                 </div>
-                <div className="review-stats">
-                  <div className="review-stat-row">
-                    <div className="review-stat-label"><div className="review-stat-dot bg-teal"></div> Review</div>
-                    <strong>{(flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)}</strong>
-                  </div>
-                  <div className="review-stat-row">
-                    <div className="review-stat-label"><div className="review-stat-dot bg-light-teal"></div> Learning</div>
-                    <strong>{flashcardDashboard?.newCards ?? 0}</strong>
-                  </div>
-                </div>
-                <Link to="/review" style={{textDecoration: 'none'}}>
-                  <button className="btn-primary">Open Review</button>
-                </Link>
+                {dueCards === 0 ? <p className="m-0 text-sm text-muted-foreground">No cards due today</p> : null}
+                <Button asChild><Link to="/review">Open Review</Link></Button>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Daily To-Do */}
-            <div className="bento-card card-col-4">
-              <div className="bento-card-header">
-                <h3 className="bento-card-subtitle">Daily To-Do</h3>
-                <CheckSquare size={20} color="#0D9488" />
-              </div>
-              <ul className="todo-list">
-                {todos.length === 0 ? <p style={{fontSize: 14}}>No tasks for today.</p> : null}
-                {visibleTodos.map(todo => (
-                  <li key={todo.id} className={`todo-item ${todo.isCompleted ? 'completed' : ''}`} onClick={() => todoToggle.mutate(todo)}>
-                    {todo.isCompleted ? <CheckCircle2 size={18} color="#0D9488" /> : <Circle size={18} color="#6d7a77" />}
-                    <span>{todo.title}</span>
+          <Card className="col-span-4 max-xl:col-span-12">
+            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Daily todo</CardTitle><CardDescription>Your three most relevant tasks.</CardDescription></div><Check className="size-5 text-primary" /></CardHeader>
+            <CardContent className="flex h-[226px] flex-col">
+              <ul className="m-0 grid list-none gap-2 p-0" role="list">
+                {visibleTodos.map((todo) => (
+                  <li key={todo.id}>
+                    <button
+                      type="button"
+                      className={cn('flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-md border border-transparent px-2 text-left text-sm transition-colors hover:bg-accent', todo.isCompleted && 'text-muted-foreground line-through')}
+                      aria-label={`${todo.isCompleted ? 'Uncheck' : 'Check'} todo ${todo.title}`}
+                      onClick={() => todoToggle.mutate(todo)}
+                    >
+                      {todo.isCompleted ? <CheckCircle2 className="size-[18px] text-primary" /> : <Circle className="size-[18px] text-muted-foreground" />}
+                      <span>{todo.title}</span>
+                    </button>
                   </li>
                 ))}
               </ul>
-              <Link to="/todo" style={{textDecoration: 'none', marginTop: 'auto'}}>
-                 <button className="btn-outline" style={{ border: 'none', color: '#0D9488', width: 'auto', padding: 0 }}>View all tasks →</button>
-              </Link>
-            </div>
+              {todos.length === 0 ? <div className="grid flex-1 place-content-center text-center"><CheckCircle2 className="mx-auto mb-2 size-7 text-muted-foreground" /><p className="m-0 text-sm text-muted-foreground">No tasks for today.</p></div> : null}
+              <Button asChild variant="ghost" size="sm" className="mt-auto self-start"><Link to="/todo">View all tasks</Link></Button>
+            </CardContent>
+          </Card>
 
-            {/* Next Event */}
-            <div className="bento-card card-col-6">
-              <div className="bento-card-header">
-                <h3 className="bento-card-subtitle">Next Event</h3>
-                <Timer size={20} color="#0D9488" />
+          <Card className="col-span-5 max-xl:col-span-12">
+            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Next event</CardTitle><CardDescription>Keep the nearest milestone in view.</CardDescription></div><CalendarClock className="size-5 text-primary" /></CardHeader>
+            <CardContent>
+              <div className="rounded-lg bg-secondary p-5 text-center">
+                <p className="m-0 text-3xl font-semibold tracking-[-0.03em] text-secondary-foreground">{countdowns.length ? remainingText(countdowns[0].targetDate, now) : '--:--'}</p>
+                <p className="m-0 mt-2 text-sm text-muted-foreground">{countdowns[0]?.name ?? 'No upcoming events'}</p>
               </div>
-              {countdowns.length > 0 ? (
-                <div className="next-event-content">
-                  <p className="next-event-time">{remainingText(countdowns[0].targetDate, now)}</p>
-                  <p className="next-event-label">{countdowns[0].name}</p>
-                </div>
-              ) : (
-                <div className="next-event-content">
-                  <p className="next-event-time">--:--</p>
-                  <p className="next-event-label">No upcoming events</p>
-                </div>
-              )}
-              <Link to="/countdowns" style={{textDecoration: 'none', marginTop: 'auto'}}>
-                <button className="btn-outline">Open Countdowns</button>
-              </Link>
-            </div>
+              <Button asChild variant="outline" className="mt-4 w-full"><Link to="/countdowns"><Timer /> Open countdowns</Link></Button>
+            </CardContent>
+          </Card>
 
-            {/* Habit Tracker */}
-            <div className="bento-card card-col-6">
-              <div className="bento-card-header">
-                <h3 className="bento-card-subtitle">Habit Tracker</h3>
-                <TrendingUp size={20} color="#0D9488" />
-              </div>
-              <div className="habit-list">
-                {habits.length === 0 ? <p style={{fontSize: 14}}>No habits scheduled today.</p> : null}
-                {habits.map(habit => (
-                  <div className="habit-item" key={habit.id}>
-                    <div className="habit-item-header">
-                      <span className="habit-dashboard-name"><HabitIconGlyph icon={habit.icon} size={16} /> {habit.name}</span>
-                      <span>{habit.isCheckedToday ? '100%' : '0%'}</span>
-                    </div>
-                    <div className="habit-progress-bar">
-                      <div className="habit-progress-fill" style={{ width: habit.isCheckedToday ? '100%' : '0%' }}></div>
-                    </div>
-                    <p className="habit-item-label">STREAK: {habit.currentStreak} DAYS</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <Card className="col-span-7 max-xl:col-span-12">
+            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Habit tracker</CardTitle><CardDescription>Small actions that keep your learning rhythm alive.</CardDescription></div><TrendingUp className="size-5 text-primary" /></CardHeader>
+            <CardContent className="grid gap-3">
+              {habits.map((habit) => (
+                <button
+                  type="button"
+                  key={habit.id}
+                  className="grid min-h-12 cursor-pointer grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-left transition-colors hover:border-primary/35 hover:bg-accent/50"
+                  aria-label={`${habit.isCheckedToday ? 'Uncheck' : 'Check'} habit ${habit.name}`}
+                  onClick={() => habitToggle.mutate(habit)}
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium"><HabitIconGlyph icon={habit.icon} size={16} /> {habit.name}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{habit.currentStreak} day streak</span>
+                  <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted"><span className={cn('block h-full rounded-full bg-primary transition-[width] duration-200', habit.isCheckedToday ? 'w-full' : 'w-0')} /></span>
+                </button>
+              ))}
+              {habits.length === 0 ? <div className="grid min-h-28 place-content-center text-center"><TrendingUp className="mx-auto mb-2 size-7 text-muted-foreground" /><p className="m-0 text-sm text-muted-foreground">No habits scheduled today.</p></div> : null}
+            </CardContent>
+          </Card>
         </div>
-      </main>
-    </div>
+      )}
+    </AppShell>
   )
 }

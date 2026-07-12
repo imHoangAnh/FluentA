@@ -1,0 +1,105 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+  --font-sans: "Geist Variable", "Segoe UI", sans-serif;
+  --color-background: var(--ds-background);
+  --color-foreground: var(--ds-foreground);
+  --color-card: var(--ds-card);
+  --color-card-foreground: var(--ds-card-foreground);
+  --color-popover: var(--ds-popover);
+  --color-popover-foreground: var(--ds-popover-foreground);
+  --color-primary: var(--ds-primary);
+  --color-primary-foreground: var(--ds-primary-foreground);
+  --color-secondary: var(--ds-secondary);
+  --color-secondary-foreground: var(--ds-secondary-foreground);
+  --color-muted: var(--ds-muted);
+  --color-muted-foreground: var(--ds-muted-foreground);
+  --color-accent: var(--ds-accent);
+  --color-accent-foreground: var(--ds-accent-foreground);
+  --color-destructive: var(--ds-destructive);
+  --color-destructive-foreground: var(--ds-destructive-foreground);
+  --color-border: var(--ds-border);
+  --color-input: var(--ds-input);
+  --color-ring: var(--ds-ring);
+  --radius-sm: calc(var(--ds-radius) - 4px);
+  --radius-md: calc(var(--ds-radius) - 2px);
+  --radius-lg: var(--ds-radius);
+  --radius-xl: calc(var(--ds-radius) + 4px);
+}
+
+:root {
+  --ds-background: #f6f8f8;
+  --ds-foreground: #17211f;
+  --ds-card: #ffffff;
+  --ds-card-foreground: #17211f;
+  --ds-popover: #ffffff;
+  --ds-popover-foreground: #17211f;
+  --ds-primary: #0f766e;
+  --ds-primary-foreground: #ffffff;
+  --ds-secondary: #e7f5f2;
+  --ds-secondary-foreground: #115e59;
+  --ds-muted: #eef2f1;
+  --ds-muted-foreground: #5d6b68;
+  --ds-accent: #d9f1ed;
+  --ds-accent-foreground: #115e59;
+  --ds-destructive: #b42318;
+  --ds-destructive-foreground: #ffffff;
+  --ds-border: #dce4e2;
+  --ds-input: #cbd7d4;
+  --ds-ring: #0d9488;
+  --ds-radius: 10px;
+}
+
+.ds-root {
+  min-height: 100vh;
+  background: var(--ds-background);
+  color: var(--ds-foreground);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ds-root *,
+.ds-root *::before,
+.ds-root *::after {
+  box-sizing: border-box;
+}
+
+.ds-root :focus-visible {
+  outline: 2px solid var(--ds-ring);
+  outline-offset: 2px;
+}
+
+.ds-root a {
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+.ds-root nav a {
+  color: var(--ds-muted-foreground);
+}
+
+.ds-root nav a[aria-current="page"] {
+  color: var(--ds-secondary-foreground);
+}
+
+.ds-root a[data-variant="default"] {
+  color: var(--ds-primary-foreground);
+}
+
+.ds-root a[data-variant="outline"] {
+  color: var(--ds-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-root *,
+  .ds-root *::before,
+  .ds-root *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

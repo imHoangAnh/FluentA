@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
+
+const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
 
 const emptyWord = (): vocabularyApi.WordInput => ({
   word: '',
@@ -127,21 +130,21 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
   return (
     <div>
       {type === 'select' ? (
-        <div className="vw-select-wrapper">
-          <select className="vw-input" ref={register} {...shared}>
+        <div className="relative">
+          <select className={`${cellClassName} appearance-none pr-7`} ref={register} {...shared}>
             {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
-          <span className="material-symbols-outlined vw-select-icon">expand_more</span>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
       ) : type === 'textarea' ? (
-        <textarea className="vw-input" ref={register} {...shared} rows={2} />
+        <textarea className={`${cellClassName} resize-none`} ref={register} {...shared} rows={2} />
       ) : (
-        <input className="vw-input" ref={register} {...shared} type="text" />
+        <input className={cellClassName} ref={register} {...shared} type="text" />
       )}
-      {saving ? <small style={{ fontSize: 11, color: '#6d7a77' }}>Saving...</small> : null}
+      {saving ? <small className="px-2 text-[11px] text-muted-foreground">Saving...</small> : null}
       {error ? (
-        <small style={{ fontSize: 11, color: '#ba1a1a' }}>
-          {error} <button type="button" onClick={() => void commitValue(draft)}>Retry</button>
+        <small className="px-2 text-[11px] text-destructive">
+          {error} <button className="cursor-pointer font-semibold underline underline-offset-2" type="button" onClick={() => void commitValue(draft)}>Retry</button>
         </small>
       ) : null}
     </div>
@@ -164,7 +167,7 @@ function SortableHeader({
   return (
     <div
       ref={setNodeRef}
-      className="vw-table-header__item"
+      className="relative flex min-h-10 items-center border-r border-border last:border-r-0"
       style={{
         width,
         transform: CSS.Translate.toString(transform),
@@ -172,14 +175,14 @@ function SortableHeader({
         opacity: isDragging ? 0.6 : 1,
       }}
     >
-      <button type="button" className="vw-table-header__drag" {...attributes} {...listeners}>
-        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>drag_indicator</span>
+      <button type="button" className="flex h-full min-w-0 flex-1 cursor-grab items-center gap-1.5 overflow-hidden px-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground active:cursor-grabbing" {...attributes} {...listeners}>
+        <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
         {label}
       </button>
       <button
         type="button"
         aria-label={`Resize ${label}`}
-        className="vw-table-header__resize"
+        className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize border-0 bg-transparent p-0 hover:bg-primary/20"
         onMouseDown={(event) => onResizeStart(event, id)}
       />
     </div>
@@ -333,28 +336,28 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
     if (column.type === 'select') {
       return (
-        <div className="vw-select-wrapper">
-          <select className="vw-input" {...shared}>
+        <div className="relative">
+          <select className={`${cellClassName} appearance-none pr-7`} {...shared}>
             {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
-          <span className="material-symbols-outlined vw-select-icon">expand_more</span>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
       )
     }
 
     if (column.type === 'textarea') {
-      return <textarea className="vw-input" {...shared} rows={1} placeholder={column.label} />
+      return <textarea className={`${cellClassName} resize-none`} {...shared} rows={1} placeholder={column.label} />
     }
 
-    return <input className="vw-input" {...shared} type="text" placeholder={column.label} />
+    return <input className={cellClassName} {...shared} type="text" placeholder={column.label} />
   }
 
   return (
-    <div className="vw-table-scroll" data-testid="vocab-table-scroll">
-      <div className="vw-table-container">
+    <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card" data-testid="vocab-table-scroll">
+      <div className="min-w-max">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={columns.map((column) => column.key)} strategy={horizontalListSortingStrategy}>
-            <div className="vw-table-header" style={{ gridTemplateColumns }}>
+            <div className="grid border-b border-border bg-muted/70" style={{ gridTemplateColumns }}>
               {columns.map((column) => (
                 <SortableHeader
                   key={column.key}
@@ -370,7 +373,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         </DndContext>
 
         {wordsQuery.data?.map((word) => (
-          <div className="vw-table-row" style={{ gridTemplateColumns }} key={word.id}>
+          <div className="grid min-h-12 items-start border-b border-border bg-card py-1 transition-colors hover:bg-accent/20" style={{ gridTemplateColumns }} key={word.id}>
             {columns.map((column) => (
               <AutosaveCell
                 key={column.key}
@@ -383,30 +386,30 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
                 onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
               />
             ))}
-            <div className="vw-action-cell">
+            <div className="grid h-10 place-items-center">
               <button
-                className="vw-delete-btn"
+                className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 type="button"
                 tabIndex={-1}
                 aria-label={`Delete ${word.word}`}
                 onClick={() => { if (window.confirm(`Delete "${word.word}"?`)) deleteWord.mutate(word.id) }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+                <Trash2 className="size-4" aria-hidden="true" />
               </button>
             </div>
           </div>
         ))}
 
-        <form className="vw-table-row create-row" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
+        <form className="grid min-h-12 items-start bg-secondary/35 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
           {columns.map((column) => <div key={column.key}>{renderBlankCell(column)}</div>)}
-          <div className="vw-action-cell">
-            <button className="vw-confirm-btn" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add">
-              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+          <div className="grid h-10 place-items-center">
+            <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add" aria-label="Create word">
+              <CheckCircle2 className="size-4" aria-hidden="true" />
             </button>
           </div>
         </form>
-        {wordsQuery.isLoading ? <div style={{ padding: 16, color: '#6d7a77' }}>Loading words...</div> : null}
-        {createWord.isError ? <div style={{ padding: 16, color: '#ba1a1a' }}>Could not create word. Fix the row and try again.</div> : null}
+        {wordsQuery.isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading words...</div> : null}
+        {createWord.isError ? <div className="p-4 text-sm text-destructive" role="alert">Could not create word. Fix the row and try again.</div> : null}
       </div>
     </div>
   )

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import type { BoardPreferences } from '../../lib/api/vocabulary.api'
+import { Check, ChevronDown, Columns3 } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Button } from '@/components/ui/button'
+import type { BoardPreferences } from '@/lib/api/vocabulary.api'
 
 const optionalColumns = [
   { key: 'definition', name: 'Definition' },
@@ -14,62 +16,45 @@ type ColumnSettingsProps = {
 }
 
 export function ColumnSettings({ preferences, onSave }: ColumnSettingsProps) {
-  const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   function toggle(key: string) {
     const hidden = new Set(preferences.hiddenColumns)
     if (hidden.has(key)) hidden.delete(key)
     else hidden.add(key)
 
-    void onSave({
-      ...preferences,
-      hiddenColumns: [...hidden],
-    })
+    void onSave({ ...preferences, hiddenColumns: [...hidden] })
   }
 
   return (
-    <div className="vw-column-settings-container" ref={dropdownRef}>
-      <button
-        className="vw-tool-btn"
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>view_column</span>
-        Columns
-        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>arrow_drop_down</span>
-      </button>
-
-      {open ? (
-        <div className="vw-column-settings-dropdown">
-          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#191c1e' }}>Board columns</h4>
-
-          <div className="vw-column-settings-list">
-            {optionalColumns.map((column) => (
-              <label key={column.key} className="vw-column-settings-item">
-                <input
-                  type="checkbox"
-                  checked={!preferences.hiddenColumns.includes(column.key)}
-                  onChange={() => toggle(column.key)}
-                />
-                {column.name}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button type="button" variant="outline" size="sm">
+          <Columns3 /> Columns <ChevronDown />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 min-w-52 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_12px_36px_rgba(16,32,29,0.14)] data-[state=open]:animate-in data-[state=closed]:animate-out"
+        >
+          <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Board columns</DropdownMenu.Label>
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          {optionalColumns.map((column) => (
+            <DropdownMenu.CheckboxItem
+              key={column.key}
+              checked={!preferences.hiddenColumns.includes(column.key)}
+              onCheckedChange={() => toggle(column.key)}
+              onSelect={(event) => event.preventDefault()}
+              className="relative flex min-h-9 cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground"
+            >
+              <span className="absolute left-2 grid size-4 place-items-center">
+                <DropdownMenu.ItemIndicator><Check className="size-3.5" /></DropdownMenu.ItemIndicator>
+              </span>
+              {column.name}
+            </DropdownMenu.CheckboxItem>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   )
 }

@@ -31,6 +31,22 @@ this document.
 - Board and page lists show the newest created item first. Their order is not
   manually configurable.
 
+## Frontend Presentation Contract
+
+- `/vocabulary` renders inside the shared FluentA desktop/tablet AppShell.
+- The workspace keeps a dedicated board/page rail beside the data canvas; the
+  app-wide sidebar remains the primary route navigation.
+- Vocabulary uses the compact density of the shared design system so fixed
+  columns remain practical without shrinking editable controls below usable
+  sizes.
+- Board creation and page creation use visible inline forms rather than
+  browser prompts. Existing API validation and ownership rules are unchanged.
+- Column visibility uses an accessible Radix-backed menu. Reorder, resize,
+  autosave, Retry, Tab, Shift+Tab, Escape, Enter, and horizontal scrolling keep
+  their existing behavior.
+- Desktop and tablet Chromium layouts are blocking acceptance targets. Smaller
+  screens may degrade naturally but must not crash.
+
 ## Ownership And Authorization Rules
 
 - Every board belongs to exactly one authenticated user.
