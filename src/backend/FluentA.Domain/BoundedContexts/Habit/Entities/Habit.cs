@@ -14,8 +14,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         Guid userId,
         string name,
         string? description,
-        string? color,
-        string? icon,
+        HabitIcon icon,
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays)
     {
@@ -25,14 +24,13 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         }
 
         UserId = userId;
-        ApplyDetails(name, description, color, icon, frequency, customDays);
+        ApplyDetails(name, description, icon, frequency, customDays);
     }
 
     public Guid UserId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public string? Color { get; private set; }
-    public string? Icon { get; private set; }
+    public HabitIcon Icon { get; private set; }
     public HabitFrequency Frequency { get; private set; }
     public string? CustomDays { get; private set; }
     public bool ReminderEnabled { get; private set; } = true;
@@ -44,23 +42,21 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         Guid userId,
         string name,
         string? description,
-        string? color,
-        string? icon,
+        HabitIcon icon,
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays)
     {
-        return new Habit(userId, name, description, color, icon, frequency, customDays);
+        return new Habit(userId, name, description, icon, frequency, customDays);
     }
 
     public void Update(
         string name,
         string? description,
-        string? color,
-        string? icon,
+        HabitIcon icon,
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays)
     {
-        ApplyDetails(name, description, color, icon, frequency, customDays);
+        ApplyDetails(name, description, icon, frequency, customDays);
         Touch();
     }
 
@@ -90,15 +86,13 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     private void ApplyDetails(
         string name,
         string? description,
-        string? color,
-        string? icon,
+        HabitIcon icon,
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays)
     {
         Name = CleanName(name);
         Description = CleanOptional(description, 2000, nameof(description));
-        Color = CleanColor(color);
-        Icon = CleanOptional(icon, 16, nameof(icon));
+        Icon = icon;
         Frequency = frequency;
         CustomDays = SerializeCustomDays(frequency, customDays);
     }
@@ -130,22 +124,6 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         if (cleaned.Length > maxLength)
         {
             throw new ArgumentException($"Habit {paramName} must be at most {maxLength} characters.", paramName);
-        }
-
-        return cleaned;
-    }
-
-    private static string? CleanColor(string? color)
-    {
-        if (string.IsNullOrWhiteSpace(color))
-        {
-            return null;
-        }
-
-        var cleaned = color.Trim();
-        if (cleaned.Length != 7 || cleaned[0] != '#' || cleaned.Skip(1).Any(character => !Uri.IsHexDigit(character)))
-        {
-            throw new ArgumentException("Habit color must be a hex value like #22C55E.", nameof(color));
         }
 
         return cleaned;

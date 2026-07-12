@@ -362,9 +362,8 @@ export function ReviewSessionPage() {
           <div className="review-setup-container">
             <div className="review-setup-card">
               <div className="review-setup-header">
-                <span className="review-setup-badge">Board Review</span>
-                <h1>Review due words</h1>
-                <p>Pick a board, choose queue order, then FluentA will start a random-mode review queue from the board&apos;s due words.</p>
+                <span className="review-setup-badge">Review</span>
+                <h2>Select a board to start review</h2>
               </div>
 
               <div className="review-setup-body">
@@ -436,9 +435,6 @@ export function ReviewSessionPage() {
                     <Play size={20} fill="currentColor" />
                     Start review
                   </button>
-                  <p className="review-setup-note">
-                    Random mode is fixed for Review. Progress keeps the queue membership owned by the review session.
-                  </p>
                   {startSessionMutation.isError ? (
                     <p className="flashcard-status flashcard-status--error">Unable to start review right now.</p>
                   ) : null}

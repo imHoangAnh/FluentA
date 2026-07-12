@@ -166,13 +166,19 @@ All responses use the FluentA envelope.
 - A logged-in user can create daily or custom-schedule habits through the Habit
   API and Habit page form.
 - A logged-in user can see only their own active habits.
-- A logged-in user can update habit name, description, color, icon, frequency,
-  and custom weekdays from the Habit page.
+- A logged-in user can update habit name, description, semantic icon,
+  frequency, and custom weekdays from the Habit page.
 - A logged-in user can soft-delete their own habits from the Habit page.
 - A logged-in user can query completed habit entries for an owned habit and
   month.
-- A logged-in user can navigate a monthly contribution grid with habits as rows
-  and days as columns.
+- On desktop and tablet, the Habit page uses an approximately 50/50 list/detail
+  layout. Each Habit card shows its semantic icon, compact current streak, and
+  the Monday-through-Sunday completion cells for the selected week.
+- A logged-in user can navigate past or future weeks. Eligible past and current
+  scheduled cells can be toggled directly; future and unscheduled cells are
+  visible but disabled.
+- The selected Habit detail shows four statistics, an optional description,
+  and then the navigable monthly calendar.
 - A logged-in user can toggle completion for today or past scheduled dates from
   the monthly grid.
 - Future dates and unscheduled custom-frequency dates are disabled in the grid.
@@ -222,8 +228,11 @@ All responses use the FluentA envelope.
   commands.
 - Name is required and must be at most 180 characters after trimming.
 - Description is optional and must be at most 2000 characters after trimming.
-- Color is optional and must be a hex value like `#22C55E` when supplied.
-- Icon is optional and must be at most 16 characters after trimming.
+- Icon is stored as one of `Default`, `Book`, `Exercise`, `Water`,
+  `Meditation`, `Study`, `Work`, or `Health`; omitted create values default to
+  `Default`, while unknown values return `422 VALIDATION_ERROR`.
+- Habit responses do not expose a per-Habit color. Habit, Habit Stats, and
+  Dashboard map the semantic icon to shared application presentation styling.
 - Frequency must be `Daily` or `Custom`.
 - Custom habits require at least one valid weekday name.
 - Month values must be `YYYY-MM`.

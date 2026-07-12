@@ -2,13 +2,13 @@ import { apiClient } from './client'
 import type { ApiEnvelope } from './auth.api'
 
 export type HabitFrequency = 'Daily' | 'Custom'
+export type HabitIcon = 'Default' | 'Book' | 'Exercise' | 'Water' | 'Meditation' | 'Study' | 'Work' | 'Health'
 
 export type Habit = {
   id: string
   name: string
   description?: string | null
-  color?: string | null
-  icon?: string | null
+  icon: HabitIcon
   frequency: HabitFrequency
   customDays: string[]
   reminderEnabled: boolean
@@ -32,8 +32,7 @@ export type HabitStats = {
   habitId: string
   name: string
   description?: string | null
-  color?: string | null
-  icon?: string | null
+  icon: HabitIcon
   frequency: HabitFrequency
   customDays: string[]
   currentStreak: number
@@ -50,8 +49,7 @@ export type HabitStats = {
 export type CreateHabitInput = {
   name: string
   description?: string | null
-  color?: string | null
-  icon?: string | null
+  icon?: HabitIcon
   frequency: HabitFrequency
   customDays?: string[] | null
   reminderEnabled?: boolean

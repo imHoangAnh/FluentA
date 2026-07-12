@@ -15,7 +15,7 @@ async function registerAndLogin(page) {
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Habit Stats Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.locator('input[name="password"]').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
@@ -23,9 +23,10 @@ async function registerAndLogin(page) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/');
 }
@@ -39,9 +40,10 @@ test('habit stats page shows backend-owned streak and rolling rates', async ({ p
   });
 
   await registerAndLogin(page);
-  await page.getByTestId('open-habits').click();
+  await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/habits');
 
+  await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('Read Stats');
   await page.getByTestId('habit-description-input').fill('One measured habit');
   await page.getByTestId('save-habit-button').click();
@@ -53,7 +55,7 @@ test('habit stats page shows backend-owned streak and rolling rates', async ({ p
 
   await page.getByRole('link', { name: 'View stats for Read Stats' }).click();
   await expect(page).toHaveURL(/\/habits\/.+\/stats$/);
-  await expect(page.getByRole('heading', { name: 'Read Stats' })).toBeVisible();
+  await expect(page.locator('h1', { hasText: 'Read Stats' })).toBeVisible();
   await expect(page.getByText('Current streak')).toBeVisible();
   await expect(page.getByText('Longest streak')).toBeVisible();
   await expect(page.getByText('1 days')).toHaveCount(2);

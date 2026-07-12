@@ -1,5 +1,5 @@
 import { 
-  BookOpen, CalendarClock, CheckSquare, Columns3, Globe, HelpCircle, Layers, 
+  BarChart3, BookOpen, CalendarClock, CheckSquare, Columns3, Flame, Globe, HelpCircle, Layers,
   LogOut, NotebookPen, Repeat2, Settings, Kanban, Plus, 
   ChevronLeft, ChevronRight, Edit3, Trash2, X, Timer
 } from 'lucide-react'
@@ -10,14 +10,15 @@ import { getUserAvatarUrl } from '../../lib/avatar'
 import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
 import * as habitApi from '../../lib/api/habit.api'
+import { HabitIconGlyph } from '../../lib/habit-icons'
+import { habitIconOptions } from '../../lib/habit-icon-options'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 type HabitFormState = {
   name: string
   description: string
-  color: string
-  icon: string
+  icon: habitApi.HabitIcon
   frequency: habitApi.HabitFrequency
   customDays: string[]
   reminderEnabled: boolean
@@ -27,8 +28,7 @@ function emptyForm(): HabitFormState {
   return {
     name: '',
     description: '',
-    color: '#22C55E',
-    icon: '',
+    icon: 'Default',
     frequency: 'Daily',
     customDays: [],
     reminderEnabled: true,
@@ -61,6 +61,25 @@ function shiftMonth(monthValue: string, months: number) {
   const date = parseMonth(monthValue)
   date.setMonth(date.getMonth() + months)
   return toMonthInput(date)
+}
+
+function startOfWeek(date: Date) {
+  const monday = new Date(date)
+  const day = monday.getDay()
+  monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1))
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+function parseDateInput(dateValue: string) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function shiftWeek(dateValue: string, weeks: number) {
+  const date = parseDateInput(dateValue)
+  date.setDate(date.getDate() + weeks * 7)
+  return toDateInput(date)
 }
 
 function monthDates(monthValue: string) {
@@ -107,8 +126,7 @@ function toPayload(form: HabitFormState) {
   return {
     name: form.name,
     description: form.description.trim() ? form.description : null,
-    color: form.color.trim() ? form.color : null,
-    icon: form.icon.trim() ? form.icon : null,
+    icon: form.icon,
     frequency: form.frequency,
     customDays: form.frequency === 'Custom' ? form.customDays : null,
     reminderEnabled: form.reminderEnabled,
@@ -120,10 +138,12 @@ export function HabitPage() {
   const timeZoneId = useMemo(() => browserTimeZone(), [])
   const today = useMemo(() => toDateInput(new Date()), [])
   const [selectedMonth, setSelectedMonth] = useState(() => toMonthInput(new Date()))
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(new Date())))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<HabitFormState>(emptyForm)
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [iconMenuOpen, setIconMenuOpen] = useState(false)
 
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
@@ -132,11 +152,7 @@ export function HabitPage() {
   const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const weekDates = useMemo(() => {
-    const todayDate = new Date()
-    const currentDayOfWeek = todayDate.getDay() // 0 is Sunday
-    const monday = new Date(todayDate)
-    const diff = todayDate.getDate() - currentDayOfWeek + (currentDayOfWeek === 0 ? -6 : 1)
-    monday.setDate(diff)
+    const monday = parseDateInput(selectedWeekStart)
     
     return Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(monday)
@@ -149,7 +165,7 @@ export function HabitPage() {
         isToday: toDateInput(d) === today
       }
     })
-  }, [today])
+  }, [selectedWeekStart, today])
 
   const dates = useMemo(() => monthDates(selectedMonth), [selectedMonth])
 
@@ -165,20 +181,34 @@ export function HabitPage() {
   
   const selectedHabit = useMemo(() => habits.find(h => h.id === selectedHabitId) || habits[0], [habits, selectedHabitId])
 
+  const weekEntryMonths = useMemo(
+    () => [...new Set(weekDates.map(({ date }) => toMonthInput(date)))],
+    [weekDates],
+  )
+  const entryQueryKeys = useMemo(
+    () => {
+      const keys = habits.flatMap((habit) => weekEntryMonths.map((month) => ({ habitId: habit.id, month })))
+      if (selectedHabit && !weekEntryMonths.includes(selectedMonth)) {
+        keys.push({ habitId: selectedHabit.id, month: selectedMonth })
+      }
+      return keys
+    },
+    [habits, selectedHabit, selectedMonth, weekEntryMonths],
+  )
   const entryQueries = useQueries({
-    queries: habits.map((habit) => ({
-      queryKey: ['habit', 'entries', habit.id, selectedMonth, timeZoneId],
-      queryFn: () => habitApi.listHabitEntries(habit.id, selectedMonth, timeZoneId),
-      enabled: habits.length > 0,
+    queries: entryQueryKeys.map(({ habitId, month }) => ({
+      queryKey: ['habit', 'entries', habitId, month, timeZoneId],
+      queryFn: () => habitApi.listHabitEntries(habitId, month, timeZoneId),
     })),
   })
 
   const entriesByHabit = useMemo(() => {
-    return new Map(habits.map((habit, index) => [
-      habit.id,
-      new Set((entryQueries[index]?.data ?? []).map((entry) => entry.date)),
-    ]))
-  }, [entryQueries, habits])
+    const entries = new Map(habits.map((habit) => [habit.id, new Set<string>()]))
+    entryQueryKeys.forEach(({ habitId }, index) => {
+      for (const entry of entryQueries[index]?.data ?? []) entries.get(habitId)?.add(entry.date)
+    })
+    return entries
+  }, [entryQueries, entryQueryKeys, habits])
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['habit'] })
@@ -187,6 +217,7 @@ export function HabitPage() {
   const resetForm = () => {
     setEditingId(null)
     setForm(emptyForm())
+    setIconMenuOpen(false)
   }
 
   const createHabit = useMutation({
@@ -238,8 +269,7 @@ export function HabitPage() {
     setForm({
       name: habit.name,
       description: habit.description ?? '',
-      color: habit.color ?? '#22C55E',
-      icon: habit.icon ?? '',
+      icon: habit.icon,
       frequency: habit.frequency,
       customDays: habit.customDays,
       reminderEnabled: habit.reminderEnabled,
@@ -332,12 +362,21 @@ export function HabitPage() {
               <h2>Habit Tracker</h2>
             </div>
             <div className="habit-tracker-header-actions">
-              <button onClick={() => { resetForm(); setShowForm(true); }}><Plus size={24} /></button>
+              <button aria-label="Create habit" onClick={() => { resetForm(); setShowForm(true); }}><Plus size={24} /></button>
             </div>
           </header>
           
           {/* Weekly Tracker Bar */}
           <div className="habit-tracker-week">
+            <div className="habit-week-navigation">
+              <button type="button" onClick={() => setSelectedWeekStart((week) => shiftWeek(week, -1))} aria-label="Previous week">
+                <ChevronLeft size={18} />
+              </button>
+              <strong>{weekDates[0].dateStr} – {weekDates[6].dateStr}</strong>
+              <button type="button" onClick={() => setSelectedWeekStart((week) => shiftWeek(week, 1))} aria-label="Next week">
+                <ChevronRight size={18} />
+              </button>
+            </div>
             <div className="habit-tracker-week-grid">
               {weekDates.map(({dateStr, dayName, dayNum, isToday}) => (
                 <div key={dateStr} className="habit-tracker-week-day">
@@ -363,7 +402,6 @@ export function HabitPage() {
             {habits.map(habit => {
               const isSelected = selectedHabit?.id === habit.id
               const completedDates = entriesByHabit.get(habit.id) ?? new Set<string>()
-              const isCompletedToday = completedDates.has(today)
               
               return (
                 <div 
@@ -371,25 +409,40 @@ export function HabitPage() {
                   onClick={() => setSelectedHabitId(habit.id)}
                   className={`habit-list-card ${isSelected ? 'active' : ''}`}
                 >
-                  <div className="habit-list-card-content">
-                    <div className="habit-list-card-icon" style={{ backgroundColor: habit.color ? `${habit.color}20` : '#e2e8f0' }}>
-                      {habit.icon || '📌'}
+                  <div className="habit-list-card-meta">
+                    <div className="habit-list-card-icon">
+                      <HabitIconGlyph icon={habit.icon} size={22} />
                     </div>
                     <div className="habit-list-card-info">
                       <p className="habit-list-card-name">{habit.name}</p>
-                      <div className="habit-list-card-streak">
-                        <span><CalendarClock size={14} /> {habit.currentStreak} Days Streak</span>
-                      </div>
+                      <span className="habit-list-card-streak" aria-label={`${habit.currentStreak} day current streak`}>
+                        <Flame size={14} /> {habit.currentStreak}
+                      </span>
                     </div>
                   </div>
-                  
-                  {/* Quick toggle for today */}
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); toggleEntry.mutate({ habitId: habit.id, date: today }) }}
-                    className={`habit-list-card-toggle ${isCompletedToday ? 'completed' : ''}`}
-                  >
-                    <CheckSquare size={16} />
-                  </button>
+                  <div className="habit-list-card-week" aria-label={`${habit.name} selected week`}>
+                    {weekDates.map(({ dateStr, dayName, dayNum }) => {
+                      const isCompleted = completedDates.has(dateStr)
+                      const disabled = dateStr > today || !isScheduled(habit, dateStr)
+                      const action = isCompleted ? 'Uncheck' : 'Check'
+                      return (
+                        <button
+                          type="button"
+                          key={dateStr}
+                          className={`habit-week-cell ${isCompleted ? 'completed' : ''}`}
+                          disabled={disabled}
+                          aria-label={`${action} ${habit.name} on ${dateStr}`}
+                          title={`${dayName} ${dayNum}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleEntry.mutate({ habitId: habit.id, date: dateStr })
+                          }}
+                        >
+                          {isCompleted ? <CheckSquare size={15} /> : dayNum}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
@@ -403,20 +456,20 @@ export function HabitPage() {
               {/* Selected Habit Header */}
               <div className="habit-details-header">
                 <div className="habit-details-title-area">
-                  <div className="habit-details-icon" style={{ backgroundColor: selectedHabit.color ? `${selectedHabit.color}20` : '#e2e8f0' }}>
-                    {selectedHabit.icon || '📌'}
+                  <div className="habit-details-icon">
+                    <HabitIconGlyph icon={selectedHabit.icon} size={34} />
                   </div>
                   <div className="habit-details-text">
                     <h3>{selectedHabit.name}</h3>
                     <p>
-                      <span className="habit-color-dot" style={{ backgroundColor: selectedHabit.color || '#e2e8f0' }}></span>
                       {scheduleText(selectedHabit)}
                     </p>
                   </div>
                 </div>
                 <div className="habit-details-actions">
-                  <button onClick={() => { editHabit(selectedHabit); setShowForm(true); }}><Edit3 size={20} /></button>
-                  <button className="danger" onClick={() => confirmDelete(selectedHabit)}><Trash2 size={20} /></button>
+                  <Link aria-label={`View stats for ${selectedHabit.name}`} to={`/habits/${selectedHabit.id}/stats`}><BarChart3 size={20} /></Link>
+                  <button aria-label={`Edit ${selectedHabit.name}`} onClick={() => { editHabit(selectedHabit); setShowForm(true); }}><Edit3 size={20} /></button>
+                  <button aria-label={`Delete ${selectedHabit.name}`} className="danger" onClick={() => confirmDelete(selectedHabit)}><Trash2 size={20} /></button>
                 </div>
               </div>
 
@@ -455,6 +508,13 @@ export function HabitPage() {
                 </div>
               </div>
 
+              {selectedHabit.description ? (
+                <section className="habit-description-card" aria-label="Habit description">
+                  <h4>Description</h4>
+                  <p>{selectedHabit.description}</p>
+                </section>
+              ) : null}
+
               {/* Monthly Calendar Grid */}
               <div className="habit-calendar-card">
                 <div className="habit-calendar-header">
@@ -480,7 +540,6 @@ export function HabitPage() {
                           onClick={() => toggleEntry.mutate({ habitId: selectedHabit.id, date })}
                           disabled={!isScheduledDay || isFuture}
                           className={`habit-calendar-day-btn ${isCompleted ? 'completed' : ''} ${date === today ? 'today' : ''} ${!isScheduledDay || isFuture ? 'disabled' : ''}`}
-                          style={isCompleted ? { backgroundColor: selectedHabit.color ?? undefined, color: '#fff' } : undefined}
                         >
                           {dayNumber(date)}
                         </button>
@@ -510,25 +569,49 @@ export function HabitPage() {
               <form onSubmit={(e) => { submitHabit(e); setShowForm(false); }} className="habit-modal-form">
                 <label>
                   Habit Name
-                  <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Read a book" />
+                  <input data-testid="habit-name-input" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Read a book" />
                 </label>
                 
                 <label>
                   Description
-                  <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="30 minutes every day" />
+                  <input data-testid="habit-description-input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="30 minutes every day" />
                 </label>
 
-                <div className="habit-modal-form-row">
-                  <label>
-                    Icon (Emoji)
-                    <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="📖" />
-                  </label>
-                  <label>
-                    Color
-                    <div className="habit-color-picker">
-                      <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
-                    </div>
-                  </label>
+                <div className="habit-icon-field">
+                  <span>Icon</span>
+                  <div className="habit-icon-select">
+                    <button
+                      type="button"
+                      className="habit-icon-select-trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded={iconMenuOpen}
+                      aria-label="Habit icon"
+                      onClick={() => setIconMenuOpen((open) => !open)}
+                    >
+                      <HabitIconGlyph icon={form.icon} size={18} />
+                      <span>{form.icon}</span>
+                      <ChevronRight className={iconMenuOpen ? 'open' : ''} size={17} />
+                    </button>
+                    {iconMenuOpen ? (
+                      <div className="habit-icon-options" role="listbox" aria-label="Habit icon">
+                        {habitIconOptions.map((option) => (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={form.icon === option.value}
+                            key={option.value}
+                            onClick={() => {
+                              setForm((current) => ({ ...current, icon: option.value }))
+                              setIconMenuOpen(false)
+                            }}
+                          >
+                            <HabitIconGlyph icon={option.value} size={18} />
+                            <span>{option.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 
                 <label>
@@ -556,7 +639,7 @@ export function HabitPage() {
                 
                 <div className="habit-modal-footer">
                   <button type="button" className="habit-btn-cancel" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
-                  <button type="submit" className="habit-btn-submit" disabled={!canSubmit || isSaving}>
+                  <button data-testid="save-habit-button" type="submit" className="habit-btn-submit" disabled={!canSubmit || isSaving}>
                     {editingId ? 'Save Changes' : 'Create Habit'}
                   </button>
                 </div>

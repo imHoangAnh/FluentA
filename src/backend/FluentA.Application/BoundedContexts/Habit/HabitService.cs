@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Habit.Enums;
@@ -59,7 +58,7 @@ public sealed partial class HabitService : IHabitService
             return OperationResult<HabitDto>.Failure(HabitError.Validation(validation.Errors));
         }
 
-        var habit = HabitEntity.Create(userId, request.Name, request.Description, request.Color, request.Icon, validation.Frequency, validation.CustomDays);
+        var habit = HabitEntity.Create(userId, request.Name, request.Description, validation.Icon, validation.Frequency, validation.CustomDays);
         habit.SetReminderEnabled(request.ReminderEnabled);
         await _repository.AddAsync(habit, cancellationToken);
         return OperationResult<HabitDto>.Success(ToDto(habit, DateTime.UtcNow.Date, [], DateTime.UtcNow.Date, DateTime.UtcNow.Date));
@@ -86,7 +85,6 @@ public sealed partial class HabitService : IHabitService
         habit.Update(
             validation.Name,
             validation.Description,
-            validation.Color,
             validation.Icon,
             validation.Frequency,
             validation.CustomDays);
@@ -209,29 +207,29 @@ public sealed partial class HabitService : IHabitService
         return OperationResult<HabitEntryToggleDto>.Success(new HabitEntryToggleDto(habit.Id, date, isCompleted));
     }
 
-    private static (Dictionary<string, string[]> Errors, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateCreate(CreateHabitRequest request)
+    private static (Dictionary<string, string[]> Errors, HabitIcon Icon, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateCreate(CreateHabitRequest request)
     {
-        var errors = ValidateNameDescriptionColorIcon(request.Name, request.Description, request.Color, request.Icon);
+        var errors = ValidateNameAndDescription(request.Name, request.Description);
+        var icon = ValidateIcon(request.Icon, errors, HabitIcon.Default);
         var schedule = ValidateSchedule(request.Frequency, request.CustomDays);
         Merge(errors, schedule.Errors);
-        return (errors, schedule.Frequency, schedule.CustomDays);
+        return (errors, icon, schedule.Frequency, schedule.CustomDays);
     }
 
-    private static (Dictionary<string, string[]> Errors, string Name, string? Description, string? Color, string? Icon, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateUpdate(HabitEntity habit, UpdateHabitRequest request)
+    private static (Dictionary<string, string[]> Errors, string Name, string? Description, HabitIcon Icon, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateUpdate(HabitEntity habit, UpdateHabitRequest request)
     {
         var name = request.Name ?? habit.Name;
         var description = request.Description ?? habit.Description;
-        var color = request.Color ?? habit.Color;
-        var icon = request.Icon ?? habit.Icon;
         var frequency = request.Frequency ?? habit.Frequency.ToString();
         var customDays = request.CustomDays ?? habit.ScheduledCustomDays.Select(day => day.ToString()).ToList();
-        var errors = ValidateNameDescriptionColorIcon(name, description, color, icon);
+        var errors = ValidateNameAndDescription(name, description);
+        var icon = request.Icon is null ? habit.Icon : ValidateIcon(request.Icon, errors, habit.Icon);
         var schedule = ValidateSchedule(frequency, customDays);
         Merge(errors, schedule.Errors);
-        return (errors, name, description, color, icon, schedule.Frequency, schedule.CustomDays);
+        return (errors, name, description, icon, schedule.Frequency, schedule.CustomDays);
     }
 
-    private static Dictionary<string, string[]> ValidateNameDescriptionColorIcon(string name, string? description, string? color, string? icon)
+    private static Dictionary<string, string[]> ValidateNameAndDescription(string name, string? description)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(name))
@@ -248,17 +246,18 @@ public sealed partial class HabitService : IHabitService
             errors["description"] = ["Description must be at most 2000 characters."];
         }
 
-        if (!string.IsNullOrWhiteSpace(color) && !HexColorRegex().IsMatch(color.Trim()))
-        {
-            errors["color"] = ["Color must be a hex value like #22C55E."];
-        }
-
-        if (!string.IsNullOrWhiteSpace(icon) && icon.Trim().Length > 16)
-        {
-            errors["icon"] = ["Icon must be at most 16 characters."];
-        }
-
         return errors;
+    }
+
+    private static HabitIcon ValidateIcon(string? icon, Dictionary<string, string[]> errors, HabitIcon fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(icon) && Enum.TryParse<HabitIcon>(icon.Trim(), ignoreCase: false, out var parsedIcon))
+        {
+            return parsedIcon;
+        }
+
+        errors["icon"] = ["Icon must be Default, Book, Exercise, Water, Meditation, Study, Work, or Health."];
+        return fallback;
     }
 
     private static (Dictionary<string, string[]> Errors, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateSchedule(string? frequency, IReadOnlyList<string>? customDays)
@@ -363,8 +362,7 @@ public sealed partial class HabitService : IHabitService
             habit.Id,
             habit.Name,
             habit.Description,
-            habit.Color,
-            habit.Icon,
+            habit.Icon.ToString(),
             habit.Frequency.ToString(),
             habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
             habit.ReminderEnabled,
@@ -384,8 +382,7 @@ public sealed partial class HabitService : IHabitService
             habit.Id,
             habit.Name,
             habit.Description,
-            habit.Color,
-            habit.Icon,
+            habit.Icon.ToString(),
             habit.Frequency.ToString(),
             habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
             CurrentStreak(habit, completedDates, localToday),
@@ -494,6 +491,4 @@ public sealed partial class HabitService : IHabitService
         }
     }
 
-    [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
-    private static partial Regex HexColorRegex();
 }

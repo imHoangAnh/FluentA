@@ -13,6 +13,7 @@ import * as habitApi from '../../lib/api/habit.api'
 import * as todoApi from '../../lib/api/todo.api'
 import { LearningNavLinks } from '../../components/LearningNavLinks'
 import { useAuthStore } from '../../stores/authStore'
+import { HabitIconGlyph } from '../../lib/habit-icons'
 import './DashboardPage.css'
 
 const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
@@ -280,68 +281,18 @@ export function DashboardPage() {
                 {habits.map(habit => (
                   <div className="habit-item" key={habit.id}>
                     <div className="habit-item-header">
-                      <span>STREAK: {habit.currentStreak} DAYS</span>
+                      <span className="habit-dashboard-name"><HabitIconGlyph icon={habit.icon} size={16} /> {habit.name}</span>
                       <span>{habit.isCheckedToday ? '100%' : '0%'}</span>
                     </div>
                     <div className="habit-progress-bar">
                       <div className="habit-progress-fill" style={{ width: habit.isCheckedToday ? '100%' : '0%' }}></div>
                     </div>
-                    <p className="habit-item-label">{habit.name}</p>
+                    <p className="habit-item-label">STREAK: {habit.currentStreak} DAYS</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-
-          {/* Continue Learning Section */}
-          <section style={{marginTop: '16px'}}>
-            <div className="continue-learning-header" style={{marginBottom: '24px'}}>
-              <h3>Continue Learning</h3>
-              <Link to="/vocabulary">View All</Link>
-            </div>
-            
-            <div className="word-grid">
-              <div className="word-card">
-                <div className="word-card-header">
-                  <span className="word-type">Noun</span>
-                </div>
-                <h4>perro</h4>
-                <p className="word-example">"El perro corre en el parque."</p>
-                <div className="word-translation">
-                  <p>English: Dog</p>
-                </div>
-              </div>
-              
-              <div className="word-card">
-                <div className="word-card-header">
-                  <span className="word-type">Noun</span>
-                </div>
-                <h4>casa</h4>
-                <p className="word-example">"Mi casa es su casa."</p>
-                <div className="word-translation">
-                  <p>English: House</p>
-                </div>
-              </div>
-
-              <div className="word-card">
-                <div className="word-card-header">
-                  <span className="word-type">Noun</span>
-                </div>
-                <h4>agua</h4>
-                <p className="word-example">"Bebe un poco de agua."</p>
-                <div className="word-translation">
-                  <p>English: Water</p>
-                </div>
-              </div>
-
-              <Link to="/vocabulary" style={{textDecoration: 'none'}}>
-                <div className="add-word-card">
-                  <BookOpen size={36} color="#6d7a77" style={{marginBottom: 8}} />
-                  <p style={{color: '#191c1e'}}>Add New Words</p>
-                </div>
-              </Link>
-            </div>
-          </section>
         </div>
       </main>
     </div>

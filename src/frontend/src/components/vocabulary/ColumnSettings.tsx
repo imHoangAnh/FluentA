@@ -55,9 +55,6 @@ export function ColumnSettings({ preferences, onSave }: ColumnSettingsProps) {
       {open ? (
         <div className="vw-column-settings-dropdown">
           <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#191c1e' }}>Board columns</h4>
-          <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#3d4947' }}>
-            These preferences apply to every page in this board for your account.
-          </p>
 
           <div className="vw-column-settings-list">
             {optionalColumns.map((column) => (

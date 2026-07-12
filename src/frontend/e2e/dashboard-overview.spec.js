@@ -63,7 +63,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   });
   await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
     headers,
-    data: { name: 'Dashboard reading habit', description: 'Overview proof', color: '#22C55E', icon: 'Book', frequency: 'Daily' },
+    data: { name: 'Dashboard reading habit', description: 'Overview proof', icon: 'Book', frequency: 'Daily' },
   });
   await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
     headers,

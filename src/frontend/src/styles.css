@@ -4619,9 +4619,8 @@ a {
 }
 
 .habit-tracker-sidebar {
-  width: 45%;
-  max-width: 420px;
-  min-width: 340px;
+  flex: 0 0 50%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -4745,9 +4744,8 @@ a {
   border: 1px solid var(--border);
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  gap: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -4759,45 +4757,92 @@ a {
   background: rgba(15, 159, 143, 0.05);
 }
 
-.habit-list-card-content {
+.habit-list-card-meta {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .habit-list-card-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  background: var(--surface-soft);
+  color: var(--teal-dark);
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.habit-list-card-info {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
 }
 
 .habit-list-card-name {
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
-  margin: 0 0 4px 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .habit-list-card-streak {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 3px;
   font-size: 12px;
   color: var(--muted);
   font-weight: 500;
 }
-.habit-list-card-streak span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
 .habit-list-card-streak svg {
-  color: var(--teal);
+  color: #d97706;
+}
+
+.habit-list-card-week {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.habit-week-cell {
+  align-items: center;
+  aspect-ratio: 1;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+}
+
+.habit-week-cell:hover:not(:disabled),
+.habit-week-cell:focus-visible {
+  border-color: var(--teal);
+  outline: 2px solid rgba(15, 159, 143, 0.18);
+  outline-offset: 1px;
+}
+
+.habit-week-cell.completed {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+
+.habit-week-cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 
 .habit-list-card-toggle {
@@ -4867,7 +4912,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  background: var(--surface-soft);
+  color: var(--teal-dark);
   border: 1px solid rgba(0,0,0,0.05);
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
@@ -4890,19 +4936,13 @@ a {
   gap: 8px;
 }
 
-.habit-color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
 .habit-details-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.habit-details-actions button {
+.habit-details-actions button,
+.habit-details-actions a {
   padding: 10px;
   border-radius: 12px;
   background: transparent;
@@ -4913,7 +4953,8 @@ a {
   align-items: center;
   transition: all 0.2s;
 }
-.habit-details-actions button:hover {
+.habit-details-actions button:hover,
+.habit-details-actions a:hover {
   background: var(--surface-strong);
   color: var(--teal);
 }
@@ -5146,24 +5187,82 @@ a {
 }
 .habit-modal-form-row label:first-child { flex: 1; }
 
-.habit-color-picker {
+.habit-icon-select {
+  position: relative;
+}
+
+.habit-icon-field {
+  color: var(--text);
+  display: grid;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.habit-icon-select-trigger {
+  align-items: center;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 4px;
-  height: 48px;
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.habit-color-picker input[type="color"] {
-  width: 48px;
-  height: 48px;
-  border: none;
-  padding: 0;
-  transform: scale(1.5);
+  color: var(--text);
   cursor: pointer;
+  display: flex;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.habit-icon-select-trigger span {
+  flex: 1;
+}
+
+.habit-icon-select-trigger > svg:last-child {
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.habit-icon-select-trigger > svg.open:last-child {
+  transform: rotate(90deg);
+}
+
+.habit-icon-options {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 4px;
+  left: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+}
+
+.habit-icon-options button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.habit-icon-options button:hover,
+.habit-icon-options button:focus-visible,
+.habit-icon-options button[aria-selected="true"] {
+  background: var(--surface-soft);
+  color: var(--teal-dark);
 }
 
 .habit-weekdays-toggle {
@@ -6445,4 +6544,56 @@ a {
   align-items: center;
   gap: 6px;
   margin: 0;
+}
+
+.habit-description-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.habit-description-card h4 {
+  color: var(--text);
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.habit-description-card p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.habit-week-navigation {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.habit-week-navigation strong {
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-week-navigation button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 32px;
+}
+
+.habit-week-navigation button:hover,
+.habit-week-navigation button:focus-visible {
+  background: var(--surface-soft);
+  color: var(--teal);
 }

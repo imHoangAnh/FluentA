@@ -3,8 +3,7 @@ namespace FluentA.Application.BoundedContexts.Habit.DTOs;
 public sealed record CreateHabitRequest(
     string Name,
     string? Description = null,
-    string? Color = null,
-    string? Icon = null,
+    string Icon = "Default",
     string Frequency = "Daily",
     IReadOnlyList<string>? CustomDays = null,
     bool ReminderEnabled = true);
@@ -12,7 +11,6 @@ public sealed record CreateHabitRequest(
 public sealed record UpdateHabitRequest(
     string? Name = null,
     string? Description = null,
-    string? Color = null,
     string? Icon = null,
     string? Frequency = null,
     IReadOnlyList<string>? CustomDays = null,
@@ -24,8 +22,7 @@ public sealed record HabitDto(
     Guid Id,
     string Name,
     string? Description,
-    string? Color,
-    string? Icon,
+    string Icon,
     string Frequency,
     IReadOnlyList<string> CustomDays,
     bool ReminderEnabled,
@@ -44,8 +41,7 @@ public sealed record HabitStatsDto(
     Guid HabitId,
     string Name,
     string? Description,
-    string? Color,
-    string? Icon,
+    string Icon,
     string Frequency,
     IReadOnlyList<string> CustomDays,
     int CurrentStreak,

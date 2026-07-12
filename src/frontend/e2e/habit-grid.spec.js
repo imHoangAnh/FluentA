@@ -15,57 +15,58 @@ async function registerAndLogin(page) {
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Habit Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
+  await page.locator('input[name="password"]').fill(password);
+  const responsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
+  const payload = await (await responsePromise).json();
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
+    data: { email, otp: payload.data.developmentOtp },
   });
 
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/');
 }
 
-test('habit monthly grid CRUD and toggle smoke', async ({ page }) => {
-  const consoleErrors = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error' && message.text() !== 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
-      consoleErrors.push(message.text());
-    }
-  });
-
+test('semantic icon and selected-week Habit layout work on desktop and tablet', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await registerAndLogin(page);
-  await page.getByTestId('open-habits').click();
+  await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/habits');
-  await expect(page.getByRole('heading', { name: 'Monthly rhythm' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('Read English');
-  await page.getByTestId('habit-description-input').fill('30 minutes');
-  await page.getByTestId('habit-icon-input').fill('Book');
+  await page.getByTestId('habit-description-input').fill('30 focused minutes');
+  await page.getByRole('button', { name: 'Habit icon' }).click();
+  const iconOptions = page.locator('.habit-icon-options').getByRole('option');
+  await expect(iconOptions).toHaveCount(8);
+  await page.locator('.habit-icon-options').getByRole('option', { name: 'Book' }).click();
   await page.getByTestId('save-habit-button').click();
+
   await expect(page.getByRole('heading', { name: 'Read English' })).toBeVisible();
+  await expect(page.getByText('30 focused minutes')).toBeVisible();
+  await expect(page.locator('.habit-list-card-week .habit-week-cell')).toHaveCount(7);
 
   const today = todayInput();
   await page.getByLabel(`Check Read English on ${today}`).click();
   await expect(page.getByLabel(`Uncheck Read English on ${today}`)).toBeVisible();
 
-  await page.getByLabel('Edit Read English').click();
-  await page.getByTestId('habit-name-input').fill('Read Vietnamese');
-  await page.getByTestId('save-habit-button').click();
-  await expect(page.getByRole('heading', { name: 'Read Vietnamese' })).toBeVisible();
+  const initialRange = await page.locator('.habit-week-navigation strong').textContent();
+  await page.getByRole('button', { name: 'Next week' }).click();
+  await expect(page.locator('.habit-week-navigation strong')).not.toHaveText(initialRange ?? '');
+  await expect(page.locator('.habit-list-card-week .habit-week-cell:enabled')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Previous week' }).click();
 
-  await page.setViewportSize({ width: 390, height: 800 });
-  await expect(page.locator('.habit-grid-wrap')).toBeVisible();
-  const scrollable = await page.locator('.habit-grid-wrap').evaluate((element) => element.scrollWidth > element.clientWidth);
-  expect(scrollable).toBe(true);
+  const desktopSidebar = await page.locator('.habit-tracker-sidebar').boundingBox();
+  const desktopDetails = await page.locator('.habit-tracker-details').boundingBox();
+  expect(Math.abs((desktopSidebar?.width ?? 0) - (desktopDetails?.width ?? 0))).toBeLessThan(4);
 
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByLabel('Delete Read Vietnamese').click();
-  await expect(page.getByRole('heading', { name: 'Read Vietnamese' })).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'No habits yet' })).toBeVisible();
-  expect(consoleErrors).toEqual([]);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(page.locator('.habit-tracker-sidebar')).toBeVisible();
+  await expect(page.locator('.habit-tracker-details')).toBeVisible();
+  const hasPageOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasPageOverflow).toBe(false);
 });

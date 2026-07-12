@@ -499,6 +499,12 @@
   font-weight: 700;
 }
 
+.habit-dashboard-name {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
 .habit-progress-bar {
   width: 100%;
   height: 6px;

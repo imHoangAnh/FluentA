@@ -1,8 +1,9 @@
-import { ArrowLeft, BarChart3, CalendarCheck, Home } from 'lucide-react'
+import { ArrowLeft, BarChart3, Home } from 'lucide-react'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as habitApi from '../../lib/api/habit.api'
+import { HabitIconGlyph } from '../../lib/habit-icons'
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -88,9 +89,9 @@ export function HabitStatsPage() {
 
             <section className="habit-stats-detail" aria-label="Habit schedule details">
               <div>
-                <CalendarCheck size={24} />
+                <HabitIconGlyph icon={stats.icon} size={24} />
                 <div>
-                  <h2>{stats.icon ? `${stats.icon} ${stats.name}` : stats.name}</h2>
+                  <h2>{stats.name}</h2>
                   {stats.description ? <p>{stats.description}</p> : null}
                   <p><strong>Schedule:</strong> {scheduleText(stats)}</p>
                 </div>

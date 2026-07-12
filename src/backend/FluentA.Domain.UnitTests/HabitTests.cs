@@ -8,7 +8,7 @@ public sealed class HabitTests
     [Fact]
     public void Habit_ReminderCanBeDisabledAndReenabled()
     {
-        var habit = Habit.Create(Guid.NewGuid(), "Read", null, null, null, HabitFrequency.Daily, null);
+        var habit = Habit.Create(Guid.NewGuid(), "Read", null, HabitIcon.Default, HabitFrequency.Daily, null);
 
         habit.SetReminderEnabled(false);
         Assert.False(habit.ReminderEnabled);
@@ -19,10 +19,11 @@ public sealed class HabitTests
     [Fact]
     public void Create_DailyHabit_CleansFieldsAndSchedulesEveryDay()
     {
-        var habit = Habit.Create(Guid.NewGuid(), " Read English ", " 30 minutes ", "#22C55E", "book", HabitFrequency.Daily, null);
+        var habit = Habit.Create(Guid.NewGuid(), " Read English ", " 30 minutes ", HabitIcon.Book, HabitFrequency.Daily, null);
 
         Assert.Equal("Read English", habit.Name);
         Assert.Equal("30 minutes", habit.Description);
+        Assert.Equal(HabitIcon.Book, habit.Icon);
         Assert.Empty(habit.ScheduledCustomDays);
         Assert.True(habit.IsScheduledOn(new DateTime(2026, 6, 11)));
         Assert.True(habit.IsScheduledOn(new DateTime(2026, 6, 12)));
@@ -35,8 +36,7 @@ public sealed class HabitTests
             Guid.NewGuid(),
             "Workout",
             null,
-            null,
-            null,
+            HabitIcon.Exercise,
             HabitFrequency.Custom,
             [DayOfWeek.Monday, DayOfWeek.Wednesday]);
 
@@ -49,13 +49,14 @@ public sealed class HabitTests
     public void Create_CustomHabit_RequiresScheduledDay()
     {
         Assert.Throws<ArgumentException>(() =>
-            Habit.Create(Guid.NewGuid(), "Workout", null, null, null, HabitFrequency.Custom, []));
+            Habit.Create(Guid.NewGuid(), "Workout", null, HabitIcon.Exercise, HabitFrequency.Custom, []));
     }
 
     [Fact]
-    public void Create_RejectsInvalidColor()
+    public void Create_DefaultIcon_IsPersistedAsSemanticValue()
     {
-        Assert.Throws<ArgumentException>(() =>
-            Habit.Create(Guid.NewGuid(), "Workout", null, "green", null, HabitFrequency.Daily, null));
+        var habit = Habit.Create(Guid.NewGuid(), "Workout", null, HabitIcon.Default, HabitFrequency.Daily, null);
+
+        Assert.Equal(HabitIcon.Default, habit.Icon);
     }
 }

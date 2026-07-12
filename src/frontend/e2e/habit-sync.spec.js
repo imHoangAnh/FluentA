@@ -58,7 +58,7 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   const headers = { Authorization: `Bearer ${token}` };
   const habit = (await (await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
     headers,
-    data: { name: 'Cross-tab reading', description: 'SignalR proof', color: '#22C55E', icon: 'Book', frequency: 'Daily' },
+    data: { name: 'Cross-tab reading', description: 'SignalR proof', icon: 'Book', frequency: 'Daily' },
   })).json()).data;
 
   await page.getByTestId('open-habits').click();

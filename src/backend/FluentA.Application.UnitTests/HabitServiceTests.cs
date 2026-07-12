@@ -14,7 +14,7 @@ public sealed class HabitServiceTests
         var service = new HabitService(repository);
         var userId = Guid.NewGuid();
 
-        var created = await service.CreateAsync(userId, new CreateHabitRequest(" Read ", " Daily ", "#22C55E", "R", "Daily"));
+        var created = await service.CreateAsync(userId, new CreateHabitRequest(" Read ", " Daily ", "Book", "Daily"));
         var listed = await service.ListAsync(userId, "UTC");
         var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateHabitRequest(Name: "Read English"));
         var deleted = await service.DeleteAsync(userId, created.Value.Id);
@@ -22,6 +22,7 @@ public sealed class HabitServiceTests
 
         Assert.True(created.IsSuccess);
         Assert.Equal("Read", created.Value.Name);
+        Assert.Equal("Book", created.Value.Icon);
         Assert.Single(listed.Value!);
         Assert.Equal("Read English", updated.Value!.Name);
         Assert.True(deleted.Value);
@@ -177,6 +178,21 @@ public sealed class HabitServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((HabitError)result.Error!).Code);
+    }
+
+    [Fact]
+    public async Task Create_RejectsUnknownIcon_AndDefaultsWhenOmitted()
+    {
+        var service = new HabitService(new FakeHabitRepository());
+        var userId = Guid.NewGuid();
+
+        var invalid = await service.CreateAsync(userId, new CreateHabitRequest("Read", Icon: "book"));
+        var defaulted = await service.CreateAsync(userId, new CreateHabitRequest("Write"));
+
+        Assert.False(invalid.IsSuccess);
+        var error = Assert.IsType<HabitError>(invalid.Error);
+        Assert.Contains("icon", Assert.IsType<Dictionary<string, string[]>>(error.Details).Keys);
+        Assert.Equal("Default", defaulted.Value!.Icon);
     }
 
     private static DateTime NextUnscheduledDate(DateTime start, IReadOnlyList<string> scheduledDays)
