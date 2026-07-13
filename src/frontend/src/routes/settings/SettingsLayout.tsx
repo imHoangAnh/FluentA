@@ -1,6 +1,7 @@
-import { LogOut } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuthStore } from '../../stores/authStore'
+import { AppShell } from '@/components/AppShell'
+import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 const settingsLinks = [
   { to: '/settings/profile', label: 'Profile' },
@@ -10,49 +11,16 @@ const settingsLinks = [
 ]
 
 export function SettingsLayout() {
-  const logout = useAuthStore((state) => state.logout)
-
   return (
-    <main className="workspace settings-shell">
-      <header className="workspace-header settings-shell__header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Settings workspace actions">
-          <NavLink className="ghost-button ghost-button--inline" to="/flashcards">Flashcards</NavLink>
-          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
-            <LogOut size={18} />
-          </button>
-        </nav>
-      </header>
-
-      <div className="settings-shell__body">
-        <aside className="settings-sidebar" aria-label="Settings sections">
-          <div className="settings-sidebar__copy">
-            <span className="preview-label">Settings</span>
-            <h1>Your settings</h1>
-            <p>Move between profile, review, practice, and Level 5 management from one shared desktop workspace.</p>
-          </div>
-          <nav className="settings-sidebar__nav" aria-label="Settings navigation">
-            {settingsLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) => isActive
-                  ? 'settings-sidebar__link settings-sidebar__link--active'
-                  : 'settings-sidebar__link'}
-              >
-                {link.label}
-              </NavLink>
-            ))}
+    <AppShell title="Settings" description="Manage your profile and learning preferences.">
+      <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <Card className="p-3">
+          <nav className="grid gap-1" aria-label="Settings navigation">
+            {settingsLinks.map((link) => <NavLink key={link.to} to={link.to} className={({ isActive }) => cn('rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActive && 'bg-secondary text-secondary-foreground')}>{link.label}</NavLink>)}
           </nav>
-        </aside>
-
-        <section className="settings-shell__content">
-          <Outlet />
-        </section>
+        </Card>
+        <section className="min-w-0"><Outlet /></section>
       </div>
-    </main>
+    </AppShell>
   )
 }

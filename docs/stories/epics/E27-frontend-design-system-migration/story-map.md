@@ -10,11 +10,17 @@
 
 ## Current Story
 
-`US-UI-003` is current for planning. The user approved the `US-UI-002` plan
-but explicitly deferred further `US-UI-002` implementation in favor of
-planning the productivity milestone. Existing `US-UI-002` worktree changes
-remain preserved and require their own closeout; they are not part of this
-story packet.
+`US-UI-004` is the next implementation milestone and now has a complete
+high-risk planning packet. It migrates Journal, Notes, Notifications, and
+Settings after the implemented `US-UI-003` productivity milestone. No
+`US-UI-004` source implementation has started.
+
+`US-UI-005` is also planned, but its implementation is hard-gated on running
+`US-UI-004` proof and user approval. It retires the temporary legacy CSS bridge,
+runs full Chromium release proof, and reconciles all five E27 story packets and
+Harness rows. The current `in_progress` rows for `US-UI-001` and `US-UI-002`
+must be reviewed from their own evidence during that closeout rather than
+inferred complete from later milestone work.
 
 ## Dependency Rule
 

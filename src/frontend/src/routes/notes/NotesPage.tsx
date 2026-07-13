@@ -1,31 +1,9 @@
-import {
-  CalendarClock,
-  CheckSquare,
-  Columns3,
-  FilePenLine,
-  FileText,
-  Globe,
-  HelpCircle,
-  Kanban,
-  Layers3,
-  Loader2,
-  LogOut,
-  NotebookPen,
-  Plus,
-  Repeat2,
-  Save,
-  Settings,
-  Timer,
-} from 'lucide-react'
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { FilePenLine, Layers3, Loader2, Plus, Save } from 'lucide-react'
+import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
-import { getUserAvatarUrl } from '../../lib/avatar'
+import { AppShell } from '@/components/AppShell'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as noteApi from '../../lib/api/note.api'
-import { useAuthStore } from '../../stores/authStore'
-import '../dashboard/DashboardPage.css'
 import './NotesPage.css'
 
 const JournalRichTextEditor = lazy(() =>
@@ -53,11 +31,6 @@ function toPageSummary(page: noteApi.NotePage): noteApi.NotePageSummary {
 
 export function NotesPage() {
   const queryClient = useQueryClient()
-  const location = useLocation()
-  const logout = useAuthStore((state) => state.logout)
-  const user = useAuthStore((state) => state.user)
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
@@ -70,7 +43,6 @@ export function NotesPage() {
   const [draftPageId, setDraftPageId] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [openingPageId, setOpeningPageId] = useState<string | null>(null)
   const [editorError, setEditorError] = useState<string | null>(null)
   const savePromiseRef = useRef<Promise<boolean> | null>(null)
 
@@ -96,16 +68,6 @@ export function NotesPage() {
     queryFn: () => noteApi.getPage(activePageSummary!.id),
     enabled: Boolean(activePageSummary?.id),
   })
-
-  useEffect(() => {
-    if (!pageQuery.data || pageQuery.data.id === draftPageId) return
-    setDraftPageId(pageQuery.data.id)
-    setTitle(pageQuery.data.name)
-    setContent(pageQuery.data.content)
-    setIsDirty(false)
-    setSaveStatus('saved')
-    setOpeningPageId(null)
-  }, [draftPageId, pageQuery.data])
 
   const createBoard = useMutation({
     mutationFn: noteApi.createBoard,
@@ -150,19 +112,24 @@ export function NotesPage() {
   const boardError = createBoard.isError ? 'Could not create board right now.' : null
   const pageError = editorError ?? (createPage.isError || updatePage.isError ? 'Could not save note page right now.' : null)
   const activePage = pageQuery.data
-  const isOpeningPage = openingPageId !== null
+  const isOpeningPage = pageQuery.isLoading
   const isSaving = saveStatus === 'saving'
+  // Server data is the clean draft. Local state becomes authoritative only after an edit,
+  // which avoids a state-setting effect and prevents a refetch from overwriting a dirty draft.
+  const hasServerDraft = Boolean(activePage && !isDirty && activePage.id !== draftPageId)
+  const draftTitle = hasServerDraft ? activePage!.name : title
+  const draftContent = hasServerDraft ? activePage!.content : content
 
   const textContent = useMemo(() => {
     const div = document.createElement('div')
-    div.innerHTML = content
+    div.innerHTML = draftContent
     return div.textContent || ''
-  }, [content])
+  }, [draftContent])
 
   async function persistDraft() {
     if (!activePage || !isDirty) return true
     if (savePromiseRef.current) return savePromiseRef.current
-    if (!title.trim()) {
+    if (!draftTitle.trim()) {
       setSaveStatus('error')
       return false
     }
@@ -172,8 +139,8 @@ export function NotesPage() {
     const promise = updatePage.mutateAsync({
       pageId: activePage.id,
       patch: {
-        name: title,
-        content,
+        name: draftTitle,
+        content: draftContent,
       },
     }).then((page) => {
       queryClient.setQueryData(['note', 'page', page.id], page)
@@ -232,75 +199,18 @@ export function NotesPage() {
     if (!saved) return
     setSelectedBoardId(boardId)
     setSelectedPageId(null)
-    setOpeningPageId(null)
   }
 
   async function handleSelectPage(pageId: string) {
     if (pageId === activePageSummary?.id) return
     const saved = await persistDraft()
     if (!saved) return
-    setOpeningPageId(pageId)
     setSelectedPageId(pageId)
   }
 
   return (
-    <div className="dashboard-layout">
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <FileText size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img className="dashboard-user-avatar" src={avatarUrl} alt="User" />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(event) => { event.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main notes-main">
+    <AppShell title="Notes" description="Organize boards, pages, and rich-text drafts in one workspace." contentClassName="max-w-none p-0">
+      <div className="notes-main">
         <header className="notes-header">
           <div>
             <span className="preview-label">Note Workspace</span>
@@ -483,7 +393,7 @@ export function NotesPage() {
                             <button
                               className="primary-button notes-header__action"
                               type="button"
-                              disabled={isSaving || !isDirty || !title.trim()}
+                              disabled={isSaving || !isDirty || !draftTitle.trim()}
                               onClick={() => { void persistDraft() }}
                             >
                               {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
@@ -499,9 +409,10 @@ export function NotesPage() {
                             data-testid="note-title-input"
                             disabled={isOpeningPage}
                             maxLength={240}
-                            value={title}
+                            value={draftTitle}
                             onBlur={() => { void persistDraft() }}
                             onChange={(event) => {
+                              setContent(draftContent)
                               setTitle(event.target.value)
                               markChanged()
                             }}
@@ -511,9 +422,10 @@ export function NotesPage() {
                             <div className="notes-editor-shell">
                               <JournalRichTextEditor
                                 disabled={isOpeningPage}
-                                content={content}
+                                content={draftContent}
                                 onBlur={() => { void persistDraft() }}
                                 onChange={(html) => {
+                                  setTitle(draftTitle)
                                   setContent(html)
                                   markChanged()
                                 }}
@@ -558,7 +470,7 @@ export function NotesPage() {
             </section>
           </section>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

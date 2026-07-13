@@ -399,12 +399,13 @@ describe('FluentA app routes', () => {
 
     renderApp('/settings')
 
-    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/settings/profile')
-    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
-    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
-    expect(screen.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
-    expect(screen.getAllByRole('heading', { name: 'Your settings' })).toHaveLength(2)
-    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
+    const settingsNavigation = within(screen.getByRole('navigation', { name: 'Settings navigation' }))
+    expect(settingsNavigation.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/settings/profile')
+    expect(settingsNavigation.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
+    expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
+    expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(settingsNavigation.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('heading', { name: 'Practice mode sequence' })).not.toBeInTheDocument()
   })
 
@@ -417,12 +418,12 @@ describe('FluentA app routes', () => {
 
     let view = renderApp('/settings/practice')
     expect(screen.getByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
+    expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     view = renderApp('/settings/review')
     expect(screen.getByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
+    expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     renderApp('/settings/level5')

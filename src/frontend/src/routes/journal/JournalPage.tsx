@@ -1,14 +1,7 @@
-import {
-  Bell, BookOpen, CalendarClock, CheckSquare,
-  Columns3, Globe, HelpCircle, LogOut, NotebookPen, Repeat2, Settings,
-  CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3, Kanban, Timer
-} from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3 } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
-import { useAuthStore } from '../../stores/authStore'
+import { AppShell } from '@/components/AppShell'
 import * as journalApi from '../../lib/api/journal.api'
 
 const JournalRichTextEditor = lazy(() =>
@@ -80,11 +73,6 @@ function hasHighlights(entry: journalApi.JournalEntrySummary | journalApi.Journa
 
 export function JournalPage() {
   const queryClient = useQueryClient()
-  const logout = useAuthStore((state) => state.logout)
-  const user = useAuthStore((state) => state.user)
-  const location = useLocation()
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -97,6 +85,7 @@ export function JournalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => toMonthInput(new Date()))
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const openRequestRef = useRef(0)
   const draftVersionRef = useRef(0)
 
@@ -277,69 +266,8 @@ export function JournalPage() {
   const showEmptyState = !selectedId && !title && !content && !isOpening;
 
   return (
-    <div className="dashboard-layout">
-      {/* SideNavBar */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img 
-              className="dashboard-user-avatar" 
-              src={avatarUrl}
-              alt="User" 
-            />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main" style={{ padding: '32px', height: '100vh', overflow: 'hidden' }}>
-        <div className="journal-page" style={{ marginLeft: 0, padding: 0, minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <AppShell title="Journal" description="Capture learning reflections and keep them organized by date." contentClassName="max-w-none p-0">
+        <div className="journal-page">
       <header className="journal-header">
         <div>
           <h2>My Journal</h2>
@@ -363,9 +291,6 @@ export function JournalPage() {
               </button>
             ) : null}
           </label>
-          <Link to="/notifications" aria-label="Notifications">
-            <Bell size={20} />
-          </Link>
         </div>
       </header>
 
@@ -461,9 +386,7 @@ export function JournalPage() {
                   type="button"
                   aria-label={`Delete journal ${title}`}
                   disabled={deleteEntry.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Delete "${title}"?`)) deleteEntry.mutate(selectedId)
-                  }}
+                  onClick={() => setDeleteConfirmationOpen(true)}
                   title="Delete entry"
                 >
                   <Trash2 size={18} />
@@ -567,10 +490,21 @@ export function JournalPage() {
               The journal entry could not be saved.
             </div>
           )}
+          {deleteConfirmationOpen && selectedId ? (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4" role="presentation">
+              <section className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg" role="alertdialog" aria-modal="true" aria-labelledby="journal-delete-title" aria-describedby="journal-delete-description">
+                <h3 id="journal-delete-title" className="m-0 text-lg font-semibold">Delete journal entry?</h3>
+                <p id="journal-delete-description" className="mt-2 text-sm text-muted-foreground">“{title}” will be removed from your journal. This action cannot be undone.</p>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button className="secondary-button" type="button" disabled={deleteEntry.isPending} onClick={() => setDeleteConfirmationOpen(false)}>Cancel</button>
+                  <button className="primary-button bg-destructive hover:bg-destructive/90" type="button" disabled={deleteEntry.isPending} onClick={() => deleteEntry.mutate(selectedId)}>Delete entry</button>
+                </div>
+              </section>
+            </div>
+          ) : null}
         </form>
       </div>
         </div>
-      </main>
-    </div>
+    </AppShell>
   )
 }
