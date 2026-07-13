@@ -153,3 +153,48 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
 
   }
 })
+
+test('confirms the exact Board on right-click, cancels safely, then deletes and announces success', async ({ page: browserPage }) => {
+  const newest = { ...board, id: 'board-new', name: 'Newest board', pageCount: 1, createdAt: '2026-07-13T00:00:00Z' }
+  const older = { ...board, id: 'board-old', name: 'Older board', pageCount: 1, createdAt: '2026-07-12T00:00:00Z' }
+  const details = new Map([
+    [newest.id, { ...newest, pages: [{ ...page, id: 'page-new', boardId: newest.id, name: 'Newest page', createdAt: newest.createdAt }], preferences }],
+    [older.id, { ...older, pages: [{ ...page, id: 'page-old', boardId: older.id, name: 'Older page', createdAt: older.createdAt }], preferences }],
+  ])
+  const deletedBoards = []
+
+  await browserPage.route('**/api/v1/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const method = request.method()
+    if (path.endsWith('/auth/refresh')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { accessToken: 'workspace-token', user } }) })
+    if (path.endsWith('/auth/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
+    if (method === 'GET' && path.endsWith('/boards')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [...details.values()].map(({ pages: _pages, preferences: _preferences, ...summary }) => summary) }) })
+    if (method === 'DELETE' && path.includes('/boards/')) {
+      const boardId = path.split('/').at(-1)
+      deletedBoards.push(boardId)
+      details.delete(boardId)
+      return route.fulfill({ status: 204 })
+    }
+    const boardId = path.split('/').at(-1)
+    if (method === 'GET' && details.has(boardId)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: details.get(boardId) }) })
+    if (path.endsWith('/words')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
+    return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ data: null }) })
+  })
+
+  await browserPage.goto('/vocabulary')
+  const boardButton = browserPage.getByRole('button', { name: /Newest board/ })
+  await expect(boardButton).toBeVisible()
+  await boardButton.click({ button: 'right' })
+  await browserPage.getByRole('menuitem', { name: 'Delete Board' }).click()
+  await expect(browserPage.getByRole('alertdialog')).toContainText('Delete “Newest board”?')
+  await browserPage.getByRole('button', { name: 'Cancel' }).click()
+  expect(deletedBoards).toEqual([])
+
+  await boardButton.click({ button: 'right' })
+  await browserPage.getByRole('menuitem', { name: 'Delete Board' }).click()
+  await browserPage.getByRole('button', { name: 'Delete' }).click()
+  await expect.poll(() => deletedBoards).toEqual(['board-new'])
+  await expect(browserPage.getByRole('heading', { name: 'Older page' })).toBeVisible()
+  await expect(browserPage.getByText('Board deleted successfully')).toBeVisible()
+})

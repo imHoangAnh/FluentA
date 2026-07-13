@@ -1,16 +1,27 @@
 import { BookOpenText, ChevronRight, FileText, Filter, FolderPlus, Plus, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/components/AppShell'
 import { ColumnSettings } from '@/components/vocabulary/ColumnSettings'
+import { DeleteConfirmationDialog } from '@/components/vocabulary/DeleteConfirmationDialog'
 import { VocabTable } from '@/components/vocabulary/VocabTable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { toast } from '@/lib/toast'
 import * as vocabularyApi from '@/lib/api/vocabulary.api'
 import { supportedLanguageProfiles } from '@/lib/language'
 import { cn } from '@/lib/utils'
+
+type DeleteTarget =
+  | { kind: 'board'; boardId: string; name: string }
+  | { kind: 'page'; boardId: string; pageId: string; name: string }
+
+function newestFirst<T extends { createdAt: string; id: string }>(items: T[]) {
+  return items.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
+}
 
 export function WorkspacePage() {
   const queryClient = useQueryClient()
@@ -21,14 +32,17 @@ export function WorkspacePage() {
   const [newBoardName, setNewBoardName] = useState('')
   const [newBoardLanguage, setNewBoardLanguage] = useState('en')
   const [newPageName, setNewPageName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
+  const railFocusRef = useRef<HTMLDivElement>(null)
 
   const boardsQuery = useQuery({ queryKey: ['vocab', 'boards'], queryFn: vocabularyApi.listBoards })
   const boards = useMemo(() => boardsQuery.data ?? [], [boardsQuery.data])
   const sortedBoards = useMemo(
-    () => boards.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)),
+    () => newestFirst(boards),
     [boards],
   )
-  const activeBoardId = selectedBoardId ?? sortedBoards[0]?.id ?? null
+  const activeBoardId = sortedBoards.some((board) => board.id === selectedBoardId) ? selectedBoardId : sortedBoards[0]?.id ?? null
 
   const boardQuery = useQuery({
     queryKey: ['vocab', 'boards', activeBoardId],
@@ -38,7 +52,7 @@ export function WorkspacePage() {
 
   const activeBoard = boardQuery.data
   const sortedPages = useMemo(
-    () => (activeBoard?.pages ?? []).toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)),
+    () => newestFirst(activeBoard?.pages ?? []),
     [activeBoard?.pages],
   )
   const activePage = sortedPages.find((page) => page.id === selectedPageId) ?? sortedPages[0] ?? null
@@ -51,6 +65,7 @@ export function WorkspacePage() {
       setNewBoardName('')
       setNewBoardLanguage('en')
       setIsCreatingBoard(false)
+      toast.success('Board created successfully')
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
     },
   })
@@ -61,6 +76,7 @@ export function WorkspacePage() {
       setSelectedPageId(page.id)
       setNewPageName('')
       setIsCreatingPage(false)
+      toast.success('Page created successfully')
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', activeBoardId] })
     },
@@ -76,6 +92,56 @@ export function WorkspacePage() {
       queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(['vocab', 'boards', activeBoardId], (current) => current ? { ...current, preferences } : current)
     },
   })
+
+  const deleteBoard = useMutation({
+    mutationFn: (target: Extract<DeleteTarget, { kind: 'board' }>) => vocabularyApi.deleteBoard(target.boardId),
+    onSuccess: (_, target) => {
+      const remainingBoards = newestFirst((queryClient.getQueryData<vocabularyApi.BoardSummary[]>(['vocab', 'boards']) ?? []).filter((board) => board.id !== target.boardId))
+      const deletedBoard = queryClient.getQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', target.boardId])
+      queryClient.setQueryData(['vocab', 'boards'], remainingBoards)
+      queryClient.removeQueries({ queryKey: ['vocab', 'boards', target.boardId], exact: true })
+      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: ['vocab', 'words', page.id], exact: true })
+      setSelectedBoardId(remainingBoards[0]?.id ?? null)
+      setSelectedPageId(null)
+      setRestoreDeleteFocus(true)
+      setDeleteTarget(null)
+      requestAnimationFrame(() => railFocusRef.current?.focus())
+      toast.success('Board deleted successfully')
+      void queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
+    },
+  })
+
+  const deletePage = useMutation({
+    mutationFn: (target: Extract<DeleteTarget, { kind: 'page' }>) => vocabularyApi.deletePage(target.boardId, target.pageId),
+    onSuccess: (_, target) => {
+      const boardKey = ['vocab', 'boards', target.boardId] as const
+      const current = queryClient.getQueryData<vocabularyApi.BoardDetail>(boardKey)
+      const remainingPages = newestFirst((current?.pages ?? []).filter((page) => page.id !== target.pageId))
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(boardKey, (board) => board ? { ...board, pages: remainingPages } : board)
+      queryClient.removeQueries({ queryKey: ['vocab', 'words', target.pageId], exact: true })
+      setSelectedPageId(remainingPages[0]?.id ?? null)
+      setRestoreDeleteFocus(true)
+      setDeleteTarget(null)
+      requestAnimationFrame(() => railFocusRef.current?.focus())
+      toast.success('Page deleted successfully')
+      void queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
+      void queryClient.invalidateQueries({ queryKey: boardKey })
+    },
+  })
+
+  function selectBoard(boardId: string) {
+    setSelectedBoardId(boardId)
+    setSelectedPageId(null)
+    setIsCreatingPage(false)
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return
+    if (deleteTarget.kind === 'board') deleteBoard.mutate(deleteTarget)
+    else deletePage.mutate(deleteTarget)
+  }
+
+  const deletePending = deleteBoard.isPending || deletePage.isPending
 
   return (
     <AppShell
@@ -106,29 +172,44 @@ export function WorkspacePage() {
             </form>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="vocabulary-rail-scroll">
+          <div ref={railFocusRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2 outline-none" data-testid="vocabulary-rail-scroll">
             {sortedBoards.map((board) => (
               <div className="mb-1" key={board.id}>
-                <button
-                  type="button"
-                  className={cn('flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', activeBoardId === board.id && 'bg-secondary text-secondary-foreground')}
-                  onClick={() => { setSelectedBoardId(board.id); setSelectedPageId(null); setIsCreatingPage(false) }}
-                >
-                  <ChevronRight className={cn('size-4 shrink-0 transition-transform duration-150', activeBoardId === board.id && 'rotate-90')} />
-                  <span className="min-w-0 flex-1 truncate">{board.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{board.pageCount}</span>
-                </button>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn('flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', activeBoardId === board.id && 'bg-secondary text-secondary-foreground')}
+                      onClick={() => selectBoard(board.id)}
+                      onContextMenu={() => selectBoard(board.id)}
+                    >
+                      <ChevronRight className={cn('size-4 shrink-0 transition-transform duration-150', activeBoardId === board.id && 'rotate-90')} />
+                      <span className="min-w-0 flex-1 truncate">{board.name}</span>
+                      <span className="text-[11px] text-muted-foreground">{board.pageCount}</span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }) }}>Delete Board</ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
                 {activeBoard?.id === board.id ? (
                   <div className="ml-4 mt-1 grid gap-1 border-l border-border pl-2">
                     {sortedPages.map((page) => (
-                      <button
-                        type="button"
-                        key={page.id}
-                        className={cn('flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePage?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
-                        onClick={() => setSelectedPageId(page.id)}
-                      >
-                        <FileText className="size-3.5 shrink-0" /><span className="truncate">{page.name}</span>
-                      </button>
+                      <ContextMenu key={page.id}>
+                        <ContextMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn('flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePage?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
+                            onClick={() => setSelectedPageId(page.id)}
+                            onContextMenu={() => setSelectedPageId(page.id)}
+                          >
+                            <FileText className="size-3.5 shrink-0" /><span className="truncate">{page.name}</span>
+                          </button>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name }) }}>Delete Page</ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     ))}
                     <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={() => setIsCreatingPage(true)}><Plus /> Add page</Button>
                   </div>
@@ -180,6 +261,18 @@ export function WorkspacePage() {
           )}
         </section>
       </div>
+      {deleteTarget ? (
+        <DeleteConfirmationDialog
+          entity={deleteTarget.kind === 'board' ? 'Board' : 'Page'}
+          name={deleteTarget.name}
+          open
+          pending={deletePending}
+          restoreFallback={restoreDeleteFocus}
+          fallbackRef={railFocusRef}
+          onOpenChange={(open) => { if (!open && !deletePending) { setRestoreDeleteFocus(false); setDeleteTarget(null) } }}
+          onConfirm={confirmDelete}
+        />
+      ) : null}
     </AppShell>
   )
 }

@@ -5,6 +5,8 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities'
 import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { toast } from '@/lib/toast'
 
 const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
 const textCellClassName = `${cellClassName} block h-auto resize-none overflow-hidden whitespace-pre-wrap break-words leading-5`
@@ -234,6 +236,9 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   })
   const cellRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({})
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
+  const tableFocusRef = useRef<HTMLDivElement>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
 
   const wordsKey = ['vocab', 'words', page.id]
   const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
@@ -273,12 +278,19 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => [...current, word])
       setNewWord(emptyWord())
       focus('new', firstKey)
+      toast.success('Word created successfully')
     },
   })
 
   const deleteWord = useMutation({
-    mutationFn: (wordId: string) => vocabularyApi.deleteWord(boardId, wordId),
-    onSuccess: (_, wordId) => queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== wordId)),
+    mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(boardId, target.id),
+    onSuccess: (_, target) => {
+      queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== target.id))
+      setRestoreDeleteFocus(true)
+      setDeleteTarget(null)
+      requestAnimationFrame(() => tableFocusRef.current?.focus())
+      toast.success('Word deleted successfully')
+    },
   })
 
   useEffect(() => {
@@ -397,7 +409,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-lg border border-border bg-card" data-testid="vocab-table-scroll">
+    <div ref={tableFocusRef} tabIndex={-1} className="flex min-h-0 flex-1 flex-col overflow-auto rounded-lg border border-border bg-card outline-none" data-testid="vocab-table-scroll">
       <div className="min-w-max">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={columns.map((column) => column.key)} strategy={horizontalListSortingStrategy}>
@@ -437,7 +449,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
                 type="button"
                 tabIndex={-1}
                 aria-label={`Delete ${word.word}`}
-                onClick={() => { if (window.confirm(`Delete "${word.word}"?`)) deleteWord.mutate(word.id) }}
+                onClick={() => { setRestoreDeleteFocus(false); setDeleteTarget({ id: word.id, name: word.word }) }}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
               </button>
@@ -456,6 +468,18 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         {wordsQuery.isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading words...</div> : null}
         {createWord.isError ? <div className="p-4 text-sm text-destructive" role="alert">Could not create word. Fix the row and try again.</div> : null}
       </div>
+      {deleteTarget ? (
+        <DeleteConfirmationDialog
+          entity="Word"
+          name={deleteTarget.name}
+          open
+          pending={deleteWord.isPending}
+          restoreFallback={restoreDeleteFocus}
+          fallbackRef={tableFocusRef}
+          onOpenChange={(open) => { if (!open && !deleteWord.isPending) { setRestoreDeleteFocus(false); setDeleteTarget(null) } }}
+          onConfirm={() => deleteWord.mutate(deleteTarget)}
+        />
+      ) : null}
     </div>
   )
 }

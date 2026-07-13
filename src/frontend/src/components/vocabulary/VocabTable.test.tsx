@@ -138,4 +138,18 @@ describe('VocabTable', () => {
     expect(definitionEditor).toHaveClass('overflow-hidden')
     expect(screen.getByLabelText('Resize Word').parentElement).toHaveClass('border-foreground/70')
   })
+
+  it('uses an accessible confirmation dialog for Word deletion instead of browser confirm', async () => {
+    const user = userEvent.setup()
+    renderTable()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete mitigate' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “mitigate”?')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(vocabularyApi.deleteWord).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Delete mitigate' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(vocabularyApi.deleteWord).toHaveBeenCalledWith('board-1', 'word-1'))
+  })
 })

@@ -5,7 +5,7 @@
 - ID: `US-VOCAB-009`
 - Title: Safe Vocabulary deletion and success feedback
 - Lane: normal
-- Status: planned - validation and implementation approval required
+- Status: implemented - review evidence recorded; live API/database browser proof remains unavailable locally
 
 ## Objective
 

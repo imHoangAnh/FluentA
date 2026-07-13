@@ -30,6 +30,17 @@ this document.
   widths.
 - Board and page lists show the newest created item first. Their order is not
   manually configurable.
+- Right-clicking a Board or Page selects that target and opens its matching
+  `Delete Board` or `Delete Page` context action. Every Board, Page, and Word
+  delete requires an accessible confirmation modal; Cancel and Escape leave
+  data unchanged.
+- After a confirmed Board or Page delete, the newest remaining item is
+  selected. A Board/Page empty state appears only when no replacement exists.
+- Successful Vocabulary Board/Page/Word creation and deletion display an
+  entity-specific bottom-right toast for about three seconds. The toast has an
+  explicit close action and the newest toast appears at the bottom. Cell
+  autosave and automatic board-preference persistence do not display success
+  toasts.
 
 ## Frontend Presentation Contract
 
@@ -48,6 +59,9 @@ this document.
   sizes.
 - Board creation and page creation use visible inline forms rather than
   browser prompts. Existing API validation and ownership rules are unchanged.
+- Board/Page context menus and destructive confirmation use accessible
+  Radix-backed primitives. After a successful delete removes its trigger,
+  focus moves to a surviving Vocabulary region rather than a removed item.
 - Column visibility uses an accessible Radix-backed menu. Reorder, resize,
   autosave, Retry, Tab, Shift+Tab, Escape, Enter, and horizontal scrolling keep
   their existing behavior.
