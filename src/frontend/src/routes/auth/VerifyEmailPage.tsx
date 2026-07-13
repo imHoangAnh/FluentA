@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import * as authApi from '../../lib/api/auth.api'
+import { Button } from '@/components/ui/button'
 
 type VerifyState = {
   email?: string
@@ -86,45 +87,32 @@ export function VerifyEmailPage() {
 
   return (
     <AuthShell mode="register">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="grid gap-5">
         <div>
-          <h2 style={{ margin: 0, fontSize: '24px', color: '#0f172a' }}>Verify your email</h2>
-          <p style={{ margin: '8px 0 0', color: '#64748b', fontSize: '14px', lineHeight: 1.6 }}>
+          <h1 className="m-0 text-2xl font-semibold tracking-tight">Verify your email</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Enter the six-digit code we sent to your email to finish creating your FluentA account.
           </p>
         </div>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} onSubmit={(event) => void submit(event)}>
+        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
           <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
           <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} />
-          {expiryLabel ? <p className="form-note" style={{ margin: 0 }}>Code expires at {expiryLabel}.</p> : null}
-          {developmentOtp ? <p className="form-note" style={{ margin: 0 }}>Local development code: <strong>{developmentOtp}</strong></p> : null}
-          {message ? <p className="form-note" style={{ margin: 0 }}>{message}</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
-          <button className="primary-button" type="submit" style={{ minHeight: '44px', borderRadius: '22px' }}>
-            Verify email
-          </button>
+          {expiryLabel ? <p role="status" className="m-0 text-sm text-primary">Code expires at {expiryLabel}.</p> : null}
+          {developmentOtp ? <p role="status" className="m-0 text-sm text-primary">Local development code: <strong>{developmentOtp}</strong></p> : null}
+          {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
+          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+          <Button className="w-full" type="submit">Verify email</Button>
         </form>
-        <button
+        <Button
+          variant="outline"
           type="button"
           onClick={() => void resendCode()}
           disabled={secondsRemaining > 0}
-          style={{
-            width: '100%',
-            minHeight: '44px',
-            borderRadius: '22px',
-            border: '1px solid #cbd5e1',
-            backgroundColor: secondsRemaining > 0 ? '#f8fafc' : '#ffffff',
-            color: '#0f766e',
-            fontWeight: 600,
-            cursor: secondsRemaining > 0 ? 'not-allowed' : 'pointer',
-          }}
+          className="w-full"
         >
           {secondsRemaining > 0 ? `Resend available in ${secondsRemaining}s` : 'Resend code'}
-        </button>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-          <Link to="/register" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Back to register</Link>
-          <Link to="/login" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Go to login</Link>
-        </div>
+        </Button>
+        <div className="flex justify-between text-sm font-semibold"><Link to="/register" className="text-primary no-underline hover:underline">Back to register</Link><Link to="/login" className="text-primary no-underline hover:underline">Go to login</Link></div>
       </div>
     </AuthShell>
   )

@@ -1,10 +1,12 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, LogOut, RotateCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import { getLanguageProfile } from '../../lib/language'
-import { useAuthStore } from '../../stores/authStore'
+import { AppShell } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function FlashcardViewerPage() {
   const { pageId = '' } = useParams()
@@ -12,7 +14,6 @@ export function FlashcardViewerPage() {
 }
 
 function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
-  const logout = useAuthStore((state) => state.logout)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
 
@@ -46,107 +47,53 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
   }
 
   return (
-    <main className="workspace review-workspace flashcard-viewer-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Flashcard navigation">
-          <Link className="ghost-button ghost-button--inline" to="/flashcards">
-            <ArrowLeft size={17} /> Back to decks
-          </Link>
-          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout">
-            <LogOut size={18} />
-          </button>
-        </nav>
-      </header>
-
-      {sessionQuery.isLoading ? <p className="flashcard-status">Loading flashcard viewer...</p> : null}
-      {sessionQuery.isError ? <p className="flashcard-status flashcard-status--error">This page is unavailable.</p> : null}
+    <AppShell title="Flashcard viewer" description="Flip cards and move at your pace." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>}>
+      {sessionQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading flashcard viewer...</p> : null}
+      {sessionQuery.isError ? <p role="alert" className="text-sm text-destructive">This page is unavailable.</p> : null}
 
       {sessionQuery.data && cards.length === 0 ? (
-        <section className="review-setup">
-          <span className="preview-label">Flashcard viewer</span>
-          <h1>{sessionQuery.data.pageName}</h1>
-          <p>This page has no words yet.</p>
-          <Link className="primary-button" to="/flashcards">Finish</Link>
-        </section>
+        <Card className="mx-auto max-w-xl"><CardContent className="grid gap-4 p-8 text-center"><p className="m-0 text-sm font-semibold text-primary">Flashcard viewer</p><h2 className="m-0 text-2xl font-semibold">{sessionQuery.data.pageName}</h2><p className="m-0 text-sm text-muted-foreground">This page has no words yet.</p><Button asChild className="justify-self-center"><Link to="/flashcards">Finish</Link></Button></CardContent></Card>
       ) : null}
 
       {sessionQuery.data && currentCard ? (
-        <section className="flashcard-viewer">
-          <div className="review-progress flashcard-viewer__progress">
-            <div>
-              <span className="preview-label">Flashcard</span>
-              <strong>{progressLabel}</strong>
-            </div>
-            <progress value={cards.length === 0 ? 0 : currentIndex + 1} max={Math.max(cards.length, 1)} />
-          </div>
-
-          <div className="flashcard-viewer__header">
-            <div>
-              <span className="preview-label">Vocabulary Page</span>
-              <h1>{sessionQuery.data.pageName}</h1>
-            </div>
-            <p>Click the card to flip between prompt and answer.</p>
-          </div>
+        <section className="mx-auto grid w-full max-w-3xl gap-5">
+          <div className="flex items-end justify-between gap-4"><div><p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-primary">Vocabulary page</p><h2 className="m-0 mt-1 text-2xl font-semibold tracking-[-0.02em]">{sessionQuery.data.pageName}</h2></div><div className="text-right"><p className="m-0 text-xs text-muted-foreground">Flashcard</p><strong className="text-lg">{progressLabel}</strong></div></div>
+          <progress className="h-1.5 w-full overflow-hidden rounded-full accent-primary" value={currentIndex + 1} max={Math.max(cards.length, 1)} />
+          <p className="m-0 text-sm text-muted-foreground">Click the card to flip between prompt and answer.</p>
 
           <button
-            className={flipped ? 'flashcard-stage flashcard-stage--flipped' : 'flashcard-stage'}
+            className="grid min-h-[360px] w-full place-items-center rounded-xl border border-border bg-card p-8 text-left shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             type="button"
             onClick={() => setFlipped((value) => !value)}
             data-testid="flashcard-stage"
           >
             {!flipped ? (
-              <div className="flashcard-stage__face flashcard-stage__face--front">
-                <span>{currentCard.wordClass}</span>
-                <h2>{currentCard.word}</h2>
-                {currentCard.meaningEn ? <p>{currentCard.meaningEn}</p> : null}
-                <small><RotateCw size={14} /> Click to flip</small>
+              <div className="grid w-full max-w-xl gap-4 text-center">
+                <span className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">{currentCard.wordClass}</span>
+                <h3 className="m-0 text-4xl font-semibold tracking-[-0.03em] text-foreground">{currentCard.word}</h3>
+                {currentCard.meaningEn ? <p className="m-0 text-lg text-muted-foreground">{currentCard.meaningEn}</p> : null}
+                <small className="mt-8 flex items-center justify-center gap-2 text-muted-foreground"><RotateCw size={14} /> Click to flip</small>
               </div>
             ) : (
-              <div className="flashcard-stage__face flashcard-stage__face--back">
-                <div>
-                  <span>Vietnamese</span>
-                  <strong>{currentCard.meaningVn}</strong>
-                </div>
-                <div>
-                  <span>{secondaryMeaningLabel}</span>
-                  <p>{currentCard.meaningEn}</p>
-                </div>
-                <div>
-                  <span>Example</span>
-                  <p>{currentCard.example}</p>
-                </div>
+              <div className="grid w-full gap-5"><div><span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Vietnamese</span><strong className="mt-1 block text-xl">{currentCard.meaningVn}</strong></div><div><span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{secondaryMeaningLabel}</span><p className="m-0 mt-1 text-base text-foreground">{currentCard.meaningEn}</p></div><div><span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Example</span><p className="m-0 mt-1 text-base leading-6 text-foreground">{currentCard.example}</p></div>
                 {currentCard.thesaurus ? (
-                  <div>
-                    <span>Thesaurus</span>
-                    <p>{currentCard.thesaurus}</p>
-                  </div>
+                  <div><span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Thesaurus</span><p className="m-0 mt-1 text-base text-foreground">{currentCard.thesaurus}</p></div>
                 ) : null}
-                <small><RotateCw size={14} /> Click to flip</small>
+                <small className="mt-2 flex items-center gap-2 text-muted-foreground"><RotateCw size={14} /> Click to flip</small>
               </div>
             )}
           </button>
 
-          <div className="flashcard-viewer__controls">
-            <button className="secondary-button" type="button" onClick={goPrevious} disabled={currentIndex === 0}>
-              <ChevronLeft size={16} /> Previous
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button variant="outline" type="button" onClick={goPrevious} disabled={currentIndex === 0}><ChevronLeft /> Previous</Button>
             {isFinalCard ? (
-              <div className="flashcard-viewer__final-actions">
-                <Link className="secondary-button" to="/flashcards">Finish</Link>
-                <Link className="primary-button" to={`/flashcards/pages/${pageId}/practice`}>Let's practice</Link>
-              </div>
+              <div className="flex gap-2"><Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button><Button asChild><Link to={`/flashcards/pages/${pageId}/practice`}>Let's practice</Link></Button></div>
             ) : (
-              <button className="primary-button" type="button" onClick={goNext}>
-                Next <ChevronRight size={16} />
-              </button>
+              <Button type="button" onClick={goNext}>Next <ChevronRight /></Button>
             )}
           </div>
         </section>
       ) : null}
-    </main>
+    </AppShell>
   )
 }

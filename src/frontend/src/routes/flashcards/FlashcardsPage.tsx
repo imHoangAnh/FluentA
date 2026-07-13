@@ -1,244 +1,52 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import {
-  BookOpen, CalendarClock, CheckSquare, ChevronDown, ChevronUp, Columns3,
-  Globe, HelpCircle, Kanban, Layers, LogOut,
-  NotebookPen, Plus, Repeat2, Settings, Timer,
-} from 'lucide-react'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
-import { getUserAvatarUrl } from '../../lib/avatar'
+import { Link } from 'react-router-dom'
+import { BookOpen, ChevronDown, ChevronUp, Layers, Plus } from 'lucide-react'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import type { FlashcardBoard } from '../../lib/api/flashcard.api'
 import { useFlashcardSync } from '../../lib/realtime/useFlashcardSync'
-import { useAuthStore } from '../../stores/authStore'
-import '../dashboard/DashboardPage.css'
+import { AppShell } from '@/components/AppShell'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
-type FlashcardsPageProps = {
-  entryMode?: 'flashcards' | 'practice'
-}
+type FlashcardsPageProps = { entryMode?: 'flashcards' | 'practice' }
 
 export function FlashcardsPage({ entryMode = 'flashcards' }: FlashcardsPageProps) {
-  const logout = useAuthStore((state) => state.logout)
-  const user = useAuthStore((state) => state.user)
-  const location = useLocation()
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
-
   useFlashcardSync()
-  const decksQuery = useQuery({
-    queryKey: ['flashcard', 'boards'],
-    queryFn: flashcardApi.listBoards,
-    refetchInterval: 1500,
-  })
+  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: flashcardApi.listBoards, refetchInterval: 1500 })
   const boardGroups = useMemo<FlashcardBoard[]>(() => decksQuery.data ?? [], [decksQuery.data])
-
   const practiceEntry = entryMode === 'practice'
-
-  /* Track which boards are expanded; if null, first board defaults open */
   const [expandedBoards, setExpandedBoards] = useState<Set<string> | null>(null)
 
-  const toggleBoard = useCallback(
-    (boardId: string) => {
-      setExpandedBoards((prev) => {
-        const next = prev !== null ? new Set(prev) : (boardGroups.length > 0 ? new Set([boardGroups[0].boardId]) : new Set<string>())
-        if (next.has(boardId)) {
-          next.delete(boardId)
-        } else {
-          next.add(boardId)
-        }
-        return next
-      })
-    },
-    [boardGroups],
-  )
+  const toggleBoard = useCallback((boardId: string) => {
+    setExpandedBoards((previous) => {
+      const next = previous !== null ? new Set(previous) : new Set(boardGroups[0] ? [boardGroups[0].boardId] : [])
+      if (next.has(boardId)) {
+        next.delete(boardId)
+      } else {
+        next.add(boardId)
+      }
+      return next
+    })
+  }, [boardGroups])
 
-  return (
-    <div className="dashboard-layout">
-      {/* ── Left Sidebar Navigation ── */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
+  const title = practiceEntry ? 'Choose a page to practice' : 'Your pages'
+  return <AppShell title={practiceEntry ? 'Practice' : 'Flashcards'} description={practiceEntry ? 'Choose a page and work through its configured learning modes.' : 'Browse the flashcards generated from your vocabulary pages.'}>
+  <div className="mx-auto grid max-w-6xl gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="m-0 text-sm font-medium text-primary">Learning library</p><h2 className="m-0 mt-1 text-2xl font-semibold tracking-[-0.02em] text-foreground">{title}</h2></div><Button asChild variant="outline"><Link to="/vocabulary"><Plus /> Add vocabulary</Link></Button></div>
 
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
+      {decksQuery.isLoading ? <div className="grid gap-4" aria-busy="true" aria-label="Loading flashcards">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div> : null}
+      {decksQuery.isError ? <Card className="border-destructive/40"><CardContent className="p-5"><p role="alert" className="m-0 text-sm text-destructive">Unable to load flashcards. Try again when your connection is available.</p></CardContent></Card> : null}
+      {!decksQuery.isLoading && !decksQuery.isError && boardGroups.length === 0 ? <Card><CardContent className="grid place-items-center gap-3 p-12 text-center"><span className="grid size-12 place-items-center rounded-full bg-secondary text-primary"><BookOpen /></span><div><h3 className="m-0 text-lg font-semibold">No pages yet</h3><p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Create a vocabulary board and page, then add words to see live learning content here.</p></div><Button asChild><Link to="/vocabulary">Open vocabulary</Link></Button></CardContent></Card> : null}
 
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img
-              className="dashboard-user-avatar"
-              src={avatarUrl}
-              alt="User"
-            />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main Content Area ── */}
-      <main className="dashboard-main">
-        <div className="fc-expand-content">
-          {/* Header Section */}
-          <div className="fc-expand-header">
-            <h2 className="fc-expand-title">{practiceEntry ? 'Choose a page to practice' : 'Your pages'}</h2>
-          </div>
-
-          {/* Loading / Error States */}
-          {decksQuery.isLoading ? <p className="flashcard-status">Loading flashcards...</p> : null}
-          {decksQuery.isError ? <p className="flashcard-status flashcard-status--error">Unable to load flashcards.</p> : null}
-          {!decksQuery.isLoading && !decksQuery.isError && boardGroups.length === 0 ? (
-            <div className="empty-panel flashcard-empty">
-              <BookOpen size={28} />
-              <h2>No pages yet</h2>
-              <p>Create a vocabulary board and page, then add words to see live learning content here.</p>
-              <Link className="primary-button flashcard-empty__link" to="/vocabulary">Open vocabulary</Link>
-            </div>
-          ) : null}
-
-          {/* Boards Container */}
-          <div className="fc-expand-boards">
-            {boardGroups.map((board, index) => {
-              const boardId = board.boardId
-              const expanded = expandedBoards !== null ? expandedBoards.has(boardId) : index === 0
-              return (
-                <section className="fc-expand-board" key={boardId}>
-                  {/* Board Header (Toggle) */}
-                  <button
-                    className="fc-expand-board__toggle"
-                    type="button"
-                    onClick={() => toggleBoard(boardId)}
-                    aria-expanded={expanded}
-                  >
-                    <div className="fc-expand-board__title-wrap">
-                      <Layers className="fc-expand-board__icon" size={20} />
-                      <div>
-                        <span className="fc-expand-board__label">Vocabulary Board</span>
-                        <h3 className="fc-expand-board__name">{board.boardName}</h3>
-                      </div>
-                    </div>
-                    <div className="fc-expand-board__meta">
-                      <span className="fc-expand-board__count">{board.pages.length} {board.pages.length === 1 ? 'page' : 'pages'}</span>
-                      <span className="fc-expand-board__chevron">
-                        {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Board Content (Decks Grid) */}
-                  {expanded ? (
-                    <div className="fc-expand-board__content">
-                      <div className="fc-expand-decks-grid">
-                        {board.pages.map((page) => (
-                          <article
-                            className={`fc-expand-deck${page.words.length > 0 ? ' fc-expand-deck--has-cards' : ''}`}
-                            key={page.pageId}
-                            data-testid={`flashcard-page-${page.pageId}`}
-                          >
-                            {/* Top accent bar for decks with cards */}
-                            {page.words.length > 0 ? <div className="fc-expand-deck__accent" /> : null}
-
-                            <div className="fc-expand-deck__header">
-                              <div>
-                                <span className="fc-expand-deck__type">Vocabulary Page</span>
-                                <h4 className="fc-expand-deck__name">{page.pageName}</h4>
-                                {practiceEntry && page.isPracticed ? <span className="preview-label">Practiced</span> : null}
-                              </div>
-                              <div className={`fc-expand-deck__badge${page.words.length > 0 ? ' fc-expand-deck__badge--active' : ''}`}>
-                                {page.words.length}
-                              </div>
-                            </div>
-
-                            <p className="fc-expand-deck__desc">
-                              {page.words.length > 0
-                                ? `${page.words.length} words are ready in this page.`
-                                : 'No words yet.'}
-                            </p>
-
-                            <div className="fc-expand-deck__actions">
-                              {page.words.length > 0 ? (
-                                <>
-                                  {practiceEntry ? (
-                                    <>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/pages/${page.pageId}/practice`}>
-                                        {page.isPracticed ? 'Practice again' : 'Practice'}
-                                      </Link>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/pages/${page.pageId}`}>
-                                        Open Flashcards
-                                      </Link>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--primary" to={`/flashcards/pages/${page.pageId}`}>
-                                        Open Flashcards
-                                      </Link>
-                                      <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary" to={`/flashcards/pages/${page.pageId}/practice`}>
-                                        Practice this Page
-                                      </Link>
-                                    </>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <button className="fc-expand-deck__btn fc-expand-deck__btn--disabled" type="button" disabled>
-                                    Open Flashcards
-                                  </button>
-                                  <Link className="fc-expand-deck__btn fc-expand-deck__btn--secondary fc-expand-deck__btn--add" to="/vocabulary">
-                                    <Plus size={16} /> Add Cards
-                                  </Link>
-                                </>
-                              )}
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </section>
-              )
-            })}
-          </div>
-        </div>
-      </main>
+      <div className="grid gap-4">{boardGroups.map((board, index) => {
+        const expanded = expandedBoards ? expandedBoards.has(board.boardId) : index === 0
+        return <Card key={board.boardId} className="overflow-hidden"><button className="flex w-full items-center justify-between gap-4 p-5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" type="button" onClick={() => toggleBoard(board.boardId)} aria-expanded={expanded}><span className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-md bg-secondary text-primary"><Layers className="size-5" /></span><span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Vocabulary board</span><strong className="block truncate text-base text-foreground">{board.boardName}</strong></span></span><span className="flex shrink-0 items-center gap-3"><Badge variant="outline">{board.pages.length} {board.pages.length === 1 ? 'page' : 'pages'}</Badge>{expanded ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}</span></button>
+          {expanded ? <CardContent className="border-t border-border bg-muted/30 p-5"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{board.pages.map((page) => <Card key={page.pageId} data-testid={`flashcard-page-${page.pageId}`} className="flex min-h-56 flex-col"><CardHeader><div className="flex items-start justify-between gap-3"><div><p className="m-0 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Vocabulary page</p><CardTitle className="mt-1">{page.pageName}</CardTitle></div><Badge variant={page.words.length > 0 ? 'default' : 'outline'}>{page.words.length}</Badge></div>{practiceEntry && page.isPracticed ? <Badge className="w-fit" variant="outline">Practiced</Badge> : null}<CardDescription>{page.words.length > 0 ? `${page.words.length} words are ready in this page.` : 'No words yet.'}</CardDescription></CardHeader><CardContent className="mt-auto flex flex-wrap gap-2">{page.words.length > 0 ? practiceEntry ? <><Button asChild size="sm"><Link to={`/flashcards/pages/${page.pageId}/practice`}>{page.isPracticed ? 'Practice again' : 'Practice'}</Link></Button><Button asChild variant="outline" size="sm"><Link to={`/flashcards/pages/${page.pageId}`}>Open Flashcards</Link></Button></> : <><Button asChild size="sm"><Link to={`/flashcards/pages/${page.pageId}`}>Open Flashcards</Link></Button><Button asChild variant="outline" size="sm"><Link to={`/flashcards/pages/${page.pageId}/practice`}>Practice this Page</Link></Button></> : <><Button size="sm" disabled>Open Flashcards</Button><Button asChild variant="outline" size="sm"><Link to="/vocabulary">Add cards</Link></Button></>}</CardContent></Card>)}</div></CardContent> : null}
+        </Card>
+      })}</div>
     </div>
-  )
+  </AppShell>
 }

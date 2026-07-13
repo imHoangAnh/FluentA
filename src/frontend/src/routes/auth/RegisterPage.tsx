@@ -4,6 +4,7 @@ import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import { buildGoogleAuthUrl } from '../../lib/auth/google'
 import { useAuthStore } from '../../stores/authStore'
+import { Button } from '@/components/ui/button'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -51,7 +52,8 @@ export function RegisterPage() {
 
   return (
     <AuthShell mode="register">
-      <form style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} onSubmit={(event) => void submit(event)}>
+      <div className="mb-7"><h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">Create your account</h1><p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">Start building a vocabulary you will remember.</p></div>
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
         <TextField label="Full name" name="fullName" autoComplete="name" placeholder="Enter your full name" value={fullName} onChange={setFullName} />
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
         <TextField
@@ -63,33 +65,17 @@ export function RegisterPage() {
           value={password}
           onChange={setPassword}
         />
-        {message ? <p className="form-note" style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>{message}</p> : null}
-        {error ? <p className="form-error" style={{ margin: 0 }}>{error}</p> : null}
-        
-        <button 
-          type="submit" 
-          disabled={isSubmitting}
-          style={{ width: '100%', backgroundColor: '#0d9488', color: '#fff', fontWeight: 600, padding: '12px', borderRadius: '9999px', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0f766e'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0d9488'}
-        >
-          {isSubmitting ? 'Creating account...' : 'Continue'}
-        </button>
+        {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
+        {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Continue'}</Button>
       </form>
 
-      <div style={{ position: 'relative', margin: '32px 0', textAlign: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
-          <div style={{ width: '100%', borderTop: '1px solid #f1f5f9' }}></div>
-        </div>
-        <span style={{ position: 'relative', padding: '0 16px', backgroundColor: '#ffffff', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>or</span>
-      </div>
+      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
 
       <button 
         type="button" 
         onClick={startGoogleLogin}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '12px', borderRadius: '9999px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#334155', fontWeight: 500, cursor: 'pointer', transition: 'background-color 0.2s' }}
-        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+        className="flex h-10 w-full items-center justify-center gap-3 rounded-md border border-input bg-card text-sm font-semibold text-foreground hover:bg-accent"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

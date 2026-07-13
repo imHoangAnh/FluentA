@@ -1,10 +1,11 @@
-import { ArrowLeft, CheckCircle2, LogOut, Mic, MicOff, PenSquare, TriangleAlert, Volume2 } from 'lucide-react'
+import { CheckCircle2, Mic, MicOff, PenSquare, TriangleAlert, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import { getLanguageProfile, selectSpeechVoice } from '../../lib/language'
-import { useAuthStore } from '../../stores/authStore'
+import { AppShell } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
 
 type PracticeOutcome = 'correct' | 'wrong'
 type PracticeOrderType = 'sequential' | 'shuffle'
@@ -53,7 +54,6 @@ type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
 export function PracticeSessionPage() {
   const { pageId = '' } = useParams()
-  const logout = useAuthStore((state) => state.logout)
   const [sessionStarted, setSessionStarted] = useState(false)
   const [orderType, setOrderType] = useState<PracticeOrderType>('sequential')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -252,17 +252,7 @@ export function PracticeSessionPage() {
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
   return (
-    <main className="workspace review-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Practice navigation">
-          <Link className="ghost-button ghost-button--inline" to="/flashcards"><ArrowLeft size={17} /> Back to decks</Link>
-          <button className="icon-button" type="button" onClick={() => void logout()} aria-label="Logout"><LogOut size={18} /></button>
-        </nav>
-      </header>
+    <AppShell title="Practice" description="Work through a page deck using your configured learning modes." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>}>
 
       {sessionQuery.data && !sessionStarted && !completedSession ? (
         <section className="review-setup practice-setup">
@@ -430,6 +420,6 @@ export function PracticeSessionPage() {
           </article>
         </section>
       ) : null}
-    </main>
+    </AppShell>
   )
 }

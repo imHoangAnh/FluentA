@@ -1,152 +1,32 @@
 import { Link } from 'react-router-dom'
 import { type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
+
+const orbitCards = [
+  { language: 'Vietnamese', phrase: 'Xin chào', position: 'left-1/2 top-1/2 z-10 size-[180px] -translate-x-1/2 -translate-y-1/2', accent: 'bg-slate-400' },
+  { language: 'Japanese', phrase: 'こんにちは', position: 'left-1/2 top-1/2 size-[120px] -translate-x-[260px] -translate-y-[170px]', accent: 'bg-purple-400' },
+  { language: 'English', phrase: 'Hello', position: 'left-1/2 top-1/2 size-[120px] translate-x-[140px] -translate-y-[90px]', accent: 'bg-teal-400' },
+  { language: 'Spanish', phrase: 'Hola', position: 'left-1/2 top-1/2 size-[120px] translate-x-[140px] translate-y-[90px]', accent: 'bg-yellow-400' },
+  { language: 'Chinese', phrase: '你好', position: 'left-1/2 top-1/2 size-[120px] -translate-x-1/2 translate-y-[160px]', accent: 'bg-pink-400' },
+  { language: 'Korean', phrase: '안녕하세요', position: 'left-1/2 top-1/2 size-[120px] -translate-x-[260px] translate-y-[90px]', accent: 'bg-orange-400' },
+  { language: 'French', phrase: 'Bonjour', position: 'left-1/2 top-1/2 size-[120px] -translate-x-1/2 -translate-y-[240px]', accent: 'bg-blue-400' },
+]
+
+function FluentALogo() {
+  return <svg fill="none" height="40" viewBox="0 0 40 40" width="40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10 10C10 10 15 8 22 12C29 16 30 25 30 25L25 32C25 32 24 24 18 20C12 16 10 18 10 18V10Z" fill="currentColor" /><path d="M14 14C14 14 18 13 22 16C26 19 26 24 26 24L22 28C22 28 22 22 18 20C14 18 14 14 14 14Z" fill="white" fillOpacity="0.45" /></svg>
+}
 
 export function AuthShell({ children, mode }: { children: ReactNode, mode: 'login' | 'register' }) {
   return (
-    <>
-      <style>{`
-        .orbit-container {
-          position: relative;
-          width: 100%;
-          height: 450px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .card-base {
-          position: absolute;
-          background: white;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-          padding: 12px 16px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          transition: transform 0.3s ease;
-        }
-        .center-card {
-          z-index: 10;
-          width: 180px;
-          height: 110px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-        }
-        .orbit-card {
-          width: 120px;
-          height: 80px;
-          font-size: 0.85rem;
-        }
-        .pos-top { transform: translateY(-160px); }
-        .pos-top-right { transform: translate(140px, -90px); }
-        .pos-bottom-right { transform: translate(140px, 90px); }
-        .pos-bottom { transform: translateY(160px); }
-        .pos-bottom-left { transform: translate(-140px, 90px); }
-        .pos-top-left { transform: translate(-140px, -90px); }
-
-        .orbit-ring {
-          position: absolute;
-          border: 1px dashed #e2e8f0;
-          border-radius: 50%;
-        }
-        .ring-1 { width: 320px; height: 320px; }
-        .ring-2 { width: 440px; height: 440px; }
-        
-        .lang-label {
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-size: 10px;
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-        .phrase-text {
-          font-weight: 700;
-          color: #1e293b;
-        }
-        .center-card .phrase-text {
-          font-size: 1.5rem;
-          color: #0d9488;
-        }
-      `}</style>
-      <main style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden', fontFamily: '"Inter", "Geist", sans-serif', margin: 0, backgroundColor: '#ffffff' }}>
-        <section style={{ width: '60%', backgroundColor: '#f7f9fb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ textAlign: 'center', marginBottom: '64px', zIndex: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
-              <svg fill="none" height="40" viewBox="0 0 40 40" width="40" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 10C10 10 15 8 22 12C29 16 30 25 30 25L25 32C25 32 24 24 18 20C12 16 10 18 10 18V10Z" fill="#0d9488"></path>
-                <path d="M14 14C14 14 18 13 22 16C26 19 26 24 26 24L22 28C22 28 22 22 18 20C14 18 14 14 14 14Z" fill="#2dd4bf" fillOpacity="0.6"></path>
-              </svg>
-              <span style={{ fontSize: '30px', fontWeight: 700, color: '#1e293b' }}>FluentA</span>
-            </div>
-            <h1 style={{ fontSize: '20px', color: '#475569', lineHeight: 1.6, maxWidth: '384px', margin: '0 auto', fontWeight: 400 }}>
-              Learn languages. Remember more.<br/>Use it in real life.
-            </h1>
-          </div>
-
-          <div className="orbit-container">
-            <div className="orbit-ring ring-1"></div>
-            <div className="orbit-ring ring-2"></div>
-            
-            <div className="card-base orbit-card center-card">
-              <span className="lang-label" style={{ color: '#94a3b8' }}>Vietnamese</span>
-              <span className="phrase-text">Xin chào</span>
-            </div>
-            
-            <div className="card-base orbit-card pos-top-left">
-              <span className="lang-label" style={{ color: '#c084fc' }}>Japanese</span>
-              <span className="phrase-text">こんにちは</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#c084fc' }}></div>
-            </div>
-            
-            <div className="card-base orbit-card pos-top-right">
-              <span className="lang-label" style={{ color: '#2dd4bf' }}>English</span>
-              <span className="phrase-text">Hello</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2dd4bf' }}></div>
-            </div>
-            
-            <div className="card-base orbit-card pos-bottom-right">
-              <span className="lang-label" style={{ color: '#eab308' }}>Spanish</span>
-              <span className="phrase-text">Hola</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#eab308' }}></div>
-            </div>
-            
-            <div className="card-base orbit-card pos-bottom">
-              <span className="lang-label" style={{ color: '#f472b6' }}>Chinese</span>
-              <span className="phrase-text">你好</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f472b6' }}></div>
-            </div>
-            
-            <div className="card-base orbit-card pos-bottom-left">
-              <span className="lang-label" style={{ color: '#fb923c' }}>Korean</span>
-              <span className="phrase-text">안녕하세요</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fb923c' }}></div>
-            </div>
-            
-            <div className="card-base orbit-card pos-top">
-              <span className="lang-label" style={{ color: '#60a5fa' }}>French</span>
-              <span className="phrase-text">Bonjour</span>
-              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#60a5fa' }}></div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '48px', color: '#334155', fontWeight: 500, zIndex: 20 }}>
-            Learn naturally. Speak confidently.
-          </div>
-        </section>
-        
-        <section style={{ width: '40%', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px' }}>
-          <div style={{ width: '100%', maxWidth: '384px' }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', marginBottom: '32px' }}>
-              <Link to="/login" style={{ flex: 1, paddingBottom: '16px', textAlign: 'center', fontSize: '14px', fontWeight: 600, textDecoration: 'none', borderBottom: mode === 'login' ? '2px solid #0d9488' : '2px solid transparent', color: mode === 'login' ? '#0d9488' : '#94a3b8', transition: 'color 0.2s' }}>
-                Login
-              </Link>
-              <Link to="/register" style={{ flex: 1, paddingBottom: '16px', textAlign: 'center', fontSize: '14px', fontWeight: 600, textDecoration: 'none', borderBottom: mode === 'register' ? '2px solid #0d9488' : '2px solid transparent', color: mode === 'register' ? '#0d9488' : '#94a3b8', transition: 'color 0.2s' }}>
-                Create account
-              </Link>
-            </div>
-            {children}
-          </div>
-        </section>
-      </main>
-    </>
+    <main className="ds-root grid min-h-screen bg-card lg:grid-cols-[3fr_2fr]">
+      <section className="relative hidden min-h-screen overflow-hidden bg-[#f7f9fb] px-12 py-12 lg:flex lg:flex-col lg:items-center lg:justify-center" aria-label="About FluentA">
+        <div className="relative z-10 mb-16 text-center"><div className="mb-4 flex items-center justify-center gap-3 text-teal-600"><FluentALogo /><span className="text-3xl font-bold text-slate-800">FluentA</span></div><h1 className="m-0 max-w-sm text-xl font-normal leading-8 text-slate-600">Learn languages. Remember more.<br />Use it in real life.</h1></div>
+        <div className="relative h-[450px] w-full max-w-[560px]" aria-hidden="true"><div className="absolute left-1/2 top-1/2 size-80 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" /><div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" />{orbitCards.map(({ language, phrase, position, accent }, index) => <div key={language} className={cn('absolute grid place-items-center rounded-lg bg-white px-3 py-2 text-center shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-300', position, index === 0 && 'shadow-[0_10px_25px_rgba(0,0,0,0.08)]')}><span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400">{language}</span><strong className={cn('text-sm text-slate-800', index === 0 && 'text-2xl text-teal-600')}>{phrase}</strong>{index > 0 ? <span className={cn('absolute right-2 top-2 size-2 rounded-full', accent)} /> : null}</div>)}</div>
+        <p className="relative z-10 mt-12 font-medium text-slate-700">Learn naturally. Speak confidently.</p>
+      </section>
+      <section className="flex min-h-screen items-center justify-center bg-white p-6 sm:p-10 lg:p-12">
+        <div className="w-full max-w-sm"><div className="mb-8 flex items-center gap-3 lg:hidden"><span className="text-teal-600"><FluentALogo /></span><span className="text-lg font-bold text-slate-800">FluentA</span></div><nav className="mb-8 grid grid-cols-2 border-b border-slate-100" aria-label="Authentication"><Link to="/login" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'login' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Login</Link><Link to="/register" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'register' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Register</Link></nav>{children}</div>
+      </section>
+    </main>
   )
 }

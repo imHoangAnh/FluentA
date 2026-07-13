@@ -86,7 +86,12 @@ after checking the current config and available local runtime.
 
 ## Milestone Approval
 
-`PENDING USER VISUAL APPROVAL`
+`APPROVED BY USER`
+
+The user approved the running desktop/tablet milestone before planning began
+for `US-UI-002`. Harness completion remains separate from visual approval and
+still requires truthful reconciliation of the stale real-E2E routes/selectors
+recorded in this report.
 
 ## Reality Gate
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import * as authApi from '../../lib/api/auth.api'
+import { Button } from '@/components/ui/button'
 
 export function ResetPasswordPage() {
   const navigate = useNavigate()
@@ -27,14 +28,14 @@ export function ResetPasswordPage() {
 
   return (
     <AuthShell mode="login">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="grid gap-5">
         <div>
-          <h2 style={{ margin: 0, fontSize: '24px', color: '#0f172a' }}>Choose a new password</h2>
-          <p style={{ margin: '8px 0 0', color: '#64748b', fontSize: '14px', lineHeight: 1.6 }}>
+          <h1 className="m-0 text-2xl font-semibold tracking-tight">Choose a new password</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Set a new password for your FluentA account. This link can only be used once.
           </p>
         </div>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} onSubmit={(event) => void submit(event)}>
+        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
           <TextField
             label="New password"
             name="password"
@@ -53,16 +54,11 @@ export function ResetPasswordPage() {
             value={confirmPassword}
             onChange={setConfirmPassword}
           />
-          {missingToken ? <p className="form-error">This password reset link is missing its token.</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
-          <button className="primary-button" type="submit" style={{ minHeight: '44px', borderRadius: '22px' }} disabled={missingToken}>
-            Reset password
-          </button>
+          {missingToken ? <p role="alert" className="m-0 text-sm text-destructive">This password reset link is missing its token.</p> : null}
+          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+          <Button className="w-full" type="submit" disabled={missingToken}>Reset password</Button>
         </form>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-          <Link to="/login" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Back to login</Link>
-          <Link to="/forgot-password" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Request a new link</Link>
-        </div>
+        <div className="flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/forgot-password" className="text-primary no-underline hover:underline">Request a new link</Link></div>
       </div>
     </AuthShell>
   )

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import * as authApi from '../../lib/api/auth.api'
+import { Button } from '@/components/ui/button'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -27,30 +28,25 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthShell mode="login">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="grid gap-5">
         <div>
-          <h2 style={{ margin: 0, fontSize: '24px', color: '#0f172a' }}>Reset your password</h2>
-          <p style={{ margin: '8px 0 0', color: '#64748b', fontSize: '14px', lineHeight: 1.6 }}>
+          <h1 className="m-0 text-2xl font-semibold tracking-tight">Reset your password</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Enter your account email and we will send a reset link if password recovery is available for that account.
           </p>
         </div>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} onSubmit={(event) => void submit(event)}>
+        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
           <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
-          {message ? <p className="form-note" style={{ margin: 0 }}>{message}</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
+          {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
+          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
           {developmentResetUrl ? (
-            <p className="form-note" style={{ margin: 0 }}>
+            <p role="status" className="m-0 break-all text-sm text-primary">
               Local reset link: <a href={developmentResetUrl}>{developmentResetUrl}</a>
             </p>
           ) : null}
-          <button className="primary-button" type="submit" style={{ minHeight: '44px', borderRadius: '22px' }}>
-            Send reset link
-          </button>
+          <Button className="w-full" type="submit">Send reset link</Button>
         </form>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-          <Link to="/login" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Back to login</Link>
-          <Link to="/register" style={{ color: '#0f9f8f', textDecoration: 'none', fontWeight: 600 }}>Create account</Link>
-        </div>
+        <div className="flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/register" className="text-primary no-underline hover:underline">Register</Link></div>
       </div>
     </AuthShell>
   )

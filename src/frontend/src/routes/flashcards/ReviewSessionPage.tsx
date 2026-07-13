@@ -1,30 +1,11 @@
-import {
-  BookOpen,
-  CalendarClock,
-  CheckCircle2,
-  CheckSquare,
-  ChevronDown,
-  Columns3,
-  Globe,
-  HelpCircle,
-  Kanban,
-  Layers,
-  LogOut,
-  NotebookPen,
-  Play,
-  Repeat2,
-  Settings,
-  Timer,
-  Volume2,
-  X,
-} from 'lucide-react'
+import { CheckCircle2, ChevronDown, Layers, Play, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import { getLanguageProfile, selectSpeechVoice } from '../../lib/language'
-import { useAuthStore } from '../../stores/authStore'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
+import { AppShell } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
 
 type BrowserSpeechRecognition = {
   lang: string
@@ -72,11 +53,6 @@ function modeLabel(mode: flashcardApi.ReviewSessionWord['mode']) {
 }
 
 export function ReviewSessionPage() {
-  const logout = useAuthStore((state) => state.logout)
-  const user = useAuthStore((state) => state.user)
-  const location = useLocation()
-  const avatarUrl = user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.email || 'FluentA')}`
-  const displayName = user?.fullName || user?.email?.split('@')[0] || 'Learner'
 
   const [boardId, setBoardId] = useState('')
   const [orderType, setOrderType] = useState<flashcardApi.ReviewOrderType>('sequential')
@@ -124,6 +100,8 @@ export function ReviewSessionPage() {
   useEffect(() => {
     if (!currentWord) return
     cardStartedAt.current = Date.now()
+    // A newly active word must not display the prior word's answer or transcript.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTypedAnswer('')
     setTranscript('')
     setFeedback(null)
@@ -301,63 +279,8 @@ export function ReviewSessionPage() {
   const isPronunciation = currentWord?.mode === 'pronunciation'
 
   return (
-    <div className="dashboard-layout">
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img className="dashboard-user-avatar" src={avatarUrl} alt="User" />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(event) => { event.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main" style={{ display: 'flex', flexDirection: 'column' }}>
+    <AppShell title="Review" description="Practice your due words and keep your learning streak moving." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Flashcards</Link></Button>}>
+      <div className="flex flex-col">
         {!session ? (
           <div className="review-setup-container">
             <div className="review-setup-card">
@@ -584,7 +507,7 @@ export function ReviewSessionPage() {
             </div>
           </div>
         ) : null}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

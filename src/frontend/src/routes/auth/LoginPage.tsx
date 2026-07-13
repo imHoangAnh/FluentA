@@ -4,6 +4,7 @@ import { AuthShell } from '../../components/auth/AuthShell'
 import { TextField } from '../../components/auth/TextField'
 import { buildGoogleAuthUrl } from '../../lib/auth/google'
 import { useAuthStore } from '../../stores/authStore'
+import { Button } from '@/components/ui/button'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -35,7 +36,8 @@ export function LoginPage() {
 
   return (
     <AuthShell mode="login">
-      <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} onSubmit={(event) => void submit(event)}>
+      <div className="mb-7"><h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">Welcome back</h1><p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">Sign in to continue your learning.</p></div>
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
         <TextField
           label="Password"
@@ -46,24 +48,18 @@ export function LoginPage() {
           value={password}
           onChange={setPassword}
         />
-        {error ? <p className="form-error">{error}</p> : null}
-        {notice ? <p className="form-note">{notice}</p> : null}
-        {stubMessage ? <p className="form-note">{stubMessage}</p> : null}
-        <button className="primary-button" type="submit" style={{ marginTop: '8px', minHeight: '44px', borderRadius: '22px' }}>
-          Continue
-        </button>
+        {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+        {notice ? <p role="status" className="m-0 text-sm text-primary">{notice}</p> : null}
+        {stubMessage ? <p role="status" className="m-0 text-sm text-primary">{stubMessage}</p> : null}
+        <Button className="w-full" type="submit">Continue</Button>
       </form>
 
-      <div style={{ display: 'flex', alignItems: 'center', margin: '24px 0', color: '#a7b5b2', fontSize: '14px' }}>
-        <div style={{ flex: 1, height: '1px', backgroundColor: '#e2ecea' }}></div>
-        <span style={{ padding: '0 12px' }}>or</span>
-        <div style={{ flex: 1, height: '1px', backgroundColor: '#e2ecea' }}></div>
-      </div>
+      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
 
       <button
         type="button"
         onClick={startGoogleLogin}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '44px', borderRadius: '22px', border: '1px solid #e2ecea', backgroundColor: '#fff', color: '#1a2e2a', fontWeight: 600, cursor: 'pointer' }}
+        className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-input bg-card text-sm font-semibold text-foreground hover:bg-accent"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -74,9 +70,7 @@ export function LoginPage() {
         Continue with Google
       </button>
 
-      <div style={{ textAlign: 'center', marginTop: '24px' }}>
-        <Link to="/forgot-password" style={{ color: '#0f9f8f', fontSize: '14px', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</Link>
-      </div>
+      <div className="mt-6 text-center"><Link to="/forgot-password" className="text-sm font-semibold text-primary no-underline hover:underline">Forgot password?</Link></div>
     </AuthShell>
   )
 }

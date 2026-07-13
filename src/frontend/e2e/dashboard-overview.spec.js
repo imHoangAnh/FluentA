@@ -30,6 +30,7 @@ async function registerAndLogin(page) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill(password);

@@ -10,12 +10,14 @@
 
 ## Current Story
 
-`US-UI-001` is current. It is intentionally a full user-visible milestone,
-not a package-installation or token-only technical story.
+`US-UI-003` is current for planning. The user approved the `US-UI-002` plan
+but explicitly deferred further `US-UI-002` implementation in favor of
+planning the productivity milestone. Existing `US-UI-002` worktree changes
+remain preserved and require their own closeout; they are not part of this
+story packet.
 
 ## Dependency Rule
 
 Do not begin the next story until the user approves the current milestone.
 Later stories must consume the approved components and tokens rather than
 forking a new visual language.
-
