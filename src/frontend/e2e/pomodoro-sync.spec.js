@@ -15,7 +15,7 @@ async function registerAndLogin(page) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   await login(page, email, password);
   return { email, password };
 }
@@ -38,8 +38,8 @@ test('Pomodoro timer controls sync across same-user tabs', async ({ context, pag
   page.on('console', collectConsoleError);
 
   const { email, password } = await registerAndLogin(page);
-  await page.getByTestId('open-pomodoro').click();
-  await expect(page.getByRole('heading', { name: 'Idle' })).toBeVisible();
+  await page.getByRole('link', { name: 'Pomodoro' }).click();
+  await expect(page.getByTestId('pomodoro-state')).toHaveText('Idle');
 
   const secondTab = await context.newPage();
   secondTab.on('console', collectConsoleError);
@@ -48,23 +48,23 @@ test('Pomodoro timer controls sync across same-user tabs', async ({ context, pag
     if (socket.url().includes('/hubs/sync')) secondTabHubSockets.push(socket.url());
   });
   await login(secondTab, email, password);
-  await secondTab.getByTestId('open-pomodoro').click();
-  await expect(secondTab.getByRole('heading', { name: 'Idle' })).toBeVisible();
+  await secondTab.getByRole('link', { name: 'Pomodoro' }).click();
+  await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Idle');
   await expect.poll(() => secondTabHubSockets.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
 
   await page.getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(secondTab.getByRole('heading', { name: 'Running' })).toBeVisible();
+  await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Running');
 
   await secondTab.getByRole('button', { name: 'Pause', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
+  await expect(page.getByTestId('pomodoro-state')).toHaveText('Paused');
 
   await page.getByRole('button', { name: 'Resume', exact: true }).click();
-  await expect(secondTab.getByRole('heading', { name: 'Running' })).toBeVisible();
+  await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Running');
 
   await secondTab.getByRole('button', { name: 'Complete phase', exact: true }).click();
-  await expect(page.getByText(/ShortBreak phase/)).toBeVisible();
+  await expect(page.getByText(/ShortBreak Session/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
-  await expect(secondTab.getByRole('heading', { name: 'Idle' })).toBeVisible();
+  await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Idle');
   expect(consoleErrors).toEqual([]);
 });

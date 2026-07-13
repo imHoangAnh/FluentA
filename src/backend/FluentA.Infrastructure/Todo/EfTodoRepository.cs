@@ -20,6 +20,7 @@ public sealed class EfTodoRepository : ITodoRepository
         return await _dbContext.TodoItems
             .Where(item => item.UserId == userId && item.Date == normalized && item.DeletedAt == null)
             .OrderBy(item => item.IsCompleted)
+            .ThenBy(item => item.SortOrder)
             .ThenByDescending(item => item.IsCompleted ? item.CompletedAt : item.CreatedAt)
             .ThenByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -33,6 +34,7 @@ public sealed class EfTodoRepository : ITodoRepository
             .Where(item => item.UserId == userId && item.Date >= start && item.Date <= end && item.DeletedAt == null)
             .OrderBy(item => item.Date)
             .ThenBy(item => item.IsCompleted)
+            .ThenBy(item => item.SortOrder)
             .ThenByDescending(item => item.IsCompleted ? item.CompletedAt : item.CreatedAt)
             .ThenByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -50,9 +52,25 @@ public sealed class EfTodoRepository : ITodoRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeDate(date);
+        var maximum = await _dbContext.TodoItems
+            .Where(item => item.UserId == userId && item.Date == normalized && item.DeletedAt == null)
+            .Select(item => (int?)item.SortOrder)
+            .MaxAsync(cancellationToken);
+        return (maximum ?? -1) + 1;
+    }
+
     public async Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
     {
         _dbContext.TodoItems.Update(item);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
+    {
+        _dbContext.TodoItems.UpdateRange(items);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
     private static DateTime NormalizeDate(DateTime date)

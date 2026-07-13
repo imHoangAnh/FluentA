@@ -23,6 +23,7 @@ async function registerAndLogin(page) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
+  await page.goto('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
@@ -51,9 +52,9 @@ test('personal productivity navigation and authenticated cross-tab Todo sync', a
     data: { title: 'Cross-tab integration task', date: todayInput() },
   })).json()).data;
 
-  await expect(page.getByTestId('open-todo')).toBeVisible();
-  await expect(page.getByTestId('open-countdown')).toBeVisible();
-  await page.getByTestId('open-todo').click();
+  await expect(page.getByRole('link', { name: 'Todo', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Countdowns', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Todo', exact: true }).click();
   await expect(page.getByLabel('Complete Cross-tab integration task')).toBeVisible();
 
   const secondTab = await context.newPage();
@@ -61,22 +62,24 @@ test('personal productivity navigation and authenticated cross-tab Todo sync', a
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   await login(secondTab, email, password);
-  await secondTab.getByTestId('open-todo').click();
+  await secondTab.getByRole('link', { name: 'Todo' }).click();
   await expect(secondTab.getByLabel('Complete Cross-tab integration task')).toBeVisible({ timeout: 15_000 });
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
-  await secondTab.getByTestId('open-countdown').click();
-  await expect(secondTab.getByRole('heading', { name: 'Important dates' })).toBeVisible();
+  await secondTab.getByRole('link', { name: 'Countdowns' }).click();
+  await expect(secondTab.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
 
   const syncedTodoResponse = secondTab.waitForResponse((response) =>
     response.request().method() === 'GET' && response.url().includes('/api/v1/todos?date='));
   await page.getByLabel('Complete Cross-tab integration task').click();
-  await expect(page.locator('article.todo-item').filter({ hasText: 'Cross-tab integration task' })).toHaveClass(/todo-item--completed/);
+  await page.getByRole('button', { name: /Completed/ }).click();
+  await expect(page.locator('article.todo-card-v2').filter({ hasText: 'Cross-tab integration task' })).toHaveClass(/todo-card-v2--completed/);
   const syncedItems = (await (await syncedTodoResponse).json()).data;
   expect(syncedItems.find((item) => item.id === todo.id)?.isCompleted).toBe(true);
 
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
-  await secondTab.getByTestId('open-todo').click();
-  await expect(secondTab.getByLabel('Complete Cross-tab integration task')).toBeChecked();
+  await secondTab.getByRole('link', { name: 'Todo' }).click();
+  await secondTab.getByRole('button', { name: /Completed/ }).click();
+  await expect(secondTab.getByLabel('Uncomplete Cross-tab integration task')).toBeChecked();
 
   const response = await page.request.get(`http://127.0.0.1:5000/api/v1/todos?date=${todayInput()}`, { headers });
   const persisted = (await response.json()).data.find((item) => item.id === todo.id);

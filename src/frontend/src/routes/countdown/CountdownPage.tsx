@@ -1,15 +1,9 @@
-import {
-  Plus, Trash2, X,
-  CalendarClock, Settings, Columns3, BookOpen, LogOut, NotebookPen, Repeat2, Kanban, Timer, Globe, HelpCircle, CheckSquare, ImagePlus
-} from 'lucide-react'
-import { type FormEvent, useMemo, useState } from 'react'
+import { CalendarClock, ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as countdownApi from '../../lib/api/countdown.api'
-import { useAuthStore } from '../../stores/authStore'
+import { AppShell } from '@/components/AppShell'
 import './CountdownPage.css'
 
 const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
@@ -43,11 +37,6 @@ function statusText(item: countdownApi.CountdownEvent) {
 
 export function CountdownPage() {
   const queryClient = useQueryClient()
-  const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const logout = useAuthStore((state) => state.logout)
-  const displayName = user?.fullName?.split(' ')[0] || 'User'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [showFormModal, setShowFormModal] = useState(false)
   const [name, setName] = useState('')
@@ -55,6 +44,8 @@ export function CountdownPage() {
   const [alerts, setAlerts] = useState<Array<{ alertDay: string; alertTime: string }>>([defaultAlert()])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const dialogTitleId = useId()
+  const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const countdownsQuery = useQuery({
     queryKey: ['countdown', 'events'],
@@ -67,14 +58,24 @@ export function CountdownPage() {
     await queryClient.invalidateQueries({ queryKey: ['countdown', 'events'] })
   }
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setName('')
     setTargetDate(defaultTargetDate())
     setAlerts([defaultAlert()])
     setCoverFile(null)
     setFormError(null)
     setShowFormModal(false)
-  }
+    window.requestAnimationFrame(() => createTriggerRef.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    if (!showFormModal) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') resetForm()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [resetForm, showFormModal])
 
   const createCountdown = useMutation({
     mutationFn: async () => {
@@ -112,69 +113,14 @@ export function CountdownPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img className="dashboard-user-avatar" src={avatarUrl} alt="User" />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main countdown-main">
+    <AppShell title="Countdowns" description="Track important dates and reminder alerts.">
+      <main className="countdown-main">
         <header className="countdown-header">
           <div className="countdown-header-title">
             <h2>Countdowns</h2>
             <p>Date-based milestones with fixed Vietnam-local alerts.</p>
           </div>
-          <button className="add-event-btn" onClick={() => setShowFormModal(true)}>
+          <button ref={createTriggerRef} className="add-event-btn" type="button" onClick={() => setShowFormModal(true)}>
             <Plus size={20} />
             <span>New Countdown</span>
           </button>
@@ -187,7 +133,7 @@ export function CountdownPage() {
                 {countdowns.map((item) => (
                   <article key={item.id} className="event-list-item active">
                     <div className="event-icon-box">
-                      {item.coverUrl ? <img src={item.coverUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }} /> : <CalendarClock size={28} />}
+                      {item.coverUrl ? <img className="countdown-cover-image" src={item.coverUrl} alt={item.name} /> : <CalendarClock size={28} />}
                     </div>
                     <div className="event-info">
                       <h4 className="event-title">{item.name}</h4>
@@ -199,6 +145,7 @@ export function CountdownPage() {
                       <button
                         className="kanban-danger-btn"
                         type="button"
+                        aria-label={`Delete ${item.name}`}
                         onClick={() => {
                           if (window.confirm(`Delete "${item.name}"?`)) deleteCountdown.mutate(item.id)
                         }}
@@ -225,20 +172,20 @@ export function CountdownPage() {
         </div>
 
         {showFormModal ? (
-          <div className="modal-overlay">
-            <div className="modal-content">
+          <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && resetForm()}>
+            <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}>
               <div className="modal-header">
-                <h3>Create Countdown</h3>
-                <button onClick={resetForm}><X size={20} /></button>
+                <h3 id={dialogTitleId}>Create Countdown</h3>
+                <button type="button" aria-label="Close countdown dialog" onClick={resetForm}><X size={20} /></button>
               </div>
               <form onSubmit={submitCountdown}>
                 <label>
                   Countdown name
-                  <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="E.g., JLPT N2 Exam" />
+                  <input data-testid="countdown-name-input" required value={name} onChange={(event) => setName(event.target.value)} placeholder="E.g., JLPT N2 Exam" />
                 </label>
                 <label>
                   Target date
-                  <input type="date" required value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+                  <input data-testid="countdown-target-input" type="date" required value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
                 </label>
                 <label>
                   Cover image (optional)
@@ -249,13 +196,13 @@ export function CountdownPage() {
                 </label>
                 <div className="detail-notes">
                   <label>Alerts</label>
-                  <div className="notes-box" style={{ display: 'grid', gap: '12px' }}>
+                  <div className="notes-box countdown-alerts-list">
                     {alerts.map((alert, index) => (
-                      <div key={`${alert.alertDay}-${index}`} style={{ display: 'grid', gap: '8px' }}>
-                        <select value={alert.alertDay} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertDay: event.target.value } : item))}>
+                      <div className="countdown-alert-row" key={`${alert.alertDay}-${index}`}>
+                        <select aria-label={`Alert ${index + 1} day`} value={alert.alertDay} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertDay: event.target.value } : item))}>
                           {alertDayOptions.map((option) => <option value={option} key={option}>{option}</option>)}
                         </select>
-                        <input type="time" value={alert.alertTime} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))} />
+                        <input aria-label={`Alert ${index + 1} time`} type="time" value={alert.alertTime} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))} />
                         <button type="button" className="btn-cancel" onClick={() => setAlerts((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={alerts.length === 1}>
                           Remove alert
                         </button>
@@ -267,16 +214,16 @@ export function CountdownPage() {
                     </button>
                   </div>
                 </div>
-                {formError ? <p className="flashcard-status flashcard-status--error">{formError}</p> : null}
+                {formError ? <p className="flashcard-status flashcard-status--error" role="alert">{formError}</p> : null}
                 <div className="modal-actions">
                   <button type="button" className="btn-cancel" onClick={resetForm}>Cancel</button>
-                  <button type="submit" className="btn-submit" disabled={createCountdown.isPending}>Create Countdown</button>
+                  <button data-testid="save-countdown-button" type="submit" className="btn-submit" disabled={createCountdown.isPending}>Create Countdown</button>
                 </div>
               </form>
             </div>
           </div>
         ) : null}
       </main>
-    </div>
+    </AppShell>
   )
 }

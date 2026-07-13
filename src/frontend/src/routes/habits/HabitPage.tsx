@@ -1,14 +1,8 @@
-import { 
-  BarChart3, BookOpen, CalendarClock, CheckSquare, Columns3, Flame, Globe, HelpCircle, Layers,
-  LogOut, NotebookPen, Repeat2, Settings, Kanban, Plus, 
-  ChevronLeft, ChevronRight, Edit3, Trash2, X, Timer
-} from 'lucide-react'
-import { type FormEvent, useMemo, useState } from 'react'
+import { BarChart3, CalendarClock, CheckSquare, ChevronLeft, ChevronRight, Edit3, Flame, Layers, Plus, Repeat2, Trash2, X } from 'lucide-react'
+import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
-import { useAuthStore } from '../../stores/authStore'
+import { Link } from 'react-router-dom'
+import { AppShell } from '@/components/AppShell'
 import * as habitApi from '../../lib/api/habit.api'
 import { HabitIconGlyph } from '../../lib/habit-icons'
 import { habitIconOptions } from '../../lib/habit-icon-options'
@@ -144,12 +138,9 @@ export function HabitPage() {
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [iconMenuOpen, setIconMenuOpen] = useState(false)
+  const dialogTitleId = useId()
+  const formTriggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const user = useAuthStore((state) => state.user)
-  const logout = useAuthStore((state) => state.logout)
-  const location = useLocation()
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const weekDates = useMemo(() => {
     const monday = parseDateInput(selectedWeekStart)
@@ -214,11 +205,26 @@ export function HabitPage() {
     await queryClient.invalidateQueries({ queryKey: ['habit'] })
   }
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setEditingId(null)
     setForm(emptyForm())
     setIconMenuOpen(false)
-  }
+  }, [])
+
+  const closeForm = useCallback(() => {
+    setShowForm(false)
+    resetForm()
+    window.requestAnimationFrame(() => formTriggerRef.current?.focus())
+  }, [resetForm])
+
+  useEffect(() => {
+    if (!showForm) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeForm()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [closeForm, showForm])
 
   const createHabit = useMutation({
     mutationFn: habitApi.createHabit,
@@ -292,68 +298,8 @@ export function HabitPage() {
   }
 
   return (
-    <div className="dashboard-layout">
-      {/* SideNavBar exactly like KanbanPage/JournalPage */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img 
-              className="dashboard-user-avatar" 
-              src={avatarUrl}
-              alt="User" 
-            />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main habit-tracker-main">
+    <AppShell title="Habits" description="Build consistency with small actions every day.">
+      <div className="habit-tracker-main">
         {/* LEFT: HABIT LIST */}
         <div className="habit-tracker-sidebar">
           {/* Top Header */}
@@ -362,7 +308,7 @@ export function HabitPage() {
               <h2>Habit Tracker</h2>
             </div>
             <div className="habit-tracker-header-actions">
-              <button aria-label="Create habit" onClick={() => { resetForm(); setShowForm(true); }}><Plus size={24} /></button>
+              <button ref={formTriggerRef} aria-label="Create habit" onClick={(event) => { formTriggerRef.current = event.currentTarget; resetForm(); setShowForm(true); }}><Plus size={24} /></button>
             </div>
           </header>
           
@@ -468,7 +414,7 @@ export function HabitPage() {
                 </div>
                 <div className="habit-details-actions">
                   <Link aria-label={`View stats for ${selectedHabit.name}`} to={`/habits/${selectedHabit.id}/stats`}><BarChart3 size={20} /></Link>
-                  <button aria-label={`Edit ${selectedHabit.name}`} onClick={() => { editHabit(selectedHabit); setShowForm(true); }}><Edit3 size={20} /></button>
+                  <button aria-label={`Edit ${selectedHabit.name}`} onClick={(event) => { formTriggerRef.current = event.currentTarget; editHabit(selectedHabit); setShowForm(true); }}><Edit3 size={20} /></button>
                   <button aria-label={`Delete ${selectedHabit.name}`} className="danger" onClick={() => confirmDelete(selectedHabit)}><Trash2 size={20} /></button>
                 </div>
               </div>
@@ -559,14 +505,14 @@ export function HabitPage() {
         
         {/* Habit Form Modal */}
         {showForm && (
-          <div className="habit-modal-overlay">
-            <div className="habit-modal">
+          <div className="habit-modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && closeForm()}>
+            <div className="habit-modal" role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}>
               <div className="habit-modal-header">
-                <h3>{editingId ? 'Edit Habit' : 'New Habit'}</h3>
-                <button onClick={() => { setShowForm(false); resetForm(); }}><X size={24} /></button>
+                <h3 id={dialogTitleId}>{editingId ? 'Edit Habit' : 'New Habit'}</h3>
+                <button type="button" aria-label="Close habit dialog" onClick={closeForm}><X size={24} /></button>
               </div>
               
-              <form onSubmit={(e) => { submitHabit(e); setShowForm(false); }} className="habit-modal-form">
+              <form onSubmit={(e) => { submitHabit(e); closeForm(); }} className="habit-modal-form">
                 <label>
                   Habit Name
                   <input data-testid="habit-name-input" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Read a book" />
@@ -638,7 +584,7 @@ export function HabitPage() {
                 )}
                 
                 <div className="habit-modal-footer">
-                  <button type="button" className="habit-btn-cancel" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
+                  <button type="button" className="habit-btn-cancel" onClick={closeForm}>Cancel</button>
                   <button data-testid="save-habit-button" type="submit" className="habit-btn-submit" disabled={!canSubmit || isSaving}>
                     {editingId ? 'Save Changes' : 'Create Habit'}
                   </button>
@@ -647,7 +593,7 @@ export function HabitPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

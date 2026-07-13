@@ -73,7 +73,8 @@ public sealed class TodoService : ITodoService
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
         }
 
-        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note);
+        var sortOrder = await _repository.NextSortOrderAsync(userId, validation.Date, cancellationToken);
+        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note, sortOrder);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(ToDto(item));
     }
@@ -112,7 +113,28 @@ public sealed class TodoService : ITodoService
             item.SetCompleted(request.IsCompleted.Value, DateTime.UtcNow);
         }
 
-        await _repository.UpdateAsync(item, cancellationToken);
+        if (request.Date is not null || request.SortOrder is not null)
+        {
+            var destinationDate = request.Date is null ? item.Date : ParseDate(request.Date);
+            var destination = (await _repository.ListByDateAsync(userId, destinationDate, cancellationToken))
+                .Where(candidate => candidate.Id != item.Id)
+                .OrderBy(candidate => candidate.IsCompleted)
+                .ThenBy(candidate => candidate.SortOrder)
+                .ToList();
+            var targetIndex = Math.Clamp(request.SortOrder ?? destination.Count, 0, destination.Count);
+            destination.Insert(targetIndex, item);
+
+            foreach (var (candidate, index) in destination.Select((candidate, index) => (candidate, index)))
+            {
+                candidate.MoveTo(destinationDate, index);
+            }
+
+            await _repository.UpdateRangeAsync(destination, cancellationToken);
+        }
+        else
+        {
+            await _repository.UpdateAsync(item, cancellationToken);
+        }
         if (completionBefore != item.IsCompleted)
         {
             await _syncNotifier.TodoItemCheckedAsync(userId, item.Id, item.IsCompleted, cancellationToken);
@@ -162,6 +184,16 @@ public sealed class TodoService : ITodoService
             errors["note"] = ["Note must be at most 4000 characters."];
         }
 
+        if (request.Date is not null && !TryParseDate(request.Date, "date", out _, out var dateErrors))
+        {
+            errors["date"] = dateErrors["date"];
+        }
+
+        if (request.SortOrder is < 0)
+        {
+            errors["sortOrder"] = ["sortOrder cannot be negative."];
+        }
+
         return errors;
     }
 
@@ -206,6 +238,7 @@ public sealed class TodoService : ITodoService
             item.Title,
             item.Note,
             FormatDate(item.Date),
+            item.SortOrder,
             item.IsCompleted,
             item.CompletedAt,
             item.CreatedAt,
@@ -215,5 +248,11 @@ public sealed class TodoService : ITodoService
     private static string FormatDate(DateTime date)
     {
         return date.ToString(DateFormat, CultureInfo.InvariantCulture);
+    }
+
+    private static DateTime ParseDate(string value)
+    {
+        TryParseDate(value, "date", out var parsed, out _);
+        return parsed;
     }
 }

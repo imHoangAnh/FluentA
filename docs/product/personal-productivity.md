@@ -65,8 +65,8 @@ and mobile drag-and-drop are separate future stories.
   assigned date.
 - A logged-in user can create a task for any day in the visible week.
 - A logged-in user can toggle task completion without reloading the page.
-- A logged-in user can update task title, note, and completion through
-  field-scoped API behavior.
+- A logged-in user can update task title, note, completion, assigned date, and
+  week sort order through field-scoped API behavior.
 - A logged-in user can delete their own task.
 - Todo compact rows show title only; note remains in form/detail.
 - Incomplete tasks stay above completed tasks.
@@ -79,8 +79,10 @@ and mobile drag-and-drop are separate future stories.
 - API calls for missing, deleted, or foreign-user tasks return `404` so another
   user's data is not revealed.
 - Deleted tasks are hidden from normal list endpoints.
-- Task date is immutable after create; moving a task to another day requires
-  delete and recreate.
+- Task date remains owner-scoped and can change through the authenticated
+  update route when the learner moves a task in Week view.
+- The server normalizes sort order for every affected owned task in the source
+  and destination dates; clients do not write another user's ordering.
 
 ## Todo API Contract
 
@@ -91,7 +93,7 @@ All responses use the FluentA envelope.
 | `GET` | `/api/v1/todos?date=YYYY-MM-DD` | List active tasks for the selected date. |
 | `GET` | `/api/v1/todos?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active tasks in an inclusive date range for week planning. |
 | `POST` | `/api/v1/todos` | Create a task. |
-| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, or completion. |
+| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, completion, assigned date, or week sort order. |
 | `DELETE` | `/api/v1/todos/{id}` | Soft-delete a task. |
 
 ## Todo Validation And Error Rules
@@ -99,6 +101,8 @@ All responses use the FluentA envelope.
 - Title is required and must be at most 240 characters after trimming.
 - Note is optional and must be at most 4000 characters after trimming.
 - Date values must parse as calendar dates.
+- Sort order must be a non-negative integer; an omitted sort order preserves
+  the task's current position unless a date move requires normalization.
 - Date ranges must include both `startDate` and `endDate`, and `startDate` must
   be on or before `endDate`.
 - Validation failures return `422 VALIDATION_ERROR`.
@@ -108,9 +112,9 @@ All responses use the FluentA envelope.
 
 - Week view always shows seven columns from Monday through Sunday.
 - Selecting a week column changes the date used by the create-task form.
-- Week view is for creating and viewing tasks by day only.
-- Drag-and-drop reorder and cross-day move are not part of the current
-  contract.
+- Week view supports desktop pointer drag-and-drop to reorder tasks within a
+  day and move tasks between visible days. The same behavior remains covered by
+  an explicit accessible Move action in the UI.
 - Mobile drag-and-drop is not part of the current contract.
 
 ## Todo Real-Time Rules

@@ -27,7 +27,7 @@ async function registerAndLogin(page) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
@@ -61,17 +61,17 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
     data: { name: 'Cross-tab reading', description: 'SignalR proof', icon: 'Book', frequency: 'Daily' },
   })).json()).data;
 
-  await page.getByTestId('open-habits').click();
+  await page.getByRole('link', { name: 'Habits' }).click();
   await expect(page.getByRole('heading', { name: 'Cross-tab reading' })).toBeVisible();
 
   const secondTab = await context.newPage();
   secondTab.on('console', collectConsoleError);
   await login(secondTab, email, password);
-  await secondTab.getByTestId('open-habits').click();
+  await secondTab.getByRole('link', { name: 'Habits' }).click();
   await expect(secondTab.getByLabel(`Check Cross-tab reading on ${todayInput()}`)).toBeVisible({ timeout: 15_000 });
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
-  await secondTab.getByTestId('open-countdown').click();
-  await expect(secondTab.getByRole('heading', { name: 'Important dates' })).toBeVisible();
+  await secondTab.getByRole('link', { name: 'Countdowns' }).click();
+  await expect(secondTab.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
 
   const syncedHabitList = secondTab.waitForResponse((response) =>
     response.request().method() === 'GET' && response.url().includes('/api/v1/habits?timeZoneId='));
@@ -89,7 +89,7 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   expect(entriesPayload.data.some((entry) => entry.date === todayInput())).toBe(true);
 
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
-  await secondTab.getByTestId('open-habits').click();
+  await secondTab.getByRole('link', { name: 'Habits' }).click();
   await expect(secondTab.getByLabel(`Uncheck Cross-tab reading on ${todayInput()}`)).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });

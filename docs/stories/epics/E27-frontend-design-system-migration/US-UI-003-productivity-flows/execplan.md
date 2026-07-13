@@ -2,8 +2,10 @@
 
 ## Goal
 
-Produce the third user-approved E27 milestone without changing productivity
-business rules, API/database contracts, realtime events, or timer ownership.
+Produce the third user-approved E27 milestone while preserving productivity
+business rules, realtime events, authorization, and timer ownership. The
+approved Todo week contract permits the bounded PATCH/schema ordering change
+documented in the story overview and validation evidence.
 
 ## Risk Classification
 
@@ -108,8 +110,16 @@ dialog, wide-board/calendar, and active timer states.
 - `US-UI-002` worktree conflicts with shared primitives/AppShell in a way that
   cannot be isolated safely.
 
+## Approved Plan Deviation
+
+Baseline reconciliation proved the locked Todo week behavior could not persist
+through the prior title/note/completion-only update DTO. The user approved a
+bounded expansion of the existing authenticated PATCH route with `date` and
+`sortOrder`, plus the corresponding migration. No route, ownership rule,
+SignalR payload, or broader architecture changed.
+
 ## Rollback Boundary
 
-Each route group is migrated and proven before the next begins. The story has
-no backend or database rollback. A failed route phase can return to its legacy
-presentation while previously approved design-system routes remain intact.
+Each route group is migrated and proven before the next begins. Presentation
+changes remain route-bounded; the Todo ordering migration is the only database
+rollback boundary and must stay paired with its DTO/service/repository tests.

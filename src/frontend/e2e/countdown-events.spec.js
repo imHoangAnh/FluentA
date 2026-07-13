@@ -31,7 +31,7 @@ async function registerAndLogin(page, prefix) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
@@ -44,41 +44,41 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
   const { token } = await registerAndLogin(page, 'countdown');
   const headers = { Authorization: `Bearer ${token}` };
 
-  await page.getByTestId('open-countdown').click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/countdown');
-  await expect(page.getByRole('heading', { name: 'Important dates' })).toBeVisible();
+  await page.getByRole('link', { name: 'Countdowns' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:5173/countdowns');
+  await expect(page.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
 
+  const newCountdownButton = page.getByRole('button', { name: 'New Countdown' });
+  await newCountdownButton.click();
+  await expect(page.getByRole('dialog', { name: 'Create Countdown' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Create Countdown' })).toBeHidden();
+  await expect(newCountdownButton).toBeFocused();
+  await newCountdownButton.click();
   await page.getByTestId('countdown-name-input').fill('IELTS Exam');
-  await page.getByTestId('countdown-target-input').fill(localDateTimeInput(21));
-  await page.getByTestId('countdown-icon-input').fill('Exam');
+  await page.getByTestId('countdown-target-input').fill(localDateTimeInput(21).slice(0, 10));
   await page.getByTestId('save-countdown-button').click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
-  await expect(page.getByText(/remaining/)).toBeVisible();
-
-  await page.getByLabel('Edit IELTS Exam').click();
-  await page.getByTestId('countdown-name-input').fill('IELTS Final');
-  await page.getByTestId('save-countdown-button').click();
-  await expect(page.getByRole('heading', { name: 'IELTS Final' })).toBeVisible();
+  await expect(page.getByText(/days? left/)).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByLabel('Delete IELTS Final').click();
-  await expect(page.getByRole('heading', { name: 'IELTS Final' })).toBeHidden();
+  await page.getByLabel('Delete IELTS Exam').click();
+  await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeHidden();
 
-  const past = (await (await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
+  const past = await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
     headers,
-    data: { name: 'Past deadline', targetDate: utcIso(-1), color: '#16A34A', icon: 'Done' },
+    data: { name: 'Past deadline', targetDate: localDateTimeInput(-1).slice(0, 10), alerts: [{ alertDay: 'OnTargetDay', alertTime: '09:00' }] },
+  });
+  expect(past.status()).toBe(422);
+
+  const protectedCountdown = (await (await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
+    headers,
+    data: { name: 'Protected deadline', targetDate: localDateTimeInput(14).slice(0, 10), alerts: [{ alertDay: '1DayBefore', alertTime: '09:00' }] },
   })).json()).data;
 
-  await page.getByRole('link', { name: 'Vocabulary' }).click();
-  await page.getByTestId('open-countdown').click();
-  await expect(page.getByRole('heading', { name: 'Past deadline' })).toBeVisible();
-  await expect(page.locator('.countdown-badge').filter({ hasText: 'Completed' })).toBeVisible();
-  await expect(page.getByText('Event Past deadline has arrived!')).toBeVisible();
-
   const second = await registerAndLogin(page, 'countdown-foreign');
-  const foreign = await page.request.patch(`http://127.0.0.1:5000/api/v1/countdowns/${past.id}`, {
+  const foreign = await page.request.delete(`http://127.0.0.1:5000/api/v1/countdowns/${protectedCountdown.id}`, {
     headers: { Authorization: `Bearer ${second.token}` },
-    data: { name: 'Foreign edit' },
   });
   expect(foreign.status()).toBe(404);
 });

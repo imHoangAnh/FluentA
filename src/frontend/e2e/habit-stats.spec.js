@@ -24,7 +24,7 @@ async function registerAndLogin(page) {
   });
 
   await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();

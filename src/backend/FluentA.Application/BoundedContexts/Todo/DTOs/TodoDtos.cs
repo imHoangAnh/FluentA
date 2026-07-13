@@ -5,13 +5,16 @@ public sealed record CreateTodoItemRequest(string Title, string Date, string? No
 public sealed record UpdateTodoItemRequest(
     string? Title = null,
     string? Note = null,
-    bool? IsCompleted = null);
+    bool? IsCompleted = null,
+    string? Date = null,
+    int? SortOrder = null);
 
 public sealed record TodoItemDto(
     Guid Id,
     string Title,
     string? Note,
     string Date,
+    int SortOrder,
     bool IsCompleted,
     DateTime? CompletedAt,
     DateTime CreatedAt,

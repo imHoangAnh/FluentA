@@ -3823,6 +3823,12 @@ a {
   gap: 16px;
 }
 
+.todo-tasks-v2__header .todo-section-v2__toggle {
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+
 .todo-tasks-v2__heading {
   margin: 0;
   display: flex;
@@ -5739,6 +5745,20 @@ a {
 .kanban-main-wrapper {
   background: var(--bg);
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kanban-loading-label {
+  padding-bottom: 12px;
+}
+
+.kanban-status-notice {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
 }
 
 .kanban-header {
@@ -5750,6 +5770,41 @@ a {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   z-index: 40;
+}
+
+.kanban-filter-bar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.kanban-filter-bar label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.kanban-filter-bar select {
+  min-width: 164px;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-container);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 32px 7px 10px;
+}
+
+.kanban-filter-bar select:focus-visible,
+.kanban-card-move:focus-visible,
+.kanban-card-edit-btn:focus-visible {
+  outline: 3px solid rgba(13, 148, 136, 0.25);
+  outline-offset: 2px;
 }
 
 .kanban-search-wrapper {
@@ -6081,6 +6136,17 @@ a {
   margin: 0;
 }
 
+.kanban-card-edit-btn {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
 .kanban-card-footer {
   display: flex;
   justify-content: space-between;
@@ -6093,6 +6159,18 @@ a {
   gap: 4px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.kanban-card-move {
+  max-width: 132px;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 24px 4px 7px;
 }
 .kanban-card-avatar {
   width: 24px;
@@ -6544,6 +6622,10 @@ a {
   align-items: center;
   gap: 6px;
   margin: 0;
+}
+
+.kanban-modal-spacer {
+  flex: 1;
 }
 
 .habit-description-card {

@@ -9,7 +9,7 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Title = string.Empty;
     }
 
-    private TodoItem(Guid userId, string title, DateTime date, string? note)
+    private TodoItem(Guid userId, string title, DateTime date, string? note, int sortOrder)
     {
         if (userId == Guid.Empty)
         {
@@ -20,17 +20,19 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Title = CleanTitle(title);
         Date = NormalizeDate(date);
         Note = CleanNote(note);
+        SortOrder = ValidateSortOrder(sortOrder);
     }
 
     public Guid UserId { get; private set; }
     public string Title { get; private set; }
     public string? Note { get; private set; }
     public DateTime Date { get; private set; }
+    public int SortOrder { get; private set; }
     public bool IsCompleted { get; private set; }
     public DateTime? CompletedAt { get; private set; }
-    public static TodoItem Create(Guid userId, string title, DateTime date, string? note)
+    public static TodoItem Create(Guid userId, string title, DateTime date, string? note, int sortOrder = 0)
     {
-        return new TodoItem(userId, title, date, note);
+        return new TodoItem(userId, title, date, note, sortOrder);
     }
 
     public void Rename(string title)
@@ -55,6 +57,13 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         IsCompleted = isCompleted;
         CompletedAt = isCompleted ? nowUtc : null;
         Touch(nowUtc);
+    }
+
+    public void MoveTo(DateTime date, int sortOrder)
+    {
+        Date = NormalizeDate(date);
+        SortOrder = ValidateSortOrder(sortOrder);
+        Touch();
     }
 
     public void SoftDelete()
@@ -98,6 +107,16 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         }
 
         return cleaned;
+    }
+
+    private static int ValidateSortOrder(int sortOrder)
+    {
+        if (sortOrder < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sortOrder), "Todo sort order cannot be negative.");
+        }
+
+        return sortOrder;
     }
 
 }

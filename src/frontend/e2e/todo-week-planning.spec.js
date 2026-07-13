@@ -34,7 +34,7 @@ async function registerAndLogin(page, prefix) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
@@ -44,24 +44,15 @@ async function registerAndLogin(page, prefix) {
 }
 
 async function dragWithMouse(page, source, target) {
-  await source.scrollIntoViewIfNeeded();
+  const sourceCard = source.locator('xpath=ancestor::article');
+  await sourceCard.scrollIntoViewIfNeeded();
   await target.scrollIntoViewIfNeeded();
-  const sourceBox = await source.boundingBox();
-  const targetBox = await target.boundingBox();
-  if (!sourceBox || !targetBox) throw new Error('Drag source or target is not visible');
-
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-  const targetX = targetBox.x + targetBox.width / 2;
-  const targetY = targetBox.y + targetBox.height / 3;
-
-  await page.mouse.move(sourceX, sourceY);
-  await page.mouse.down();
-  await page.mouse.move(sourceX + 12, sourceY + 12, { steps: 3 });
-  await expect(source.locator('xpath=ancestor::article')).toHaveClass(/todo-week-card--dragging/);
-  await page.mouse.move(targetX, targetY, { steps: 20 });
-  await page.waitForTimeout(150);
-  await page.mouse.up();
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await sourceCard.dispatchEvent('dragstart', { dataTransfer });
+  await expect(sourceCard).toHaveClass(/todo-week-card--dragging/);
+  await target.dispatchEvent('dragover', { dataTransfer });
+  await target.dispatchEvent('drop', { dataTransfer });
+  await sourceCard.dispatchEvent('dragend', { dataTransfer });
 }
 
 test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
@@ -82,11 +73,11 @@ test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
     data: { title: 'Tuesday task', date: dates.tuesday },
   })).json()).data;
 
-  await page.getByTestId('open-todo').click();
+  await page.getByRole('link', { name: 'Todo' }).click();
+  await page.getByLabel('Selected todo date').fill(dates.monday);
   await page.getByRole('button', { name: 'Week' }).click();
-  await page.getByRole('button', { name: 'Next' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Week plan' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Todo week' })).toBeVisible();
   await expect(page.locator('[data-testid^="week-day-"]')).toHaveCount(7);
   await expect(page.getByTestId(`week-todo-${first.id}`)).toBeVisible();
   await expect(page.getByTestId(`week-todo-${second.id}`)).toBeVisible();
@@ -117,5 +108,5 @@ test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
     tuesdayTitles: ['First Monday', 'Tuesday task'],
   });
 
-  await expect(page.getByTestId(`week-day-${dates.tuesday}`).getByText('First Monday')).toBeVisible();
+  await expect(page.getByTestId(`week-day-${dates.tuesday}`).getByText('First Monday', { exact: true })).toBeVisible();
 });

@@ -6,6 +6,7 @@ export type TodoItem = {
   title: string
   note?: string | null
   date: string
+  sortOrder: number
   isCompleted: boolean
   completedAt?: string | null
   createdAt: string
@@ -22,6 +23,8 @@ export type UpdateTodoInput = {
   title?: string
   note?: string
   isCompleted?: boolean
+  date?: string
+  sortOrder?: number
 }
 
 export async function listByDate(date: string) {

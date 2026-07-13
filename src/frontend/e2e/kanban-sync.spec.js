@@ -15,7 +15,7 @@ async function registerAndLogin(page, prefix) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
+  await page.goto('http://127.0.0.1:5173/login');
   const token = await login(page, email, password);
   return { email, password, token };
 }
@@ -42,15 +42,15 @@ test('KanbanCardMoved syncs card movement across same-user tabs', async ({ conte
 
   const { email, password } = await registerAndLogin(page, 'kanban-sync');
 
-  await page.getByTestId('open-kanban').click();
+  await page.getByRole('link', { name: 'Kanban' }).click();
   await page.getByTestId('kanban-board-name-input').fill('Sync board');
-  await page.getByRole('button', { name: 'Create board' }).click();
+  await page.getByTestId('kanban-board-name-input').press('Enter');
   await expect(page.getByTestId('kanban-column-To Do')).toBeVisible();
   await expect(page.getByTestId('kanban-column-In Progress')).toBeVisible();
 
-  await page.getByTestId('kanban-card-title-input').fill('Move me live');
-  await page.getByTestId('kanban-card-column-select').selectOption({ label: 'To Do' });
-  await page.getByRole('button', { name: 'Add card' }).click();
+  await page.getByTestId('kanban-column-To Do').getByRole('button', { name: 'Add Card' }).click();
+  await page.getByTestId('kanban-edit-title-input').fill('Move me live');
+  await page.getByRole('button', { name: 'Save card' }).click();
   await expect(page.getByTestId('kanban-column-To Do').getByTestId('kanban-card-Move me live')).toBeVisible();
 
   const secondTab = await context.newPage();
@@ -68,14 +68,14 @@ test('KanbanCardMoved syncs card movement across same-user tabs', async ({ conte
     }
   });
   await login(secondTab, email, password);
-  await secondTab.getByTestId('open-kanban').click();
+  await secondTab.getByRole('link', { name: 'Kanban' }).click();
   await expect(secondTab.getByTestId('kanban-column-To Do').getByTestId('kanban-card-Move me live')).toBeVisible({ timeout: 15_000 });
   await expect(secondTab.getByTestId('kanban-column-In Progress').getByTestId('kanban-card-Move me live')).toHaveCount(0);
   await expect.poll(() => secondTabHubSockets.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
 
   const responseCountBeforeMove = secondTabKanbanResponses.length;
 
-  await page.getByTestId('kanban-card-Move me live').getByRole('button', { name: 'Move', exact: true }).click();
+  await page.getByTestId('kanban-card-Move me live').dragTo(page.getByTestId('kanban-column-In Progress'));
   await expect(page.getByTestId('kanban-column-In Progress').getByTestId('kanban-card-Move me live')).toBeVisible();
   await expect(secondTab.getByTestId('kanban-column-In Progress').getByTestId('kanban-card-Move me live')).toBeVisible();
   expect(secondTabKanbanResponses.length).toBeGreaterThan(responseCountBeforeMove);

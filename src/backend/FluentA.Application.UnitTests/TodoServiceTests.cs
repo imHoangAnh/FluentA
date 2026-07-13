@@ -105,6 +105,30 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
+    public async Task Update_MoveAndReorder_PersistsOwnedTaskAndPreservesFields()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var monday = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
+        var tuesday = DateTime.UtcNow.Date.AddDays(2).ToString("yyyy-MM-dd");
+        var first = await service.CreateAsync(userId, new CreateTodoItemRequest("First", monday, "keep"));
+        var second = await service.CreateAsync(userId, new CreateTodoItemRequest("Second", monday));
+
+        var reordered = await service.UpdateAsync(userId, second.Value!.Id, new UpdateTodoItemRequest(SortOrder: 0));
+        var moved = await service.UpdateAsync(userId, first.Value!.Id, new UpdateTodoItemRequest(Date: tuesday, SortOrder: 0));
+        var mondayItems = await service.ListByDateAsync(userId, monday);
+        var tuesdayItems = await service.ListByDateAsync(userId, tuesday);
+
+        Assert.True(reordered.IsSuccess);
+        Assert.True(moved.IsSuccess);
+        Assert.Equal(["Second"], mondayItems.Value!.Select(item => item.Title));
+        Assert.Equal(["First"], tuesdayItems.Value!.Select(item => item.Title));
+        Assert.Equal("keep", moved.Value!.Note);
+        Assert.Equal(0, moved.Value.SortOrder);
+    }
+
+    [Fact]
     public async Task InvalidInputs_ReturnValidationErrorsAndDoNotNotify()
     {
         var notifier = new RecordingTodoSyncNotifier();
@@ -126,6 +150,7 @@ public sealed class TodoServiceTests
             return Task.FromResult<IReadOnlyList<TodoItem>>(_items
                 .Where(item => item.UserId == userId && item.Date == date.Date && item.DeletedAt is null)
                 .OrderBy(item => item.IsCompleted)
+                .ThenBy(item => item.SortOrder)
                 .ThenBy(item => item.CompletedAt ?? item.CreatedAt)
                 .ToList());
         }
@@ -136,6 +161,7 @@ public sealed class TodoServiceTests
                 .Where(item => item.UserId == userId && item.Date >= startDate.Date && item.Date <= endDate.Date && item.DeletedAt is null)
                 .OrderBy(item => item.Date)
                 .ThenBy(item => item.IsCompleted)
+                .ThenBy(item => item.SortOrder)
                 .ThenBy(item => item.CompletedAt ?? item.CreatedAt)
                 .ToList());
         }
@@ -143,6 +169,12 @@ public sealed class TodoServiceTests
         public Task<TodoItem?> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_items.FirstOrDefault(item => item.UserId == userId && item.Id == todoId && item.DeletedAt is null));
+        }
+
+        public Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
+        {
+            var next = _items.Where(item => item.UserId == userId && item.Date == date.Date && item.DeletedAt is null).Select(item => item.SortOrder).DefaultIfEmpty(-1).Max() + 1;
+            return Task.FromResult(next);
         }
 
         public Task AddAsync(TodoItem item, CancellationToken cancellationToken = default)
@@ -155,6 +187,8 @@ public sealed class TodoServiceTests
         {
             return Task.CompletedTask;
         }
+
+        public Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class RecordingTodoSyncNotifier : ITodoSyncNotifier

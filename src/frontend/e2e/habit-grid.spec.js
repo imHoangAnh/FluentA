@@ -37,7 +37,13 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/habits');
 
-  await page.getByRole('button', { name: 'Create habit' }).click();
+  const createHabitButton = page.getByRole('button', { name: 'Create habit' });
+  await createHabitButton.click();
+  await expect(page.getByRole('dialog', { name: 'New Habit' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'New Habit' })).toBeHidden();
+  await expect(createHabitButton).toBeFocused();
+  await createHabitButton.click();
   await page.getByTestId('habit-name-input').fill('Read English');
   await page.getByTestId('habit-description-input').fill('30 focused minutes');
   await page.getByRole('button', { name: 'Habit icon' }).click();

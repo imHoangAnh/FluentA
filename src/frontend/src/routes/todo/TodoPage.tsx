@@ -1,17 +1,8 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import '../dashboard/DashboardPage.css'
-import {
-  BookOpen, CalendarClock, CheckSquare, Columns3,
-  Globe, HelpCircle, LogOut, NotebookPen,
-  Repeat2, Settings, Kanban, Timer,
-} from 'lucide-react'
-import { LearningNavLinks } from '../../components/LearningNavLinks'
 import * as todoApi from '../../lib/api/todo.api'
-import { useAuthStore } from '../../stores/authStore'
 import { TodoWeekView } from './TodoWeekView'
+import { AppShell } from '@/components/AppShell'
 
 type TodoView = 'day' | 'week'
 
@@ -54,11 +45,6 @@ function weekDates(dateValue: string) {
 
 export function TodoPage() {
   const queryClient = useQueryClient()
-  const location = useLocation()
-  const logout = useAuthStore((state) => state.logout)
-  const user = useAuthStore((state) => state.user)
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
-  const avatarUrl = getUserAvatarUrl(user, displayName)
 
   const [selectedDate, setSelectedDate] = useState(() => toDateInput(new Date()))
   const [view, setView] = useState<TodoView>('day')
@@ -145,69 +131,7 @@ export function TodoPage() {
   }
 
   return (
-    <div className="dashboard-layout">
-      {/* ── Left Sidebar Navigation ── */}
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <Globe size={24} />
-          </div>
-          <div className="dashboard-brand-text">
-            <h1>FluentA</h1>
-            <p>Language Learning</p>
-          </div>
-        </div>
-
-        <nav className="dashboard-nav">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            <Columns3 size={20} /> Today
-          </Link>
-          <Link to="/vocabulary" className={location.pathname === '/vocabulary' ? 'active' : ''}>
-            <BookOpen size={20} /> Vocabulary
-          </Link>
-          <LearningNavLinks />
-          <Link to="/todo" className={location.pathname === '/todo' ? 'active' : ''}>
-            <CheckSquare size={20} /> Todo
-          </Link>
-          <Link to="/habits" className={location.pathname === '/habits' ? 'active' : ''}>
-            <Repeat2 size={20} /> Habits
-          </Link>
-          <Link to="/countdowns" className={location.pathname === '/countdowns' ? 'active' : ''}>
-            <CalendarClock size={20} /> Countdowns
-          </Link>
-          <Link to="/journal" className={location.pathname === '/journal' ? 'active' : ''}>
-            <NotebookPen size={20} /> Journal
-          </Link>
-          <Link to="/kanban" className={location.pathname === '/kanban' ? 'active' : ''}>
-            <Kanban size={20} /> Kanban
-          </Link>
-          <Link to="/pomodoro" className={location.pathname === '/pomodoro' ? 'active' : ''}>
-            <Timer size={20} /> Pomodoro
-          </Link>
-        </nav>
-
-        <div className="dashboard-user-section">
-          <div className="dashboard-user-card">
-            <img
-              className="dashboard-user-avatar"
-              src={avatarUrl}
-              alt="User"
-            />
-            <div className="dashboard-user-info">
-              <p className="dashboard-user-name">{user?.fullName || displayName}</p>
-              <p className="dashboard-user-level">Learner Profile</p>
-            </div>
-          </div>
-          <div className="dashboard-user-links">
-            <Link to="/settings"><Settings size={16} /> Settings</Link>
-            <Link to="#"><HelpCircle size={16} /> Help</Link>
-            <Link to="#" onClick={(e) => { e.preventDefault(); void logout() }}><LogOut size={16} /> Logout</Link>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main Content Area ── */}
-      <main className="dashboard-main">
+    <AppShell title="Todo" description="Plan the day, then finish the work that matters.">
         <div className="todo-content-v2">
           {/* Hero Header */}
           <div className="todo-hero-v2">
@@ -331,37 +255,39 @@ export function TodoPage() {
               {/* ── Active Tasks (Collapsible) ── */}
               {openTasks.length > 0 && (
                 <div className="todo-section-v2">
-                  <button
-                    className="todo-section-v2__toggle"
-                    type="button"
-                    onClick={() => setActiveExpanded((prev) => !prev)}
-                    aria-expanded={activeExpanded}
-                  >
-                    <svg
-                      className={`todo-section-v2__chevron${activeExpanded ? ' todo-section-v2__chevron--open' : ''}`}
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <div className="todo-tasks-v2__header">
+                    <button
+                      className="todo-section-v2__toggle"
+                      type="button"
+                      onClick={() => setActiveExpanded((prev) => !prev)}
+                      aria-expanded={activeExpanded}
                     >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                    <h4 className="todo-section-v2__heading">
-                      Active Tasks
-                      <span className="todo-tasks-v2__count">{openTasks.length}</span>
-                    </h4>
+                      <svg
+                        className={`todo-section-v2__chevron${activeExpanded ? ' todo-section-v2__chevron--open' : ''}`}
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                      <h4 className="todo-section-v2__heading">
+                        Active Tasks
+                        <span className="todo-tasks-v2__count">{openTasks.length}</span>
+                      </h4>
+                    </button>
                     <button
                       className="todo-tasks-v2__mark-all"
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); handleMarkAllDone() }}
+                      onClick={handleMarkAllDone}
                     >
                       Mark all as done
                     </button>
-                  </button>
+                  </div>
 
                   {activeExpanded && (
                     <div className="todo-section-v2__list">
@@ -476,10 +402,10 @@ export function TodoPage() {
               onSelectDate={setSelectedDate}
               onToggle={(item, isCompleted) => updateTodo.mutate({ id: item.id, patch: { isCompleted } })}
               onDelete={(item) => deleteTodo.mutate(item.id)}
+              onMove={(item, date, sortOrder) => updateTodo.mutate({ id: item.id, patch: { date, sortOrder } })}
             />
           ) : null}
         </div>
-      </main>
-    </div>
+    </AppShell>
   )
 }

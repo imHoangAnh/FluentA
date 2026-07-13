@@ -114,11 +114,11 @@ export function AppShell({ children, title, description, headerActions, contentC
             <Settings className="size-[18px]" aria-hidden="true" />
             <span className={cn(collapsed && 'sr-only', 'max-[1100px]:sr-only')}>Settings</span>
           </NavLink>
-          <div className={cn('flex items-center gap-3 rounded-md border border-border bg-background p-2', collapsed && 'justify-center border-0 bg-transparent', 'max-[1100px]:justify-center max-[1100px]:border-0 max-[1100px]:bg-transparent')}>
+          <div className={cn('flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-border bg-background p-2', collapsed && 'justify-center border-0 bg-transparent', 'max-[1100px]:justify-center max-[1100px]:border-0 max-[1100px]:bg-transparent')}>
             <img className="size-8 shrink-0 rounded-full border border-border object-cover" src={avatarUrl} alt="" />
-            <div className={cn('min-w-0 flex-1', collapsed && 'hidden', 'max-[1100px]:hidden')}>
-              <p className="m-0 truncate text-xs font-semibold text-foreground">{displayName}</p>
-              <p className="m-0 truncate text-[11px] text-muted-foreground">{user?.email}</p>
+            <div className={cn('min-w-0 flex-1 overflow-hidden', collapsed && 'hidden', 'max-[1100px]:hidden')}>
+              <p className="m-0 max-w-full truncate text-xs font-semibold text-foreground">{displayName}</p>
+              <p className="m-0 max-w-full truncate text-[11px] text-muted-foreground">{user?.email}</p>
             </div>
             <Button className={cn(collapsed && 'hidden', 'max-[1100px]:hidden')} variant="ghost" size="icon-sm" aria-label="Logout" onClick={() => void logout()}>
               <LogOut />

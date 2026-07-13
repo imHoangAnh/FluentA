@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -89,16 +89,19 @@ ordering, timer, realtime, and ownership behavior.
    without clipped primary actions or unintended page-level horizontal
    overflow. Horizontal scrolling remains intentional inside week/calendar and
    Kanban board regions. Mobile-specific quality is out of scope.
-9. Existing API routes, DTOs, query keys, mutation ordering, SignalR events,
-   Redis timer state, database behavior, and authorization rules do not change.
+9. Existing API routes, query keys, SignalR events, Redis timer state, and
+   authorization rules do not change. The user-approved Todo week contract is
+   the bounded exception: the existing authenticated Todo PATCH DTO and Todo
+   schema add `date`/`sortOrder` so week reorder and cross-day Move persist.
 10. Focused Vitest, productivity Playwright scenarios, targeted lint,
     production build, keyboard review, realtime two-tab proof, and milestone
     screenshots pass or record unrelated pre-existing failures.
 
 ## Non-Goals
 
-- New productivity features, APIs, schemas, notification rules, background
-  jobs, task types, timer modes, search, tags, or dashboard aggregation.
+- New productivity features, API routes, notification rules, background jobs,
+  task types, timer modes, search, tags, or dashboard aggregation. The approved
+  Todo ordering fields are contract reconciliation, not a new product area.
 - Replacing native browser drag behavior with a new drag-and-drop library
   unless validation proves the current implementation cannot meet the locked
   keyboard/desktop contract and the user approves that expansion.
