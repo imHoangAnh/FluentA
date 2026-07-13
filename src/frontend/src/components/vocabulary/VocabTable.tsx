@@ -1,4 +1,4 @@
-import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
@@ -7,6 +7,7 @@ import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../../lib/api/vocabulary.api'
 
 const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
+const textCellClassName = `${cellClassName} block h-auto resize-none overflow-hidden whitespace-pre-wrap break-words leading-5`
 
 const emptyWord = (): vocabularyApi.WordInput => ({
   word: '',
@@ -49,6 +50,14 @@ type VocabTableProps = {
   onPreferencesChange: (preferences: vocabularyApi.BoardPreferences) => Promise<void>
 }
 
+function resizeTextarea(element: HTMLTextAreaElement | null) {
+  if (!element) return
+
+  element.style.height = '0px'
+  const border = element.offsetHeight - element.clientHeight
+  element.style.height = `${element.scrollHeight + border}px`
+}
+
 function AutosaveCell({ label, value, type, required, onSave, onEndEnter, register }: AutosaveCellProps) {
   const [draft, setDraft] = useState(value)
   const [saving, setSaving] = useState(false)
@@ -57,6 +66,7 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
   const pending = useRef(false)
   const queued = useRef<string | null>(null)
   const suppressBlur = useRef(false)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     if (!pending.current && !error && draft === confirmed.current) {
@@ -64,6 +74,19 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       setDraft(value)
     }
   }, [draft, error, value])
+
+  useLayoutEffect(() => {
+    resizeTextarea(textareaRef.current)
+  }, [draft, value])
+
+  useEffect(() => {
+    const element = textareaRef.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(() => resizeTextarea(element))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   async function commitValue(nextValue: string): Promise<void> {
     if (nextValue === confirmed.current) return
@@ -111,10 +134,15 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       return
     }
 
-    if (event.key === 'Enter' && !event.shiftKey && onEndEnter) {
-      event.preventDefault()
-      await commitValue(draft)
-      await onEndEnter()
+    if (event.key === 'Enter') {
+      if (onEndEnter && !event.shiftKey) {
+        event.preventDefault()
+        await commitValue(draft)
+        await onEndEnter()
+        return
+      }
+
+      if (type === 'text') event.preventDefault()
     }
   }
 
@@ -136,10 +164,17 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
-      ) : type === 'textarea' ? (
-        <textarea className={`${cellClassName} resize-none`} ref={register} {...shared} rows={2} />
       ) : (
-        <input className={cellClassName} ref={register} {...shared} type="text" />
+        <textarea
+          className={textCellClassName}
+          ref={(element) => {
+            textareaRef.current = element
+            register(element)
+            resizeTextarea(element)
+          }}
+          {...shared}
+          rows={1}
+        />
       )}
       {saving ? <small className="px-2 text-[11px] text-muted-foreground">Saving...</small> : null}
       {error ? (
@@ -167,7 +202,7 @@ function SortableHeader({
   return (
     <div
       ref={setNodeRef}
-      className="relative flex min-h-10 items-center border-r border-border last:border-r-0"
+      className="relative flex min-h-10 items-center border-r border-foreground/70 last:border-r-0"
       style={{
         width,
         transform: CSS.Translate.toString(transform),
@@ -345,19 +380,28 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
       )
     }
 
-    if (column.type === 'textarea') {
-      return <textarea className={`${cellClassName} resize-none`} {...shared} rows={1} placeholder={column.label} />
-    }
-
-    return <input className={cellClassName} {...shared} type="text" placeholder={column.label} />
+    return <textarea
+      className={textCellClassName}
+      {...shared}
+      rows={1}
+      placeholder={column.label}
+      onKeyDown={(event) => {
+        shared.onKeyDown(event)
+        if (column.type === 'text' && event.key === 'Enter') event.preventDefault()
+      }}
+      ref={(element) => {
+        shared.ref(element)
+        resizeTextarea(element)
+      }}
+    />
   }
 
   return (
-    <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card" data-testid="vocab-table-scroll">
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-lg border border-border bg-card" data-testid="vocab-table-scroll">
       <div className="min-w-max">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={columns.map((column) => column.key)} strategy={horizontalListSortingStrategy}>
-            <div className="grid border-b border-border bg-muted/70" style={{ gridTemplateColumns }}>
+            <div className="sticky top-0 z-10 grid border-b border-border bg-muted/95 shadow-[0_1px_0_var(--border)] backdrop-blur" style={{ gridTemplateColumns }}>
               {columns.map((column) => (
                 <SortableHeader
                   key={column.key}
@@ -375,16 +419,17 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         {wordsQuery.data?.map((word) => (
           <div className="grid min-h-12 items-start border-b border-border bg-card py-1 transition-colors hover:bg-accent/20" style={{ gridTemplateColumns }} key={word.id}>
             {columns.map((column) => (
-              <AutosaveCell
-                key={column.key}
-                label={`${column.label} for ${word.word}`}
-                value={column.value(word)}
-                type={column.type}
-                required={column.required}
-                register={(element) => { cellRefs.current[`${word.id}:${column.key}`] = element }}
-                onSave={(value) => saveCell(word.id, column.key, value)}
-                onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
-              />
+              <div className="min-w-0 self-start border-r border-foreground/70 px-1" key={column.key}>
+                <AutosaveCell
+                  label={`${column.label} for ${word.word}`}
+                  value={column.value(word)}
+                  type={column.type}
+                  required={column.required}
+                  register={(element) => { cellRefs.current[`${word.id}:${column.key}`] = element }}
+                  onSave={(value) => saveCell(word.id, column.key, value)}
+                  onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
+                />
+              </div>
             ))}
             <div className="grid h-10 place-items-center">
               <button
@@ -401,7 +446,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         ))}
 
         <form className="grid min-h-12 items-start bg-secondary/35 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
-          {columns.map((column) => <div key={column.key}>{renderBlankCell(column)}</div>)}
+          {columns.map((column) => <div className="min-w-0 self-start border-r border-foreground/70 px-1" key={column.key}>{renderBlankCell(column)}</div>)}
           <div className="grid h-10 place-items-center">
             <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add" aria-label="Create word">
               <CheckCircle2 className="size-4" aria-hidden="true" />

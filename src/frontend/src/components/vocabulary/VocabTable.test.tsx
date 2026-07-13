@@ -125,4 +125,17 @@ describe('VocabTable', () => {
     expect(screen.getByLabelText('Resize Word')).toBeInTheDocument()
     expect(screen.getByLabelText('Resize Example')).toBeInTheDocument()
   })
+
+  it('uses independently sized wrapped editors with visible column dividers', async () => {
+    renderTable()
+
+    const wordEditor = await screen.findByLabelText('Word for mitigate')
+    const definitionEditor = screen.getByLabelText('Definition for mitigate')
+
+    expect(wordEditor.tagName).toBe('TEXTAREA')
+    expect(definitionEditor.tagName).toBe('TEXTAREA')
+    expect(wordEditor).toHaveClass('overflow-hidden')
+    expect(definitionEditor).toHaveClass('overflow-hidden')
+    expect(screen.getByLabelText('Resize Word').parentElement).toHaveClass('border-foreground/70')
+  })
 })

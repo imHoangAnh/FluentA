@@ -92,20 +92,31 @@ export function AppShell({ children, title, description, headerActions, contentC
     <div className="ds-root flex min-h-screen bg-background">
       <aside
         className={cn(
-          'sticky top-0 z-30 flex h-screen shrink-0 flex-col border-r border-border bg-card px-3 py-4 transition-[width] duration-200',
-          collapsed ? 'w-[84px]' : 'w-[272px]',
-          'max-[1100px]:w-[84px]',
+          'sticky top-0 z-30 flex h-screen shrink-0 flex-col border-r border-border bg-card py-4 transition-[width] duration-200',
+          collapsed ? 'w-[84px] px-1' : 'w-[184px] px-2',
+          'max-[1100px]:w-[84px] max-[1100px]:px-1',
         )}
         aria-label="Primary navigation"
       >
-        <div className={cn('flex h-12 items-center gap-3 px-2', collapsed && 'justify-center', 'max-[1100px]:justify-center')}>
+        <div className={cn('flex h-12 items-center gap-1 px-1', collapsed && 'justify-center', 'max-[1100px]:justify-center')}>
           <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <BookOpenText className="size-5" aria-hidden="true" />
           </div>
-          <div className={cn('min-w-0', collapsed && 'hidden', 'max-[1100px]:hidden')}>
+          <div className={cn('min-w-0 flex-1', collapsed && 'hidden', 'max-[1100px]:hidden')}>
             <p className="m-0 text-base font-bold tracking-[-0.02em] text-foreground">FluentA</p>
             <p className="m-0 text-xs text-muted-foreground">Learn with focus</p>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 max-[1100px]:hidden"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? <ChevronRight /> : <ChevronLeft />}
+          </Button>
         </div>
 
         <nav className="mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto" aria-label="Application">
@@ -138,24 +149,12 @@ export function AppShell({ children, title, description, headerActions, contentC
               <LogOut />
             </Button>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="max-[1100px]:hidden"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            {collapsed ? <ChevronRight /> : <ChevronLeft />}
-            <span className={collapsed ? 'sr-only' : ''}>{collapsed ? 'Expand' : 'Collapse'}</span>
-          </Button>
         </div>
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-4 border-b border-border bg-background/95 px-6 backdrop-blur lg:px-8">
-          <div className="min-w-0 py-3">
+        <header className="sticky top-0 z-20 flex h-14 min-h-14 items-center justify-between gap-4 border-b border-border bg-background/95 px-5 backdrop-blur lg:px-6">
+          <div className="min-w-0 py-2">
             <h1 className="m-0 truncate text-xl font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
             {description ? <p className="m-0 mt-1 truncate text-sm text-muted-foreground">{description}</p> : null}
           </div>

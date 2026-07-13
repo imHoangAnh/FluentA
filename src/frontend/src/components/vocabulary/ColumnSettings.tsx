@@ -28,7 +28,7 @@ export function ColumnSettings({ preferences, onSave }: ColumnSettingsProps) {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <Button type="button" variant="outline" size="sm">
-          <Columns3 /> Columns <ChevronDown />
+          <Columns3 /> Setting Columns <ChevronDown />
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

@@ -33,9 +33,16 @@ this document.
 
 ## Frontend Presentation Contract
 
-- `/vocabulary` renders inside the shared FluentA desktop/tablet AppShell.
+- `/vocabulary` renders inside the shared FluentA desktop/tablet AppShell. The
+  AppShell header is compact while keeping its full content width; the expanded
+  sidebar is 184px, the collapsed sidebar is 84px, and its desktop-only
+  collapse/expand control is icon-only beside the FluentA logo.
 - The workspace keeps a dedicated board/page rail beside the data canvas; the
-  app-wide sidebar remains the primary route navigation.
+  app-wide sidebar remains the primary route navigation. The rail heading and
+  create-board action stay fixed while the Board/Page tree scrolls independently.
+- The Vocabulary workspace fills the available viewport beneath the AppShell.
+  Its page toolbar and table column header stay visible while Word rows scroll
+  vertically; the full fixed-column grid retains horizontal scrolling.
 - Vocabulary uses the compact density of the shared design system so fixed
   columns remain practical without shrinking editable controls below usable
   sizes.
@@ -44,6 +51,12 @@ this document.
 - Column visibility uses an accessible Radix-backed menu. Reorder, resize,
   autosave, Retry, Tab, Shift+Tab, Escape, Enter, and horizontal scrolling keep
   their existing behavior.
+- The page toolbar shows only the active Page name plus disabled `Search` and
+  `Filter` placeholders marked `Coming soon`, followed by `Setting Columns`.
+  Search and Filter do not yet change displayed data.
+- Every table column has a high-contrast vertical divider. Long text wraps in
+  content-sized editors without an inner scrollbar; short editors remain compact
+  even when another cell in the same grid row is taller.
 - Desktop and tablet Chromium layouts are blocking acceptance targets. Smaller
   screens may degrade naturally but must not crash.
 

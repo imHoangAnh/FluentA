@@ -1,4 +1,4 @@
-import { BookOpenText, ChevronRight, FileText, FolderPlus, Plus, Rows3 } from 'lucide-react'
+import { BookOpenText, ChevronRight, FileText, Filter, FolderPlus, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/components/AppShell'
@@ -81,10 +81,10 @@ export function WorkspacePage() {
     <AppShell
       title="Vocabulary"
       description="Organize boards, pages, and words in one focused workspace"
-      contentClassName="max-w-none"
+      contentClassName="h-[calc(100dvh-3.5rem)] max-w-none"
       headerActions={activeBoard ? <Badge variant="outline">{activeBoard.language.toUpperCase()}</Badge> : undefined}
     >
-      <div className="grid min-h-[calc(100vh-9.5rem)] grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div>
@@ -106,7 +106,7 @@ export function WorkspacePage() {
             </form>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="vocabulary-rail-scroll">
             {sortedBoards.map((board) => (
               <div className="mb-1" key={board.id}>
                 <button
@@ -140,19 +140,21 @@ export function WorkspacePage() {
           </div>
         </Card>
 
-        <section className="min-w-0">
+        <section className="flex min-w-0 min-h-0 flex-col">
           {activeBoard ? (
-            <div className="grid gap-4">
-              <Card className="flex min-h-[72px] flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <div className="min-w-0"><p className="m-0 text-xs font-medium text-muted-foreground">{activeBoard.name}</p><h2 className="m-0 mt-1 truncate text-xl font-semibold tracking-[-0.02em]">{activePage?.name ?? 'Create your first page'}</h2></div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <Card className="flex min-h-[64px] shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3" data-testid="vocabulary-toolbar">
+                <div className="min-w-0"><h2 className="m-0 truncate text-xl font-semibold tracking-[-0.02em]">{activePage?.name ?? 'Create your first page'}</h2></div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" aria-label="Table view"><Rows3 /></Button>
+                  <span id="vocabulary-search-coming-soon" className="sr-only">Coming soon</span>
+                  <Button variant="outline" size="sm" disabled aria-describedby="vocabulary-search-coming-soon" title="Coming soon"><Search /> Search</Button>
+                  <Button variant="outline" size="sm" disabled aria-describedby="vocabulary-search-coming-soon" title="Coming soon"><Filter /> Filter</Button>
                   <ColumnSettings preferences={activeBoard.preferences} onSave={async (preferences) => { await updatePreferences.mutateAsync(preferences) }} />
                 </div>
               </Card>
 
               {isCreatingPage ? (
-                <Card>
+                <Card className="shrink-0">
                   <form className="flex items-end gap-3 p-4" onSubmit={(event) => { event.preventDefault(); const name = newPageName.trim(); if (name) createPage.mutate({ boardId: activeBoard.id, name }) }}>
                     <div className="grid flex-1 gap-1.5"><label className="text-xs font-medium" htmlFor="new-page-name">Page name</label><Input id="new-page-name" data-testid="page-name-input" value={newPageName} onChange={(event) => setNewPageName(event.target.value)} autoFocus required /></div>
                     <Button type="button" variant="ghost" onClick={() => setIsCreatingPage(false)}>Cancel</Button>
@@ -170,11 +172,11 @@ export function WorkspacePage() {
                   onPreferencesChange={async (preferences) => { await updatePreferences.mutateAsync(preferences) }}
                 />
               ) : (
-                <Card className="grid min-h-80 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then add your first vocabulary row.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingPage(true)}><Plus /> Create page</Button></Card>
+                <Card className="grid min-h-0 flex-1 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then add your first vocabulary row.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingPage(true)}><Plus /> Create page</Button></Card>
               )}
             </div>
           ) : (
-            <Card className="grid min-h-[calc(100vh-9.5rem)] place-content-center text-center"><BookOpenText className="mx-auto mb-4 size-12 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a vocabulary board</h2><p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Boards keep related pages and learning material together.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingBoard(true)}><FolderPlus /> Create board</Button></Card>
+            <Card className="grid min-h-0 flex-1 place-content-center text-center"><BookOpenText className="mx-auto mb-4 size-12 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a vocabulary board</h2><p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Boards keep related pages and learning material together.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingBoard(true)}><FolderPlus /> Create board</Button></Card>
           )}
         </section>
       </div>
