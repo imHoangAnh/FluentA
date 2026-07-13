@@ -180,7 +180,7 @@ export function JournalRichTextEditor({
             max={150}
             min={80}
             step={10}
-            style={{ display: 'none' }}
+            className="hidden"
             type="range"
             value={zoom}
             onChange={(event) => setZoom(Number(event.target.value))}

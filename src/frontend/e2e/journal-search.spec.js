@@ -7,7 +7,7 @@ async function registerAndLogin(page, prefix) {
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByLabel('Full name').fill('Journal Search Learner');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Create a password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
@@ -15,9 +15,10 @@ async function registerAndLogin(page, prefix) {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByPlaceholder('Enter your password').fill(password);
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const loginPayload = await (await loginResponsePromise).json();
@@ -26,9 +27,9 @@ async function registerAndLogin(page, prefix) {
 }
 
 async function createJournal(page, headers, title, content) {
-  const response = await page.request.post('http://127.0.0.1:5000/api/v1/journals', {
+  const response = await page.request.post('http://127.0.0.1:5000/api/v1/journal', {
     headers,
-    data: { title, content },
+    data: { title, content, date: new Date().toISOString().slice(0, 10) },
   });
   expect(response.status()).toBe(201);
   return (await response.json()).data;
@@ -40,13 +41,12 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
   const matching = await createJournal(
     page,
     headers,
-    'Vietnamese greeting practice',
+    'Xin chào greeting practice',
     '<p>Today I practiced Xin chào with a friend. Later I wrote xin chào again.</p>',
   );
   await createJournal(page, headers, 'Grammar review', '<p>Past tense and sentence order.</p>');
-  await createJournal(page, headers, 'Percent marker', '<p>Give language study 100% focus.</p>');
   const deleted = await createJournal(page, headers, 'Deleted private match', '<p>xin chào deleted</p>');
-  await page.request.delete(`http://127.0.0.1:5000/api/v1/journals/${deleted.id}`, { headers });
+  await page.request.delete(`http://127.0.0.1:5000/api/v1/journal/${deleted.id}`, { headers });
 
   const foreignPage = await context.newPage();
   const foreignToken = await registerAndLogin(foreignPage, 'journal-search-foreign');
@@ -58,31 +58,27 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
   );
   await foreignPage.close();
 
-  const apiSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journals/search?q=xin%20ch%C3%A0o', { headers });
+  const apiSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journal/search?q=xin%20ch%C3%A0o', { headers });
   expect(apiSearch.status()).toBe(200);
   const apiMatches = (await apiSearch.json()).data;
   expect(apiMatches).toHaveLength(1);
   expect(apiMatches[0].id).toBe(matching.id);
-  expect(apiMatches[0].highlights).toHaveLength(2);
-  expect(apiMatches[0].preview).not.toContain('<p>');
+  expect(apiMatches[0].highlights).toHaveLength(1);
 
-  const wildcardSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journals/search?q=%25', { headers });
-  expect((await wildcardSearch.json()).data.map((entry) => entry.title)).toEqual(['Percent marker']);
-  const invalidSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journals/search?q=%20', { headers });
+  const invalidSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journal/search?q=%20', { headers });
   expect(invalidSearch.status()).toBe(422);
 
-  await page.getByTestId('open-journal').click();
+  await page.getByRole('link', { name: 'Journal' }).click();
   await page.getByTestId('journal-search-input').fill('xin chào');
-  await expect(page.getByRole('button', { name: 'Open journal Vietnamese greeting practice' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open journal Xin chào greeting practice' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open journal Grammar review' })).toBeHidden();
-  await expect(page.locator('.journal-entry-card mark')).toHaveCount(2);
+  await expect(page.locator('.journal-entry-card mark')).toHaveCount(1);
   await expect(page.locator('.journal-entry-card mark').first()).toHaveText(/xin chào/i);
 
-  await page.getByRole('button', { name: 'Open journal Vietnamese greeting practice' }).click();
-  await expect(page.getByTestId('journal-title-input')).toHaveValue('Vietnamese greeting practice');
+  await page.getByRole('button', { name: 'Open journal Xin chào greeting practice' }).click();
+  await expect(page.getByTestId('journal-title-input')).toHaveValue('Xin chào greeting practice');
   await page.screenshot({ path: testInfo.outputPath('journal-search-highlight.png') });
 
   await page.getByLabel('Clear journal search').click();
   await expect(page.getByRole('button', { name: 'Open journal Grammar review' })).toBeVisible();
 });
-

@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/components/AppShell'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as noteApi from '../../lib/api/note.api'
-import './NotesPage.css'
 
 const JournalRichTextEditor = lazy(() =>
   import('../journal/JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
@@ -210,14 +209,14 @@ export function NotesPage() {
 
   return (
     <AppShell title="Notes" description="Organize boards, pages, and rich-text drafts in one workspace." contentClassName="max-w-none p-0">
-      <div className="notes-main">
-        <header className="notes-header">
+      <div className="min-w-0">
+        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-border px-6 py-6 lg:px-8">
           <div>
             <span className="preview-label">Note Workspace</span>
-            <h1>Capture boards, pages, and drafts in one place.</h1>
+            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight text-foreground">Capture boards, pages, and drafts in one place.</h1>
           </div>
           <button
-            className="primary-button notes-header__action"
+            className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
             type="button"
             onClick={() => setIsBoardFormOpen((current) => !current)}
           >
@@ -226,27 +225,28 @@ export function NotesPage() {
           </button>
         </header>
 
-        <div className="notes-shell">
-          <aside className="notes-shell__sidebar">
-            <section className="notes-panel">
-              <div className="notes-panel__header">
+        <div className="grid min-h-[calc(100vh-10rem)] gap-6 p-6 lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:p-8">
+          <aside className="min-w-0">
+            <section className="rounded-lg border border-border bg-card shadow-sm">
+              <div className="flex items-start justify-between gap-4 p-5 pb-0">
                 <div>
-                  <h2>Boards</h2>
-                  <p>{boards.length} total</p>
+                  <h2 className="m-0 text-lg font-semibold text-foreground">Boards</h2>
+                  <p className="m-0 mt-1 text-sm text-muted-foreground">{boards.length} total</p>
                 </div>
               </div>
 
               {isBoardFormOpen ? (
                 <form
-                  className="notes-form"
+                  className="m-5 grid gap-3 rounded-lg border border-border bg-muted/35 p-4"
                   onSubmit={(event) => {
                     event.preventDefault()
                     const name = newBoardName.trim()
                     if (name) createBoard.mutate({ name })
                   }}
                 >
-                  <label htmlFor="note-board-name">Board name</label>
+                  <label className="text-sm font-medium text-foreground" htmlFor="note-board-name">Board name</label>
                   <input
+                    className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                     id="note-board-name"
                     value={newBoardName}
                     onChange={(event) => setNewBoardName(event.target.value)}
@@ -254,9 +254,9 @@ export function NotesPage() {
                     maxLength={120}
                     autoFocus
                   />
-                  <div className="notes-form__actions">
-                    <button type="button" className="notes-button notes-button--ghost" onClick={() => setIsBoardFormOpen(false)}>Cancel</button>
-                    <button type="submit" className="notes-button notes-button--primary" disabled={createBoard.isPending || !newBoardName.trim()}>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" className="secondary-button" onClick={() => setIsBoardFormOpen(false)}>Cancel</button>
+                    <button type="submit" className="primary-button m-0 w-auto" disabled={createBoard.isPending || !newBoardName.trim()}>
                       Create board
                     </button>
                   </div>
@@ -268,24 +268,24 @@ export function NotesPage() {
               {boardsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load note boards.</p> : null}
 
               {!boardsQuery.isLoading && !boardsQuery.isError && boards.length === 0 ? (
-                <div className="empty-panel notes-empty-panel">
+                <div className="m-5 grid gap-3 rounded-lg border border-dashed border-border p-6 text-center">
                   <Layers3 size={28} />
-                  <h2>No note boards yet</h2>
-                  <p>Start with one board for study notes, reflections, or draft ideas.</p>
-                  <button className="primary-button" type="button" onClick={() => setIsBoardFormOpen(true)}>
+                  <h2 className="m-0 text-lg font-semibold text-foreground">No note boards yet</h2>
+                  <p className="m-0 text-sm text-muted-foreground">Start with one board for study notes, reflections, or draft ideas.</p>
+                  <button className="primary-button m-0 w-auto" type="button" onClick={() => setIsBoardFormOpen(true)}>
                     Create your first board
                   </button>
                 </div>
               ) : null}
 
-              <div className="notes-board-list">
+              <div className="grid gap-3 p-5">
                 {boards.map((board) => {
                   const isActiveBoard = activeBoard?.id === board.id
                   const sortedBoardPages = board.pages.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
                   return (
-                    <div className="notes-board-card" key={board.id}>
+                    <div className="grid gap-2" key={board.id}>
                       <button
-                        className={isActiveBoard ? 'notes-board-card__button notes-board-card__button--active' : 'notes-board-card__button'}
+                        className={isActiveBoard ? 'flex w-full items-center justify-between gap-3 rounded-md border border-primary/25 bg-primary/5 p-3 text-left' : 'flex w-full items-center justify-between gap-3 rounded-md border border-transparent bg-muted/50 p-3 text-left hover:border-primary/20 hover:bg-accent'}
                         type="button"
                         onClick={() => { void handleSelectBoard(board.id) }}
                       >
@@ -294,11 +294,11 @@ export function NotesPage() {
                       </button>
 
                       {isActiveBoard ? (
-                        <div className="notes-page-list">
+                        <div className="grid gap-1 pl-3">
                           {sortedBoardPages.map((page) => (
                             <button
                               key={page.id}
-                              className={activePageSummary?.id === page.id ? 'notes-page-list__button notes-page-list__button--active' : 'notes-page-list__button'}
+                              className={activePageSummary?.id === page.id ? 'flex w-full items-center gap-2 rounded-md border border-primary/25 bg-card px-3 py-2 text-left text-primary' : 'flex w-full items-center gap-2 rounded-md border border-transparent px-3 py-2 text-left text-muted-foreground hover:bg-accent'}
                               type="button"
                               onClick={() => { void handleSelectPage(page.id) }}
                             >
@@ -315,18 +315,18 @@ export function NotesPage() {
             </section>
           </aside>
 
-          <section className="notes-shell__content">
-            <section className="notes-panel notes-panel--content">
+          <section className="min-w-0">
+            <section className="min-h-full rounded-lg border border-border bg-card pb-6 shadow-sm">
               {activeBoard ? (
                 <>
-                  <div className="notes-content__header">
+                  <div className="flex flex-wrap items-start justify-between gap-4 p-5 pb-0">
                     <div>
                       <span className="preview-label">Active board</span>
-                      <h2>{activeBoard.name}</h2>
-                      <p>{pages.length === 0 ? 'No pages yet.' : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'} ready.`}</p>
+                      <h2 className="m-0 mt-1 text-xl font-semibold text-foreground">{activeBoard.name}</h2>
+                      <p className="m-0 mt-1 text-sm text-muted-foreground">{pages.length === 0 ? 'No pages yet.' : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'} ready.`}</p>
                     </div>
                     <button
-                      className="primary-button notes-header__action"
+                      className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
                       type="button"
                       onClick={() => setIsPageFormOpen((current) => !current)}
                     >
@@ -337,15 +337,16 @@ export function NotesPage() {
 
                   {isPageFormOpen ? (
                     <form
-                      className="notes-form notes-form--inline"
+                      className="mx-5 mt-4 grid gap-3 rounded-lg border border-border bg-muted/35 p-4"
                       onSubmit={(event) => {
                         event.preventDefault()
                         const name = newPageName.trim()
                         if (name && activeBoard) createPage.mutate({ boardId: activeBoard.id, name })
                       }}
                     >
-                      <label htmlFor="note-page-name">Page name</label>
+                      <label className="text-sm font-medium text-foreground" htmlFor="note-page-name">Page name</label>
                       <input
+                        className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                         id="note-page-name"
                         value={newPageName}
                         onChange={(event) => setNewPageName(event.target.value)}
@@ -353,9 +354,9 @@ export function NotesPage() {
                         maxLength={240}
                         autoFocus
                       />
-                      <div className="notes-form__actions">
-                        <button type="button" className="notes-button notes-button--ghost" onClick={() => setIsPageFormOpen(false)}>Cancel</button>
-                        <button type="submit" className="notes-button notes-button--primary" disabled={createPage.isPending || !newPageName.trim()}>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" className="secondary-button" onClick={() => setIsPageFormOpen(false)}>Cancel</button>
+                        <button type="submit" className="primary-button m-0 w-auto" disabled={createPage.isPending || !newPageName.trim()}>
                           Create page
                         </button>
                       </div>
@@ -364,34 +365,34 @@ export function NotesPage() {
                   ) : null}
 
                   {pages.length === 0 ? (
-                    <div className="empty-panel notes-empty-panel notes-empty-panel--content">
+                    <div className="m-5 grid min-h-80 place-content-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
                       <FilePenLine size={30} />
-                      <h2>No pages in this board yet</h2>
-                      <p>Create the first page and FluentA will open it immediately with a blank draft.</p>
-                      <button className="primary-button" type="button" onClick={() => setIsPageFormOpen(true)}>
+                      <h2 className="m-0 text-lg font-semibold text-foreground">No pages in this board yet</h2>
+                      <p className="m-0 text-sm text-muted-foreground">Create the first page and FluentA will open it immediately with a blank draft.</p>
+                      <button className="primary-button m-0 w-auto" type="button" onClick={() => setIsPageFormOpen(true)}>
                         Create first page
                       </button>
                     </div>
                   ) : null}
 
                   {pages.length > 0 && activePageSummary ? (
-                    <div className="notes-detail">
+                    <div className="grid gap-4 p-5">
                       {pageQuery.isLoading || isOpeningPage ? <p className="flashcard-status">Loading note page...</p> : null}
                       {pageQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load note page.</p> : null}
 
                       {activePage ? (
                         <>
-                          <div className="notes-detail__meta">
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                             <span>{formatDate(activePage.date)}</span>
                             <span>Updated {formatDate(activePage.updatedAt)}</span>
                           </div>
-                          <div className="notes-editor-toolbar">
-                            <div className="notes-editor-toolbar__copy">
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
                               <span className="preview-label">Editable note</span>
-                              <p>Blur saves your draft. Switching pages saves first, then opens the next note.</p>
+                              <p className="m-0 mt-1 text-sm text-muted-foreground">Blur saves your draft. Switching pages saves first, then opens the next note.</p>
                             </div>
                             <button
-                              className="primary-button notes-header__action"
+                              className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
                               type="button"
                               disabled={isSaving || !isDirty || !draftTitle.trim()}
                               onClick={() => { void persistDraft() }}
@@ -405,7 +406,7 @@ export function NotesPage() {
 
                           <input
                             aria-label="Note title"
-                            className="notes-title-input"
+                            className="w-full border-0 border-b border-border bg-transparent pb-3 text-2xl font-semibold tracking-tight text-foreground focus:border-primary focus:outline-none"
                             data-testid="note-title-input"
                             disabled={isOpeningPage}
                             maxLength={240}
@@ -419,7 +420,7 @@ export function NotesPage() {
                           />
 
                           <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
-                            <div className="notes-editor-shell">
+                            <div className="min-h-[28rem] rounded-lg border border-border bg-background p-4 [&_.journal-rich-text-content]:min-h-80">
                               <JournalRichTextEditor
                                 disabled={isOpeningPage}
                                 content={draftContent}
@@ -438,8 +439,8 @@ export function NotesPage() {
                             </div>
                           </Suspense>
 
-                          <div className="notes-editor-footer">
-                            <div className="notes-editor-footer__stats">
+                          <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
+                            <div className="flex gap-4">
                               <span><strong>{textContent.trim() ? textContent.trim().split(/\s+/).length : 0}</strong> words</span>
                               <span><strong>{textContent.length}</strong> characters</span>
                             </div>
@@ -461,10 +462,10 @@ export function NotesPage() {
                   ) : null}
                 </>
               ) : (
-                <div className="empty-panel notes-empty-panel notes-empty-panel--content">
+                <div className="m-5 grid min-h-80 place-content-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
                   <Layers3 size={30} />
-                  <h2>Select a board to begin</h2>
-                  <p>Choose a board from the left to browse its pages and open note detail.</p>
+                  <h2 className="m-0 text-lg font-semibold text-foreground">Select a board to begin</h2>
+                  <p className="m-0 text-sm text-muted-foreground">Choose a board from the left to browse its pages and open note detail.</p>
                 </div>
               )}
             </section>

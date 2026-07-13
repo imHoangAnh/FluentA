@@ -4,8 +4,8 @@
 
 Assets are user-owned uploaded files managed through a shared authenticated API.
 Feature 18 introduced the first asset type, `avatar`, backed by MinIO in local
-development. Feature 22 adds `countdown-cover` as a second shared image asset
-type.
+development. Feature 22 adds `countdown-cover` and the shipped Note Workspace
+adds `note-image` as shared image asset types.
 
 ## User Outcomes
 
@@ -25,7 +25,8 @@ type.
 ## Ownership And Lifecycle Rules
 
 - Assets are owned by the authenticated user only.
-- Supported `assetType` values are `avatar` and `countdown-cover`.
+- Supported `assetType` values are `avatar`, `countdown-cover`, and
+  `note-image`.
 - Presign creates a pending asset record with a 1-hour expiry.
 - Finalize requires the owned asset to still be pending and unexpired.
 - Finalize verifies the MinIO object exists at the pending key, has an allowed

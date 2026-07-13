@@ -299,7 +299,7 @@ export function JournalPage() {
           <section className="journal-calendar-card" aria-label="Journal date calendar">
             <header>
               <strong>{monthLabel(calendarMonth)}</strong>
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div className="flex gap-1">
                 <button aria-label="Previous calendar month" type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, -1))}>
                   <ChevronLeft size={16} />
                 </button>
@@ -350,7 +350,7 @@ export function JournalPage() {
             {isListError ? <p className="flashcard-status flashcard-status--error">Could not load journal entries.</p> : null}
             {!isListLoading && !isListError && entries.length === 0 ? (
               <div className="journal-empty">
-                <p style={{ color: 'var(--muted)', fontSize: '14px', textAlign: 'center' }}>
+                <p className="text-center text-sm text-muted-foreground">
                   {isSearching ? `No content matches "${debouncedSearchQuery}".` : "No entries found."}
                 </p>
               </div>
@@ -394,7 +394,7 @@ export function JournalPage() {
               ) : null}
             </div>
             <div className="journal-editor-toolbar-right">
-              <button className="primary-button" style={{ minHeight: '36px', padding: '0 16px', margin: 0, width: 'auto' }} type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
+              <button className="primary-button m-0 min-h-9 w-auto px-4" type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
                 {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId ? saveStatus === 'error' ? 'Retry' : 'Save' : 'Create'}
               </button>
             </div>
@@ -472,8 +472,7 @@ export function JournalPage() {
               <p>Write your first thought from today's language practice to track your growth over time.</p>
               <button 
                 type="button"
-                className="primary-button" 
-                style={{ width: 'auto', padding: '0 24px', margin: 0 }}
+                className="primary-button m-0 w-auto px-6"
                 onClick={() => {
                   setTitle('New Entry');
                   document.querySelector<HTMLInputElement>('.journal-title-input')?.focus();
@@ -486,7 +485,7 @@ export function JournalPage() {
           )}
 
           {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
-            <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', background: 'var(--error)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 100 }}>
+            <div className="absolute bottom-[70px] left-1/2 z-[100] -translate-x-1/2 rounded-lg bg-destructive px-4 py-2 text-destructive-foreground" role="alert">
               The journal entry could not be saved.
             </div>
           )}
