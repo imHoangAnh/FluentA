@@ -13,11 +13,14 @@ test('board-wide custom columns, visibility, typed values, and permanent deletio
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
   await page.getByLabel('Email').fill(email);
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await page.goto('http://127.0.0.1:5173/vocabulary');
+  await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('Custom Columns Board');
   await page.getByTestId('create-board-button').click();

@@ -5,7 +5,6 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import '@fontsource-variable/geist/wght.css'
 import './design-system.css'
-import './styles.css'
 
 const queryClient = new QueryClient()
 

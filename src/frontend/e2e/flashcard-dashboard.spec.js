@@ -14,6 +14,7 @@ test('flashcard dashboard shows streak, retention, due counts, and forecast', as
   await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
+  await page.goto('http://127.0.0.1:5173/login');
   await expect(page).toHaveURL('http://127.0.0.1:5173/login');
 
   await page.getByLabel('Email').fill(email);

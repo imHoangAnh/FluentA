@@ -1,9 +1,11 @@
-import { ArrowLeft, BarChart3, Home } from 'lucide-react'
+import { ArrowLeft, BarChart3 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as habitApi from '../../lib/api/habit.api'
 import { HabitIconGlyph } from '../../lib/habit-icons'
+import { AppShell } from '@/components/AppShell'
+import { Button } from '@/components/ui/button'
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -30,25 +32,11 @@ export function HabitStatsPage() {
   const stats = statsQuery.data
 
   return (
-    <main className="workspace habit-workspace">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <span className="brand-mark brand-mark--small">FA</span>
-          <strong>FluentA</strong>
-        </div>
-        <nav className="workspace-nav" aria-label="Habit stats navigation">
-          <Link className="ghost-button ghost-button--inline" to="/">
-            <BarChart3 size={17} /> Dashboard
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/habits">
-            <ArrowLeft size={17} /> Habits
-          </Link>
-          <Link className="ghost-button ghost-button--inline" to="/vocabulary">
-            <Home size={17} /> Vocabulary
-          </Link>
-        </nav>
-      </header>
-
+    <AppShell
+      title="Habit statistics"
+      description="Review streaks, completion rates, and schedule details."
+      headerActions={<Button asChild variant="outline" size="sm"><Link to="/habits"><ArrowLeft /> Habits</Link></Button>}
+    >
       <section className="habit-shell">
         <div className="habit-hero">
           <div>
@@ -103,6 +91,6 @@ export function HabitStatsPage() {
           </>
         ) : null}
       </section>
-    </main>
+    </AppShell>
   )
 }

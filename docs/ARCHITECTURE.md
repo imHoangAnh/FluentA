@@ -297,3 +297,16 @@ own PostgreSQL limits and provider pooler strategy.
 A bounded context should become an independent service only when it needs an
 independent deployment cadence, scaling profile, failure boundary, or data
 ownership model that outweighs distributed-system cost.
+## Frontend Presentation Boundary
+
+The React frontend has one canonical styling entrypoint:
+`src/frontend/src/design-system.css`. It owns Tailwind theme, Preflight,
+semantic `--ds-*` tokens, reduced-motion behavior, and the audited semantic
+component layer. Public authentication routes use their separate AuthShell;
+protected routes use AppShell, including nested Habit Stats, Settings, and
+page-specific learning routes.
+
+Superseded global and route stylesheets are not runtime dependencies. Stable
+presentation uses utilities and shared primitives. Inline values are limited
+to computed feature behavior: Vocabulary drag/resize and grid tracks, Journal
+editor zoom, and Pomodoro progress geometry.

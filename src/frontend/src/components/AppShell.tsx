@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { getUserAvatarUrl } from '@/lib/avatar'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
@@ -51,18 +51,31 @@ type AppShellProps = {
 
 export function AppShell({ children, title, description, headerActions, contentClassName }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const displayName = user?.fullName || user?.email?.split('@')[0] || 'Learner'
   const avatarUrl = getUserAvatarUrl(user, displayName)
 
-  const navItem = ({ to, label, icon: Icon, end }: (typeof primaryNav)[number]) => (
-    <NavLink
+  const isPracticeRoute = location.pathname === '/flashcards/practice'
+    || /^\/flashcards\/pages\/[^/]+\/practice$/.test(location.pathname)
+
+  const navItem = ({ to, label, icon: Icon, end }: (typeof primaryNav)[number]) => {
+    const isActive = end
+      ? location.pathname === to
+      : to === '/flashcards/practice'
+        ? isPracticeRoute
+        : to === '/flashcards'
+          ? location.pathname.startsWith('/flashcards') && !isPracticeRoute
+          : location.pathname === to || location.pathname.startsWith(`${to}/`)
+
+    return (
+    <Link
       key={to}
       to={to}
-      end={end}
       aria-label={label}
-      className={({ isActive }) => cn(
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
         'group flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground',
         isActive && 'bg-secondary text-secondary-foreground',
         collapsed && 'justify-center px-0',
@@ -71,8 +84,9 @@ export function AppShell({ children, title, description, headerActions, contentC
     >
       <Icon className="size-[18px]" aria-hidden="true" />
       <span className={cn('truncate', collapsed && 'sr-only', 'max-[1100px]:sr-only')}>{label}</span>
-    </NavLink>
-  )
+    </Link>
+    )
+  }
 
   return (
     <div className="ds-root flex min-h-screen bg-background">

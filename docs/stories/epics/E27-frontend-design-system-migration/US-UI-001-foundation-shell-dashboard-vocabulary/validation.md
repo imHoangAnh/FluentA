@@ -1,5 +1,15 @@
 # US-UI-001 Validation
 
+## Release Reconciliation — 2026-07-13
+
+`IMPLEMENTED AND APPROVED`
+
+US-UI-005 independently re-ran the 36-test frontend unit suite, ESLint,
+production build, two-viewpoint design-system milestone, and complete E27 route
+manifest. Dashboard and Vocabulary use AppShell, Dashboard widget visibility
+is restored and browser-persistent, and their retired stylesheet has no active
+consumer. The earlier backend build blocker no longer affects release proof.
+
 ## Proof Strategy
 
 Baseline the current frontend, prove dependency/toolchain and CSS coexistence,

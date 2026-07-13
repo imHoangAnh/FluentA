@@ -19,6 +19,8 @@ test('Chinese board adapts vocabulary and review labels to Pinyin', async ({ pag
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await page.goto('http://127.0.0.1:5173/vocabulary');
+  await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('HSK Board');
   await page.getByTestId('board-language-select').selectOption('zh');

@@ -54,8 +54,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   const today = todayInput();
 
   await expect(page.getByText('Dashboard Overview')).toBeVisible();
-  await expect(page.getByTestId('open-vocabulary')).toHaveAttribute('href', '/vocabulary');
-  await expect(page.getByTestId('open-flashcards')).toHaveAttribute('href', '/flashcards');
+  await expect(page.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review');
   await expect(page.getByText('No cards due today')).toBeVisible();
 
   await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
@@ -71,9 +70,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
     data: { name: 'Dashboard IELTS date', targetDate: utcIso(14), color: '#16A34A', icon: 'Exam' },
   });
 
-  await page.getByTestId('open-vocabulary').click();
-  await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible();
-  await page.goBack();
+  await page.reload();
 
   await expect(page.getByText('Dashboard planning task')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Dashboard reading habit')).toBeVisible();

@@ -19,6 +19,8 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await page.goto('http://127.0.0.1:5173/vocabulary');
+  await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('Spreadsheet Board');
   await page.getByTestId('create-board-button').click();

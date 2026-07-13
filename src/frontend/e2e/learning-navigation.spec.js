@@ -27,13 +27,13 @@ test('protected navigation exposes separate Flashcard, Practice, and Review entr
 
   await page.getByRole('link', { name: 'Practice' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards/practice');
-  await expect(page.getByRole('heading', { name: 'Choose a page deck to practice' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose a page to practice' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Review', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/review');
-  await expect(page.getByRole('heading', { name: 'Review due words by board' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Flashcard' }).click();
+  await page.getByRole('link', { name: 'Flashcard', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
-  await expect(page.getByRole('heading', { name: 'Your page decks' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your pages' })).toBeVisible();
 });

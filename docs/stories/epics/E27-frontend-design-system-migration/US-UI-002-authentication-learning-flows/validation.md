@@ -4,11 +4,13 @@ Date: 2026-07-13
 
 ## Status
 
-`IN PROGRESS — IMPLEMENTATION RESUMED BY USER 2026-07-13`
+`IMPLEMENTED AND APPROVED — RELEASE RECONCILED 2026-07-13`
 
-The user resumed the approved `US-UI-002` implementation. AuthShell,
-Flashcards, and Flashcard Viewer now use the shared composition and primitives;
-Practice and Review presentation migration and full release proof remain open.
+Auth routes retain their separate design-system AuthShell. Flashcards,
+Practice, Review, Viewer, and page-specific learning routes use AppShell with
+correct active navigation. US-UI-005 re-ran frontend unit/lint/build, auth
+reachability, desktop/tablet route-manifest, focus, reduced-motion, and source
+proof; the temporary CSS bridge and duplicated learning navigation are gone.
 
 ## Implementation And Baseline Evidence
 

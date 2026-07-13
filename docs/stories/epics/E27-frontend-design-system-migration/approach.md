@@ -2,12 +2,11 @@
 
 ## Recommended Path
 
-Use one high-risk frontend initiative with five dependency-ordered,
-user-visible stories. Introduce the design-system runtime and a bounded legacy
-CSS bridge in the first story, then migrate complete route groups at each
-approval milestone. Preserve routes, data hooks, API clients, and domain
-behavior; replace presentation structure only where required by the approved
-controlled redesign.
+E27 shipped as five dependency-ordered, user-visible stories. The temporary
+legacy bridge used during milestones has been retired; `design-system.css` is
+now the single canonical style entrypoint. Routes, data hooks, API clients, and
+domain behavior remain unchanged except for presentation and the restoration
+of documented Dashboard widget visibility.
 
 The first story delivers the approved Foundation + AppShell + Dashboard +
 Vocabulary milestone as one demonstrable outcome. It establishes the patterns
@@ -36,8 +35,8 @@ and FluentA's densest keyboard/autosave surface.
 - **Behavioral safeguards:** Vocabulary autosave, keyboard navigation, column
   configuration, realtime synchronization, editor behavior, and auth guards
   remain owned by existing code and tests.
-- **Legacy bridge:** existing CSS stays loaded only while unmigrated routes
-  need it. New design-system components must not depend on legacy selectors.
+- **Canonical styling:** Tailwind Preflight, semantic tokens, utilities, and
+  the audited semantic component layer are owned by `design-system.css`.
 
 ## Expected File Areas
 
@@ -94,4 +93,3 @@ and FluentA's densest keyboard/autosave surface.
   design-system and legacy CSS retirement boundary.
 - Record acceptance evidence in each story packet and reconcile Harness state
   at every milestone.
-

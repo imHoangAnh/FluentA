@@ -63,6 +63,16 @@ Tradeoffs:
 
 ## Follow-Up
 
-- `US-UI-002` through `US-UI-004` migrate the remaining route groups.
-- `US-UI-005` removes superseded CSS, audits inline presentation, and decides
-  whether a global reset is safe after full migration.
+Completed by `US-UI-005` on 2026-07-13:
+
+- Tailwind Preflight is enabled now that all public and protected routes use
+  the design-system boundary. Full route-manifest, responsive, focus, and
+  reduced-motion proof found no reset regression.
+- `styles.css`, `DashboardPage.css`, `NotesPage.css`, `CountdownPage.css`, and
+  `PomodoroPage.css` and their imports were removed.
+- Required authored rules were consumer-audited, remapped to `--ds-*` tokens,
+  and retained only in the canonical semantic component layer.
+- Computed inline values remain allowlisted for Vocabulary drag/resize/grid
+  tracks, Journal editor zoom, and Pomodoro SVG progress. Fixed presentation
+  inline styles are not retained.
+- The temporary coexistence and import-order tradeoff no longer applies.
