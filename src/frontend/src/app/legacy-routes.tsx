@@ -11,13 +11,6 @@ function lazyLegacyPage<T extends Record<string, unknown>>(
 export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'todo', lazy: lazyLegacyPage(() => import('@/routes/todo/TodoPage'), 'TodoPage') },
   { path: 'countdowns', lazy: lazyLegacyPage(() => import('@/routes/countdown/CountdownPage'), 'CountdownPage') },
-  {
-    path: 'practice',
-    lazy: async () => {
-      const { PracticeLibraryPage } = await import('@/routes/practice/PracticeLibraryPage')
-      return { Component: PracticeLibraryPage }
-    },
-  },
   { path: 'habits', lazy: lazyLegacyPage(() => import('@/routes/habits/HabitPage'), 'HabitPage') },
   { path: 'habits/:habitId/stats', lazy: lazyLegacyPage(() => import('@/routes/habits/HabitStatsPage'), 'HabitStatsPage') },
   { path: 'journal', lazy: lazyLegacyPage(() => import('@/routes/journal/JournalPage'), 'JournalPage') },
@@ -25,5 +18,4 @@ export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'kanban', lazy: lazyLegacyPage(() => import('@/routes/kanban/KanbanPage'), 'KanbanPage') },
   { path: 'pomodoro', lazy: lazyLegacyPage(() => import('@/routes/pomodoro/PomodoroPage'), 'PomodoroPage') },
   { path: 'review', lazy: lazyLegacyPage(() => import('@/routes/flashcards/ReviewSessionPage'), 'ReviewSessionPage') },
-  { path: 'practice/:pageId', lazy: lazyLegacyPage(() => import('@/routes/flashcards/PracticeSessionPage'), 'PracticeSessionPage') },
 ]

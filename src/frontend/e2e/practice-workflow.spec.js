@@ -119,9 +119,9 @@ test('practice completion keeps finish separate from per-word add-to-review', as
 
   await page.goto('/practice');
   const pageCard = page.getByTestId(`flashcard-page-${pageDeck.pageId}`);
-  await expect(pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` })).toBeVisible();
+  await expect(pageCard).toHaveAccessibleName('Practice Practice Workflow Page, 2 words');
 
-  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
+  await pageCard.click();
   await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible();
   await expect(page.getByText('Meaning → Word')).toBeVisible();
 
@@ -133,7 +133,7 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   const afterAbandonPage = findPageBoard(afterAbandonBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
   expect(reviewSnapshot(afterAbandonPage)).toEqual(initialSchedule);
 
-  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
+  await pageCard.click();
   await completeMeaningToWordPractice(page);
 
   const finishSummaryResponsePromise = page.waitForResponse((response) =>
@@ -149,7 +149,7 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   const afterFinishPage = findPageBoard(afterFinishBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
   expect(reviewSnapshot(afterFinishPage)).toEqual(initialSchedule);
 
-  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
+  await pageCard.click();
   await page.getByRole('button', { name: 'Start practice' }).click();
   await page.getByTestId('practice-answer-input').fill('mitigate');
   await page.getByRole('button', { name: 'Submit answer' }).click();

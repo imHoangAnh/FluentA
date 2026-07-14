@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { FlashcardPage } from '@/features/flashcards'
-import { getPracticeSettings, type PracticeMode } from '@/features/practice'
+import { getPracticeSettings, type PracticeMode } from '../api/practice.api'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/shared/components/ui/dialog'

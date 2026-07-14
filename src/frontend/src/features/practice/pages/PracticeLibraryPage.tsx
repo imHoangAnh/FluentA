@@ -6,7 +6,7 @@ import { LearningDeckLibrary, listBoards, type FlashcardBoard, type FlashcardPag
 import { AppShell } from '@/shared/components/layout/AppShell'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { PracticeLaunchDialog } from './PracticeLaunchDialog'
+import { PracticeLaunchDialog } from '../components/PracticeLaunchDialog'
 
 export function PracticeLibraryPage() {
   useFlashcardSync()
