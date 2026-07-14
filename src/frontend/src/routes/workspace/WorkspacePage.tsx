@@ -146,7 +146,6 @@ export function WorkspacePage() {
   return (
     <AppShell
       title="Vocabulary"
-      description="Organize boards, pages, and words in one focused workspace"
       contentClassName="h-[calc(100dvh-3.5rem)] max-w-none"
       headerActions={activeBoard ? <Badge variant="outline">{activeBoard.language.toUpperCase()}</Badge> : undefined}
     >

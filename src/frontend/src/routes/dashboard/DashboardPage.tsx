@@ -111,26 +111,19 @@ export function DashboardPage() {
 
   return (
     <AppShell
-      title="Dashboard Overview"
-      headerActions={<Button variant="outline" size="sm" aria-label="Dashboard widget settings" aria-expanded={showWidgetSettings} onClick={() => setShowWidgetSettings((current) => !current)}><SlidersHorizontal /> Widgets</Button>}
+      title="Overview"
+      // headerActions={<Button variant="outline" size="sm" aria-label="Dashboard widget settings" aria-expanded={showWidgetSettings} onClick={() => setShowWidgetSettings((current) => !current)}><SlidersHorizontal /> Widgets</Button>}
     >
       <section className="mb-6 flex flex-wrap items-end justify-between gap-4" aria-labelledby="welcome-heading">
         <div>
-          <Badge className="mb-3"><Sparkles className="mr-1 size-3" /> Today</Badge>
           <h2 id="welcome-heading" className="m-0 text-3xl font-semibold tracking-[-0.035em] text-foreground">{greeting(now.getHours(), displayName)}</h2>
           <p className="m-0 mt-2 text-sm text-muted-foreground">
             {new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}
           </p>
         </div>
-        <Card className="min-w-48">
-          <CardContent className="flex items-center gap-3 p-3.5">
-            <div className="grid size-10 place-items-center rounded-lg bg-amber-100 text-amber-700"><Flame className="size-5" /></div>
-            <div><p className="m-0 text-xs font-medium text-muted-foreground">Current streak</p><p className="m-0 mt-0.5 text-lg font-semibold">{flashcardDashboard?.streakDays ?? 0} days</p></div>
-          </CardContent>
-        </Card>
       </section>
 
-      {showWidgetSettings ? (
+      {/* {showWidgetSettings ? (
         <Card className="mb-6" aria-label="Dashboard widget settings">
           <CardHeader><CardTitle>Visible widgets</CardTitle><CardDescription>Choose which dashboard sections appear in this browser.</CardDescription></CardHeader>
           <CardContent className="flex flex-wrap gap-5">
@@ -142,7 +135,7 @@ export function DashboardPage() {
             ))}
           </CardContent>
         </Card>
-      ) : null}
+      ) : null} */}
 
       {isLoading ? (
         <div className="grid grid-cols-12 gap-4" aria-label="Loading dashboard" aria-busy="true">
