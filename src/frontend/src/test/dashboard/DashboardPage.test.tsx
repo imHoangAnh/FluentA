@@ -17,7 +17,7 @@ const adapters = vi.hoisted(() => ({
 
 vi.mock('@/features/todo', () => ({ listByDate: adapters.listByDate, updateTodo: adapters.updateTodo }))
 vi.mock('@/lib/api/habit.api', () => ({ listHabits: adapters.listHabits, toggleHabitEntry: adapters.toggleHabitEntry }))
-vi.mock('@/lib/api/countdown.api', () => ({ listCountdowns: adapters.listCountdowns }))
+vi.mock('@/features/countdown', () => ({ listCountdowns: adapters.listCountdowns }))
 vi.mock('@/features/review', () => ({ getReviewDashboard: adapters.getReviewDashboard }))
 vi.mock('@/features/journal', () => ({ JournalRichTextEditor: () => null }))
 
