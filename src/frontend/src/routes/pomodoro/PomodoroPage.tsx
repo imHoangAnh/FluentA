@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../../lib/api/pomodoro.api'
 import * as todoApi from '../../lib/api/todo.api'
 import * as kanbanApi from '../../lib/api/kanban.api'
-import { AppShell } from '@/components/AppShell'
+import { AppShell } from '@/shared/components/layout/AppShell'
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)

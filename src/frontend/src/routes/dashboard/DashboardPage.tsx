@@ -1,24 +1,21 @@
-import { CalendarClock, Check, CheckCircle2, Circle, Flame, SlidersHorizontal, Sparkles, Timer, TrendingUp } from 'lucide-react'
+import { CalendarClock, Check, CheckCircle2, Circle, Timer, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { AppShell } from '@/components/AppShell'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import * as countdownApi from '@/lib/api/countdown.api'
 import * as flashcardApi from '@/lib/api/flashcard.api'
 import * as habitApi from '@/lib/api/habit.api'
 import * as todoApi from '@/lib/api/todo.api'
 import { HabitIconGlyph } from '@/lib/habit-icons'
-import { useAuthStore } from '@/stores/authStore'
-import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/features/auth'
+import { cn } from '@/shared/lib/utils'
 
 const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
-const defaultVisibleWidgets = { review: true, todo: true, countdown: true, habits: true }
-type DashboardWidget = keyof typeof defaultVisibleWidgets
-type DashboardVisibility = Record<DashboardWidget, boolean>
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -52,14 +49,6 @@ export function DashboardPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((state) => state.user)
   const [now, setNow] = useState(() => new Date())
-  const [showWidgetSettings, setShowWidgetSettings] = useState(false)
-  const [visibleWidgets, setVisibleWidgets] = useState<DashboardVisibility>(() => {
-    try {
-      return { ...defaultVisibleWidgets, ...JSON.parse(localStorage.getItem('dashboard-visible-widgets') ?? '{}') } as DashboardVisibility
-    } catch {
-      return defaultVisibleWidgets
-    }
-  })
 
   const today = useMemo(() => toDateInput(new Date()), [])
   const timeZoneId = useMemo(() => browserTimeZone(), [])
@@ -101,18 +90,9 @@ export function DashboardPage() {
   const ringProgress = Math.min(100, dueCards * 5)
   const isLoading = todosQuery.isLoading || habitsQuery.isLoading || countdownsQuery.isLoading || flashcardDashboardQuery.isLoading
 
-  function toggleWidget(widget: DashboardWidget) {
-    setVisibleWidgets((current) => {
-      const next = { ...current, [widget]: !current[widget] }
-      localStorage.setItem('dashboard-visible-widgets', JSON.stringify(next))
-      return next
-    })
-  }
-
   return (
     <AppShell
       title="Overview"
-      // headerActions={<Button variant="outline" size="sm" aria-label="Dashboard widget settings" aria-expanded={showWidgetSettings} onClick={() => setShowWidgetSettings((current) => !current)}><SlidersHorizontal /> Widgets</Button>}
     >
       <section className="mb-6 flex flex-wrap items-end justify-between gap-4" aria-labelledby="welcome-heading">
         <div>
@@ -123,20 +103,6 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* {showWidgetSettings ? (
-        <Card className="mb-6" aria-label="Dashboard widget settings">
-          <CardHeader><CardTitle>Visible widgets</CardTitle><CardDescription>Choose which dashboard sections appear in this browser.</CardDescription></CardHeader>
-          <CardContent className="flex flex-wrap gap-5">
-            {(Object.keys(defaultVisibleWidgets) as Array<keyof typeof defaultVisibleWidgets>).map((widget) => (
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize" key={widget}>
-                <input type="checkbox" checked={visibleWidgets[widget]} onChange={() => toggleWidget(widget)} />
-                {widget}
-              </label>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null} */}
-
       {isLoading ? (
         <div className="grid grid-cols-12 gap-4" aria-label="Loading dashboard" aria-busy="true">
           <Skeleton className="col-span-8 h-80 max-xl:col-span-12" />
@@ -146,7 +112,7 @@ export function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-4">
-          <Card hidden={!visibleWidgets.review} className="col-span-8 max-xl:col-span-12">
+          <Card className="col-span-8 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between">
               <div><CardTitle>Review queue</CardTitle><CardDescription>Cards ready for your next focused session.</CardDescription></div>
               <Badge variant={dueCards > 0 ? 'default' : 'outline'}>{dueCards} due</Badge>
@@ -170,7 +136,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card hidden={!visibleWidgets.todo} className="col-span-4 max-xl:col-span-12">
+          <Card className="col-span-4 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Daily todo</CardTitle><CardDescription>Your three most relevant tasks.</CardDescription></div><Check className="size-5 text-primary" /></CardHeader>
             <CardContent className="flex h-[226px] flex-col">
               <ul className="m-0 grid list-none gap-2 p-0" role="list">
@@ -193,7 +159,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card hidden={!visibleWidgets.countdown} className="col-span-5 max-xl:col-span-12">
+          <Card className="col-span-5 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Next event</CardTitle><CardDescription>Keep the nearest milestone in view.</CardDescription></div><CalendarClock className="size-5 text-primary" /></CardHeader>
             <CardContent>
               <div className="rounded-lg bg-secondary p-5 text-center">
@@ -204,7 +170,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card hidden={!visibleWidgets.habits} className="col-span-7 max-xl:col-span-12">
+          <Card className="col-span-7 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Habit tracker</CardTitle><CardDescription>Small actions that keep your learning rhythm alive.</CardDescription></div><TrendingUp className="size-5 text-primary" /></CardHeader>
             <CardContent className="grid gap-3">
               {habits.map((habit) => (

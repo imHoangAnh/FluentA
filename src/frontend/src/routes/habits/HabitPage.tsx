@@ -2,7 +2,7 @@ import { BarChart3, CalendarClock, CheckSquare, ChevronLeft, ChevronRight, Edit3
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { AppShell } from '@/components/AppShell'
+import { AppShell } from '@/shared/components/layout/AppShell'
 import * as habitApi from '../../lib/api/habit.api'
 import { HabitIconGlyph } from '../../lib/habit-icons'
 import { habitIconOptions } from '../../lib/habit-icon-options'

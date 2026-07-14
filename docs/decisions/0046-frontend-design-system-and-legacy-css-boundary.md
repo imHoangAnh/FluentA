@@ -22,8 +22,8 @@ regressions unrelated to the current milestone.
 
 - Use Tailwind CSS utilities and semantic CSS variables as the presentation
   foundation.
-- Keep shadcn-style components as repository-owned source under
-  `src/frontend/src/components/ui`.
+- Keep shadcn-style components as repository-owned source under the canonical
+  `src/frontend/src/shared/components/ui` boundary.
 - Use focused Radix packages for accessible behavior primitives and cva,
   clsx, plus tailwind-merge for variants/class composition.
 - Use self-hosted Geist Sans Variable from the frontend npm bundle.

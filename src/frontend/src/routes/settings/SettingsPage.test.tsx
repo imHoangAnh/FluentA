@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import * as settingsApi from '../../lib/api/settings.api'
-import { useAuthStore } from '../../stores/authStore'
+import { useAuthStore } from '@/features/auth'
 import { SettingsPage } from './SettingsPage'
 
 vi.mock('../../lib/api/assets.api', async () => {

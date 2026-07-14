@@ -3,10 +3,10 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
-import { getLanguageProfile } from '../../lib/language'
-import { AppShell } from '@/components/AppShell'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { getLanguageProfile } from '@/shared/lib/language'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent } from '@/shared/components/ui/card'
 
 export function FlashcardViewerPage() {
   const { pageId = '' } = useParams()

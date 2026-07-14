@@ -7,7 +7,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+} from '@/shared/components/ui/alert-dialog'
 
 type DeleteEntity = 'Board' | 'Page' | 'Word'
 

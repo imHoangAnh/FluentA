@@ -19,4 +19,30 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/{app,features,shared}/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            regex: '^@/features/[^/]+/.+',
+            message: 'Import a feature through its public index.',
+          },
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            regex: '^(?:@/(?:app|features)(?:/|$)|(?:\\.\\./)+(?:app|features)(?:/|$))',
+            message: 'Shared modules must remain domain-neutral.',
+          },
+        ],
+      }],
+    },
+  },
 ])

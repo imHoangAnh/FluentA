@@ -1,6 +1,7 @@
 import type { PracticeSettings, ReviewSettings } from './flashcard.api'
-import { apiClient } from './client'
-import type { ApiEnvelope, UserProfile } from './auth.api'
+import { apiClient } from '@/shared/lib/http/client'
+import type { UserProfile } from '@/features/auth'
+import type { ApiEnvelope } from '@/shared/types/api'
 
 export type SettingsPayload = {
   profile: UserProfile

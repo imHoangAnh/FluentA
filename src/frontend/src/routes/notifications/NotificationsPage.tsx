@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, CircleAlert, Inbox, LoaderCircle } from 'lucide-react'
-import { AppShell } from '@/components/AppShell'
-import { Alert } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Alert } from '@/shared/components/ui/alert'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { cn } from '@/shared/lib/utils'
 import { notificationApi } from '../../lib/api/notification.api'
 
 export function NotificationsPage() {

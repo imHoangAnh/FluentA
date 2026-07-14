@@ -5,11 +5,11 @@ import { BookOpen } from 'lucide-react'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import type { FlashcardBoard, FlashcardPage } from '../../lib/api/flashcard.api'
 import { useFlashcardSync } from '../../lib/realtime/useFlashcardSync'
-import { AppShell } from '@/components/AppShell'
+import { AppShell } from '@/shared/components/layout/AppShell'
 import { LearningDeckLibrary } from '@/components/flashcards/LearningDeckLibrary'
 import { PracticeLaunchDialog } from '@/components/flashcards/PracticeLaunchDialog'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 
 type FlashcardsPageProps = { entryMode?: 'flashcards' | 'practice' }
 

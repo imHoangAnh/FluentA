@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { FlashcardBoard, FlashcardPage } from '@/lib/api/flashcard.api'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/shared/components/ui/card'
 
 type LearningDeckLibraryProps = {
   boards: FlashcardBoard[]

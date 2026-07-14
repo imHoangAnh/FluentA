@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
-import { getLanguageProfile, selectSpeechVoice } from '../../lib/language'
-import { AppShell } from '@/components/AppShell'
-import { Button } from '@/components/ui/button'
+import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Button } from '@/shared/components/ui/button'
 
 type BrowserSpeechRecognition = {
   lang: string

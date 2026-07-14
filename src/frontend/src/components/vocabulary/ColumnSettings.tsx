@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Columns3 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/shared/components/ui/button'
 import type { BoardPreferences } from '@/lib/api/vocabulary.api'
 
 const optionalColumns = [

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as settingsApi from '../../lib/api/settings.api'
-import { getUserAvatarUrl } from '../../lib/avatar'
-import { useAuthStore } from '../../stores/authStore'
+import { getUserAvatarUrl } from '@/shared/lib/avatar'
+import { useAuthStore } from '@/features/auth'
 
 type ProfileDraft = {
   fullName: string

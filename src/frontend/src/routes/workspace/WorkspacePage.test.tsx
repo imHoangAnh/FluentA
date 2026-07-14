@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import { WorkspacePage } from './WorkspacePage'
 import * as vocabularyApi from '@/lib/api/vocabulary.api'
+import { AppProviders } from '@/app/providers'
 
 vi.mock('@/lib/api/vocabulary.api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api/vocabulary.api')>('@/lib/api/vocabulary.api')
@@ -29,7 +30,7 @@ function renderWorkspace() {
   client.setQueryData(['vocab', 'boards'], [newestBoard, olderBoard])
   client.setQueryData(['vocab', 'boards', newestBoard.id], newestBoard)
   client.setQueryData(['vocab', 'boards', olderBoard.id], olderBoard)
-  return render(<QueryClientProvider client={client}><MemoryRouter><WorkspacePage /></MemoryRouter></QueryClientProvider>)
+  return render(<AppProviders queryClient={client}><MemoryRouter><WorkspacePage /></MemoryRouter></AppProviders>)
 }
 
 describe('WorkspacePage deletion', () => {

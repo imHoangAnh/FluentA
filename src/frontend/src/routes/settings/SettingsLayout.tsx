@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { AppShell } from '@/components/AppShell'
-import { Card } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Card } from '@/shared/components/ui/card'
+import { cn } from '@/shared/lib/utils'
 
 const settingsLinks = [
   { to: '/settings/profile', label: 'Profile' },

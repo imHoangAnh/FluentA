@@ -2,7 +2,7 @@ import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as todoApi from '../../lib/api/todo.api'
 import { TodoWeekView } from './TodoWeekView'
-import { AppShell } from '@/components/AppShell'
+import { AppShell } from '@/shared/components/layout/AppShell'
 
 type TodoView = 'day' | 'week'
 

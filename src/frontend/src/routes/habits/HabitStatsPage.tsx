@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as habitApi from '../../lib/api/habit.api'
 import { HabitIconGlyph } from '../../lib/habit-icons'
-import { AppShell } from '@/components/AppShell'
-import { Button } from '@/components/ui/button'
+import { AppShell } from '@/shared/components/layout/AppShell'
+import { Button } from '@/shared/components/ui/button'
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'

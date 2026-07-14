@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as assetsApi from '../../lib/api/assets.api'
 import * as noteApi from '../../lib/api/note.api'
-import { useAuthStore } from '../../stores/authStore'
+import { useAuthStore } from '@/features/auth'
+import { AppProviders } from '@/app/providers'
 import { NotesPage } from './NotesPage'
 
 vi.mock('../../lib/api/note.api', async () => {
@@ -39,11 +40,11 @@ function renderPage() {
   })
 
   return render(
-    <QueryClientProvider client={queryClient}>
+    <AppProviders queryClient={queryClient}>
       <MemoryRouter initialEntries={['/notes']}>
         <NotesPage />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </AppProviders>,
   )
 }
 

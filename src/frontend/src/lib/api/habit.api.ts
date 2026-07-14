@@ -1,5 +1,5 @@
-import { apiClient } from './client'
-import type { ApiEnvelope } from './auth.api'
+import { apiClient } from '@/shared/lib/http/client'
+import type { ApiEnvelope } from '@/shared/types/api'
 
 export type HabitFrequency = 'Daily' | 'Custom'
 export type HabitIcon = 'Default' | 'Book' | 'Exercise' | 'Water' | 'Meditation' | 'Study' | 'Work' | 'Health'

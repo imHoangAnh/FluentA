@@ -31,6 +31,7 @@ const protectedRoutes = [
   ['/kanban', 'Kanban', 'Kanban'],
   ['/pomodoro', 'Pomodoro', 'Pomodoro'],
   ['/notifications', 'Notifications', null],
+  ['/settings', 'Settings', 'Settings'],
   ['/settings/profile', 'Settings', 'Settings'],
   ['/settings/practice', 'Settings', 'Settings'],
   ['/settings/review', 'Settings', 'Settings'],
@@ -40,10 +41,14 @@ const protectedRoutes = [
   ['/practice/route-proof', 'Practice', 'Practice'],
 ]
 
-async function mockReleaseApis(page) {
+async function mockReleaseApis(page, authState) {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/auth/refresh')) {
+      if (!authState.enabled) {
+        await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Anonymous route proof' }) })
+        return
+      }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { accessToken: 'e27-route-proof-token', user } }) })
       return
     }
@@ -62,7 +67,8 @@ for (const viewport of [
   test(`E27 ${viewport.name} public and protected route manifest`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await mockReleaseApis(page)
+    const authState = { enabled: true }
+    await mockReleaseApis(page, authState)
 
     for (const [path, heading] of publicRoutes) {
       await page.goto(path)
@@ -73,9 +79,16 @@ for (const viewport of [
     }
 
     await page.goto('/login')
+    await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
     await page.keyboard.press('Tab')
     await expect(page.locator(':focus-visible')).toBeVisible()
     await page.screenshot({ path: `test-results/e27-login-${viewport.name}.png`, fullPage: true })
+
+    authState.enabled = false
+    await page.goto('/practice/route-proof?order=shuffle')
+    await expect(page).toHaveURL(/\/login$/)
+    await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
+    authState.enabled = true
 
     for (const [path, heading, activeNavigation] of protectedRoutes) {
       await page.goto(path)
@@ -87,7 +100,15 @@ for (const viewport of [
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     }
 
+    await page.goto('/practice?deck=route-proof&order=shuffle')
+    await expect(page).toHaveURL(/\/practice\?deck=route-proof&order=shuffle$/)
+
+    await page.goto('/not-a-real-route')
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
+
     await page.goto('/pomodoro')
+    await expect(page.getByRole('heading', { name: 'Pomodoro', exact: true })).toBeVisible()
     await page.locator('body').click({ position: { x: 2, y: 2 } })
     await page.keyboard.press('Tab')
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true)

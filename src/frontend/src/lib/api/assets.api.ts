@@ -1,5 +1,5 @@
-import type { ApiEnvelope } from './auth.api'
-import { apiClient } from './client'
+import type { ApiEnvelope } from '@/shared/types/api'
+import { apiClient } from '@/shared/lib/http/client'
 
 export type AssetPayload = {
   id: string

@@ -103,19 +103,28 @@ controllers.
 
 ## Frontend Architecture
 
-`src/frontend` is a React SPA organized around product routes. Route components
-compose feature UI and TanStack Query operations; API modules own HTTP request
-shapes; authentication and realtime behavior live under `src/lib`.
+`src/frontend` is a React SPA migrating incrementally to feature-first
+ownership. `src/app` owns composition, providers, the data router, and route
+guards. Completed domains live under `src/features/<domain>` and expose a small
+public `index.ts`; domain-neutral UI and infrastructure live under `src/shared`.
+Unit/component test infrastructure lives under `src/test`, and global styling
+lives under `src/styles`.
+
+`src/app/legacy-routes.tsx` is the explicit temporary seam for product domains
+that have not completed their E30 migration. Each later feature story replaces
+its legacy lazy route entries with that feature's public route objects. The
+manifest must shrink and is removed by the final migration story.
 
 Responsibilities are divided as follows:
 
 | Concern | Owner |
 | --- | --- |
-| Routing and protected pages | React Router and `ProtectedRoute` |
+| Routing and protected pages | `app/router.tsx`, feature route objects, and `app/route-guards/ProtectedRoute.tsx` |
 | Server-state cache | TanStack Query |
-| Authentication state | Zustand auth store |
-| HTTP transport | Axios API clients |
-| Cross-tab/server synchronization | SignalR hooks and query invalidation |
+| Authentication state | `features/auth` Zustand store and public API |
+| HTTP transport | Domain-neutral `shared/lib/http/client.ts` plus feature API adapters |
+| Protected realtime composition | `app/runtime/ProtectedRuntime.tsx`; feature-owned hooks migrate behind public APIs |
+| Shared presentation | `shared/components` with no app or feature imports |
 | Rich-text editing | TipTap |
 | Drag and drop | dnd-kit |
 
@@ -300,7 +309,7 @@ ownership model that outweighs distributed-system cost.
 ## Frontend Presentation Boundary
 
 The React frontend has one canonical styling entrypoint:
-`src/frontend/src/design-system.css`. It owns Tailwind theme, Preflight,
+`src/frontend/src/styles/design-system.css`. It owns Tailwind theme, Preflight,
 semantic `--ds-*` tokens, reduced-motion behavior, and the audited semantic
 component layer. Public authentication routes use their separate AuthShell;
 protected routes use AppShell, including nested Habit Stats, Settings, and

@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient } from '@/shared/lib/http/client'
 
 export type NotificationItem = {
   id: string

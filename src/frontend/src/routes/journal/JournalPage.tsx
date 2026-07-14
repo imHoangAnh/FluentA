@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3 } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AppShell } from '@/components/AppShell'
+import { AppShell } from '@/shared/components/layout/AppShell'
 import * as journalApi from '../../lib/api/journal.api'
 
 const JournalRichTextEditor = lazy(() =>
