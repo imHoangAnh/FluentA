@@ -2,31 +2,31 @@
 
 ## Current Story
 
-- ID: `US-FE-005`
-- Title: Vocabulary feature boundary
-- Lane: high-risk
+- ID: `US-FE-006`
+- Title: Flashcards feature boundary
+- Lane: normal
 - Status: implemented, reviewed, and verified on 2026-07-14; pending local smart commit
 
 ## Objective
 
-Move the protected Vocabulary route, workspace/table components, adapter and
-types, and tests into `features/vocabulary`; expose its lazy route through the
-public API and remove the Vocabulary legacy manifest entry without changing
-board/page CRUD, autosave, fixed-column preferences, cache keys, or realtime.
+Move `/flashcards` and `/flashcards/pages/:pageId`, their deck library/viewer,
+Flashcard endpoint subset, realtime subscription, types, and focused tests into
+`features/flashcards`. Preserve the `/practice` route as a temporary public-API
+consumer until its own US-FE-007 boundary migration.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-005-vocabulary-feature-boundary/overview.md`
-- `US-FE-005-vocabulary-feature-boundary/design.md`
-- `US-FE-005-vocabulary-feature-boundary/validation.md`
+- `US-FE-006-flashcards-feature-boundary/overview.md`
+- `US-FE-006-flashcards-feature-boundary/design.md`
+- `US-FE-006-flashcards-feature-boundary/validation.md`
 
 ## Gate
 
-US-FE-005 is high-risk because it owns board/page CRUD, spreadsheet autosave,
-preference persistence, and Vocabulary-to-Flashcard synchronization. It may
-close only after focused and full tests, API-backed browser proof, lint/build,
-legacy-path and cross-feature scans, Harness verification, review evidence,
-and its own local smart commit.
+US-FE-006 must preserve `flashcard` query keys, deck/session endpoints, the
+FlashcardDeckUpdated invalidation behavior, viewer navigation, and the
+temporary Practice library workflow. It may close only after focused and full
+tests, route/browser proof, lint/build, old-path and cross-feature scans,
+Harness verification, review evidence, and its own local smart commit.

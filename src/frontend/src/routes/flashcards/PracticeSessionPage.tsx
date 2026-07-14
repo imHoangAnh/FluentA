@@ -2,7 +2,8 @@ import { CheckCircle2, Mic, MicOff, PenSquare, TriangleAlert, Volume2 } from 'lu
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import * as flashcardApi from '../../lib/api/flashcard.api'
+import * as practiceApi from '../../lib/api/flashcard.api'
+import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '@/features/practice'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { AppShell } from '@/shared/components/layout/AppShell'
@@ -47,7 +48,7 @@ function getSpeechRecognitionConstructor() {
   return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition ?? null
 }
 
-function shuffleCards(cards: flashcardApi.FlashcardCard[]) {
+function shuffleCards(cards: FlashcardCard[]) {
   return [...cards].sort(() => Math.random() - 0.5)
 }
 
@@ -70,16 +71,16 @@ export function PracticeSessionPage() {
   const [recognitionError, setRecognitionError] = useState<string | null>(null)
   const [correctWords, setCorrectWords] = useState(0)
   const [wrongWords, setWrongWords] = useState(0)
-  const [sessionCards, setSessionCards] = useState<flashcardApi.FlashcardCard[]>([])
+  const [sessionCards, setSessionCards] = useState<FlashcardCard[]>([])
   const [completedSession, setCompletedSession] = useState<{ correctCards: number; wrongCards: number } | null>(null)
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const initializedSessionKeyRef = useRef<string | null>(null)
 
-  const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => flashcardApi.getPageSession(pageId), enabled: Boolean(pageId) })
+  const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => getPageSession(pageId), enabled: Boolean(pageId) })
   const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: getPracticeSettings })
-  const saveSummaryMutation = useMutation({ mutationFn: flashcardApi.createPracticeSessionSummary })
-  const addToReviewMutation = useMutation({ mutationFn: flashcardApi.addPracticeWordsToReview })
+  const saveSummaryMutation = useMutation({ mutationFn: practiceApi.createPracticeSessionSummary })
+  const addToReviewMutation = useMutation({ mutationFn: practiceApi.addPracticeWordsToReview })
 
   const currentCard = sessionCards[currentIndex] ?? null
   const language = sessionQuery.data?.boardLanguage ?? 'en'

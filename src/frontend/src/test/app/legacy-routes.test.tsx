@@ -7,7 +7,6 @@ describe('temporary legacy route manifest', () => {
     expect(paths).toEqual([
       'todo',
       'countdowns',
-      'flashcards',
       'practice',
       'habits',
       'habits/:habitId/stats',
@@ -15,7 +14,6 @@ describe('temporary legacy route manifest', () => {
       'notes',
       'kanban',
       'pomodoro',
-      'flashcards/pages/:pageId',
       'review',
       'practice/:pageId',
     ])

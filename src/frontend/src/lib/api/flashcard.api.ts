@@ -2,45 +2,6 @@ import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
 import type { PracticeMode } from '@/features/practice'
 
-export type FlashcardCard = {
-  id: string
-  wordId: string
-  word: string
-  wordClass: string
-  meaningVn: string
-  meaningEn: string
-  example: string
-  thesaurus?: string | null
-  collocation?: string | null
-  note?: string | null
-  isInReview: boolean
-  reviewLevel?: number | null
-  nextReviewDate?: string | null
-  lapseCount: number
-}
-
-export type FlashcardPage = {
-  pageId: string
-  pageName: string
-  isPracticed: boolean
-  words: FlashcardCard[]
-}
-
-export type FlashcardBoard = {
-  boardId: string
-  boardName: string
-  boardLanguage: string
-  pages: FlashcardPage[]
-}
-
-export type PageSession = {
-  pageId: string
-  boardId: string
-  pageName: string
-  boardLanguage: string
-  words: FlashcardCard[]
-}
-
 export type ReviewMode = 'dictation' | 'meaningToWord' | 'pronunciation' | 'random'
 export type ReviewOrderType = 'sequential' | 'shuffle'
 export type ReviewStartBehavior = 'prompt' | 'continue' | 'replace'
@@ -99,11 +60,7 @@ export type ReviewResult = {
   nextReviewDate: string
 }
 
-export type DashboardForecastPoint = {
-  date: string
-  dueCount: number
-}
-
+export type DashboardForecastPoint = { date: string; dueCount: number }
 export type FlashcardDashboard = {
   boardId?: string | null
   boardName?: string | null
@@ -135,44 +92,17 @@ export type AddPracticeWordsToReviewResult = {
   nextReviewDate: string
 }
 
-export async function listBoards() {
-  const response = await apiClient.get<ApiEnvelope<FlashcardBoard[]>>('/flashcards/pages')
-  return response.data.data ?? []
-}
-
-export async function getPageSession(pageId: string) {
-  const response = await apiClient.get<ApiEnvelope<PageSession>>(`/flashcards/pages/${pageId}/words`)
-  return response.data.data!
-}
-
-export async function createReviewSession(input: {
-  boardId: string
-  orderType: ReviewOrderType
-  mode: ReviewMode
-  startBehavior: ReviewStartBehavior
-  timeZoneId: string
-}) {
+export async function createReviewSession(input: { boardId: string; orderType: ReviewOrderType; mode: ReviewMode; startBehavior: ReviewStartBehavior; timeZoneId: string }) {
   const response = await apiClient.post<ApiEnvelope<ReviewSessionCreated>>('/review/sessions', input)
   return response.data.data!
 }
 
-export async function createPracticeSessionSummary(input: {
-  pageId: string
-  mode: PracticeMode
-  totalCards: number
-  correctCards: number
-  wrongCards: number
-  timeZoneId: string
-}) {
+export async function createPracticeSessionSummary(input: { pageId: string; mode: PracticeMode; totalCards: number; correctCards: number; wrongCards: number; timeZoneId: string }) {
   const response = await apiClient.post<ApiEnvelope<PracticeSessionSummary>>('/practice/sessions', input)
   return response.data.data!
 }
 
-export async function addPracticeWordsToReview(input: {
-  pageId: string
-  wordId: string
-  timeZoneId: string
-}) {
+export async function addPracticeWordsToReview(input: { pageId: string; wordId: string; timeZoneId: string }) {
   const response = await apiClient.post<ApiEnvelope<AddPracticeWordsToReviewResult>>('/practice/add-to-review', input)
   return response.data.data!
 }
@@ -188,13 +118,7 @@ export async function getDashboard(timeZoneId: string, boardId?: string) {
   return response.data.data!
 }
 
-export async function submitReview(input: {
-  sessionId: string
-  wordId: string
-  correct: boolean
-  timeSpentSeconds: number
-  timeZoneId: string
-}) {
+export async function submitReview(input: { sessionId: string; wordId: string; correct: boolean; timeSpentSeconds: number; timeZoneId: string }) {
   const response = await apiClient.post<ApiEnvelope<ReviewResult>>('/review', input)
   return response.data.data!
 }

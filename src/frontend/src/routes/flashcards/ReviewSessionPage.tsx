@@ -2,7 +2,8 @@ import { CheckCircle2, ChevronDown, Layers, Play, Volume2, X } from 'lucide-reac
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import * as flashcardApi from '../../lib/api/flashcard.api'
+import * as reviewApi from '../../lib/api/flashcard.api'
+import { listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { getReviewSettings } from '@/features/review'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { AppShell } from '@/shared/components/layout/AppShell'
@@ -29,7 +30,7 @@ function speakWord(word: string, language: string) {
   window.speechSynthesis.speak(utterance)
 }
 
-function buildBoardOptions(boards: flashcardApi.FlashcardBoard[]) {
+function buildBoardOptions(boards: FlashcardBoard[]) {
   const options = boards.map((board) => {
     const words = board.pages.flatMap((page) => page.words)
     const dueCount = words.filter((word) => word.isInReview && word.nextReviewDate).length
@@ -49,16 +50,16 @@ function buildBoardOptions(boards: flashcardApi.FlashcardBoard[]) {
   })
 }
 
-function modeLabel(mode: flashcardApi.ReviewSessionWord['mode']) {
+function modeLabel(mode: reviewApi.ReviewSessionWord['mode']) {
   return mode === 'meaningToWord' ? 'Meaning -> Word' : mode
 }
 
 export function ReviewSessionPage() {
 
   const [boardId, setBoardId] = useState('')
-  const [orderType, setOrderType] = useState<flashcardApi.ReviewOrderType>('sequential')
-  const [resumeModalSession, setResumeModalSession] = useState<flashcardApi.ReviewSessionCreated | null>(null)
-  const [session, setSession] = useState<flashcardApi.ReviewSessionCreated | null>(null)
+  const [orderType, setOrderType] = useState<reviewApi.ReviewOrderType>('sequential')
+  const [resumeModalSession, setResumeModalSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
+  const [session, setSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
   const [transcript, setTranscript] = useState('')
@@ -75,7 +76,7 @@ export function ReviewSessionPage() {
   const cardStartedAt = useRef(0)
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
 
-  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: flashcardApi.listBoards })
+  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: listBoards })
   const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: getReviewSettings })
   const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? []), [decksQuery.data])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
@@ -85,7 +86,7 @@ export function ReviewSessionPage() {
   const currentLanguage = activeBoard?.boardLanguage ?? 'en'
 
   const startSessionMutation = useMutation({
-    mutationFn: flashcardApi.createReviewSession,
+    mutationFn: reviewApi.createReviewSession,
     onSuccess: (result) => {
       if (result.startDisposition === 'prompt') {
         setResumeModalSession(result)
@@ -96,7 +97,7 @@ export function ReviewSessionPage() {
     },
   })
 
-  const submitReviewMutation = useMutation({ mutationFn: flashcardApi.submitReview })
+  const submitReviewMutation = useMutation({ mutationFn: reviewApi.submitReview })
 
   useEffect(() => {
     if (!currentWord) return
@@ -125,7 +126,7 @@ export function ReviewSessionPage() {
     }
   }, [])
 
-  function openSession(nextSession: flashcardApi.ReviewSessionCreated) {
+  function openSession(nextSession: reviewApi.ReviewSessionCreated) {
     setResumeModalSession(null)
     setSession(nextSession)
     setCurrentIndex(0)
@@ -199,7 +200,7 @@ export function ReviewSessionPage() {
     recognition.start()
   }
 
-  async function startReview(startBehavior: flashcardApi.ReviewStartBehavior) {
+  async function startReview(startBehavior: reviewApi.ReviewStartBehavior) {
     if (!boardId) return
 
     await startSessionMutation.mutateAsync({

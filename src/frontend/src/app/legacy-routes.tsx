@@ -12,17 +12,10 @@ export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'todo', lazy: lazyLegacyPage(() => import('@/routes/todo/TodoPage'), 'TodoPage') },
   { path: 'countdowns', lazy: lazyLegacyPage(() => import('@/routes/countdown/CountdownPage'), 'CountdownPage') },
   {
-    path: 'flashcards',
-    lazy: async () => {
-      const { FlashcardsPage } = await import('@/routes/flashcards/FlashcardsPage')
-      return { Component: () => <FlashcardsPage entryMode="flashcards" /> }
-    },
-  },
-  {
     path: 'practice',
     lazy: async () => {
-      const { FlashcardsPage } = await import('@/routes/flashcards/FlashcardsPage')
-      return { Component: () => <FlashcardsPage entryMode="practice" /> }
+      const { PracticeLibraryPage } = await import('@/routes/practice/PracticeLibraryPage')
+      return { Component: PracticeLibraryPage }
     },
   },
   { path: 'habits', lazy: lazyLegacyPage(() => import('@/routes/habits/HabitPage'), 'HabitPage') },
@@ -31,7 +24,6 @@ export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'notes', lazy: lazyLegacyPage(() => import('@/routes/notes/NotesPage'), 'NotesPage') },
   { path: 'kanban', lazy: lazyLegacyPage(() => import('@/routes/kanban/KanbanPage'), 'KanbanPage') },
   { path: 'pomodoro', lazy: lazyLegacyPage(() => import('@/routes/pomodoro/PomodoroPage'), 'PomodoroPage') },
-  { path: 'flashcards/pages/:pageId', lazy: lazyLegacyPage(() => import('@/routes/flashcards/FlashcardViewerPage'), 'FlashcardViewerPage') },
   { path: 'review', lazy: lazyLegacyPage(() => import('@/routes/flashcards/ReviewSessionPage'), 'ReviewSessionPage') },
   { path: 'practice/:pageId', lazy: lazyLegacyPage(() => import('@/routes/flashcards/PracticeSessionPage'), 'PracticeSessionPage') },
 ]

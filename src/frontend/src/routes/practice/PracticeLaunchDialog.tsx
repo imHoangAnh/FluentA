@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { FlashcardPage } from '@/lib/api/flashcard.api'
+import type { FlashcardPage } from '@/features/flashcards'
 import { getPracticeSettings, type PracticeMode } from '@/features/practice'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'

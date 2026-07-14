@@ -32,6 +32,6 @@
 
 ## Current Story
 
-`US-FE-001` through `US-FE-004` are implemented, reviewed, verified, and
-locally committed. `US-FE-005` is the active story. Do not start `US-FE-006`
-until US-FE-005 has its own verified local smart commit.
+`US-FE-001` through `US-FE-005` are implemented, reviewed, verified, and
+locally committed. `US-FE-006` is the active story. Do not start `US-FE-007`
+until US-FE-006 has its own verified local smart commit.
