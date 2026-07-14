@@ -1,6 +1,7 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { type ReactNode, useMemo } from 'react'
 import { useAuthStore } from '@/features/auth'
+import { NotificationsMenu } from '@/features/notifications'
 import { ShellEnvironmentProvider } from '@/shared/components/layout/ShellEnvironment'
 import { Toaster } from '@/shared/components/ui/toaster'
 import { shellNavigationSections, shellNotificationsPath, shellSettingsNavigation } from './navigation'
@@ -20,6 +21,7 @@ export function AppProviders({ children, queryClient = productionQueryClient }: 
     navigationSections: shellNavigationSections,
     settingsNavigation: shellSettingsNavigation,
     notificationsPath: shellNotificationsPath,
+    notificationsMenu: <NotificationsMenu notificationsPath={shellNotificationsPath} />,
   }), [account, logout])
 
   return (

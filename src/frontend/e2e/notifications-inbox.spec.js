@@ -12,8 +12,8 @@ const initialItems = [
   { id: '22222222-2222-2222-2222-222222222222', type: 'CountdownAlert', title: 'Countdown reminder', message: 'Your IELTS countdown has completed.', readAt: null, createdAt: '2026-07-13T08:00:00Z' },
 ]
 
-async function mockAuthenticatedInbox(page, { failList = false } = {}) {
-  let items = structuredClone(initialItems)
+async function mockAuthenticatedInbox(page, { failList = false, items: sourceItems = initialItems } = {}) {
+  let items = structuredClone(sourceItems)
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
@@ -40,6 +40,25 @@ async function mockAuthenticatedInbox(page, { failList = false } = {}) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
   })
 }
+
+test('Notification bell opens a scrollable inbox preview with a full-inbox action', async ({ page }) => {
+  const manyItems = Array.from({ length: 12 }, (_, index) => ({
+    id: `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`,
+    type: 'HabitReminder',
+    title: `Habit reminder ${index + 1}`,
+    message: 'Practice listening today.',
+    readAt: index % 2 === 0 ? null : '2026-07-13T10:00:00Z',
+    createdAt: '2026-07-13T09:00:00Z',
+  }))
+  await mockAuthenticatedInbox(page, { items: manyItems })
+  await page.goto('/notifications')
+
+  await page.getByRole('button', { name: 'Notifications' }).click()
+  await expect(page.getByRole('menuitem', { name: 'Show all notifications' })).toHaveAttribute('href', '/notifications')
+  const previewList = page.getByLabel('Recent notifications').first()
+  await expect(previewList.getByText('Habit reminder 12')).toBeVisible()
+  expect(await previewList.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+})
 
 test('Notifications inbox covers unread, pending, mark-one, mark-all, and responsive states', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })

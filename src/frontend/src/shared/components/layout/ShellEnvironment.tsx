@@ -28,6 +28,7 @@ export type ShellEnvironmentValue = {
   navigationSections: ShellNavigationSection[]
   settingsNavigation: ShellNavigationItem
   notificationsPath: string
+  notificationsMenu?: ReactNode
 }
 
 const ShellEnvironmentContext = createContext<ShellEnvironmentValue | null>(null)

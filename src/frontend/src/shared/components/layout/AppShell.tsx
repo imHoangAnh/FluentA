@@ -29,6 +29,7 @@ export function AppShell({ children, title, description, headerActions, contentC
     avatarUrl,
     logout,
     navigationSections,
+    notificationsMenu,
     notificationsPath,
     settingsNavigation,
   } = useShellEnvironment()
@@ -130,9 +131,11 @@ export function AppShell({ children, title, description, headerActions, contentC
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {headerActions}
-            <Button asChild variant="ghost" size="icon" aria-label="Notifications">
-              <Link to={notificationsPath}><Bell /></Link>
-            </Button>
+            {notificationsMenu ?? (
+              <Button asChild variant="ghost" size="icon" aria-label="Notifications">
+                <Link to={notificationsPath}><Bell /></Link>
+              </Button>
+            )}
           </div>
         </header>
         <main id="main-content" className={cn('mx-auto w-full max-w-[1480px] p-6 lg:p-8', contentClassName)}>
