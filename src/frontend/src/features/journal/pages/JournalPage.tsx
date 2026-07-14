@@ -2,10 +2,10 @@ import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Sear
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/shared/components/layout/AppShell'
-import * as journalApi from '../../lib/api/journal.api'
+import * as journalApi from '../api/journal.api'
 
 const JournalRichTextEditor = lazy(() =>
-  import('./JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
+  import('../components/JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
 )
 
 function formatDate(value: string) {

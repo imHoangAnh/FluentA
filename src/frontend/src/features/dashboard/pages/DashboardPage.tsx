@@ -15,7 +15,7 @@ import { useAuthStore } from '@/features/auth'
 import { getReviewDashboard } from '@/features/review'
 import { cn } from '@/shared/lib/utils'
 
-const preloadJournalEditor = () => import('@/routes/journal/JournalRichTextEditor')
+const preloadJournalEditor = () => import('@/features/journal')
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'

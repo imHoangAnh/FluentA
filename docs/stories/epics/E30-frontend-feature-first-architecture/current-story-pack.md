@@ -2,31 +2,30 @@
 
 ## Current Story
 
-- ID: `US-FE-010`
-- Title: Kanban feature boundary
+- ID: `US-FE-011`
+- Title: Journal feature boundary
 - Lane: high-risk
 - Status: implemented, reviewed, verified, and locally committed on
   2026-07-14
 
 ## Objective
 
-Move `/kanban`, board/column/card UI, Kanban API/types, and realtime
-invalidation into `features/kanban` while preserving Pomodoro's public Kanban
-contract.
+Move `/journal`, rich-text editor, autosave/search/date UI, and Journal API
+into `features/journal` while preserving Dashboard editor preloading.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-010-kanban-feature-boundary/overview.md`
-- `US-FE-010-kanban-feature-boundary/design.md`
-- `US-FE-010-kanban-feature-boundary/validation.md`
+- `US-FE-011-journal-feature-boundary/overview.md`
+- `US-FE-011-journal-feature-boundary/design.md`
+- `US-FE-011-journal-feature-boundary/validation.md`
 
 ## Gate
 
-US-FE-010 must preserve `/kanban`, board/column/card operations, request
-payloads, `['kanban']` query/cache keys, `refetchType: 'all'` realtime
-invalidation, and Pomodoro's Kanban consumer. It may close only after focused
-and full tests, browser proof, lint/build, old-path and cross-feature scans,
-Harness verification, review evidence, and its own local smart commit.
+US-FE-011 must preserve `/journal`, rich-text autosave/search/calendar
+behavior, request payloads, query/cache keys, and Dashboard's editor preload.
+It may close only after focused and full tests, browser proof, lint/build,
+boundary scans, Harness verification, review evidence, and its own local smart
+commit.

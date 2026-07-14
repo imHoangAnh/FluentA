@@ -19,7 +19,7 @@ vi.mock('@/features/todo', () => ({ listByDate: adapters.listByDate, updateTodo:
 vi.mock('@/lib/api/habit.api', () => ({ listHabits: adapters.listHabits, toggleHabitEntry: adapters.toggleHabitEntry }))
 vi.mock('@/lib/api/countdown.api', () => ({ listCountdowns: adapters.listCountdowns }))
 vi.mock('@/features/review', () => ({ getReviewDashboard: adapters.getReviewDashboard }))
-vi.mock('@/routes/journal/JournalRichTextEditor', () => ({ JournalRichTextEditor: () => null }))
+vi.mock('@/features/journal', () => ({ JournalRichTextEditor: () => null }))
 
 function renderDashboard() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })

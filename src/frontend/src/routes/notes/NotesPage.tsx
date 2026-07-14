@@ -6,7 +6,7 @@ import * as assetsApi from '../../lib/api/assets.api'
 import * as noteApi from '../../lib/api/note.api'
 
 const JournalRichTextEditor = lazy(() =>
-  import('../journal/JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
+  import('@/features/journal').then((module) => ({ default: module.JournalRichTextEditor })),
 )
 
 function formatDate(value: string) {
