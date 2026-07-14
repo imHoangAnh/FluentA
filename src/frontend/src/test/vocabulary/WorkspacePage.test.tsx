@@ -3,12 +3,12 @@ import { QueryClient } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import { WorkspacePage } from './WorkspacePage'
-import * as vocabularyApi from '@/lib/api/vocabulary.api'
+import { WorkspacePage } from '@/features/vocabulary/pages/WorkspacePage'
+import * as vocabularyApi from '@/features/vocabulary/api/vocabulary.api'
 import { AppProviders } from '@/app/providers'
 
-vi.mock('@/lib/api/vocabulary.api', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/api/vocabulary.api')>('@/lib/api/vocabulary.api')
+vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
+  const actual = await vi.importActual<typeof import('@/features/vocabulary/api/vocabulary.api')>('@/features/vocabulary/api/vocabulary.api')
   return { ...actual, deleteBoard: vi.fn(), deletePage: vi.fn(), listWords: vi.fn() }
 })
 

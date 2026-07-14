@@ -32,6 +32,6 @@
 
 ## Current Story
 
-`US-FE-002` remains the current story and is implemented, reviewed, and
-verified. `US-FE-001` is also implemented and verified. Do not start
-`US-FE-003` until its story workflow is explicitly opened.
+`US-FE-001` through `US-FE-004` are implemented, reviewed, verified, and
+locally committed. `US-FE-005` is the active story. Do not start `US-FE-006`
+until US-FE-005 has its own verified local smart commit.

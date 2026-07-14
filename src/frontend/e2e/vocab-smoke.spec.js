@@ -25,19 +25,18 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
 
   await page.getByTestId('board-name-input').fill('IELTS Browser Board');
   await page.getByTestId('create-board-button').click();
-  await expect(page.getByRole('heading', { name: 'IELTS Browser Board' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /IELTS Browser Board/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create your first page' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Create page' }).click();
   await page.getByTestId('page-name-input').fill('Unit 1 - Education');
   await page.getByTestId('create-page-button').click();
-  await expect(page.getByLabel('Rename Unit 1 - Education')).toBeVisible();
-
-  await page.getByLabel('Rename Unit 1 - Education').fill('Unit 1 - Learning');
-  await page.locator('button[data-testid^="save-page-"]').click();
-  await expect(page.getByLabel('Rename Unit 1 - Learning')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unit 1 - Education', exact: true })).toBeVisible();
 
   await page.getByLabel('New word', { exact: true }).fill('mitigate');
   await page.getByLabel('New Vietnamese meaning', { exact: true }).fill('giảm nhẹ');
-  await page.getByLabel('New English meaning', { exact: true }).fill('make less severe');
+  await page.getByLabel('New IPA pronunciation', { exact: true }).fill('/ˈmɪt.ɪ.ɡeɪt/');
+  await page.getByLabel('New definition', { exact: true }).fill('make less severe');
   await page.getByLabel('New word class', { exact: true }).selectOption('verb');
   await page.getByLabel('New example', { exact: true }).fill('Mitigate the risk.');
   await page.getByTestId('create-word-button').click();
@@ -49,10 +48,14 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('Class for mitigation').selectOption('noun');
   await page.getByLabel('Class for mitigation').press('Tab');
 
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByLabel('Delete mitigation').click();
-  await expect(page.getByLabel('Word mitigation')).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Delete Word?' })).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByLabel('Word for mitigation')).toBeHidden();
 
-  await page.locator('button[data-testid^="delete-page-"]').click();
-  await expect(page.getByLabel('Rename Unit 1 - Learning')).toBeHidden();
+  await page.getByRole('button', { name: 'Unit 1 - Education', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Delete Page' }).click();
+  await expect(page.getByRole('heading', { name: 'Delete Page?' })).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Unit 1 - Education', exact: true })).toBeHidden();
 });

@@ -2,11 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import { VocabTable } from './VocabTable'
-import * as vocabularyApi from '../../lib/api/vocabulary.api'
+import { VocabTable } from '@/features/vocabulary/components/VocabTable'
+import * as vocabularyApi from '@/features/vocabulary/api/vocabulary.api'
 
-vi.mock('../../lib/api/vocabulary.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/vocabulary.api')>('../../lib/api/vocabulary.api')
+vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
+  const actual = await vi.importActual<typeof import('@/features/vocabulary/api/vocabulary.api')>('@/features/vocabulary/api/vocabulary.api')
   return {
     ...actual,
     listWords: vi.fn(),

@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
-import * as vocabularyApi from '../../lib/api/vocabulary.api'
+import * as vocabularyApi from '../api/vocabulary.api'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { toast } from '@/lib/toast'
 
