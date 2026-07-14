@@ -51,6 +51,15 @@ export async function createBoard(input: CreateNoteBoardInput) {
   return response.data.data!
 }
 
+export async function updateBoard(boardId: string, input: { name: string }) {
+  const response = await apiClient.patch<ApiEnvelope<NoteBoardSummary>>(`/notes/boards/${boardId}`, input)
+  return response.data.data!
+}
+
+export async function deleteBoard(boardId: string) {
+  await apiClient.delete(`/notes/boards/${boardId}`)
+}
+
 export async function createPage(boardId: string, input: CreateNotePageInput) {
   const response = await apiClient.post<ApiEnvelope<NotePage>>(`/notes/boards/${boardId}/pages`, input)
   return response.data.data!
@@ -64,4 +73,8 @@ export async function getPage(pageId: string) {
 export async function updatePage(pageId: string, input: UpdateNotePageInput) {
   const response = await apiClient.patch<ApiEnvelope<NotePage>>(`/notes/pages/${pageId}`, input)
   return response.data.data!
+}
+
+export async function deletePage(pageId: string) {
+  await apiClient.delete(`/notes/pages/${pageId}`)
 }

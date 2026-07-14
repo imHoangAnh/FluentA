@@ -15,9 +15,14 @@ and cross-feature linking remain out of scope.
 
 - A logged-in user can enter `/notes` from the protected app navigation.
 - A logged-in user can list only their own active Note boards.
+- A logged-in user can right-click a Note Board or Page to rename or delete
+  that exact item with accessible dialogs and entity-specific success feedback.
 - A logged-in user can create a Note board and create a Note page inside it.
 - New Note pages open immediately with blank content.
 - A logged-in user can get and update one owned active Note page.
+- Note Workspace uses the same board-and-page rail pattern as Vocabulary. A
+  selected page shows its editable title with its date directly below, followed
+  by the rich-text editor; word and character counters are not displayed.
 - Note page edits show save-state feedback, save on blur, and save before a
   page switch completes.
 - A user can paste or drop an image file into a Note page.
@@ -88,5 +93,4 @@ All responses use the FluentA envelope.
 
 ## Deferred Integration
 
-- Note board/page rename and delete UI affordances.
 - Note search, tags, sharing, templates, and file-picker uploads.

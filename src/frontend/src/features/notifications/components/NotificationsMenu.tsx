@@ -8,25 +8,40 @@ import { notificationApi } from '../api/notification.api'
 
 type NotificationsMenuProps = {
   notificationsPath: string
+  collapsed?: boolean
+  active?: boolean
 }
 
-export function NotificationsMenu({ notificationsPath }: NotificationsMenuProps) {
+export function NotificationsMenu({ notificationsPath, collapsed = false, active = false }: NotificationsMenuProps) {
   const query = useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list })
   const unreadCount = query.data?.filter((item) => !item.readAt).length ?? 0
 
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button type="button" variant="ghost" size="icon" aria-label="Notifications" aria-describedby={unreadCount > 0 ? 'notification-unread-count' : undefined}>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label="Notifications"
+          aria-describedby={unreadCount > 0 ? 'notification-unread-count' : undefined}
+          className={cn(
+            'h-10 w-full justify-start gap-3 px-3 text-sm font-medium text-muted-foreground hover:text-accent-foreground',
+            active && 'bg-secondary text-secondary-foreground',
+            collapsed && 'justify-center px-0',
+            'max-[1100px]:justify-center max-[1100px]:px-0',
+          )}
+        >
           <span className="relative grid place-items-center">
             <Bell />
             {unreadCount > 0 ? <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
           </span>
+          <span className={cn('truncate', collapsed && 'sr-only', 'max-[1100px]:sr-only')}>Notifications</span>
           {unreadCount > 0 ? <span id="notification-unread-count" className="sr-only">{unreadCount} unread notifications</span> : null}
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          side="right"
           align="end"
           sideOffset={8}
           className="z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-[0_12px_36px_rgba(16,32,29,0.14)]"

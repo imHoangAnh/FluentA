@@ -60,6 +60,7 @@ export function AppShell({ children, title, description, headerActions, contentC
     )
   }
   const SettingsIcon = settingsNavigation.icon
+  const notificationsActive = location.pathname === notificationsPath || location.pathname.startsWith(`${notificationsPath}/`)
 
   return (
     <div className="ds-root flex min-h-screen bg-background">
@@ -101,6 +102,17 @@ export function AppShell({ children, title, description, headerActions, contentC
         </nav>
 
         <div className="mt-4 grid gap-2 border-t border-border pt-4">
+          {notificationsMenu ? notificationsMenu(collapsed, notificationsActive) : (
+            <Link
+              to={notificationsPath}
+              aria-label="Notifications"
+              aria-current={notificationsActive ? 'page' : undefined}
+              className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground', notificationsActive && 'bg-secondary text-secondary-foreground', collapsed && 'justify-center px-0', 'max-[1100px]:justify-center max-[1100px]:px-0')}
+            >
+              <Bell className="size-[18px]" aria-hidden="true" />
+              <span className={cn(collapsed && 'sr-only', 'max-[1100px]:sr-only')}>Notifications</span>
+            </Link>
+          )}
           <Link
             to={settingsNavigation.to}
             aria-label="Settings"
@@ -124,21 +136,10 @@ export function AppShell({ children, title, description, headerActions, contentC
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 flex h-14 min-h-14 items-center justify-between gap-4 border-b border-border bg-background/95 px-5 backdrop-blur lg:px-6">
-          <div className="min-w-0 py-2">
-            <h1 className="m-0 truncate text-xl font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
-            {description ? <p className="m-0 mt-1 truncate text-sm text-muted-foreground">{description}</p> : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {headerActions}
-            {notificationsMenu ?? (
-              <Button asChild variant="ghost" size="icon" aria-label="Notifications">
-                <Link to={notificationsPath}><Bell /></Link>
-              </Button>
-            )}
-          </div>
-        </header>
         <main id="main-content" className={cn('mx-auto w-full max-w-[1480px] p-6 lg:p-8', contentClassName)}>
+          <h1 className="sr-only">{title}</h1>
+          {description ? <p className="sr-only">{description}</p> : null}
+          {headerActions ? <div className="mb-4 flex justify-end">{headerActions}</div> : null}
           {children}
         </main>
       </div>

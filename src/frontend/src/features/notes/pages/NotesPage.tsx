@@ -1,8 +1,16 @@
-import { FilePenLine, Layers3, Loader2, Plus, Save } from 'lucide-react'
+import { BookOpenText, ChevronRight, FileText, FolderPlus, Layers3, Loader2, Plus, Save } from 'lucide-react'
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/shared/components/layout/AppShell'
+import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
+import { Button } from '@/shared/components/ui/button'
+import { Card } from '@/shared/components/ui/card'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
+import { Input } from '@/shared/components/ui/input'
+import { cn } from '@/shared/lib/utils'
 import * as assetsApi from '@/lib/api/assets.api'
+import { toast } from '@/lib/toast'
+import { DeleteNoteConfirmationDialog } from '../components/DeleteNoteConfirmationDialog'
 import * as noteApi from '../api/note.api'
 
 const JournalRichTextEditor = lazy(() =>
@@ -17,6 +25,10 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
+function newestFirst<T extends { createdAt: string; id: string }>(items: T[]) {
+  return items.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
+}
+
 function toPageSummary(page: noteApi.NotePage): noteApi.NotePageSummary {
   return {
     id: page.id,
@@ -27,6 +39,10 @@ function toPageSummary(page: noteApi.NotePage): noteApi.NotePageSummary {
     updatedAt: page.updatedAt,
   }
 }
+
+type NoteEntityTarget =
+  | { kind: 'board'; boardId: string; name: string }
+  | { kind: 'page'; boardId: string; pageId: string; name: string }
 
 export function NotesPage() {
   const queryClient = useQueryClient()
@@ -43,6 +59,8 @@ export function NotesPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [editorError, setEditorError] = useState<string | null>(null)
+  const [renameTarget, setRenameTarget] = useState<NoteEntityTarget | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<NoteEntityTarget | null>(null)
   const savePromiseRef = useRef<Promise<boolean> | null>(null)
 
   const boardsQuery = useQuery({
@@ -51,13 +69,13 @@ export function NotesPage() {
   })
 
   const boards = useMemo(
-    () => (boardsQuery.data ?? []).toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)),
+    () => newestFirst(boardsQuery.data ?? []),
     [boardsQuery.data],
   )
 
   const activeBoard = boards.find((board) => board.id === selectedBoardId) ?? boards[0] ?? null
   const pages = useMemo(
-    () => (activeBoard?.pages ?? []).toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)),
+    () => newestFirst(activeBoard?.pages ?? []),
     [activeBoard?.pages],
   )
   const activePageSummary = pages.find((page) => page.id === selectedPageId) ?? pages[0] ?? null
@@ -67,6 +85,7 @@ export function NotesPage() {
     queryFn: () => noteApi.getPage(activePageSummary!.id),
     enabled: Boolean(activePageSummary?.id),
   })
+  const activePage = pageQuery.data
 
   const createBoard = useMutation({
     mutationFn: noteApi.createBoard,
@@ -104,13 +123,83 @@ export function NotesPage() {
       await queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
     },
   })
+  const renameBoard = useMutation({
+    mutationFn: (input: { target: Extract<NoteEntityTarget, { kind: 'board' }>; name: string }) => noteApi.updateBoard(input.target.boardId, { name: input.name }),
+    onSuccess: (renamedBoard) => {
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+        current.map((board) => board.id === renamedBoard.id ? { ...board, name: renamedBoard.name, updatedAt: renamedBoard.updatedAt } : board),
+      )
+      setRenameTarget(null)
+      toast.success('Board renamed successfully')
+    },
+  })
+  const renamePage = useMutation({
+    mutationFn: (input: { target: Extract<NoteEntityTarget, { kind: 'page' }>; name: string }) => noteApi.updatePage(input.target.pageId, { name: input.name }),
+    onSuccess: (page) => {
+      queryClient.setQueryData(['note', 'page', page.id], page)
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+        current.map((board) => board.id === page.boardId
+          ? { ...board, updatedAt: page.updatedAt, pages: board.pages.map((item) => item.id === page.id ? toPageSummary(page) : item) }
+          : board),
+      )
+      if (activePage?.id === page.id) {
+        setDraftPageId(page.id)
+        setTitle(page.name)
+        if (!isDirty) {
+          setContent(page.content)
+          setSaveStatus('saved')
+        }
+      }
+      setRenameTarget(null)
+      toast.success('Page renamed successfully')
+    },
+  })
   const updatePage = useMutation({
     mutationFn: (input: { pageId: string; patch: noteApi.UpdateNotePageInput }) => noteApi.updatePage(input.pageId, input.patch),
+  })
+  const deleteBoard = useMutation({
+    mutationFn: (target: Extract<NoteEntityTarget, { kind: 'board' }>) => noteApi.deleteBoard(target.boardId),
+    onSuccess: (_, target) => {
+      const current = queryClient.getQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards']) ?? []
+      const deletedBoard = current.find((board) => board.id === target.boardId)
+      const remainingBoards = newestFirst(current.filter((board) => board.id !== target.boardId))
+      queryClient.setQueryData(['note', 'boards'], remainingBoards)
+      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: ['note', 'page', page.id], exact: true })
+      setSelectedBoardId(remainingBoards[0]?.id ?? null)
+      setSelectedPageId(null)
+      setDraftPageId(null)
+      setTitle('')
+      setContent('')
+      setIsDirty(false)
+      setDeleteTarget(null)
+      toast.success('Board deleted successfully')
+      void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+    },
+  })
+  const deletePage = useMutation({
+    mutationFn: (target: Extract<NoteEntityTarget, { kind: 'page' }>) => noteApi.deletePage(target.pageId),
+    onSuccess: (_, target) => {
+      let nextPageId: string | null = null
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) => current.map((board) => {
+        if (board.id !== target.boardId) return board
+        const remainingPages = newestFirst(board.pages.filter((page) => page.id !== target.pageId))
+        nextPageId = remainingPages[0]?.id ?? null
+        return { ...board, pages: remainingPages }
+      }))
+      queryClient.removeQueries({ queryKey: ['note', 'page', target.pageId], exact: true })
+      setSelectedPageId(nextPageId)
+      setDraftPageId(null)
+      setTitle('')
+      setContent('')
+      setIsDirty(false)
+      setDeleteTarget(null)
+      toast.success('Page deleted successfully')
+      void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+    },
   })
 
   const boardError = createBoard.isError ? 'Could not create board right now.' : null
   const pageError = editorError ?? (createPage.isError || updatePage.isError ? 'Could not save note page right now.' : null)
-  const activePage = pageQuery.data
   const isOpeningPage = pageQuery.isLoading
   const isSaving = saveStatus === 'saving'
   // Server data is the clean draft. Local state becomes authoritative only after an edit,
@@ -118,12 +207,6 @@ export function NotesPage() {
   const hasServerDraft = Boolean(activePage && !isDirty && activePage.id !== draftPageId)
   const draftTitle = hasServerDraft ? activePage!.name : title
   const draftContent = hasServerDraft ? activePage!.content : content
-
-  const textContent = useMemo(() => {
-    const div = document.createElement('div')
-    div.innerHTML = draftContent
-    return div.textContent || ''
-  }, [draftContent])
 
   async function persistDraft() {
     if (!activePage || !isDirty) return true
@@ -207,271 +290,114 @@ export function NotesPage() {
     setSelectedPageId(pageId)
   }
 
+  function confirmRename(name: string) {
+    if (!renameTarget) return
+    if (renameTarget.kind === 'board') renameBoard.mutate({ target: renameTarget, name })
+    else renamePage.mutate({ target: renameTarget, name })
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return
+    if (deleteTarget.kind === 'board') deleteBoard.mutate(deleteTarget)
+    else deletePage.mutate(deleteTarget)
+  }
+
   return (
-    <AppShell title="Notes" description="Organize boards, pages, and rich-text drafts in one workspace." contentClassName="max-w-none p-0">
-      <div className="min-w-0">
-        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-border px-6 py-6 lg:px-8">
-          <div>
-            <span className="preview-label">Note Workspace</span>
-            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight text-foreground">Capture boards, pages, and drafts in one place.</h1>
-          </div>
-          <button
-            className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
-            type="button"
-            onClick={() => setIsBoardFormOpen((current) => !current)}
-          >
-            <Plus size={18} />
-            New board
-          </button>
-        </header>
-
-        <div className="grid min-h-[calc(100vh-10rem)] gap-6 p-6 lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:p-8">
-          <aside className="min-w-0">
-            <section className="rounded-lg border border-border bg-card shadow-sm">
-              <div className="flex items-start justify-between gap-4 p-5 pb-0">
-                <div>
-                  <h2 className="m-0 text-lg font-semibold text-foreground">Boards</h2>
-                  <p className="m-0 mt-1 text-sm text-muted-foreground">{boards.length} total</p>
-                </div>
-              </div>
-
-              {isBoardFormOpen ? (
-                <form
-                  className="m-5 grid gap-3 rounded-lg border border-border bg-muted/35 p-4"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    const name = newBoardName.trim()
-                    if (name) createBoard.mutate({ name })
-                  }}
-                >
-                  <label className="text-sm font-medium text-foreground" htmlFor="note-board-name">Board name</label>
-                  <input
-                    className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    id="note-board-name"
-                    value={newBoardName}
-                    onChange={(event) => setNewBoardName(event.target.value)}
-                    placeholder="Learning notes"
-                    maxLength={120}
-                    autoFocus
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button type="button" className="secondary-button" onClick={() => setIsBoardFormOpen(false)}>Cancel</button>
-                    <button type="submit" className="primary-button m-0 w-auto" disabled={createBoard.isPending || !newBoardName.trim()}>
-                      Create board
-                    </button>
-                  </div>
-                  {boardError ? <p className="flashcard-status flashcard-status--error">{boardError}</p> : null}
-                </form>
-              ) : null}
-
-              {boardsQuery.isLoading ? <p className="flashcard-status">Loading note boards...</p> : null}
-              {boardsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load note boards.</p> : null}
-
-              {!boardsQuery.isLoading && !boardsQuery.isError && boards.length === 0 ? (
-                <div className="m-5 grid gap-3 rounded-lg border border-dashed border-border p-6 text-center">
-                  <Layers3 size={28} />
-                  <h2 className="m-0 text-lg font-semibold text-foreground">No note boards yet</h2>
-                  <p className="m-0 text-sm text-muted-foreground">Start with one board for study notes, reflections, or draft ideas.</p>
-                  <button className="primary-button m-0 w-auto" type="button" onClick={() => setIsBoardFormOpen(true)}>
-                    Create your first board
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="grid gap-3 p-5">
-                {boards.map((board) => {
-                  const isActiveBoard = activeBoard?.id === board.id
-                  const sortedBoardPages = board.pages.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
-                  return (
-                    <div className="grid gap-2" key={board.id}>
+    <AppShell title="Notes" description="Organize boards, pages, and rich-text drafts in one workspace." contentClassName="h-screen max-w-none">
+      <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
+        <Card className="flex min-h-0 flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={() => setIsBoardFormOpen((value) => !value)}><FolderPlus /></Button></div>
+          {isBoardFormOpen ? <form className="grid gap-3 border-b border-border bg-secondary/30 p-3" onSubmit={(event) => { event.preventDefault(); const name = newBoardName.trim(); if (name) createBoard.mutate({ name }) }}><div className="grid gap-1.5"><label className="text-xs font-medium" htmlFor="note-board-name">Board name</label><Input id="note-board-name" value={newBoardName} onChange={(event) => setNewBoardName(event.target.value)} placeholder="Learning notes" maxLength={120} autoFocus required /></div><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" onClick={() => setIsBoardFormOpen(false)}>Cancel</Button><Button type="submit" size="sm" disabled={createBoard.isPending || !newBoardName.trim()}>Create</Button></div>{boardError ? <p className="m-0 text-sm text-destructive">{boardError}</p> : null}</form> : null}
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {boards.map((board) => {
+              const isActiveBoard = activeBoard?.id === board.id
+              const sortedBoardPages = newestFirst(board.pages)
+              return (
+                <div className="mb-1" key={board.id}>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
                       <button
-                        className={isActiveBoard ? 'flex w-full items-center justify-between gap-3 rounded-md border border-primary/25 bg-primary/5 p-3 text-left' : 'flex w-full items-center justify-between gap-3 rounded-md border border-transparent bg-muted/50 p-3 text-left hover:border-primary/20 hover:bg-accent'}
                         type="button"
+                        className={cn('flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActiveBoard && 'bg-secondary text-secondary-foreground')}
                         onClick={() => { void handleSelectBoard(board.id) }}
+                        onContextMenu={() => { void handleSelectBoard(board.id) }}
                       >
-                        <span>{board.name}</span>
-                        <small>{board.pages.length} {board.pages.length === 1 ? 'page' : 'pages'}</small>
+                        <ChevronRight className={cn('size-4 shrink-0 transition-transform', isActiveBoard && 'rotate-90')} />
+                        <span className="min-w-0 flex-1 truncate">{board.name}</span>
+                        <span className="text-[11px] text-muted-foreground">{board.pages.length}</span>
                       </button>
-
-                      {isActiveBoard ? (
-                        <div className="grid gap-1 pl-3">
-                          {sortedBoardPages.map((page) => (
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'board', boardId: board.id, name: board.name })}>Rename Board</ContextMenuItem>
+                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name })}>Delete Board</ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                  {isActiveBoard ? (
+                    <div className="ml-4 mt-1 grid gap-1 border-l border-border pl-2">
+                      {sortedBoardPages.map((page) => (
+                        <ContextMenu key={page.id}>
+                          <ContextMenuTrigger asChild>
                             <button
-                              key={page.id}
-                              className={activePageSummary?.id === page.id ? 'flex w-full items-center gap-2 rounded-md border border-primary/25 bg-card px-3 py-2 text-left text-primary' : 'flex w-full items-center gap-2 rounded-md border border-transparent px-3 py-2 text-left text-muted-foreground hover:bg-accent'}
                               type="button"
+                              className={cn('flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePageSummary?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
                               onClick={() => { void handleSelectPage(page.id) }}
+                              onContextMenu={() => { void handleSelectPage(page.id) }}
                             >
-                              <FilePenLine size={14} />
-                              <span>{page.name}</span>
+                              <FileText className="size-3.5 shrink-0" /><span className="truncate">{page.name}</span>
                             </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          </aside>
-
-          <section className="min-w-0">
-            <section className="min-h-full rounded-lg border border-border bg-card pb-6 shadow-sm">
-              {activeBoard ? (
-                <>
-                  <div className="flex flex-wrap items-start justify-between gap-4 p-5 pb-0">
-                    <div>
-                      <span className="preview-label">Active board</span>
-                      <h2 className="m-0 mt-1 text-xl font-semibold text-foreground">{activeBoard.name}</h2>
-                      <p className="m-0 mt-1 text-sm text-muted-foreground">{pages.length === 0 ? 'No pages yet.' : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'} ready.`}</p>
-                    </div>
-                    <button
-                      className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
-                      type="button"
-                      onClick={() => setIsPageFormOpen((current) => !current)}
-                    >
-                      <Plus size={18} />
-                      New page
-                    </button>
-                  </div>
-
-                  {isPageFormOpen ? (
-                    <form
-                      className="mx-5 mt-4 grid gap-3 rounded-lg border border-border bg-muted/35 p-4"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        const name = newPageName.trim()
-                        if (name && activeBoard) createPage.mutate({ boardId: activeBoard.id, name })
-                      }}
-                    >
-                      <label className="text-sm font-medium text-foreground" htmlFor="note-page-name">Page name</label>
-                      <input
-                        className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        id="note-page-name"
-                        value={newPageName}
-                        onChange={(event) => setNewPageName(event.target.value)}
-                        placeholder="Week 1 reflections"
-                        maxLength={240}
-                        autoFocus
-                      />
-                      <div className="flex justify-end gap-2">
-                        <button type="button" className="secondary-button" onClick={() => setIsPageFormOpen(false)}>Cancel</button>
-                        <button type="submit" className="primary-button m-0 w-auto" disabled={createPage.isPending || !newPageName.trim()}>
-                          Create page
-                        </button>
-                      </div>
-                      {pageError ? <p className="flashcard-status flashcard-status--error">{pageError}</p> : null}
-                    </form>
-                  ) : null}
-
-                  {pages.length === 0 ? (
-                    <div className="m-5 grid min-h-80 place-content-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
-                      <FilePenLine size={30} />
-                      <h2 className="m-0 text-lg font-semibold text-foreground">No pages in this board yet</h2>
-                      <p className="m-0 text-sm text-muted-foreground">Create the first page and FluentA will open it immediately with a blank draft.</p>
-                      <button className="primary-button m-0 w-auto" type="button" onClick={() => setIsPageFormOpen(true)}>
-                        Create first page
-                      </button>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Rename Page</ContextMenuItem>
+                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Delete Page</ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      ))}
+                      <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={() => setIsPageFormOpen(true)}><Plus /> Add page</Button>
                     </div>
                   ) : null}
-
-                  {pages.length > 0 && activePageSummary ? (
-                    <div className="grid gap-4 p-5">
-                      {pageQuery.isLoading || isOpeningPage ? <p className="flashcard-status">Loading note page...</p> : null}
-                      {pageQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load note page.</p> : null}
-
-                      {activePage ? (
-                        <>
-                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            <span>{formatDate(activePage.date)}</span>
-                            <span>Updated {formatDate(activePage.updatedAt)}</span>
-                          </div>
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                              <span className="preview-label">Editable note</span>
-                              <p className="m-0 mt-1 text-sm text-muted-foreground">Blur saves your draft. Switching pages saves first, then opens the next note.</p>
-                            </div>
-                            <button
-                              className="primary-button m-0 inline-flex min-h-10 w-auto items-center gap-2 px-4"
-                              type="button"
-                              disabled={isSaving || !isDirty || !draftTitle.trim()}
-                              onClick={() => { void persistDraft() }}
-                            >
-                              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                              {saveStatus === 'error' ? 'Retry save' : 'Save'}
-                            </button>
-                          </div>
-
-                          {pageError ? <p className="flashcard-status flashcard-status--error">{pageError}</p> : null}
-
-                          <input
-                            aria-label="Note title"
-                            className="w-full border-0 border-b border-border bg-transparent pb-3 text-2xl font-semibold tracking-tight text-foreground focus:border-primary focus:outline-none"
-                            data-testid="note-title-input"
-                            disabled={isOpeningPage}
-                            maxLength={240}
-                            value={draftTitle}
-                            onBlur={() => { void persistDraft() }}
-                            onChange={(event) => {
-                              setContent(draftContent)
-                              setTitle(event.target.value)
-                              markChanged()
-                            }}
-                          />
-
-                          <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
-                            <div className="min-h-[28rem] rounded-lg border border-border bg-background p-4 [&_.journal-rich-text-content]:min-h-80">
-                              <JournalRichTextEditor
-                                disabled={isOpeningPage}
-                                content={draftContent}
-                                onBlur={() => { void persistDraft() }}
-                                onChange={(html) => {
-                                  setTitle(draftTitle)
-                                  setContent(html)
-                                  markChanged()
-                                }}
-                                onImageFiles={uploadNoteImages}
-                                onImageUploadError={(message) => {
-                                  setEditorError(message)
-                                  setSaveStatus('error')
-                                }}
-                              />
-                            </div>
-                          </Suspense>
-
-                          <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
-                            <div className="flex gap-4">
-                              <span><strong>{textContent.trim() ? textContent.trim().split(/\s+/).length : 0}</strong> words</span>
-                              <span><strong>{textContent.length}</strong> characters</span>
-                            </div>
-                            <small data-testid="note-save-status">
-                              {saveStatus === 'saving'
-                                ? 'Saving...'
-                                : saveStatus === 'saved'
-                                  ? 'Saved'
-                                  : saveStatus === 'error'
-                                    ? 'Save failed'
-                                    : isDirty
-                                      ? 'Unsaved changes'
-                                      : 'Saved'}
-                            </small>
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="m-5 grid min-h-80 place-content-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
-                  <Layers3 size={30} />
-                  <h2 className="m-0 text-lg font-semibold text-foreground">Select a board to begin</h2>
-                  <p className="m-0 text-sm text-muted-foreground">Choose a board from the left to browse its pages and open note detail.</p>
                 </div>
-              )}
-            </section>
-          </section>
-        </div>
+              )
+            })}
+            {boardsQuery.isLoading ? <p className="px-2 text-sm text-muted-foreground">Loading note boards...</p> : null}
+            {boardsQuery.isError ? <p className="px-2 text-sm text-destructive">Could not load note boards.</p> : null}
+            {!boardsQuery.isLoading && !boardsQuery.isError && boards.length === 0 ? <div className="px-3 py-10 text-center"><BookOpenText className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="m-0 text-sm font-medium">No note boards yet</p><p className="m-0 mt-1 text-xs leading-5 text-muted-foreground">Create a board to start organizing notes.</p><Button className="mt-4" size="sm" onClick={() => setIsBoardFormOpen(true)}>Create board</Button></div> : null}
+          </div>
+        </Card>
+
+        <section className="flex min-h-0 min-w-0 flex-col">
+          {activeBoard ? <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <Card className="flex min-h-[64px] shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><h2 className="m-0 truncate text-xl font-semibold tracking-[-0.02em]">{activePageSummary?.name ?? 'Create your first page'}</h2></div><Button type="button" size="sm" onClick={() => setIsPageFormOpen((value) => !value)}><Plus /> Add page</Button></Card>
+            {isPageFormOpen ? <Card className="shrink-0"><form className="flex items-end gap-3 p-4" onSubmit={(event) => { event.preventDefault(); const name = newPageName.trim(); if (name) createPage.mutate({ boardId: activeBoard.id, name }) }}><div className="grid flex-1 gap-1.5"><label className="text-xs font-medium" htmlFor="note-page-name">Page name</label><Input id="note-page-name" value={newPageName} onChange={(event) => setNewPageName(event.target.value)} placeholder="Week 1 reflections" maxLength={240} autoFocus required /></div><Button type="button" variant="ghost" onClick={() => setIsPageFormOpen(false)}>Cancel</Button><Button type="submit" disabled={createPage.isPending || !newPageName.trim()}>Create page</Button></form>{pageError ? <p className="m-0 px-4 pb-4 text-sm text-destructive">{pageError}</p> : null}</Card> : null}
+            {pages.length === 0 ? <Card className="grid min-h-0 flex-1 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then start writing your first note.</p><Button className="mx-auto mt-5" onClick={() => setIsPageFormOpen(true)}><Plus /> Create page</Button></Card> : null}
+            {pages.length > 0 && activePageSummary ? <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {pageQuery.isLoading || isOpeningPage ? <p className="m-0 px-5 pt-4 text-sm text-muted-foreground">Loading note page...</p> : null}
+              {pageQuery.isError ? <p className="m-0 px-5 pt-4 text-sm text-destructive">Could not load note page.</p> : null}
+              {activePage ? <><div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"><div className="min-w-0 flex-1"><input aria-label="Note title" className="w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-[-0.02em] text-foreground outline-none placeholder:text-muted-foreground" data-testid="note-title-input" disabled={isOpeningPage} maxLength={240} value={draftTitle} onBlur={() => { void persistDraft() }} onChange={(event) => { setContent(draftContent); setTitle(event.target.value); markChanged() }} /><p className="m-0 mt-1 text-sm text-muted-foreground">{formatDate(activePage.date)}</p></div><div className="flex shrink-0 items-center gap-3"><small data-testid="note-save-status" className="text-xs text-muted-foreground">{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : isDirty ? 'Unsaved changes' : 'Saved'}</small><Button type="button" size="sm" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>{isSaving ? <Loader2 className="animate-spin" /> : <Save />}{saveStatus === 'error' ? 'Retry save' : 'Save'}</Button></div></div>{pageError ? <p className="m-0 border-b border-border px-5 py-3 text-sm text-destructive">{pageError}</p> : null}<Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}><div className="min-h-0 flex-1 overflow-y-auto p-5 [&_.journal-rich-text-content]:min-h-[32rem]"><JournalRichTextEditor disabled={isOpeningPage} content={draftContent} onBlur={() => { void persistDraft() }} onChange={(html) => { setTitle(draftTitle); setContent(html); markChanged() }} onImageFiles={uploadNoteImages} onImageUploadError={(message) => { setEditorError(message); setSaveStatus('error') }} /></div></Suspense></> : null}
+            </Card> : null}
+          </div> : <Card className="grid min-h-0 flex-1 place-content-center text-center"><Layers3 className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a note board</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Boards keep related note pages together.</p><Button className="mx-auto mt-5" onClick={() => setIsBoardFormOpen(true)}><FolderPlus /> Create your first board</Button></Card>}
+        </section>
       </div>
+      {renameTarget ? (
+        <RenameEntityDialog
+          key={`${renameTarget.kind}:${renameTarget.kind === 'board' ? renameTarget.boardId : renameTarget.pageId}`}
+          entity={renameTarget.kind === 'board' ? 'Board' : 'Page'}
+          initialName={renameTarget.name}
+          maxLength={renameTarget.kind === 'board' ? 120 : 240}
+          pending={renameBoard.isPending || renamePage.isPending}
+          error={renameBoard.isError || renamePage.isError ? `Could not rename ${renameTarget.kind} right now.` : null}
+          onOpenChange={(open) => { if (!open) setRenameTarget(null) }}
+          onConfirm={confirmRename}
+        />
+      ) : null}
+      {deleteTarget ? (
+        <DeleteNoteConfirmationDialog
+          entity={deleteTarget.kind === 'board' ? 'Board' : 'Page'}
+          name={deleteTarget.name}
+          pending={deleteBoard.isPending || deletePage.isPending}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+          onConfirm={confirmDelete}
+        />
+      ) : null}
     </AppShell>
   )
 }

@@ -102,14 +102,13 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
 
     const shell = await browserPage.evaluate(() => {
       const sidebar = document.querySelector('aside[aria-label="Primary navigation"]')
-      const header = document.querySelector('header')
       const rail = document.querySelector('[data-testid="vocabulary-rail-scroll"]')
       const table = document.querySelector('[data-testid="vocab-table-scroll"]')
       return {
         documentScrollHeight: document.documentElement.scrollHeight,
         viewportHeight: window.innerHeight,
         sidebarWidth: Math.round(sidebar.getBoundingClientRect().width),
-        headerHeight: Math.round(header.getBoundingClientRect().height),
+        headerCount: document.querySelectorAll('header').length,
         railOwnsVerticalOverflow: rail.scrollHeight > rail.clientHeight,
         tableOwnsVerticalOverflow: table.scrollHeight > table.clientHeight,
         tableOwnsHorizontalOverflow: table.scrollWidth > table.clientWidth,
@@ -118,7 +117,7 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
 
     expect(shell.documentScrollHeight).toBe(shell.viewportHeight)
     expect(shell.sidebarWidth).toBe(viewport.sidebarWidth)
-    expect(shell.headerHeight).toBe(56)
+    expect(shell.headerCount).toBe(0)
     expect(shell.railOwnsVerticalOverflow).toBe(true)
     expect(shell.tableOwnsVerticalOverflow).toBe(true)
     expect(shell.tableOwnsHorizontalOverflow).toBe(true)

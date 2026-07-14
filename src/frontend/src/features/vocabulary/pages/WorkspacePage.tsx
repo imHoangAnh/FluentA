@@ -2,6 +2,7 @@ import { BookOpenText, ChevronRight, FileText, Filter, FolderPlus, Plus, Search 
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/shared/components/layout/AppShell'
+import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { ColumnSettings } from '../components/ColumnSettings'
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog'
 import { VocabTable } from '../components/VocabTable'
@@ -19,6 +20,10 @@ type DeleteTarget =
   | { kind: 'board'; boardId: string; name: string }
   | { kind: 'page'; boardId: string; pageId: string; name: string }
 
+type RenameTarget =
+  | { kind: 'board'; boardId: string; name: string; language: string }
+  | { kind: 'page'; boardId: string; pageId: string; name: string }
+
 function newestFirst<T extends { createdAt: string; id: string }>(items: T[]) {
   return items.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
 }
@@ -33,6 +38,7 @@ export function WorkspacePage() {
   const [newBoardLanguage, setNewBoardLanguage] = useState('en')
   const [newPageName, setNewPageName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
   const railFocusRef = useRef<HTMLDivElement>(null)
 
@@ -93,6 +99,31 @@ export function WorkspacePage() {
     },
   })
 
+  const renameBoard = useMutation({
+    mutationFn: (input: { target: Extract<RenameTarget, { kind: 'board' }>; name: string }) =>
+      vocabularyApi.updateBoard(input.target.boardId, { name: input.name, language: input.target.language }),
+    onSuccess: (board) => {
+      queryClient.setQueryData<vocabularyApi.BoardSummary[]>(['vocab', 'boards'], (current = []) =>
+        current.map((item) => item.id === board.id ? { ...item, name: board.name, updatedAt: board.updatedAt } : item),
+      )
+      queryClient.setQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', board.id], board)
+      setRenameTarget(null)
+      toast.success('Board renamed successfully')
+    },
+  })
+
+  const renamePage = useMutation({
+    mutationFn: (input: { target: Extract<RenameTarget, { kind: 'page' }>; name: string }) =>
+      vocabularyApi.updatePage(input.target.boardId, input.target.pageId, { name: input.name }),
+    onSuccess: (page, input) => {
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(['vocab', 'boards', input.target.boardId], (board) => board
+        ? { ...board, pages: board.pages.map((item) => item.id === page.id ? page : item) }
+        : board)
+      setRenameTarget(null)
+      toast.success('Page renamed successfully')
+    },
+  })
+
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'board' }>) => vocabularyApi.deleteBoard(target.boardId),
     onSuccess: (_, target) => {
@@ -141,13 +172,18 @@ export function WorkspacePage() {
     else deletePage.mutate(deleteTarget)
   }
 
+  function confirmRename(name: string) {
+    if (!renameTarget) return
+    if (renameTarget.kind === 'board') renameBoard.mutate({ target: renameTarget, name })
+    else renamePage.mutate({ target: renameTarget, name })
+  }
+
   const deletePending = deleteBoard.isPending || deletePage.isPending
 
   return (
     <AppShell
       title="Vocabulary"
-      contentClassName="h-[calc(100dvh-3.5rem)] max-w-none"
-      headerActions={activeBoard ? <Badge variant="outline">{activeBoard.language.toUpperCase()}</Badge> : undefined}
+      contentClassName="h-screen max-w-none"
     >
       <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
@@ -184,10 +220,14 @@ export function WorkspacePage() {
                     >
                       <ChevronRight className={cn('size-4 shrink-0 transition-transform duration-150', activeBoardId === board.id && 'rotate-90')} />
                       <span className="min-w-0 flex-1 truncate">{board.name}</span>
-                      <span className="text-[11px] text-muted-foreground">{board.pageCount}</span>
+                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span>{board.pageCount}</span>
+                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase">{board.language}</Badge>
+                      </span>
                     </button>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'board', boardId: board.id, name: board.name, language: board.language })}>Rename Board</ContextMenuItem>
                     <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }) }}>Delete Board</ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
@@ -206,6 +246,7 @@ export function WorkspacePage() {
                           </button>
                         </ContextMenuTrigger>
                         <ContextMenuContent>
+                          <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Rename Page</ContextMenuItem>
                           <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name }) }}>Delete Page</ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
@@ -270,6 +311,18 @@ export function WorkspacePage() {
           fallbackRef={railFocusRef}
           onOpenChange={(open) => { if (!open && !deletePending) { setRestoreDeleteFocus(false); setDeleteTarget(null) } }}
           onConfirm={confirmDelete}
+        />
+      ) : null}
+      {renameTarget ? (
+        <RenameEntityDialog
+          key={`${renameTarget.kind}:${renameTarget.kind === 'board' ? renameTarget.boardId : renameTarget.pageId}`}
+          entity={renameTarget.kind === 'board' ? 'Board' : 'Page'}
+          initialName={renameTarget.name}
+          maxLength={120}
+          pending={renameBoard.isPending || renamePage.isPending}
+          error={renameBoard.isError || renamePage.isError ? `Could not rename ${renameTarget.kind} right now.` : null}
+          onOpenChange={(open) => { if (!open) setRenameTarget(null) }}
+          onConfirm={confirmRename}
         />
       ) : null}
     </AppShell>

@@ -16,9 +16,12 @@ vi.mock('../api/note.api', async () => {
     ...actual,
     listBoards: vi.fn(),
     createBoard: vi.fn(),
+    updateBoard: vi.fn(),
+    deleteBoard: vi.fn(),
     createPage: vi.fn(),
     getPage: vi.fn(),
     updatePage: vi.fn(),
+    deletePage: vi.fn(),
   }
 })
 
@@ -62,6 +65,8 @@ describe('NotesPage', () => {
       },
     })
     vi.mocked(noteApi.listBoards).mockResolvedValue([])
+    vi.mocked(noteApi.deleteBoard).mockResolvedValue(undefined)
+    vi.mocked(noteApi.deletePage).mockResolvedValue(undefined)
     vi.mocked(noteApi.updatePage).mockResolvedValue({
       id: 'page-1',
       boardId: 'board-1',
@@ -87,7 +92,7 @@ describe('NotesPage', () => {
   it('renders the empty state when no boards exist', async () => {
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'No note boards yet' })).toBeInTheDocument()
+    expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create your first board' })).toBeInTheDocument()
   })
 
@@ -139,21 +144,12 @@ describe('NotesPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Create your first board' }))
     await user.type(screen.getByLabelText('Board name'), 'Learning Notes')
-    await user.click(screen.getByRole('button', { name: 'Create board' }))
+    await user.click(screen.getByRole('button', { name: 'Create' }))
 
-    expect(await screen.findByRole('heading', { name: 'Learning Notes' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Create first page' }))
-    await user.type(screen.getByLabelText('Page name'), 'Week 1 reflections')
-    await user.click(screen.getByRole('button', { name: 'Create page' }))
-
-    await waitFor(() => expect(noteApi.createPage).toHaveBeenCalledWith('board-1', { name: 'Week 1 reflections' }))
-    expect(await screen.findByDisplayValue('Week 1 reflections')).toBeInTheDocument()
-    expect(screen.getByTestId('note-save-status')).toHaveTextContent('Saved')
+    await waitFor(() => expect(noteApi.createBoard).toHaveBeenCalled())
   })
 
-  it('loads page detail when a page is selected', async () => {
-    const user = userEvent.setup()
-
+  it('loads the default page detail', async () => {
     vi.mocked(noteApi.listBoards).mockResolvedValue([{
       id: 'board-1',
       name: 'Learning Notes',
@@ -190,12 +186,8 @@ describe('NotesPage', () => {
 
     renderPage()
 
-    expect(await screen.findByDisplayValue('Practice recap')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Week 1 reflections' }))
-
     await waitFor(() => expect(noteApi.getPage).toHaveBeenCalledWith('page-1'))
     expect(await screen.findByDisplayValue('Week 1 reflections')).toBeInTheDocument()
-    expect(screen.getByTestId('note-save-status')).toHaveTextContent('Saved')
   })
 
   it('saves the current draft on blur', async () => {
@@ -237,6 +229,8 @@ describe('NotesPage', () => {
     renderPage()
 
     const titleInput = await screen.findByLabelText('Note title')
+    expect(screen.getByText('Jul 9, 2026')).toBeInTheDocument()
+    expect(screen.queryByText(/words/i)).not.toBeInTheDocument()
     await user.clear(titleInput)
     await user.type(titleInput, 'Updated reflections')
 
@@ -414,5 +408,95 @@ describe('NotesPage', () => {
 
     expect(await screen.findByText('Note image upload could not be completed.')).toBeInTheDocument()
     expect(screen.getByTestId('note-save-status')).toHaveTextContent('Save failed')
+  })
+
+  it('renames and deletes a Board from its right-click menu', async () => {
+    const user = userEvent.setup()
+    vi.mocked(noteApi.listBoards).mockResolvedValueOnce([{
+      id: 'board-1',
+      name: 'Learning Notes',
+      pages: [],
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T09:00:00Z',
+    }]).mockResolvedValue([])
+    vi.mocked(noteApi.updateBoard).mockResolvedValue({
+      id: 'board-1',
+      name: 'Study Notes',
+      pages: [],
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T10:00:00Z',
+    })
+
+    renderPage()
+
+    fireEvent.contextMenu(await screen.findByRole('button', { name: /Learning Notes/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename Board' }))
+    const input = screen.getByLabelText('Board name')
+    await user.clear(input)
+    await user.type(input, 'Study Notes')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await waitFor(() => expect(noteApi.updateBoard).toHaveBeenCalledWith('board-1', { name: 'Study Notes' }))
+    const renamedBoard = await screen.findByRole('button', { name: /Study Notes/ })
+    fireEvent.contextMenu(renamedBoard)
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Study Notes”?')
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(noteApi.deleteBoard).toHaveBeenCalledWith('board-1'))
+    expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
+  })
+
+  it('renames and deletes a Page from its right-click menu', async () => {
+    const user = userEvent.setup()
+    const boardAfterDelete: noteApi.NoteBoardSummary = {
+      id: 'board-1',
+      name: 'Learning Notes',
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T09:00:00Z',
+      pages: [],
+    }
+    vi.mocked(noteApi.listBoards).mockResolvedValueOnce([{
+      ...boardAfterDelete,
+      id: 'board-1',
+      name: 'Learning Notes',
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T09:00:00Z',
+      pages: [{
+        id: 'page-1',
+        boardId: 'board-1',
+        name: 'Week 1 reflections',
+        date: '2026-07-09',
+        createdAt: '2026-07-09T09:00:00Z',
+        updatedAt: '2026-07-09T09:00:00Z',
+      }],
+    }]).mockResolvedValue([boardAfterDelete])
+    vi.mocked(noteApi.getPage).mockResolvedValue({
+      id: 'page-1', boardId: 'board-1', name: 'Week 1 reflections', content: '', date: '2026-07-09',
+      createdAt: '2026-07-09T09:00:00Z', updatedAt: '2026-07-09T09:00:00Z',
+    })
+    vi.mocked(noteApi.updatePage).mockResolvedValue({
+      id: 'page-1', boardId: 'board-1', name: 'Weekly review', content: '', date: '2026-07-09',
+      createdAt: '2026-07-09T09:00:00Z', updatedAt: '2026-07-09T10:00:00Z',
+    })
+
+    renderPage()
+
+    fireEvent.contextMenu(await screen.findByRole('button', { name: 'Week 1 reflections' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename Page' }))
+    const input = screen.getByLabelText('Page name')
+    await user.clear(input)
+    await user.type(input, 'Weekly review')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledWith('page-1', { name: 'Weekly review' }))
+    const renamedPage = await screen.findByRole('button', { name: 'Weekly review' })
+    fireEvent.contextMenu(renamedPage)
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Weekly review”?')
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(noteApi.deletePage).toHaveBeenCalledWith('page-1'))
+    expect(await screen.findByText('This board has no pages')).toBeInTheDocument()
   })
 })

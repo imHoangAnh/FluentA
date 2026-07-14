@@ -9,7 +9,7 @@ import { AppProviders } from '@/app/providers'
 
 vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
   const actual = await vi.importActual<typeof import('@/features/vocabulary/api/vocabulary.api')>('@/features/vocabulary/api/vocabulary.api')
-  return { ...actual, deleteBoard: vi.fn(), deletePage: vi.fn(), listWords: vi.fn() }
+  return { ...actual, updateBoard: vi.fn(), updatePage: vi.fn(), deleteBoard: vi.fn(), deletePage: vi.fn(), listWords: vi.fn() }
 })
 
 const preferences: vocabularyApi.BoardPreferences = { hiddenColumns: [], columnOrder: [...vocabularyApi.DEFAULT_VOCAB_COLUMN_ORDER], columnWidths: {} }
@@ -33,7 +33,7 @@ function renderWorkspace() {
   return render(<AppProviders queryClient={client}><MemoryRouter><WorkspacePage /></MemoryRouter></AppProviders>)
 }
 
-describe('WorkspacePage deletion', () => {
+describe('WorkspacePage board and page context actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue(undefined)
@@ -74,5 +74,46 @@ describe('WorkspacePage deletion', () => {
 
     await waitFor(() => expect(vocabularyApi.deletePage).toHaveBeenCalledWith('board-new', 'page-new'))
     expect(await screen.findByRole('heading', { name: 'Earlier page' })).toBeInTheDocument()
+  })
+
+  it('renames the exact right-clicked Board and preserves its language', async () => {
+    const user = userEvent.setup()
+    vi.mocked(vocabularyApi.updateBoard).mockResolvedValue({ ...newestBoard, name: 'Renamed board' })
+    renderWorkspace()
+
+    fireEvent.contextMenu(await screen.findByRole('button', { name: /Newest board/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename Board' }))
+    const input = screen.getByLabelText('Board name')
+    await user.clear(input)
+    await user.type(input, 'Renamed board')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await waitFor(() => expect(vocabularyApi.updateBoard).toHaveBeenCalledWith('board-new', { name: 'Renamed board', language: 'en' }))
+    expect(await screen.findByRole('button', { name: /Renamed board/ })).toBeInTheDocument()
+  })
+
+  it('shows each Board language beside its Page count instead of in the header', async () => {
+    renderWorkspace()
+
+    const newestBoardButton = await screen.findByRole('button', { name: /Newest board/ })
+    expect(newestBoardButton).toHaveTextContent('1en')
+    expect(screen.getAllByText('en')[0]).toHaveClass('uppercase')
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+  })
+
+  it('renames the exact right-clicked Page', async () => {
+    const user = userEvent.setup()
+    vi.mocked(vocabularyApi.updatePage).mockResolvedValue({ ...newestBoard.pages[0], name: 'Renamed page' })
+    renderWorkspace()
+
+    fireEvent.contextMenu(await screen.findByRole('button', { name: 'Newest page' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename Page' }))
+    const input = screen.getByLabelText('Page name')
+    await user.clear(input)
+    await user.type(input, 'Renamed page')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await waitFor(() => expect(vocabularyApi.updatePage).toHaveBeenCalledWith('board-new', 'page-new', { name: 'Renamed page' }))
+    expect(await screen.findByRole('button', { name: 'Renamed page' })).toBeInTheDocument()
   })
 })

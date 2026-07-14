@@ -24,6 +24,12 @@ describe('AppShell environment', () => {
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('Test Learner')).toBeInTheDocument()
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Test page' })).toHaveClass('sr-only')
+
+    const applicationLinks = screen.getAllByRole('link')
+    expect(applicationLinks.indexOf(screen.getByRole('link', { name: 'Notifications' })))
+      .toBeLessThan(applicationLinks.indexOf(screen.getByRole('link', { name: 'Settings' })))
 
     const collapse = screen.getByRole('button', { name: 'Collapse sidebar' })
     expect(collapse).toHaveAttribute('aria-expanded', 'true')
