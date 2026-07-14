@@ -9,6 +9,12 @@ file reflects implementation truth.
 
 ## Current Redesign Status
 
+- Flashcards and Practice use one full-width Board -> Page Deck library. Board
+  headers show the Board name and Page Deck count; enabled square Page Deck
+  cards show only Page name and word count.
+- A zero-word Page Deck remains visible but cannot open the viewer or Practice.
+- Flashcard cards open the existing viewer. Practice cards open a preparation
+  dialog rather than starting a session immediately.
 - Legacy `All Words` decks are removed from synchronization, reads, and
   shipped learning flows.
 - Every vocabulary page now synchronizes to exactly one Page Deck.

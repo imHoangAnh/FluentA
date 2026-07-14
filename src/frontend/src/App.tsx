@@ -77,7 +77,7 @@ export default function App() {
         }
       />
       <Route
-        path="/flashcards/practice"
+        path="/practice"
         element={
           <ProtectedRoute>
             <FlashcardsPage entryMode="practice" />
@@ -167,7 +167,7 @@ export default function App() {
         }
       />
       <Route
-        path="/flashcards/pages/:pageId/practice"
+        path="/practice/:pageId"
         element={
           <ProtectedRoute>
             <PracticeSessionPage />

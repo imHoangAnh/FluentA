@@ -41,7 +41,8 @@ async function createBoardWithWords(page, headers, boardName, pageName, words) {
       data: {
         word,
         meaningVn: `${word} vn`,
-        meaningEn: `${word} definition`,
+        ipaPronunciation: `/${word}/`,
+        definition: `${word} definition`,
         class: 'other',
         example: `${word} example.`,
       },
@@ -71,8 +72,7 @@ function reviewSnapshot(pageDeck) {
 }
 
 async function completeMeaningToWordPractice(page) {
-  await page.getByRole('button', { name: 'Sequential' }).click();
-  await page.getByTestId('start-practice-session').click();
+  await page.getByRole('button', { name: 'Start practice' }).click();
 
   await expect(page.getByText('1 / 2')).toBeVisible();
   await page.getByTestId('practice-answer-input').fill('wrong');
@@ -117,16 +117,15 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   });
   expect(practiceSettingsResponse.status()).toBe(200);
 
-  await page.goto('/flashcards/practice');
+  await page.goto('/practice');
   const pageCard = page.getByTestId(`flashcard-page-${pageDeck.pageId}`);
-  await expect(pageCard.getByRole('link', { name: 'Practice' })).toBeVisible();
+  await expect(pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` })).toBeVisible();
 
-  await pageCard.getByRole('link', { name: 'Practice' }).click();
-  await expect(page.getByRole('heading', { name: 'Practice Workflow Page' })).toBeVisible();
-  await expect(page.getByText('Meaning -> Word')).toBeVisible();
-  await expect(page.getByText('recap', { exact: true })).toBeVisible();
+  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
+  await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible();
+  await expect(page.getByText('Meaning → Word')).toBeVisible();
 
-  await page.getByTestId('start-practice-session').click();
+  await page.getByRole('button', { name: 'Start practice' }).click();
   await expect(page.getByText('1 / 2')).toBeVisible();
   await page.getByRole('link', { name: 'Back to decks' }).click();
 
@@ -134,7 +133,7 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   const afterAbandonPage = findPageBoard(afterAbandonBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
   expect(reviewSnapshot(afterAbandonPage)).toEqual(initialSchedule);
 
-  await pageCard.getByRole('link', { name: 'Practice' }).click();
+  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
   await completeMeaningToWordPractice(page);
 
   const finishSummaryResponsePromise = page.waitForResponse((response) =>
@@ -150,8 +149,8 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   const afterFinishPage = findPageBoard(afterFinishBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
   expect(reviewSnapshot(afterFinishPage)).toEqual(initialSchedule);
 
-  await pageCard.getByRole('link', { name: 'Practice again' }).click();
-  await page.getByTestId('start-practice-session').click();
+  await pageCard.getByRole('button', { name: `Practice Practice Workflow Page, 2 words` }).click();
+  await page.getByRole('button', { name: 'Start practice' }).click();
   await page.getByTestId('practice-answer-input').fill('mitigate');
   await page.getByRole('button', { name: 'Submit answer' }).click();
   await page.getByTestId('practice-next-card').click();

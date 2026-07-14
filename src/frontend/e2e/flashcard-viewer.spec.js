@@ -69,7 +69,7 @@ test('flashcard viewer is protected, owner-scoped, and refreshes from SignalR', 
   await page.getByTestId('flashcard-stage').click();
   await expect(page.getByTestId('flashcard-stage')).toContainText('dong bo');
   await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
-  await expect(page.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', /\/practice$/);
+  await expect(page.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', /\/practice\?deck=/);
   await page.getByRole('link', { name: 'Finish' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/flashcards');
   const updateVisibleMs = Date.now() - updateStarted;

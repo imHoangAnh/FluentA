@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -280,7 +280,7 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('heading', { name: /Good|Burning midnight oil/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Vocabulary' })).toHaveAttribute('href', '/vocabulary')
     expect(screen.getByRole('link', { name: 'Flashcard' })).toHaveAttribute('href', '/flashcards')
-    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/flashcards/practice')
+    expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/practice')
     expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/review')
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
@@ -327,37 +327,33 @@ describe('FluentA app routes', () => {
 
     renderApp('/flashcards')
 
-    expect(screen.getByRole('heading', { name: 'Your pages' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'No pages yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open vocabulary' })).toHaveAttribute('href', '/vocabulary')
+    expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
   })
 
   it('protects practice sessions when anonymous', () => {
-    renderApp('/flashcards/pages/page-1/practice')
+    renderApp('/practice/page-1')
 
     expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
   })
 
-  it('shows a practice entry for non-empty decks and renders practice mode selection', () => {
+  it('opens the modal-first Practice flow and starts the selected deck directly', async () => {
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    const { unmount } = renderAppWithDeck('/flashcards')
+    renderAppWithDeck('/practice')
 
-    expect(screen.getByRole('link', { name: 'Practice this Page' })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
-    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/pages/page-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Practice HSK - Unit 1, 1 words' }))
+    expect(screen.getByRole('heading', { name: 'Start practice' })).toBeInTheDocument()
+    expect(screen.getByText('Dictation')).toBeInTheDocument()
+    expect(screen.getByText('Meaning → Word')).toBeInTheDocument()
+    expect(screen.getByText('Pronunciation')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start practice' }))
 
-    unmount()
-    renderAppWithDeck('/flashcards/pages/page-1/practice')
-
-    expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
-    expect(screen.getByText('dictation')).toBeInTheDocument()
-    expect(screen.getByText('Meaning -> Word')).toBeInTheDocument()
-    expect(screen.getByText('pronunciation')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Start practice' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('active-practice-card')).toBeInTheDocument())
   })
 
   it('renders the dedicated practice entry route with practice-first copy', () => {
@@ -367,12 +363,11 @@ describe('FluentA app routes', () => {
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    renderAppWithDeck('/flashcards/practice')
+    renderAppWithDeck('/practice?deck=page-1')
 
-    expect(screen.getByRole('heading', { name: 'Choose a page to practice' })).toBeInTheDocument()
-    const pageCard = screen.getByTestId('flashcard-page-page-1')
-    expect(within(pageCard).getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
-    expect(screen.getByRole('link', { name: 'Open Flashcards' })).toHaveAttribute('href', '/flashcards/pages/page-1')
+    expect(screen.getByRole('heading', { name: 'Start practice' })).toBeInTheDocument()
+    expect(screen.getByText('HSK - Unit 1 · 1 word')).toBeInTheDocument()
+    expect(screen.queryByText('Vocabulary page')).not.toBeInTheDocument()
   })
 
   it('renders the one-card flashcard viewer route from cached data', () => {
@@ -387,7 +382,7 @@ describe('FluentA app routes', () => {
     expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
     expect(screen.getByText('1 / 1')).toBeInTheDocument()
     expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/flashcards/pages/page-1/practice')
+    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/practice?deck=page-1')
   })
 
   it('renders protected settings from cached data', () => {

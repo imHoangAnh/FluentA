@@ -87,7 +87,7 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button variant="outline" type="button" onClick={goPrevious} disabled={currentIndex === 0}><ChevronLeft /> Previous</Button>
             {isFinalCard ? (
-              <div className="flex gap-2"><Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button><Button asChild><Link to={`/flashcards/pages/${pageId}/practice`}>Let's practice</Link></Button></div>
+              <div className="flex gap-2"><Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button><Button asChild><Link to={`/practice?deck=${pageId}`}>Let's practice</Link></Button></div>
             ) : (
               <Button type="button" onClick={goNext}>Next <ChevronRight /></Button>
             )}

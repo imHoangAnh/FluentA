@@ -27,7 +27,7 @@ const primaryNav = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/vocabulary', label: 'Vocabulary', icon: BookOpenText },
   { to: '/flashcards', label: 'Flashcard', icon: GraduationCap },
-  { to: '/flashcards/practice', label: 'Practice', icon: BookOpenText },
+  { to: '/practice', label: 'Practice', icon: BookOpenText },
   { to: '/review', label: 'Review', icon: Flame },
 ]
 
@@ -57,13 +57,13 @@ export function AppShell({ children, title, description, headerActions, contentC
   const displayName = user?.fullName || user?.email?.split('@')[0] || 'Learner'
   const avatarUrl = getUserAvatarUrl(user, displayName)
 
-  const isPracticeRoute = location.pathname === '/flashcards/practice'
-    || /^\/flashcards\/pages\/[^/]+\/practice$/.test(location.pathname)
+  const isPracticeRoute = location.pathname === '/practice'
+    || /^\/practice\/[^/]+$/.test(location.pathname)
 
   const navItem = ({ to, label, icon: Icon, end }: (typeof primaryNav)[number]) => {
     const isActive = end
       ? location.pathname === to
-      : to === '/flashcards/practice'
+      : to === '/practice'
         ? isPracticeRoute
         : to === '/flashcards'
           ? location.pathname.startsWith('/flashcards') && !isPracticeRoute
@@ -104,7 +104,6 @@ export function AppShell({ children, title, description, headerActions, contentC
           </div>
           <div className={cn('min-w-0 flex-1', collapsed && 'hidden', 'max-[1100px]:hidden')}>
             <p className="m-0 text-base font-bold tracking-[-0.02em] text-foreground">FluentA</p>
-            <p className="m-0 text-xs text-muted-foreground">Learn with focus</p>
           </div>
           <Button
             type="button"

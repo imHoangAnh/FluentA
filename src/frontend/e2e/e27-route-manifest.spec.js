@@ -18,12 +18,12 @@ const publicRoutes = [
 ]
 
 const protectedRoutes = [
-  ['/', 'Dashboard Overview', 'Overview'],
+  ['/', 'Overview', 'Overview'],
   ['/vocabulary', 'Vocabulary', 'Vocabulary'],
   ['/todo', 'Todo', 'Todo'],
   ['/countdowns', 'Countdowns', 'Countdowns'],
   ['/flashcards', 'Flashcards', 'Flashcard'],
-  ['/flashcards/practice', 'Practice', 'Practice'],
+  ['/practice', 'Practice', 'Practice'],
   ['/habits', 'Habits', 'Habits'],
   ['/habits/route-proof/stats', 'Habit statistics', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
@@ -37,7 +37,7 @@ const protectedRoutes = [
   ['/settings/level5', 'Settings', 'Settings'],
   ['/review', 'Review', 'Review'],
   ['/flashcards/pages/route-proof', 'Flashcard viewer', 'Flashcard'],
-  ['/flashcards/pages/route-proof/practice', 'Practice', 'Practice'],
+  ['/practice/route-proof', 'Practice', 'Practice'],
 ]
 
 async function mockReleaseApis(page) {

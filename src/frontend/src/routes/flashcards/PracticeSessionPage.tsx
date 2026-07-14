@@ -1,7 +1,7 @@
 import { CheckCircle2, Mic, MicOff, PenSquare, TriangleAlert, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
 import { getLanguageProfile, selectSpeechVoice } from '../../lib/language'
 import { AppShell } from '@/components/AppShell'
@@ -54,8 +54,9 @@ type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
 export function PracticeSessionPage() {
   const { pageId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const orderType: PracticeOrderType = searchParams.get('order') === 'shuffle' ? 'shuffle' : 'sequential'
   const [sessionStarted, setSessionStarted] = useState(false)
-  const [orderType, setOrderType] = useState<PracticeOrderType>('sequential')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
@@ -72,6 +73,7 @@ export function PracticeSessionPage() {
   const [completedSession, setCompletedSession] = useState<{ correctCards: number; wrongCards: number } | null>(null)
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const initializedSessionKeyRef = useRef<string | null>(null)
 
   const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => flashcardApi.getPageSession(pageId), enabled: Boolean(pageId) })
   const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: flashcardApi.getPracticeSettings })
@@ -80,7 +82,7 @@ export function PracticeSessionPage() {
 
   const currentCard = sessionCards[currentIndex] ?? null
   const language = sessionQuery.data?.boardLanguage ?? 'en'
-  const modeSequence = useMemo(() => [...(practiceSettingsQuery.data?.modeSequence ?? ['dictation', 'meaningToWord', 'pronunciation']), 'recap' as const], [practiceSettingsQuery.data?.modeSequence])
+  const modeSequence = useMemo(() => [...(practiceSettingsQuery.data?.modeSequence ?? []), 'recap' as const], [practiceSettingsQuery.data?.modeSequence])
   const currentStep = modeSequence[currentStepIndex] ?? 'recap'
   const recognitionSupported = Boolean(getSpeechRecognitionConstructor())
 
@@ -96,6 +98,38 @@ export function PracticeSessionPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const cards = sessionQuery.data?.words ?? []
+    const sessionKey = `${pageId}:${orderType}`
+    if (!sessionQuery.data || !practiceSettingsQuery.isSuccess || cards.length === 0 || initializedSessionKeyRef.current === sessionKey) return
+
+    initializedSessionKeyRef.current = sessionKey
+    const initialReviewStatuses = cards.reduce<Record<string, PracticeReviewStatus>>((state, card) => {
+      if (card.isInReview) state[card.wordId] = 'alreadyInReview'
+      return state
+    }, {})
+
+    setSessionCards(orderType === 'shuffle' ? shuffleCards(cards) : [...cards])
+    setSessionStarted(true)
+    setCurrentIndex(0)
+    setCurrentStepIndex(0)
+    setTypedAnswer('')
+    setTranscript('')
+    setFeedback(null)
+    setResolvedOutcome(null)
+    setRevealedAnswer(false)
+    setWordHasMistake(false)
+    setRecognitionError(null)
+    recognitionRef.current?.stop()
+    setIsListening(false)
+    setCorrectWords(0)
+    setWrongWords(0)
+    setCompletedSession(null)
+    setReviewStatuses(initialReviewStatuses)
+    saveSummaryMutation.reset()
+    addToReviewMutation.reset()
+  }, [addToReviewMutation, orderType, pageId, practiceSettingsQuery.isSuccess, saveSummaryMutation, sessionQuery.data])
+
   function resetStepState() {
     setTypedAnswer('')
     setTranscript('')
@@ -105,29 +139,6 @@ export function PracticeSessionPage() {
     setRecognitionError(null)
     recognitionRef.current?.stop()
     setIsListening(false)
-  }
-
-  function startPractice() {
-    const cards = sessionQuery.data?.words ?? []
-    const initialReviewStatuses = cards.reduce<Record<string, PracticeReviewStatus>>((state, card) => {
-      if (card.isInReview) {
-        state[card.wordId] = 'alreadyInReview'
-      }
-
-      return state
-    }, {})
-    setSessionCards(orderType === 'shuffle' ? shuffleCards(cards) : [...cards])
-    setSessionStarted(true)
-    setCurrentIndex(0)
-    setCurrentStepIndex(0)
-    setCorrectWords(0)
-    setWrongWords(0)
-    setCompletedSession(null)
-    setWordHasMistake(false)
-    setReviewStatuses(initialReviewStatuses)
-    saveSummaryMutation.reset()
-    addToReviewMutation.reset()
-    resetStepState()
   }
 
   async function persistCompletion(nextCorrectCards: number, nextWrongCards: number) {
@@ -252,30 +263,12 @@ export function PracticeSessionPage() {
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
   return (
-    <AppShell title="Practice" description="Work through a page deck using your configured learning modes." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>}>
+    <AppShell title="Practice" description="Work through a page deck using your configured learning modes." headerActions={<Button asChild variant="outline" size="sm"><Link to="/practice">Back to decks</Link></Button>}>
 
-      {sessionQuery.data && !sessionStarted && !completedSession ? (
-        <section className="review-setup practice-setup">
-          <span className="preview-label">Practice</span>
-          <h1>{sessionQuery.data.pageName}</h1>
-          <p>This page will run the global mode sequence, then recap each word before advancing.</p>
-          <div className="review-mode-options" role="group" aria-label="Practice order">
-            <button className={orderType === 'sequential' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setOrderType('sequential')}>Sequential</button>
-            <button className={orderType === 'shuffle' ? 'review-mode review-mode--active' : 'review-mode'} type="button" onClick={() => setOrderType('shuffle')}>Shuffle</button>
-          </div>
-          <div className="practice-summary__stats">
-            {modeSequence.map((step) => (
-              <div key={step}>
-                <strong>{step === 'meaningToWord' ? 'Meaning -> Word' : step}</strong>
-                <span>{step === 'recap' ? 'Always last' : 'Enabled'}</span>
-              </div>
-            ))}
-          </div>
-          <button className="primary-button review-start" type="button" onClick={startPractice} data-testid="start-practice-session">
-            Start practice
-          </button>
-        </section>
-      ) : null}
+      {sessionQuery.isLoading || practiceSettingsQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading practice session...</p> : null}
+      {sessionQuery.isError || practiceSettingsQuery.isError ? <p role="alert" className="text-sm text-destructive">This practice session is unavailable.</p> : null}
+      {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length === 0 ? <p role="status" className="text-sm text-muted-foreground">This page has no words to practice.</p> : null}
+      {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length > 0 && !sessionStarted && !completedSession ? <p role="status" className="text-sm text-muted-foreground">Starting practice...</p> : null}
 
       {!sessionStarted && completedSession ? (
         <section className="review-summary practice-summary" data-testid="practice-summary">
@@ -284,7 +277,7 @@ export function PracticeSessionPage() {
           <h1>{sessionQuery.data?.pageName}</h1>
           <p>{correctWords} words completed cleanly and {wrongWords} words needed reveal/skip across {sessionCards.length} practiced words.</p>
           {saveSummaryMutation.isSuccess ? (
-            <Link className="primary-button review-summary__done" to="/flashcards/practice">Done</Link>
+            <Link className="primary-button review-summary__done" to="/practice">Done</Link>
           ) : (
             <button
               className="primary-button review-summary__done"

@@ -29,8 +29,17 @@ target behavior for that split and the data ownership rules that support it.
 
 ## Practice
 
-- Practice runs on one selected page deck chosen from a Board -> Page Deck
-  selection flow.
+- Practice library route is `/practice`; its active session route is
+  `/practice/:pageId`.
+- Practice runs on one selected page deck chosen from the full-width Board ->
+  Page Deck selection flow. An external Page Deck action uses
+  `/practice?deck=:pageId`, which opens that Page Deck's preparation dialog
+  after its Board data loads; closing the dialog returns to `/practice`.
+- The preparation dialog defaults to Sequential each time, offers Shuffle, and
+  shows the ordered configured Practice mode names. Its single Start action
+  navigates to `/practice/:pageId?order=sequential|shuffle` and starts the
+  active session directly. Refresh preserves that order; missing or invalid
+  order is Sequential.
 - Practice includes every word in the selected page deck, including words that
   already have review state.
 - Practice supports `Sequential` and `Shuffle` word order.
