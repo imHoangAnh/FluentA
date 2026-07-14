@@ -10,7 +10,7 @@ import {
   type LucideProps,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
-import type { HabitIcon } from './api/habit.api'
+import type { HabitIcon } from '../api/habit.api'
 
 const habitIconComponents: Record<HabitIcon, ComponentType<LucideProps>> = {
   Default: CircleDot,

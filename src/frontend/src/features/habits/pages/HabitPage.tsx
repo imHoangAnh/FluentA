@@ -3,9 +3,9 @@ import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useStat
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/shared/components/layout/AppShell'
-import * as habitApi from '../../lib/api/habit.api'
-import { HabitIconGlyph } from '../../lib/habit-icons'
-import { habitIconOptions } from '../../lib/habit-icon-options'
+import * as habitApi from '../api/habit.api'
+import { HabitIconGlyph } from '../components/habit-icons'
+import { habitIconOptions } from '../components/habit-icon-options'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 

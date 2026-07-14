@@ -29,7 +29,7 @@ function runtimeMock(hookName: string, runtimeName: RuntimeName) {
 }
 
 vi.mock('@/features/todo', runtimeMock('useTodoSync', 'todo'))
-vi.mock('@/lib/realtime/useHabitSync', runtimeMock('useHabitSync', 'habit'))
+vi.mock('@/features/habits', runtimeMock('useHabitSync', 'habit'))
 vi.mock('@/features/kanban', runtimeMock('useKanbanSync', 'kanban'))
 vi.mock('@/features/pomodoro', runtimeMock('usePomodoroSync', 'pomodoro'))
 

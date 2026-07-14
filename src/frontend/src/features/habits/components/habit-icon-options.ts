@@ -1,4 +1,4 @@
-import type { HabitIcon } from './api/habit.api'
+import type { HabitIcon } from '../api/habit.api'
 
 export const habitIconOptions: ReadonlyArray<{ value: HabitIcon; label: string }> = [
   { value: 'Default', label: 'Default' },

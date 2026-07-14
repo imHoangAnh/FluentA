@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { useTodoSync } from '@/features/todo'
-import { useHabitSync } from '@/lib/realtime/useHabitSync'
+import { useHabitSync } from '@/features/habits'
 import { useKanbanSync } from '@/features/kanban'
 import { usePomodoroSync } from '@/features/pomodoro'
 
