@@ -1,7 +1,7 @@
 import { Bell, CheckCircle2, CheckSquare, Clock3, Pause, Play, RotateCcw, Settings, TimerReset } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as pomodoroApi from '../../lib/api/pomodoro.api'
+import * as pomodoroApi from '../api/pomodoro.api'
 import * as todoApi from '@/features/todo'
 import * as kanbanApi from '@/features/kanban'
 import { AppShell } from '@/shared/components/layout/AppShell'

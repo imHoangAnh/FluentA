@@ -2,30 +2,29 @@
 
 ## Current Story
 
-- ID: `US-FE-012`
-- Title: Notes feature boundary
+- ID: `US-FE-013`
+- Title: Pomodoro feature boundary
 - Lane: high-risk
 - Status: implemented, reviewed, verified, and locally committed on
   2026-07-14
 
 ## Objective
 
-Move `/notes`, workspace/editor/assets behavior, and Notes API into
-`features/notes` while preserving the Journal public editor boundary.
+Move `/pomodoro`, timer state/API, and realtime synchronization into
+`features/pomodoro` while preserving Todo and Kanban public consumers.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-012-notes-feature-boundary/overview.md`
-- `US-FE-012-notes-feature-boundary/design.md`
-- `US-FE-012-notes-feature-boundary/validation.md`
+- `US-FE-013-pomodoro-feature-boundary/overview.md`
+- `US-FE-013-pomodoro-feature-boundary/design.md`
+- `US-FE-013-pomodoro-feature-boundary/validation.md`
 
 ## Gate
 
-US-FE-012 must preserve `/notes`, workspace/page/editor/assets behavior,
-request payloads, query/cache keys, and Journal's public editor boundary. It
-may close only after focused and full tests, browser proof, lint/build,
-boundary scans, Harness verification, review evidence, and its own local smart
-commit.
+US-FE-013 must preserve `/pomodoro`, timer/session payloads, Todo and Kanban
+task selection, query/cache keys, and realtime synchronization. It may close
+only after focused and full tests, browser proof, lint/build, boundary scans,
+Harness verification, review evidence, and its own local smart commit.

@@ -11,6 +11,7 @@ import { todoRoutes } from '@/features/todo'
 import { kanbanRoutes } from '@/features/kanban'
 import { journalRoutes } from '@/features/journal'
 import { notesRoutes } from '@/features/notes'
+import { pomodoroRoutes } from '@/features/pomodoro'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { legacyProtectedRoutes } from './legacy-routes'
 import { ProtectedRoute } from './route-guards/ProtectedRoute'
@@ -28,7 +29,7 @@ export const appRoutes: RouteObject[] = [
     element: <ProtectedRoute />,
     errorElement: <RouteError />,
     HydrateFallback: RouteLoading,
-    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...vocabularyRoutes, ...flashcardRoutes, ...practiceRoutes, ...reviewRoutes, ...todoRoutes, ...kanbanRoutes, ...journalRoutes, ...notesRoutes, ...legacyProtectedRoutes] }],
+    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...vocabularyRoutes, ...flashcardRoutes, ...practiceRoutes, ...reviewRoutes, ...todoRoutes, ...kanbanRoutes, ...journalRoutes, ...notesRoutes, ...pomodoroRoutes, ...legacyProtectedRoutes] }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

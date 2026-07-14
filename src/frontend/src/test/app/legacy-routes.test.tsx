@@ -8,7 +8,6 @@ describe('temporary legacy route manifest', () => {
       'countdowns',
       'habits',
       'habits/:habitId/stats',
-      'pomodoro',
     ])
   })
 })
