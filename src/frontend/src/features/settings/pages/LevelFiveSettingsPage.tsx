@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as flashcardApi from '../../lib/api/flashcard.api'
+import * as reviewApi from '@/features/review'
 
 type FilterMode = 'all' | 'active' | 'inactive'
 
@@ -10,11 +10,11 @@ export function LevelFiveSettingsPage() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string[]>([])
 
-  const levelFiveQuery = useQuery({ queryKey: ['review', 'level-five'], queryFn: flashcardApi.listLevelFiveWords })
+  const levelFiveQuery = useQuery({ queryKey: ['review', 'level-five'], queryFn: reviewApi.listLevelFiveWords })
   const removeMutation = useMutation({
-    mutationFn: flashcardApi.removeLevelFiveWords,
+    mutationFn: reviewApi.removeLevelFiveWords,
     onSuccess: (_, wordIds) => {
-      queryClient.setQueryData(['review', 'level-five'], (current: flashcardApi.LevelFiveReviewItem[] | undefined) =>
+      queryClient.setQueryData(['review', 'level-five'], (current: reviewApi.LevelFiveReviewItem[] | undefined) =>
         current?.map((item) => wordIds.includes(item.wordId) ? { ...item, status: 'inactive' as const } : item) ?? current)
       setSelected([])
     },

@@ -20,16 +20,6 @@ describe('temporary legacy route manifest', () => {
       'flashcards/pages/:pageId',
       'review',
       'practice/:pageId',
-      'settings',
-    ])
-
-    const settings = legacyProtectedRoutes.find((route) => route.path === 'settings')
-    expect(settings?.children?.map((route) => route.index ? '<index>' : route.path)).toEqual([
-      '<index>',
-      'profile',
-      'practice',
-      'review',
-      'level5',
     ])
   })
 })

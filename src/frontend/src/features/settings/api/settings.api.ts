@@ -1,6 +1,7 @@
-import type { PracticeSettings, ReviewSettings } from './flashcard.api'
-import { apiClient } from '@/shared/lib/http/client'
+import type { PracticeSettings } from '@/features/practice'
+import type { ReviewSettings } from '@/features/review'
 import type { UserProfile } from '@/features/auth'
+import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
 
 export type SettingsPayload = {
@@ -26,6 +27,5 @@ export async function updateProfile(input: {
     removeAvatar: input.removeAvatar,
     avatarAssetId: input.avatarAssetId ?? null,
   })
-
   return response.data.data!
 }

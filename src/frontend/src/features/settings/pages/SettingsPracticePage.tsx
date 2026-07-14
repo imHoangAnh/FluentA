@@ -1,32 +1,32 @@
 import { Check, LoaderCircle, Save, XCircle } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import * as flashcardApi from '../../lib/api/flashcard.api'
+import * as practiceApi from '@/features/practice'
 
-const practiceModes: flashcardApi.PracticeMode[] = ['dictation', 'meaningToWord', 'pronunciation']
+const practiceModes: practiceApi.PracticeMode[] = ['dictation', 'meaningToWord', 'pronunciation']
 
-function sameSequence(left: flashcardApi.PracticeSettings, right: flashcardApi.PracticeSettings) {
+function sameSequence(left: practiceApi.PracticeSettings, right: practiceApi.PracticeSettings) {
   return left.modeSequence.join('|') === right.modeSequence.join('|')
 }
 
 export function SettingsPracticePage() {
   const queryClient = useQueryClient()
-  const [practiceDraft, setPracticeDraft] = useState<flashcardApi.PracticeSettings | null>(null)
+  const [practiceDraft, setPracticeDraft] = useState<practiceApi.PracticeSettings | null>(null)
   const [practiceState, setPracticeState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const practiceSettingsQuery = useQuery({
     queryKey: ['practice', 'settings'],
-    queryFn: flashcardApi.getPracticeSettings,
+    queryFn: practiceApi.getPracticeSettings,
   })
 
   const updatePracticeSettings = useMutation({
-    mutationFn: flashcardApi.updatePracticeSettings,
+    mutationFn: practiceApi.updatePracticeSettings,
     onMutate: () => {
       setPracticeState('saving')
     },
     onSuccess: (settings) => {
       queryClient.setQueryData(['practice', 'settings'], settings)
-      queryClient.setQueryData(['settings'], (current: { practiceSettings?: flashcardApi.PracticeSettings } | undefined) =>
+      queryClient.setQueryData(['settings'], (current: { practiceSettings?: practiceApi.PracticeSettings } | undefined) =>
         current ? { ...current, practiceSettings: settings } : current)
       setPracticeDraft(null)
       setPracticeState('saved')
@@ -40,7 +40,7 @@ export function SettingsPracticePage() {
   const practice = practiceDraft ?? savedPractice
   const hasUnsavedChanges = practiceDraft !== null && savedPractice !== null && !sameSequence(practiceDraft, savedPractice)
 
-  function moveMode(mode: flashcardApi.PracticeMode, direction: -1 | 1) {
+  function moveMode(mode: practiceApi.PracticeMode, direction: -1 | 1) {
     if (!practice) return
 
     const index = practice.modeSequence.indexOf(mode)
@@ -55,7 +55,7 @@ export function SettingsPracticePage() {
     setPracticeState('idle')
   }
 
-  function toggleMode(mode: flashcardApi.PracticeMode) {
+  function toggleMode(mode: practiceApi.PracticeMode) {
     if (!practice) return
 
     const active = practice.modeSequence.includes(mode)

@@ -2,31 +2,29 @@
 
 ## Current Story
 
-- ID: `US-FE-002`
-- Title: Dashboard feature boundary
-- Lane: normal
-- Status: implemented and reviewed on 2026-07-14
+- ID: `US-FE-003`
+- Title: Settings feature composition
+- Lane: high-risk
+- Status: implemented and reviewed on 2026-07-14; pending local smart commit
 
 ## Objective
 
-Move the authenticated home route and Dashboard UI into
-`features/dashboard`, expose its lazy index route through the feature public
-API, and shrink the legacy manifest without changing Dashboard behavior or
-prematurely migrating its Todo, Habit, Countdown, Review, or Journal
-dependencies.
+Move the protected Settings route family into `features/settings`, expose its
+lazy nested route objects through the Settings public API, and remove the
+Settings legacy manifest entry without changing profile/avatar, Practice,
+Review, or Level 5 behavior.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-002-dashboard-feature-boundary/overview.md`
-- `US-FE-002-dashboard-feature-boundary/design.md`
-- `US-FE-002-dashboard-feature-boundary/validation.md`
+- `US-FE-003-settings-feature-composition/overview.md`
+- `US-FE-003-settings-feature-composition/design.md`
+- `US-FE-003-settings-feature-composition/validation.md`
 
 ## Gate
 
-The plan and implementation were approved. Normal-lane validation,
-implementation, and review completed on 2026-07-14 with all unit, integration,
-E2E, and platform proof passing. Adjacent feature migrations remain gated by
-their own stories.
+High-risk validation, implementation, review, unit/integration/E2E/platform
+proof, and structural scans passed on 2026-07-14. This story must receive its
+own local smart commit before US-FE-004 opens.

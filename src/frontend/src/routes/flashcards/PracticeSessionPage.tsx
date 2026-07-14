@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
+import { getPracticeSettings } from '@/features/practice'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
@@ -76,7 +77,7 @@ export function PracticeSessionPage() {
   const initializedSessionKeyRef = useRef<string | null>(null)
 
   const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => flashcardApi.getPageSession(pageId), enabled: Boolean(pageId) })
-  const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: flashcardApi.getPracticeSettings })
+  const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: getPracticeSettings })
   const saveSummaryMutation = useMutation({ mutationFn: flashcardApi.createPracticeSessionSummary })
   const addToReviewMutation = useMutation({ mutationFn: flashcardApi.addPracticeWordsToReview })
 

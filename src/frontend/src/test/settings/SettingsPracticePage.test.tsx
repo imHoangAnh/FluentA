@@ -3,11 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as flashcardApi from '../../lib/api/flashcard.api'
-import { SettingsPracticePage } from './SettingsPracticePage'
+import * as practiceApi from '@/features/practice'
+import { SettingsPracticePage } from '@/features/settings/pages/SettingsPracticePage'
 
-vi.mock('../../lib/api/flashcard.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/flashcard.api')>('../../lib/api/flashcard.api')
+vi.mock('@/features/practice', async () => {
+  const actual = await vi.importActual<typeof import('@/features/practice')>('@/features/practice')
   return {
     ...actual,
     getPracticeSettings: vi.fn(),
@@ -36,10 +36,10 @@ function renderPage() {
 describe('SettingsPracticePage manual save', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(flashcardApi.getPracticeSettings).mockResolvedValue({
+    vi.mocked(practiceApi.getPracticeSettings).mockResolvedValue({
       modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
     })
-    vi.mocked(flashcardApi.updatePracticeSettings).mockResolvedValue({
+    vi.mocked(practiceApi.updatePracticeSettings).mockResolvedValue({
       modeSequence: ['dictation', 'meaningToWord'],
     })
   })
@@ -52,13 +52,13 @@ describe('SettingsPracticePage manual save', () => {
     expect(await screen.findByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /pronunciation/i }))
 
-    expect(flashcardApi.updatePracticeSettings).not.toHaveBeenCalled()
+    expect(practiceApi.updatePracticeSettings).not.toHaveBeenCalled()
     expect(screen.getByText('Unsaved changes.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save practice settings' }))
 
-    await waitFor(() => expect(flashcardApi.updatePracticeSettings).toHaveBeenCalled())
-    expect(vi.mocked(flashcardApi.updatePracticeSettings).mock.calls[0]?.[0]).toEqual({
+    await waitFor(() => expect(practiceApi.updatePracticeSettings).toHaveBeenCalled())
+    expect(vi.mocked(practiceApi.updatePracticeSettings).mock.calls[0]?.[0]).toEqual({
       modeSequence: ['dictation', 'meaningToWord'],
     })
     expect(await screen.findByText('Practice settings saved.')).toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('SettingsPracticePage manual save', () => {
   it('keeps the local draft visible after a save failure', async () => {
     const user = userEvent.setup()
 
-    vi.mocked(flashcardApi.updatePracticeSettings).mockRejectedValueOnce(new Error('Practice save failed.'))
+    vi.mocked(practiceApi.updatePracticeSettings).mockRejectedValueOnce(new Error('Practice save failed.'))
 
     renderPage()
 

@@ -1,8 +1,8 @@
 import { Check, ImageMinus, LoaderCircle, Save, Upload, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as assetsApi from '../../lib/api/assets.api'
-import * as settingsApi from '../../lib/api/settings.api'
+import * as assetsApi from '../api/avatar-assets.api'
+import * as settingsApi from '../api/settings.api'
 import { getUserAvatarUrl } from '@/shared/lib/avatar'
 import { useAuthStore } from '@/features/auth'
 
@@ -30,7 +30,7 @@ export function SettingsPage() {
   })
   const assetsQuery = useQuery({
     queryKey: ['assets', 'avatar'],
-    queryFn: () => assetsApi.listAssets('avatar'),
+    queryFn: assetsApi.listAvatarAssets,
   })
 
   const updateProfile = useMutation({
@@ -78,12 +78,12 @@ export function SettingsPage() {
     },
   })
   const deleteAsset = useMutation({
-    mutationFn: async (asset: assetsApi.OwnedAssetPayload) => {
-      await assetsApi.deleteAsset(asset.id)
+    mutationFn: async (asset: assetsApi.OwnedAvatarAsset) => {
+      await assetsApi.deleteAvatarAsset(asset.id)
       return asset
     },
     onSuccess: (asset) => {
-      queryClient.setQueryData(['assets', 'avatar'], (current: assetsApi.OwnedAssetPayload[] | undefined) =>
+      queryClient.setQueryData(['assets', 'avatar'], (current: assetsApi.OwnedAvatarAsset[] | undefined) =>
         current ? current.filter((item) => item.id !== asset.id) : current)
       if (asset.isCurrentAvatar && authUser) {
         const nextUser = { ...authUser, avatarUrl: null }

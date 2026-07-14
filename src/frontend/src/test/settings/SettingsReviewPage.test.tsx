@@ -3,11 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as flashcardApi from '../../lib/api/flashcard.api'
-import { SettingsReviewPage } from './SettingsReviewPage'
+import * as reviewApi from '@/features/review'
+import { SettingsReviewPage } from '@/features/settings/pages/SettingsReviewPage'
 
-vi.mock('../../lib/api/flashcard.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/flashcard.api')>('../../lib/api/flashcard.api')
+vi.mock('@/features/review', async () => {
+  const actual = await vi.importActual<typeof import('@/features/review')>('@/features/review')
   return {
     ...actual,
     getReviewSettings: vi.fn(),
@@ -36,11 +36,11 @@ function renderPage() {
 describe('SettingsReviewPage manual save', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(flashcardApi.getReviewSettings).mockResolvedValue({
+    vi.mocked(reviewApi.getReviewSettings).mockResolvedValue({
       dailyLimit: 300,
       recapAfterAnswer: true,
     })
-    vi.mocked(flashcardApi.updateReviewSettings).mockResolvedValue({
+    vi.mocked(reviewApi.updateReviewSettings).mockResolvedValue({
       dailyLimit: 250,
       recapAfterAnswer: false,
     })
@@ -58,13 +58,13 @@ describe('SettingsReviewPage manual save', () => {
     await user.type(dailyLimitInput, '250')
     await user.click(screen.getByRole('checkbox', { name: 'Recap after each correct answer' }))
 
-    expect(flashcardApi.updateReviewSettings).not.toHaveBeenCalled()
+    expect(reviewApi.updateReviewSettings).not.toHaveBeenCalled()
     expect(screen.getByText('Unsaved changes.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save review settings' }))
 
-    await waitFor(() => expect(flashcardApi.updateReviewSettings).toHaveBeenCalled())
-    expect(vi.mocked(flashcardApi.updateReviewSettings).mock.calls[0]?.[0]).toEqual({
+    await waitFor(() => expect(reviewApi.updateReviewSettings).toHaveBeenCalled())
+    expect(vi.mocked(reviewApi.updateReviewSettings).mock.calls[0]?.[0]).toEqual({
       dailyLimit: 250,
       recapAfterAnswer: false,
     })
@@ -74,7 +74,7 @@ describe('SettingsReviewPage manual save', () => {
   it('keeps the local review draft after a save failure', async () => {
     const user = userEvent.setup()
 
-    vi.mocked(flashcardApi.updateReviewSettings).mockRejectedValueOnce(new Error('Review save failed.'))
+    vi.mocked(reviewApi.updateReviewSettings).mockRejectedValueOnce(new Error('Review save failed.'))
 
     renderPage()
 

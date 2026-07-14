@@ -1,29 +1,29 @@
 import { Check, LoaderCircle, Save, XCircle } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import * as flashcardApi from '../../lib/api/flashcard.api'
+import * as reviewApi from '@/features/review'
 
 export function SettingsReviewPage() {
   const queryClient = useQueryClient()
-  const [reviewDraft, setReviewDraft] = useState<flashcardApi.ReviewSettings | null>(null)
+  const [reviewDraft, setReviewDraft] = useState<reviewApi.ReviewSettings | null>(null)
   const [reviewLimitInput, setReviewLimitInput] = useState<string | null>(null)
   const [reviewState, setReviewState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [reviewError, setReviewError] = useState<string | null>(null)
 
   const reviewSettingsQuery = useQuery({
     queryKey: ['review', 'settings'],
-    queryFn: flashcardApi.getReviewSettings,
+    queryFn: reviewApi.getReviewSettings,
   })
 
   const updateReviewSettings = useMutation({
-    mutationFn: flashcardApi.updateReviewSettings,
+    mutationFn: reviewApi.updateReviewSettings,
     onMutate: () => {
       setReviewError(null)
       setReviewState('saving')
     },
     onSuccess: (settings) => {
       queryClient.setQueryData(['review', 'settings'], settings)
-      queryClient.setQueryData(['settings'], (current: { reviewSettings?: flashcardApi.ReviewSettings } | undefined) =>
+      queryClient.setQueryData(['settings'], (current: { reviewSettings?: reviewApi.ReviewSettings } | undefined) =>
         current ? { ...current, reviewSettings: settings } : current)
       setReviewDraft(null)
       setReviewLimitInput(String(settings.dailyLimit))
@@ -42,7 +42,7 @@ export function SettingsReviewPage() {
     && savedReview !== null
     && (reviewDraft.dailyLimit !== savedReview.dailyLimit || reviewDraft.recapAfterAnswer !== savedReview.recapAfterAnswer)
 
-  function updateReviewDraft(next: flashcardApi.ReviewSettings, inputValue = String(next.dailyLimit)) {
+  function updateReviewDraft(next: reviewApi.ReviewSettings, inputValue = String(next.dailyLimit)) {
     setReviewDraft(next)
     setReviewLimitInput(inputValue)
     setReviewError(null)

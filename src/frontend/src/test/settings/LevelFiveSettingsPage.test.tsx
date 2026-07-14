@@ -3,11 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as flashcardApi from '../../lib/api/flashcard.api'
-import { LevelFiveSettingsPage } from './LevelFiveSettingsPage'
+import * as reviewApi from '@/features/review'
+import { LevelFiveSettingsPage } from '@/features/settings/pages/LevelFiveSettingsPage'
 
-vi.mock('../../lib/api/flashcard.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/flashcard.api')>('../../lib/api/flashcard.api')
+vi.mock('@/features/review', async () => {
+  const actual = await vi.importActual<typeof import('@/features/review')>('@/features/review')
   return {
     ...actual,
     listLevelFiveWords: vi.fn(),
@@ -33,7 +33,7 @@ function renderPage() {
   )
 }
 
-const levelFiveItems: flashcardApi.LevelFiveReviewItem[] = [
+const levelFiveItems: reviewApi.LevelFiveReviewItem[] = [
   {
     wordId: 'word-1',
     word: 'alpha',
@@ -69,8 +69,8 @@ const levelFiveItems: flashcardApi.LevelFiveReviewItem[] = [
 describe('LevelFiveSettingsPage shared-shell regression', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(flashcardApi.listLevelFiveWords).mockResolvedValue(levelFiveItems)
-    vi.mocked(flashcardApi.removeLevelFiveWords).mockResolvedValue(1)
+    vi.mocked(reviewApi.listLevelFiveWords).mockResolvedValue(levelFiveItems)
+    vi.mocked(reviewApi.removeLevelFiveWords).mockResolvedValue(1)
   })
 
   it('filters, searches, and keeps inactive items visible when requested', async () => {
@@ -97,7 +97,7 @@ describe('LevelFiveSettingsPage shared-shell regression', () => {
   it('supports single remove and bulk remove without changing shell semantics', async () => {
     const user = userEvent.setup()
 
-    vi.mocked(flashcardApi.removeLevelFiveWords)
+    vi.mocked(reviewApi.removeLevelFiveWords)
       .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(2)
 
@@ -109,8 +109,8 @@ describe('LevelFiveSettingsPage shared-shell regression', () => {
     expect(alphaRow).not.toBeNull()
     await user.click(within(alphaRow!).getByRole('button', { name: 'Remove' }))
 
-    await waitFor(() => expect(flashcardApi.removeLevelFiveWords).toHaveBeenCalled())
-    expect(vi.mocked(flashcardApi.removeLevelFiveWords).mock.calls[0]?.[0]).toEqual(['word-1'])
+    await waitFor(() => expect(reviewApi.removeLevelFiveWords).toHaveBeenCalled())
+    expect(vi.mocked(reviewApi.removeLevelFiveWords).mock.calls[0]?.[0]).toEqual(['word-1'])
 
     await user.click(screen.getByRole('button', { name: 'Inactive' }))
     expect(screen.getByText('alpha')).toBeInTheDocument()
@@ -120,7 +120,7 @@ describe('LevelFiveSettingsPage shared-shell regression', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select beta' }))
     await user.click(screen.getByRole('button', { name: 'Remove selected' }))
 
-    await waitFor(() => expect(vi.mocked(flashcardApi.removeLevelFiveWords).mock.calls[1]?.[0]).toEqual(['word-2']))
+    await waitFor(() => expect(vi.mocked(reviewApi.removeLevelFiveWords).mock.calls[1]?.[0]).toEqual(['word-2']))
     expect(screen.getByRole('button', { name: 'Remove selected' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Inactive' }))

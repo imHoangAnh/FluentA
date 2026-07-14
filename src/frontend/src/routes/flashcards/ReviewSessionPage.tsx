@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as flashcardApi from '../../lib/api/flashcard.api'
+import { getReviewSettings } from '@/features/review'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
@@ -75,7 +76,7 @@ export function ReviewSessionPage() {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
 
   const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: flashcardApi.listBoards })
-  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: flashcardApi.getReviewSettings })
+  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: getReviewSettings })
   const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? []), [decksQuery.data])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []

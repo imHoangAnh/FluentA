@@ -3,33 +3,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as assetsApi from '../../lib/api/assets.api'
-import * as flashcardApi from '../../lib/api/flashcard.api'
-import * as settingsApi from '../../lib/api/settings.api'
+import * as assetsApi from '@/features/settings/api/avatar-assets.api'
+import * as settingsApi from '@/features/settings/api/settings.api'
 import { useAuthStore } from '@/features/auth'
-import { SettingsPage } from './SettingsPage'
+import { SettingsPage } from '@/features/settings/pages/SettingsPage'
 
-vi.mock('../../lib/api/assets.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/assets.api')>('../../lib/api/assets.api')
+vi.mock('@/features/settings/api/avatar-assets.api', async () => {
+  const actual = await vi.importActual<typeof import('@/features/settings/api/avatar-assets.api')>('@/features/settings/api/avatar-assets.api')
   return {
     ...actual,
-    listAssets: vi.fn(),
-    deleteAsset: vi.fn(),
+    listAvatarAssets: vi.fn(),
+    deleteAvatarAsset: vi.fn(),
     uploadAvatarAsset: vi.fn(),
   }
 })
 
-vi.mock('../../lib/api/flashcard.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/flashcard.api')>('../../lib/api/flashcard.api')
-  return {
-    ...actual,
-    updatePracticeSettings: vi.fn(),
-    updateReviewSettings: vi.fn(),
-  }
-})
-
-vi.mock('../../lib/api/settings.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/settings.api')>('../../lib/api/settings.api')
+vi.mock('@/features/settings/api/settings.api', async () => {
+  const actual = await vi.importActual<typeof import('@/features/settings/api/settings.api')>('@/features/settings/api/settings.api')
   return {
     ...actual,
     getSettings: vi.fn(),
@@ -89,14 +79,7 @@ describe('SettingsPage profile save', () => {
         recapAfterAnswer: true,
       },
     })
-    vi.mocked(assetsApi.listAssets).mockResolvedValue([])
-    vi.mocked(flashcardApi.updatePracticeSettings).mockResolvedValue({
-      modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
-    })
-    vi.mocked(flashcardApi.updateReviewSettings).mockResolvedValue({
-      dailyLimit: 300,
-      recapAfterAnswer: true,
-    })
+    vi.mocked(assetsApi.listAvatarAssets).mockResolvedValue([])
   })
 
   it('reuses the finalized avatar asset on profile-save retry', async () => {
@@ -113,6 +96,7 @@ describe('SettingsPage profile save', () => {
       expiresAtUtc: null,
       createdAtUtc: '2026-07-03T00:00:00Z',
       updatedAtUtc: '2026-07-03T00:00:00Z',
+      isCurrentAvatar: false,
     })
     vi.mocked(settingsApi.updateProfile)
       .mockRejectedValueOnce(new Error('Temporary profile save failure.'))
@@ -153,7 +137,7 @@ describe('SettingsPage profile save', () => {
   it('deletes the current saved avatar and clears cached profile state', async () => {
     const user = userEvent.setup()
 
-    vi.mocked(assetsApi.listAssets).mockResolvedValue([{
+    vi.mocked(assetsApi.listAvatarAssets).mockResolvedValue([{
       id: 'asset-current',
       assetType: 'avatar',
       status: 'finalized',
@@ -165,7 +149,7 @@ describe('SettingsPage profile save', () => {
       updatedAtUtc: '2026-07-03T00:00:00Z',
       isCurrentAvatar: true,
     }])
-    vi.mocked(assetsApi.deleteAsset).mockResolvedValue(undefined)
+    vi.mocked(assetsApi.deleteAvatarAsset).mockResolvedValue(undefined)
 
     renderPage()
 
@@ -173,7 +157,7 @@ describe('SettingsPage profile save', () => {
     await user.click(screen.getByRole('button', { name: /delete/i }))
 
     await waitFor(() => expect(screen.getByText('Current avatar deleted.')).toBeInTheDocument())
-    expect(assetsApi.deleteAsset).toHaveBeenCalledWith('asset-current')
+    expect(assetsApi.deleteAvatarAsset).toHaveBeenCalledWith('asset-current')
     expect(useAuthStore.getState().user?.avatarUrl).toBeNull()
   })
 })

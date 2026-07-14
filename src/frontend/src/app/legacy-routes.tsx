@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Navigate, type RouteObject } from 'react-router-dom'
+import { type RouteObject } from 'react-router-dom'
 
 function lazyLegacyPage<T extends Record<string, unknown>>(
   load: () => Promise<T>,
@@ -36,15 +36,4 @@ export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'flashcards/pages/:pageId', lazy: lazyLegacyPage(() => import('@/routes/flashcards/FlashcardViewerPage'), 'FlashcardViewerPage') },
   { path: 'review', lazy: lazyLegacyPage(() => import('@/routes/flashcards/ReviewSessionPage'), 'ReviewSessionPage') },
   { path: 'practice/:pageId', lazy: lazyLegacyPage(() => import('@/routes/flashcards/PracticeSessionPage'), 'PracticeSessionPage') },
-  {
-    path: 'settings',
-    lazy: lazyLegacyPage(() => import('@/routes/settings/SettingsLayout'), 'SettingsLayout'),
-    children: [
-      { index: true, element: <Navigate to="profile" replace /> },
-      { path: 'profile', lazy: lazyLegacyPage(() => import('@/routes/settings/SettingsPage'), 'SettingsPage') },
-      { path: 'practice', lazy: lazyLegacyPage(() => import('@/routes/settings/SettingsPracticePage'), 'SettingsPracticePage') },
-      { path: 'review', lazy: lazyLegacyPage(() => import('@/routes/settings/SettingsReviewPage'), 'SettingsReviewPage') },
-      { path: 'level5', lazy: lazyLegacyPage(() => import('@/routes/settings/LevelFiveSettingsPage'), 'LevelFiveSettingsPage') },
-    ],
-  },
 ]

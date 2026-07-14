@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { PracticeMode } from '@/features/practice'
 
 export type FlashcardCard = {
   id: string
@@ -98,22 +99,6 @@ export type ReviewResult = {
   nextReviewDate: string
 }
 
-export type ReviewSettings = {
-  dailyLimit: number
-  recapAfterAnswer: boolean
-}
-
-export type LevelFiveReviewItem = {
-  wordId: string
-  word: string
-  boardId: string
-  boardName: string
-  pageId: string
-  pageName: string
-  status: 'active' | 'inactive'
-  lastReviewDate?: string | null
-}
-
 export type DashboardForecastPoint = {
   date: string
   dueCount: number
@@ -130,11 +115,6 @@ export type FlashcardDashboard = {
   dueToday: number
   newCards: number
   forecast: DashboardForecastPoint[]
-}
-
-export type PracticeMode = 'dictation' | 'meaningToWord' | 'pronunciation'
-export type PracticeSettings = {
-  modeSequence: PracticeMode[]
 }
 
 export type PracticeSessionSummary = {
@@ -208,26 +188,6 @@ export async function getDashboard(timeZoneId: string, boardId?: string) {
   return response.data.data!
 }
 
-export async function getPracticeSettings() {
-  const response = await apiClient.get<ApiEnvelope<PracticeSettings>>('/practice/settings')
-  return response.data.data!
-}
-
-export async function updatePracticeSettings(input: PracticeSettings) {
-  const response = await apiClient.put<ApiEnvelope<PracticeSettings>>('/practice/settings', input)
-  return response.data.data!
-}
-
-export async function getReviewSettings() {
-  const response = await apiClient.get<ApiEnvelope<ReviewSettings>>('/review/settings')
-  return response.data.data!
-}
-
-export async function updateReviewSettings(input: ReviewSettings) {
-  const response = await apiClient.put<ApiEnvelope<ReviewSettings>>('/review/settings', input)
-  return response.data.data!
-}
-
 export async function submitReview(input: {
   sessionId: string
   wordId: string
@@ -237,14 +197,4 @@ export async function submitReview(input: {
 }) {
   const response = await apiClient.post<ApiEnvelope<ReviewResult>>('/review', input)
   return response.data.data!
-}
-
-export async function listLevelFiveWords() {
-  const response = await apiClient.get<ApiEnvelope<LevelFiveReviewItem[]>>('/review/level-five')
-  return response.data.data ?? []
-}
-
-export async function removeLevelFiveWords(wordIds: string[]) {
-  const response = await apiClient.post<ApiEnvelope<number>>('/review/level-five/remove', { wordIds })
-  return response.data.data ?? 0
 }
