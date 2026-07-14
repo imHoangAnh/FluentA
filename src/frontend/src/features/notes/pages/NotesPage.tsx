@@ -2,8 +2,8 @@ import { FilePenLine, Layers3, Loader2, Plus, Save } from 'lucide-react'
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '@/shared/components/layout/AppShell'
-import * as assetsApi from '../../lib/api/assets.api'
-import * as noteApi from '../../lib/api/note.api'
+import * as assetsApi from '@/lib/api/assets.api'
+import * as noteApi from '../api/note.api'
 
 const JournalRichTextEditor = lazy(() =>
   import('@/features/journal').then((module) => ({ default: module.JournalRichTextEditor })),

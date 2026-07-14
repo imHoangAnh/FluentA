@@ -4,14 +4,14 @@ import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as assetsApi from '../../lib/api/assets.api'
-import * as noteApi from '../../lib/api/note.api'
+import * as assetsApi from '@/lib/api/assets.api'
+import * as noteApi from '../api/note.api'
 import { useAuthStore } from '@/features/auth'
 import { AppProviders } from '@/app/providers'
 import { NotesPage } from './NotesPage'
 
-vi.mock('../../lib/api/note.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/note.api')>('../../lib/api/note.api')
+vi.mock('../api/note.api', async () => {
+  const actual = await vi.importActual<typeof import('../api/note.api')>('../api/note.api')
   return {
     ...actual,
     listBoards: vi.fn(),
@@ -22,8 +22,8 @@ vi.mock('../../lib/api/note.api', async () => {
   }
 })
 
-vi.mock('../../lib/api/assets.api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/api/assets.api')>('../../lib/api/assets.api')
+vi.mock('@/lib/api/assets.api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api/assets.api')>('@/lib/api/assets.api')
   return {
     ...actual,
     uploadNoteImageAsset: vi.fn(),
