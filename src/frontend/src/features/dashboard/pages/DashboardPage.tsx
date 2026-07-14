@@ -8,11 +8,11 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import * as countdownApi from '@/lib/api/countdown.api'
-import * as flashcardApi from '@/lib/api/flashcard.api'
 import * as habitApi from '@/lib/api/habit.api'
 import * as todoApi from '@/lib/api/todo.api'
 import { HabitIconGlyph } from '@/lib/habit-icons'
 import { useAuthStore } from '@/features/auth'
+import { getReviewDashboard } from '@/features/review'
 import { cn } from '@/shared/lib/utils'
 
 const preloadJournalEditor = () => import('@/routes/journal/JournalRichTextEditor')
@@ -63,7 +63,7 @@ export function DashboardPage() {
   const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today) })
   const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
   const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
-  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => flashcardApi.getDashboard(timeZoneId) })
+  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => getReviewDashboard(timeZoneId) })
 
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),

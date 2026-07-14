@@ -1,2 +1,5 @@
 export { getReviewSettings, listLevelFiveWords, removeLevelFiveWords, updateReviewSettings } from './api/review-settings.api'
 export type { LevelFiveReviewItem, ReviewSettings } from './api/review-settings.api'
+export { createReviewSession, getReviewDashboard, getReviewSessionSummary, submitReview } from './api/review.api'
+export type { DashboardForecastPoint, ReviewDashboard, ReviewMode, ReviewOrderType, ReviewResult, ReviewSessionCreated, ReviewSessionSummary, ReviewSessionWord, ReviewStartBehavior, ReviewStartDisposition, ReviewStartOptions } from './api/review.api'
+export { reviewRoutes } from './review.routes'

@@ -12,13 +12,13 @@ const adapters = vi.hoisted(() => ({
   listHabits: vi.fn(),
   toggleHabitEntry: vi.fn(),
   listCountdowns: vi.fn(),
-  getDashboard: vi.fn(),
+  getReviewDashboard: vi.fn(),
 }))
 
 vi.mock('@/lib/api/todo.api', () => ({ listByDate: adapters.listByDate, updateTodo: adapters.updateTodo }))
 vi.mock('@/lib/api/habit.api', () => ({ listHabits: adapters.listHabits, toggleHabitEntry: adapters.toggleHabitEntry }))
 vi.mock('@/lib/api/countdown.api', () => ({ listCountdowns: adapters.listCountdowns }))
-vi.mock('@/lib/api/flashcard.api', () => ({ getDashboard: adapters.getDashboard }))
+vi.mock('@/features/review', () => ({ getReviewDashboard: adapters.getReviewDashboard }))
 vi.mock('@/routes/journal/JournalRichTextEditor', () => ({ JournalRichTextEditor: () => null }))
 
 function renderDashboard() {
@@ -78,7 +78,7 @@ describe('DashboardPage', () => {
     adapters.listByDate.mockResolvedValue([])
     adapters.listHabits.mockResolvedValue([])
     adapters.listCountdowns.mockResolvedValue([])
-    adapters.getDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 0 })
+    adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 0 })
     adapters.updateTodo.mockResolvedValue(todo({ isCompleted: true }))
     adapters.toggleHabitEntry.mockResolvedValue(habit({ isCheckedToday: true }))
   })
@@ -97,7 +97,7 @@ describe('DashboardPage', () => {
     expect(adapters.listByDate).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     expect(adapters.listHabits).toHaveBeenCalledWith(timeZone)
-    expect(adapters.getDashboard).toHaveBeenCalledWith(timeZone)
+    expect(adapters.getReviewDashboard).toHaveBeenCalledWith(timeZone)
   })
 
   it('renders populated cross-domain widgets', async () => {
@@ -112,7 +112,7 @@ describe('DashboardPage', () => {
       createdAt: '2026-07-14T01:00:00Z',
       updatedAt: '2026-07-14T01:00:00Z',
     }])
-    adapters.getDashboard.mockResolvedValue({ overdue: 2, dueToday: 3, newCards: 4 })
+    adapters.getReviewDashboard.mockResolvedValue({ overdue: 2, dueToday: 3, newCards: 4 })
 
     renderDashboard()
 
@@ -144,7 +144,7 @@ describe('DashboardPage', () => {
     adapters.listByDate.mockReturnValue(pending)
     adapters.listHabits.mockReturnValue(pending)
     adapters.listCountdowns.mockReturnValue(pending)
-    adapters.getDashboard.mockReturnValue(pending)
+    adapters.getReviewDashboard.mockReturnValue(pending)
 
     renderDashboard()
 

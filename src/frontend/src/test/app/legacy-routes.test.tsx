@@ -13,7 +13,6 @@ describe('temporary legacy route manifest', () => {
       'notes',
       'kanban',
       'pomodoro',
-      'review',
     ])
   })
 })
