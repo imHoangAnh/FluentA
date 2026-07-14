@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../../lib/api/pomodoro.api'
 import * as todoApi from '@/features/todo'
-import * as kanbanApi from '../../lib/api/kanban.api'
+import * as kanbanApi from '@/features/kanban'
 import { AppShell } from '@/shared/components/layout/AppShell'
 
 function formatDuration(seconds: number) {

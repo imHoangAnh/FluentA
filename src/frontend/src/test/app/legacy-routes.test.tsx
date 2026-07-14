@@ -10,7 +10,6 @@ describe('temporary legacy route manifest', () => {
       'habits/:habitId/stats',
       'journal',
       'notes',
-      'kanban',
       'pomodoro',
     ])
   })

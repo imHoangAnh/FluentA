@@ -1,7 +1,7 @@
 import { AlertCircle, ArrowDown, CalendarDays, ChevronRight, Columns3, Plus, Trash2, X } from 'lucide-react'
 import { type DragEvent, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as kanbanApi from '../../lib/api/kanban.api'
+import * as kanbanApi from '../api/kanban.api'
 import { AppShell } from '@/shared/components/layout/AppShell'
 
 const priorities = ['Low', 'Medium', 'High', 'Critical'] as const

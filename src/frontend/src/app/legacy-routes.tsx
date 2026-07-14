@@ -14,6 +14,5 @@ export const legacyProtectedRoutes: RouteObject[] = [
   { path: 'habits/:habitId/stats', lazy: lazyLegacyPage(() => import('@/routes/habits/HabitStatsPage'), 'HabitStatsPage') },
   { path: 'journal', lazy: lazyLegacyPage(() => import('@/routes/journal/JournalPage'), 'JournalPage') },
   { path: 'notes', lazy: lazyLegacyPage(() => import('@/routes/notes/NotesPage'), 'NotesPage') },
-  { path: 'kanban', lazy: lazyLegacyPage(() => import('@/routes/kanban/KanbanPage'), 'KanbanPage') },
   { path: 'pomodoro', lazy: lazyLegacyPage(() => import('@/routes/pomodoro/PomodoroPage'), 'PomodoroPage') },
 ]
