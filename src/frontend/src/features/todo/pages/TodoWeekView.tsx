@@ -1,6 +1,6 @@
 import { GripVertical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import type { TodoItem } from '../../lib/api/todo.api'
+import type { TodoItem } from '../api/todo.api'
 
 type TodoWeekViewProps = {
   dates: string[]

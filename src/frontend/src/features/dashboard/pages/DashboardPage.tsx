@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import * as countdownApi from '@/lib/api/countdown.api'
 import * as habitApi from '@/lib/api/habit.api'
-import * as todoApi from '@/lib/api/todo.api'
+import * as todoApi from '@/features/todo'
 import { HabitIconGlyph } from '@/lib/habit-icons'
 import { useAuthStore } from '@/features/auth'
 import { getReviewDashboard } from '@/features/review'

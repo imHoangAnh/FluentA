@@ -7,6 +7,7 @@ import { vocabularyRoutes } from '@/features/vocabulary'
 import { flashcardRoutes } from '@/features/flashcards'
 import { practiceRoutes } from '@/features/practice'
 import { reviewRoutes } from '@/features/review'
+import { todoRoutes } from '@/features/todo'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { legacyProtectedRoutes } from './legacy-routes'
 import { ProtectedRoute } from './route-guards/ProtectedRoute'
@@ -24,7 +25,7 @@ export const appRoutes: RouteObject[] = [
     element: <ProtectedRoute />,
     errorElement: <RouteError />,
     HydrateFallback: RouteLoading,
-    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...vocabularyRoutes, ...flashcardRoutes, ...practiceRoutes, ...reviewRoutes, ...legacyProtectedRoutes] }],
+    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...vocabularyRoutes, ...flashcardRoutes, ...practiceRoutes, ...reviewRoutes, ...todoRoutes, ...legacyProtectedRoutes] }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

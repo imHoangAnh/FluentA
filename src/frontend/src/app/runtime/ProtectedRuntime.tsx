@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { useTodoSync } from '@/lib/realtime/useTodoSync'
+import { useTodoSync } from '@/features/todo'
 import { useHabitSync } from '@/lib/realtime/useHabitSync'
 import { useKanbanSync } from '@/lib/realtime/useKanbanSync'
 import { usePomodoroSync } from '@/lib/realtime/usePomodoroSync'
