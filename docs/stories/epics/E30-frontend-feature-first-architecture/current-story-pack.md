@@ -2,24 +2,23 @@
 
 ## Current Story
 
-- ID: `US-FE-015`
-- Title: Habits feature boundary
+- ID: `US-FE-016`
+- Title: Legacy boundary retirement and release proof
 - Lane: high-risk
 - Status: implemented, reviewed, verified, and locally committed on 2026-07-14
 
 ## Objective
 
-Move `/habits` and `/habits/:habitId/stats`, semantic icons, API, and realtime behavior into `features/habits` while preserving Dashboard behavior.
+Retire the empty legacy route manifest and record final E30 release proof.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-015-habits-feature-boundary/overview.md`
-- `US-FE-015-habits-feature-boundary/design.md`
-- `US-FE-015-habits-feature-boundary/validation.md`
+- `US-FE-016-legacy-boundary-retirement-and-release-proof/overview.md`
+- `US-FE-016-legacy-boundary-retirement-and-release-proof/validation.md`
 
 ## Gate
 
-US-FE-015 must preserve both Habit URLs, semantic icons, request payloads, query/cache keys, realtime behavior, and Dashboard consumer.
+US-FE-016 must leave no legacy route manifest, legacy ownership paths, or cross-feature deep imports, with full release proof.
