@@ -53,7 +53,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   const headers = { Authorization: `Bearer ${token}` };
   const today = todayInput();
 
-  await expect(page.getByText('Dashboard Overview')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review');
   await expect(page.getByText('No cards due today')).toBeVisible();
 
@@ -67,7 +67,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   });
   await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
     headers,
-    data: { name: 'Dashboard IELTS date', targetDate: utcIso(14), color: '#16A34A', icon: 'Exam' },
+    data: { name: 'Dashboard IELTS date', targetDate: utcIso(14).slice(0, 10), alerts: [{ alertDay: '1DayBefore', alertTime: '09:00' }] },
   });
 
   await page.reload();

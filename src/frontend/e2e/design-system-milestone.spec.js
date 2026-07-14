@@ -42,7 +42,7 @@ for (const viewport of [
     await mockFrontendApis(page)
 
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Dashboard Overview' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
     await expect(page.getByLabel('Primary navigation')).toBeVisible()
     await expect(page.getByText('Review queue')).toBeVisible()
     await expect(page.getByText('IELTS Exam')).toBeVisible()

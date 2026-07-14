@@ -9,7 +9,6 @@ function lazyLegacyPage<T extends Record<string, unknown>>(
 }
 
 export const legacyProtectedRoutes: RouteObject[] = [
-  { index: true, lazy: lazyLegacyPage(() => import('@/routes/dashboard/DashboardPage'), 'DashboardPage') },
   { path: 'vocabulary', lazy: lazyLegacyPage(() => import('@/routes/workspace/WorkspacePage'), 'WorkspacePage') },
   { path: 'todo', lazy: lazyLegacyPage(() => import('@/routes/todo/TodoPage'), 'TodoPage') },
   { path: 'countdowns', lazy: lazyLegacyPage(() => import('@/routes/countdown/CountdownPage'), 'CountdownPage') },

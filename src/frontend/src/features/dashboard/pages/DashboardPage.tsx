@@ -15,7 +15,7 @@ import { HabitIconGlyph } from '@/lib/habit-icons'
 import { useAuthStore } from '@/features/auth'
 import { cn } from '@/shared/lib/utils'
 
-const preloadJournalEditor = () => import('../journal/JournalRichTextEditor')
+const preloadJournalEditor = () => import('@/routes/journal/JournalRichTextEditor')
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'

@@ -115,86 +115,6 @@ async function renderApp(initialEntry: string) {
   return view
 }
 
-async function renderAppWithDashboardData(initialEntry: string) {
-  const queryClient = createQueryClient()
-  const today = todayInput()
-
-  queryClient.setQueryData(['todo', 'items', today], [{
-    id: 'todo-1',
-    title: 'Plan speaking practice',
-    note: null,
-    date: today,
-    isCompleted: false,
-    completedAt: null,
-    createdAt: '2026-06-11T00:00:00Z',
-    updatedAt: '2026-06-11T00:00:00Z',
-  }])
-  queryClient.setQueryData(['flashcard', 'boards'], [{
-    boardId: 'board-1',
-    boardName: 'IELTS',
-    boardLanguage: 'en',
-    pages: [{
-      pageId: 'page-1',
-      pageName: 'IELTS - Unit 1',
-      words: [{
-      id: 'card-1',
-      wordId: 'word-1',
-      word: 'hello',
-      wordClass: 'noun',
-      meaningVn: 'xin chao',
-      meaningEn: 'hello',
-      example: 'hello',
-      isInReview: false,
-      reviewLevel: null,
-      nextReviewDate: null,
-      lapseCount: 0,
-      }],
-      isPracticed: false,
-    }],
-  }])
-  queryClient.setQueryData(['review', 'dashboard'], {
-    boardId: null,
-    boardName: null,
-    totalCards: 1,
-    totalReviews: 12,
-    streakDays: 9,
-    retentionRate: 90,
-    overdue: 1,
-    dueToday: 1,
-    newCards: 1,
-    forecast: [],
-  })
-  queryClient.setQueryData(['habit', 'list', currentTimeZone()], [{
-    id: 'habit-1',
-    name: 'Read English',
-    description: '30 minutes',
-    color: '#22C55E',
-    icon: 'Book',
-    frequency: 'Daily',
-    customDays: [],
-    currentStreak: 4,
-    isScheduledToday: true,
-    isCheckedToday: false,
-    monthlyCompletionRate: 20,
-    createdAt: '2026-06-01T00:00:00Z',
-    updatedAt: '2026-06-01T00:00:00Z',
-  }])
-  queryClient.setQueryData(['countdown', 'events'], [{
-    id: 'countdown-1',
-    name: 'IELTS Exam',
-    targetDate: '2026-07-10T09:00:00Z',
-    color: '#16A34A',
-    icon: 'Exam',
-    isCompleted: false,
-    createdAt: '2026-06-01T00:00:00Z',
-    updatedAt: '2026-06-01T00:00:00Z',
-  }])
-
-  const view = renderWithClient(queryClient, initialEntry)
-  await act(async () => { await vi.dynamicImportSettled() })
-  return view
-}
-
 async function renderAppWithDeck(initialEntry: string) {
   const queryClient = createQueryClient()
 
@@ -302,26 +222,6 @@ describe('FluentA app routes', async () => {
 
     expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
-  })
-
-  it('renders cached dashboard widgets across domains', async () => {
-    useAuthStore.setState({
-      accessToken: 'memory-token',
-      status: 'authenticated',
-      user: {
-        id: 'user-1',
-        email: 'learner@example.com',
-        fullName: 'FluentA Learner',
-        isEmailVerified: true,
-      },
-    })
-
-    await renderAppWithDashboardData('/')
-
-    expect(screen.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review')
-    expect(screen.getByText('Plan speaking practice')).toBeInTheDocument()
-    expect(screen.getByText('Read English')).toBeInTheDocument()
-    expect(screen.getByText(/IELTS Exam/)).toBeInTheDocument()
   })
 
   it('renders the flashcard empty state for authenticated users', async () => {

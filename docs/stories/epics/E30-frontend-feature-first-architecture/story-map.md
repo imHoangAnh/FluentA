@@ -32,6 +32,6 @@
 
 ## Current Story
 
-`US-FE-001` is current. Its implementation remains gated by plan approval and
-high-risk validation.
-
+`US-FE-002` remains the current story and is implemented, reviewed, and
+verified. `US-FE-001` is also implemented and verified. Do not start
+`US-FE-003` until its story workflow is explicitly opened.
