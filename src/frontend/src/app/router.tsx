@@ -1,6 +1,7 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, type RouteObject } from 'react-router-dom'
 import { authRoutes } from '@/features/auth'
 import { dashboardRoutes } from '@/features/dashboard'
+import { notificationsRoutes } from '@/features/notifications'
 import { settingsRoutes } from '@/features/settings'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { legacyProtectedRoutes } from './legacy-routes'
@@ -19,7 +20,7 @@ export const appRoutes: RouteObject[] = [
     element: <ProtectedRoute />,
     errorElement: <RouteError />,
     HydrateFallback: RouteLoading,
-    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...legacyProtectedRoutes] }],
+    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...legacyProtectedRoutes] }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

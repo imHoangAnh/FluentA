@@ -5,7 +5,7 @@ import { Alert } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
-import { notificationApi } from '../../lib/api/notification.api'
+import { notificationApi } from '../api/notification.api'
 
 export function NotificationsPage() {
   const queryClient = useQueryClient()

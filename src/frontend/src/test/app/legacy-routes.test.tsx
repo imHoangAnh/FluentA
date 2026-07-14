@@ -16,7 +16,6 @@ describe('temporary legacy route manifest', () => {
       'notes',
       'kanban',
       'pomodoro',
-      'notifications',
       'flashcards/pages/:pageId',
       'review',
       'practice/:pageId',
