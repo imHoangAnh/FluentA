@@ -1,73 +1,118 @@
-# React + TypeScript + Vite
+# FluentA Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 1. Tên dự án
 
-Currently, two official plugins are available:
+**FluentA Frontend**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 2. Mô tả dự án
 
-## React Compiler
+FluentA Frontend là ứng dụng SPA cung cấp giao diện học ngoại ngữ và quản lý
+năng suất của FluentA. Ứng dụng được xây dựng bằng React 19, TypeScript và Vite;
+React Router quản lý điều hướng, TanStack Query quản lý server state, Zustand
+quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 3. Mục lục
 
-## Expanding the ESLint configuration
+- [Tên dự án](#1-tên-dự-án)
+- [Mô tả dự án](#2-mô-tả-dự-án)
+- [Mục lục](#3-mục-lục)
+- [Hướng dẫn cài đặt và chạy dự án](#4-hướng-dẫn-cài-đặt-và-chạy-dự-án)
+- [Cách sử dụng dự án](#5-cách-sử-dụng-dự-án)
+- [Các lệnh thường dùng](#6-các-lệnh-thường-dùng)
+- [Cấu trúc thư mục](#7-cấu-trúc-thư-mục)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 4. Hướng dẫn cài đặt và chạy dự án
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 4.1. Yêu cầu
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js và npm.
+- FluentA Backend đang chạy tại `http://localhost:5000`.
+- PostgreSQL, Redis và MinIO đã được khởi động theo
+  [README của root project](../../README.md).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 4.2. Cài dependency
+
+Từ thư mục `src/frontend`:
+
+```powershell
+npm install
+Copy-Item .env.example .env.local
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+File `.env.local` sử dụng các biến sau:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Biến | Mục đích |
+| --- | --- |
+| `VITE_API_URL` | Base URL của REST API, mặc định local là `http://localhost:5000/api/v1` |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID; có thể để trống nếu không dùng Google login |
+| `VITE_GOOGLE_REDIRECT_URI` | Callback URL của Google OAuth |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Không commit client ID hoặc thông tin cấu hình riêng của môi trường vào Git.
+
+### 4.3. Chạy development server
+
+```powershell
+npm run dev
 ```
+
+Mở `http://localhost:5173`. Vite tự reload khi source thay đổi.
+
+### 4.4. Build và chạy bản preview
+
+```powershell
+npm run build
+npm run preview
+```
+
+Output production được tạo trong thư mục `dist/`.
+
+## 5. Cách sử dụng dự án
+
+1. Truy cập `/register` để tạo tài khoản hoặc `/login` để đăng nhập.
+2. Sau khi đăng nhập, trang `/` hiển thị dashboard tổng quan.
+3. Sử dụng các route chính:
+   - `/vocabulary`: quản lý vocabulary board, page và từ vựng.
+   - `/flashcards`, `/practice`, `/review`: học và ôn tập.
+   - `/todo`, `/habits`, `/countdowns`: quản lý kế hoạch cá nhân.
+   - `/kanban`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
+   - `/journal`, `/notes`: lưu nhật ký và ghi chú.
+   - `/notifications`: xem thông báo.
+   - `/settings`: cập nhật hồ sơ và thiết lập học tập.
+4. Khi phát triển giao diện, đặt code theo feature trong `src/features` và chỉ
+   đặt thành phần dùng chung thực sự trong `src/shared`.
+
+Các route được bảo vệ sẽ chuyển người dùng chưa xác thực về `/login`. REST API
+được gọi qua base URL trong `VITE_API_URL`; SignalR đồng bộ thay đổi realtime
+giữa các phiên đang đăng nhập.
+
+## 6. Các lệnh thường dùng
+
+| Lệnh | Mục đích |
+| --- | --- |
+| `npm run dev` | Chạy Vite development server |
+| `npm run build` | Type-check và tạo production build |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Kiểm tra ESLint |
+| `npm run test` | Chạy Vitest ở watch mode |
+| `npm run test:run` | Chạy toàn bộ unit test một lần |
+| `npm run test:e2e` | Chạy Playwright end-to-end test |
+| `npm run test:e2e:cross-browser` | Chạy Playwright trên nhiều browser |
+| `npm run test:e2e:performance` | Chạy performance scenario |
+
+## 7. Cấu trúc thư mục
+
+```text
+src/frontend/
+  src/
+    app/              Application shell, provider và router
+    features/         Module theo tính năng
+    shared/           Component, hook, type và utility dùng chung
+    test/             Test setup và test dùng chung
+  e2e/                Playwright scenario
+  public/             Static asset
+  package.json        Dependency và npm script
+  vite.config.ts      Cấu hình Vite/Vitest
+```
+
+Xem [README của root project](../../README.md) để chạy toàn bộ hệ thống và
+[Backend README](../backend/README.md) để cấu hình API.
