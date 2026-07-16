@@ -92,14 +92,32 @@ public sealed partial class NoteContentProcessor : INoteContentProcessor
         foreach (var image in images)
         {
             var assetId = Guid.Parse(image.GetAttribute(AssetIdAttribute)!);
-            var asset = ownedAssets[assetId];
-            image.Source = asset.PublicUrl;
+            image.RemoveAttribute("src");
 
             var alt = image.AlternativeText?.Trim() ?? string.Empty;
             image.AlternativeText = alt.Length > 240 ? alt[..240] : alt;
         }
 
         return new NoteProcessedContent(document.Body?.InnerHtml ?? string.Empty, referencedIds);
+    }
+
+    public string HydrateImageSources(string? content, IReadOnlyDictionary<Guid, string> assetUrls)
+    {
+        var document = _parser.ParseDocument($"<body>{content ?? string.Empty}</body>");
+        foreach (var image in document.Body?.QuerySelectorAll("img").OfType<IHtmlImageElement>() ?? [])
+        {
+            if (Guid.TryParse(image.GetAttribute(AssetIdAttribute), out var assetId)
+                && assetUrls.TryGetValue(assetId, out var url))
+            {
+                image.Source = url;
+            }
+            else
+            {
+                image.RemoveAttribute("src");
+            }
+        }
+
+        return document.Body?.InnerHtml ?? string.Empty;
     }
 
     public IReadOnlySet<Guid> ExtractReferencedAssetIds(string? content)

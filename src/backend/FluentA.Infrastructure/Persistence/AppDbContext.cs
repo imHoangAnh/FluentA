@@ -47,6 +47,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<NoteBoard> NoteBoards => Set<NoteBoard>();
     public DbSet<NotePage> NotePages => Set<NotePage>();
+    public DbSet<NotePageAsset> NotePageAssets => Set<NotePageAsset>();
     public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
     public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();
     public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();

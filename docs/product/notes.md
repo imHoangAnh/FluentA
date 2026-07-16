@@ -6,7 +6,7 @@ This contract covers the shipped first-release Note Workspace behavior for
 Feature 25. FluentA provides an authenticated `/notes` surface with owner-scoped
 boards and pages, Journal-style rich-text editing, blur and page-switch save
 behavior, pasted or dropped Note image upload through the shared asset runtime,
-and save-time removed-image cleanup marking.
+and feature-owned Note-image references.
 
 Search, tags, sharing, templates, file-picker uploads, attachment libraries,
 and cross-feature linking remain out of scope.
@@ -28,8 +28,8 @@ and cross-feature linking remain out of scope.
 - A user can paste or drop an image file into a Note page.
 - Saved Note content renders uploaded images after reload without storing base64
   image payloads.
-- Removing an embedded Note image and then saving marks that Note-owned asset
-  for cleanup.
+- Removing an embedded Note image and then saving immediately detaches the
+  Note-page ownership reference; the shared asset lifecycle archives it later.
 - Deleting a Note board soft-deletes its active Note pages in the same first
   release lifecycle.
 
@@ -40,6 +40,10 @@ and cross-feature linking remain out of scope.
   user.
 - Every pasted or dropped Note image must be an owned finalized shared
   `note-image` asset.
+- A Note page can own many Note images, while a Note image can be attached to
+  only one active Note page through `note_page_assets`.
+- A Note-page read authorizes the page first, then hydrates short-lived signed
+  image URLs for its current ready image references.
 - Missing, deleted, or foreign-user Note boards return `404
   NOTE_BOARD_NOT_FOUND`.
 - Missing, deleted, or foreign-user Note pages return `404
@@ -72,8 +76,9 @@ All responses use the FluentA envelope.
 - Note images accept JPG, PNG, and WebP only and follow the shared 2MB upload
   limit.
 - Persisted Note content must not contain base64 image payloads.
-- Persisted Note images must carry a valid owned finalized `note-image` asset
-  reference.
+- Persisted Note images must carry a valid owned ready `note-image` asset
+  reference in `data-note-asset-id`; their `src` attribute is removed before
+  persistence.
 - Validation failures return `422 VALIDATION_ERROR`.
 
 ## Save And Image Rules
@@ -85,11 +90,12 @@ All responses use the FluentA envelope.
 - Save failures keep the visible draft intact so the user can retry.
 - Pasted or dropped Note images upload through the shared asset runtime before
   insertion into the editor.
-- Persisted Note image markup stores the public image URL plus a durable
-  `data-note-asset-id` reference.
-- When a saved Note image disappears from the next saved Note content and no
-  other active owned Note page still references that asset, the Note image
-  asset is marked deleted for cleanup.
+- Persisted Note image markup stores only the durable
+  `data-note-asset-id` reference. It never stores a public, provider, or
+  signed URL.
+- When a saved Note image disappears from the next saved Note content, its
+  `note_page_assets` association is removed in the same save. The ready asset
+  is retained until US-ASSET-010 archives and purges unreferenced assets.
 
 ## Deferred Integration
 

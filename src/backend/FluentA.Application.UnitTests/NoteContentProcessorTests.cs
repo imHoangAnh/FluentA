@@ -9,7 +9,7 @@ namespace FluentA.Application.UnitTests;
 public sealed class NoteContentProcessorTests
 {
     [Fact]
-    public async Task ProcessAsync_PreservesOwnedFinalizedNoteImagesAndNormalizesSrc()
+    public async Task ProcessAsync_PersistsOwnedReadyNoteImageReferencesWithoutSources()
     {
         var userId = Guid.NewGuid();
         var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/1", "https://cdn.example.com/1.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
@@ -21,7 +21,8 @@ public sealed class NoteContentProcessorTests
             $"<p><img src=\"https://wrong.example.com/1.png\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>");
 
         Assert.Contains($"data-note-asset-id=\"{asset.Id}\"", result.Html);
-        Assert.Contains("https://cdn.example.com/1.png", result.Html);
+        Assert.DoesNotContain("src=", result.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("wrong.example.com", result.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(asset.Id, result.ReferencedAssetIds);
     }
 

@@ -44,20 +44,39 @@ public sealed class EfNoteRepository : INoteRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<bool> IsAssetReferencedAsync(Guid userId, Guid assetId, Guid? excludingPageId = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(Guid pageId, CancellationToken cancellationToken = default)
     {
-        var assetIdText = assetId.ToString();
+        return (await _dbContext.NotePageAssets
+                .Where(link => link.NotePageId == pageId && link.DeletedAt == null)
+                .Select(link => link.AssetId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+    }
 
-        return (
-            from page in _dbContext.NotePages
-            join board in _dbContext.NoteBoards on page.BoardId equals board.Id
-            where page.DeletedAt == null
-                && board.UserId == userId
-                && board.DeletedAt == null
-                && (!excludingPageId.HasValue || page.Id != excludingPageId.Value)
-                && EF.Functions.Like(page.Content, $"%{assetIdText}%")
-            select page.Id)
-            .AnyAsync(cancellationToken);
+    public async Task<IReadOnlyDictionary<Guid, Guid>> GetAttachedAssetPageIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return new Dictionary<Guid, Guid>();
+        }
+
+        return await _dbContext.NotePageAssets
+            .Where(link => link.DeletedAt == null && assetIds.Contains(link.AssetId))
+            .ToDictionaryAsync(link => link.AssetId, link => link.NotePageId, cancellationToken);
+    }
+
+    public async Task ReplacePageAssetLinksAsync(Guid pageId, IReadOnlySet<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        var currentLinks = await _dbContext.NotePageAssets
+            .Where(link => link.NotePageId == pageId && link.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+        var currentAssetIds = currentLinks.Select(link => link.AssetId).ToHashSet();
+
+        _dbContext.NotePageAssets.RemoveRange(currentLinks.Where(link => !assetIds.Contains(link.AssetId)));
+        var additions = assetIds
+            .Where(assetId => !currentAssetIds.Contains(assetId))
+            .Select(assetId => NotePageAsset.Create(pageId, assetId));
+        await _dbContext.NotePageAssets.AddRangeAsync(additions, cancellationToken);
     }
 
     public async Task AddBoardAsync(NoteBoard board, CancellationToken cancellationToken = default)
@@ -93,12 +112,20 @@ public sealed class EfNoteRepository : INoteRepository
         {
             page.SoftDelete(board.UpdatedAt);
         }
+
+        var links = await _dbContext.NotePageAssets
+            .Where(link => pages.Select(page => page.Id).Contains(link.NotePageId))
+            .ToListAsync(cancellationToken);
+        _dbContext.NotePageAssets.RemoveRange(links);
     }
 
-    public Task SoftDeletePageAsync(NotePage page, CancellationToken cancellationToken = default)
+    public async Task SoftDeletePageAsync(NotePage page, CancellationToken cancellationToken = default)
     {
         page.SoftDelete();
-        return Task.CompletedTask;
+        var links = await _dbContext.NotePageAssets
+            .Where(link => link.NotePageId == page.Id)
+            .ToListAsync(cancellationToken);
+        _dbContext.NotePageAssets.RemoveRange(links);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

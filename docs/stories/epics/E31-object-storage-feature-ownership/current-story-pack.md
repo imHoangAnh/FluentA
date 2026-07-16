@@ -1,63 +1,59 @@
-# Current Story Pack: US-ASSET-007 Private Storage Foundation And Avatar Cutover
+# Current Story Pack: US-ASSET-008 Note Page Private Image Ownership
 
 ## Entry State
 
-- E21 already provides public MinIO asset upload with `assets.public_url` and
-  `auth_users.current_avatar_asset_id`.
-- Settings uploads through shared presign/finalize, then saves the finalized
-  asset id to the profile.
-- The MinIO bootstrap grants anonymous download and the frontend renders
-  `avatarUrl`/`publicUrl` directly.
+- US-ASSET-007 provides shared presign/finalize metadata validation and signed
+  avatar rendering, while the final all-feature private-bucket release remains
+  deferred to US-ASSET-011.
+- Note HTML still carries `data-note-asset-id`, but its existing image `src`
+  was not an explicit feature ownership relationship.
 - D1-D15 in `context.md` are approved.
 
 ## Exit State
 
-One real feature proves the new architecture end to end:
+One Note page owns its image assets explicitly and safely:
 
-- Assets uses provider-neutral `IObjectStorageService` and persists target
-  private metadata without relying on a public URL.
-- Shared presign/finalize validates controlled keys, claimed metadata, actual
-  HEAD metadata, and a bounded file signature.
-- Auth attaches one owned `READY` avatar through its feature FK.
-- Auth/Settings responses supply short-lived avatar download data generated
-  only after owner authorization.
-- Anonymous MinIO read of the pilot object is denied while its authorized
-  presigned GET succeeds.
+- `note_page_assets` records the relationship from page to asset, with a
+  database uniqueness constraint that prevents cross-page asset reuse.
+- Note persistence keeps only `data-note-asset-id`, never a public or signed
+  source URL.
+- An authorized Note-page read hydrates a short-lived signed image URL only
+  for current ready, owned Note-image assets.
+- Replacing content reconciles page associations in the same database save;
+  removing an image detaches it but leaves archive/purge to US-ASSET-010.
 
 ## Scope
 
 In scope:
 
-- Asset domain/DTO/port changes required by the pilot.
-- Target metadata and migration design sufficient for a disposable validation
-  database.
-- MinIO private presigned GET and bounded signature inspection.
-- Auth avatar attachment/download contract and Settings cutover.
-- Unit, live PostgreSQL/MinIO, frontend, and focused browser proof.
+- Note-page asset entity, EF mapping, generated migration, and repository
+  reconciliation.
+- Sanitization, exclusive attachment authorization, signed read hydration, and
+  related tests.
+- Browser upload metadata required by the shared US-ASSET-007 presign contract.
+- Product docs plus PostgreSQL/MinIO/browser proof.
 
 Out of scope:
 
-- Note and Countdown cutover.
-- Archive purge implementation beyond domain seams needed by later stories.
-- Final legacy row/object reset and removal of every transitional column.
-- Recycle Bin/Restore UI or APIs.
+- Cross-page image reuse, general attachments, or a file picker.
+- Archive/Restore/Purge state transitions or UI.
+- Final public bucket shutdown and legacy `public_url` removal.
 
 ## Primary Risks
 
-- The current Auth profile DTO is also used in auth tokens and global identity
-  surfaces, so removing `avatarUrl` can affect more than Settings.
-- Presigned GET expiry must not leave stale avatar UI indefinitely.
-- MIME headers are client-controlled; finalize needs bounded signature proof.
-- Current shared asset list/delete endpoints mix Assets and Auth ownership and
-  must not survive as a generic attached-asset authorization bypass.
+- Persisting a signed or provider URL in stored HTML would violate the target
+  data boundary.
+- An association lookup not coupled to page ownership could reveal or attach a
+  foreign asset.
+- Removing an association too early could conflict with the later archive
+  lifecycle.
 
 ## Validation Gate
 
-Before source implementation, `harness-validating` must prove:
+Before story close, require:
 
-1. the exact target schema and safe internal transition shape
-2. the Auth DTO/identity propagation path affected by the breaking rename
-3. AWS SDK/MinIO support for presigned GET and bounded range reads
-4. private bucket/CORS behavior in the local runtime
-5. deterministic commands and fixtures for owner versus foreign-user proof
-
+1. generated migration, model snapshot, and applied local PostgreSQL proof;
+2. unit proof for URL stripping, owner/type/status checks, and exclusivity;
+3. browser proof for direct upload, signed reload, base64 denial, and foreign
+   page denial;
+4. full backend/frontend regression and production builds.

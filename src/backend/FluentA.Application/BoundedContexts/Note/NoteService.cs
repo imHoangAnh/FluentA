@@ -13,12 +13,14 @@ public sealed class NoteService : INoteService
     private readonly INoteRepository _repository;
     private readonly INoteContentProcessor _contentProcessor;
     private readonly IAssetRepository _assets;
+    private readonly IAssetObjectStorage _storage;
 
-    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets)
+    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage)
     {
         _repository = repository;
         _contentProcessor = contentProcessor;
         _assets = assets;
+        _storage = storage;
     }
 
     public async Task<OperationResult<IReadOnlyList<NoteBoardSummaryDto>>> ListBoardsAsync(
@@ -113,7 +115,7 @@ public sealed class NoteService : INoteService
         await _repository.UpdateBoardAsync(board, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<NotePageDto>.Success(ToPageDto(page));
+        return OperationResult<NotePageDto>.Success(await ToPageDtoAsync(userId, page, cancellationToken));
     }
 
     public async Task<OperationResult<NotePageDto>> GetPageAsync(
@@ -124,7 +126,7 @@ public sealed class NoteService : INoteService
         var page = await _repository.GetPageAsync(userId, pageId, cancellationToken);
         return page is null
             ? OperationResult<NotePageDto>.Failure(NoteError.PageNotFound())
-            : OperationResult<NotePageDto>.Success(ToPageDto(page));
+            : OperationResult<NotePageDto>.Success(await ToPageDtoAsync(userId, page, cancellationToken));
     }
 
     public async Task<OperationResult<NotePageDto>> UpdatePageAsync(
@@ -162,45 +164,23 @@ public sealed class NoteService : INoteService
                 return OperationResult<NotePageDto>.Failure(NoteError.Validation(exception.Errors));
             }
 
-            var previouslyReferenced = _contentProcessor.ExtractReferencedAssetIds(page.Content);
+            var attachedPages = await _repository.GetAttachedAssetPageIdsAsync(processedContent.ReferencedAssetIds.ToArray(), cancellationToken);
+            if (attachedPages.Any(link => link.Value != page.Id))
+            {
+                return OperationResult<NotePageDto>.Failure(NoteError.Validation(new Dictionary<string, string[]>
+                {
+                    ["content"] = ["A note image can belong to only one page."]
+                }));
+            }
+
             page.UpdateContent(processedContent.Html);
-            await MarkRemovedAssetsForCleanupAsync(
-                userId,
-                page.Id,
-                previouslyReferenced,
-                processedContent.ReferencedAssetIds,
-                cancellationToken);
+            await _repository.ReplacePageAssetLinksAsync(page.Id, processedContent.ReferencedAssetIds, cancellationToken);
         }
 
         await _repository.UpdatePageAsync(page, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<NotePageDto>.Success(ToPageDto(page));
-    }
-
-    private async Task MarkRemovedAssetsForCleanupAsync(
-        Guid userId,
-        Guid pageId,
-        IReadOnlySet<Guid> previousAssetIds,
-        IReadOnlySet<Guid> nextAssetIds,
-        CancellationToken cancellationToken)
-    {
-        foreach (var assetId in previousAssetIds.Except(nextAssetIds))
-        {
-            if (await _repository.IsAssetReferencedAsync(userId, assetId, pageId, cancellationToken))
-            {
-                continue;
-            }
-
-            var asset = await _assets.GetOwnedAsync(userId, assetId, cancellationToken);
-            if (asset is null || asset.Type != AssetType.NoteImage || asset.Status != AssetStatus.Ready)
-            {
-                continue;
-            }
-
-            asset.MarkDeleted(DateTime.UtcNow);
-            await _assets.UpdateAsync(asset, cancellationToken);
-        }
+        return OperationResult<NotePageDto>.Success(await ToPageDtoAsync(userId, page, cancellationToken));
     }
 
     public async Task<OperationResult<bool>> DeletePageAsync(
@@ -283,13 +263,28 @@ public sealed class NoteService : INoteService
             page.UpdatedAt);
     }
 
-    private static NotePageDto ToPageDto(NotePage page)
+    private async Task<NotePageDto> ToPageDtoAsync(Guid userId, NotePage page, CancellationToken cancellationToken)
     {
+        var assetIds = await _repository.GetPageAssetIdsAsync(page.Id, cancellationToken);
+        var assets = await _assets.GetOwnedAsync(userId, assetIds.ToArray(), cancellationToken);
+        var urls = new Dictionary<Guid, string>();
+        foreach (var asset in assets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
+        {
+            try
+            {
+                urls[asset.Id] = _storage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5))).Url;
+            }
+            catch (AssetStorageUnavailableException)
+            {
+                // Fail closed: return the durable reference without a provider URL.
+            }
+        }
+
         return new NotePageDto(
             page.Id,
             page.BoardId,
             page.Name,
-            page.Content,
+            _contentProcessor.HydrateImageSources(page.Content, urls),
             page.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
             page.CreatedAt,
             page.UpdatedAt);

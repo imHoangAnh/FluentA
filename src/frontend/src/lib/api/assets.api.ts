@@ -34,28 +34,36 @@ export async function listAssets(assetType = 'avatar') {
   return response.data.data ?? []
 }
 
-export async function presignAvatarUpload(contentType: string) {
+type UploadFileMetadata = Pick<File, 'name' | 'size' | 'type'>
+
+function presignRequest(assetType: string, file: UploadFileMetadata) {
+  return {
+    assetType,
+    contentType: file.type,
+    originalName: file.name,
+    sizeBytes: file.size,
+  }
+}
+
+export async function presignAvatarUpload(file: UploadFileMetadata) {
   const response = await apiClient.post<ApiEnvelope<PresignedAssetUploadPayload>>('/assets/presign', {
-    assetType: 'avatar',
-    contentType,
+    ...presignRequest('avatar', file),
   })
 
   return response.data.data!
 }
 
-export async function presignCountdownCoverUpload(contentType: string) {
+export async function presignCountdownCoverUpload(file: UploadFileMetadata) {
   const response = await apiClient.post<ApiEnvelope<PresignedAssetUploadPayload>>('/assets/presign', {
-    assetType: 'countdown-cover',
-    contentType,
+    ...presignRequest('countdown-cover', file),
   })
 
   return response.data.data!
 }
 
-export async function presignNoteImageUpload(contentType: string) {
+export async function presignNoteImageUpload(file: UploadFileMetadata) {
   const response = await apiClient.post<ApiEnvelope<PresignedAssetUploadPayload>>('/assets/presign', {
-    assetType: 'note-image',
-    contentType,
+    ...presignRequest('note-image', file),
   })
 
   return response.data.data!
@@ -71,17 +79,17 @@ export async function deleteAsset(assetId: string) {
 }
 
 export async function uploadAvatarAsset(file: File) {
-  const presigned = await presignAvatarUpload(file.type)
+  const presigned = await presignAvatarUpload(file)
   return uploadAssetFromPresign(file, presigned, 'Avatar upload could not be completed.')
 }
 
 export async function uploadCountdownCoverAsset(file: File) {
-  const presigned = await presignCountdownCoverUpload(file.type)
+  const presigned = await presignCountdownCoverUpload(file)
   return uploadAssetFromPresign(file, presigned, 'Countdown cover upload could not be completed.')
 }
 
 export async function uploadNoteImageAsset(file: File) {
-  const presigned = await presignNoteImageUpload(file.type)
+  const presigned = await presignNoteImageUpload(file)
   return uploadAssetFromPresign(file, presigned, 'Note image upload could not be completed.')
 }
 

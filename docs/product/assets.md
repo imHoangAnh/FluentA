@@ -16,6 +16,8 @@ adds `note-image` as shared image asset types.
   backend verifies MinIO object metadata.
 - The authenticated user can finalize one optional countdown cover asset during
   countdown create after the backend verifies MinIO object metadata.
+- The authenticated user can upload a Note image which becomes usable only
+  when an owned Note page attaches it through the Note feature.
 - Ready avatar assets are rendered through a short-lived signed download URL
   after the authenticated profile save links the asset as the current avatar.
 - The authenticated user can list saved owned avatar assets and delete any of
@@ -35,6 +37,11 @@ adds `note-image` as shared image asset types.
   current profile avatar.
 - `POST /api/v1/countdowns` can link one owned finalized `countdown-cover`
   asset as the countdown cover during create only.
+- A Note page may link many ready owned `note-image` assets through
+  `note_page_assets`; each image asset may belong to one active Note page only.
+- Note page persistence contains the durable asset id but never a provider or
+  signed image URL. An authorized Note-page read hydrates a five-minute signed
+  URL in memory for rendering.
 - `GET /api/v1/assets?assetType=avatar` returns the authenticated user's
   non-deleted owned avatar assets, newest first, flags the current profile
   avatar, and includes an authorized short-lived `downloadUrl` only for ready
@@ -49,6 +56,9 @@ adds `note-image` as shared image asset types.
   cleaned automatically by a recurring cleanup job.
 - Countdown cover assets retire when the owning countdown is manually deleted
   or auto-retired after the seven-day completed window.
+- Removing a Note image or deleting its page detaches its `note_page_assets`
+  row immediately. The ready asset remains retained until the archive/purge
+  lifecycle in US-ASSET-010 owns its transition.
 
 ## Persistence Rules
 
@@ -62,6 +72,9 @@ adds `note-image` as shared image asset types.
   and profile responses must not use it.
 - `auth_users.current_avatar_asset_id` points at the owned finalized avatar
   asset currently displayed by the profile.
+- `note_page_assets.note_page_id` and `note_page_assets.asset_id` are durable
+  feature ownership references. `asset_id` is unique, while a Note page can
+  have many associated rows.
 - The shipped runtime no longer stores any provider-specific avatar identifier
   on `auth_users`.
 - When a new finalized avatar replaces the current one, the retired asset row
@@ -77,17 +90,19 @@ All responses use the FluentA envelope.
 
 | Method | Endpoint | Behavior |
 | --- | --- | --- |
-| `POST` | `/api/v1/assets/presign` | Creates a pending owned avatar asset and returns a presigned direct-upload target. |
-| `POST` | `/api/v1/assets/finalize` | Verifies the uploaded MinIO object for an owned pending avatar asset and marks it finalized. |
+| `POST` | `/api/v1/assets/presign` | Creates a pending owned image asset and returns a presigned direct-upload target. Requires asset type, content type, original file name, and claimed size. |
+| `POST` | `/api/v1/assets/finalize` | Verifies the uploaded MinIO object for an owned pending asset and marks it ready. |
 | `GET` | `/api/v1/assets?assetType=avatar` | Lists the authenticated user's saved owned avatar assets and marks the current profile avatar. |
 | `DELETE` | `/api/v1/assets/{assetId}` | Deletes an owned avatar asset, clearing the current profile avatar if that asset was active. |
 | `PUT` | `/api/v1/profile` | Links or removes the current owned finalized avatar asset after explicit Settings-page save. |
 
 ## Validation And Error Rules
 
-- Presign requires `assetType=avatar` or `assetType=countdown-cover`.
+- Presign requires `assetType=avatar`, `countdown-cover`, or `note-image`.
 - Presign requires image content type `image/jpeg`, `image/png`, or
   `image/webp`.
+- Presign requires an original file name of 255 characters or fewer and a
+  claimed upload size from 1 byte through 2MB.
 - Finalize returns `404 ASSET_NOT_FOUND` when the asset is not owned by the
   authenticated user or does not exist.
 - Finalize returns `409 ASSET_UPLOAD_EXPIRED` when the pending upload window
