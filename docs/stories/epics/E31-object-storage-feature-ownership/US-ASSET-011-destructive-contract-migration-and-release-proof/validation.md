@@ -82,3 +82,8 @@ backfill, compatibility API, recovery switch, or environment guard.
   terminal wrapper terminated the API before a scheduled tick, so this run did
   not observe a live queue drain or browser E2E flow. Do not treat either as
   completed platform/browser evidence.
+- `npm --prefix src/frontend run test:e2e` confirmed the browser prerequisite
+  is unavailable in this desktop run: 54 tests stopped at
+  `ERR_CONNECTION_REFUSED` for `127.0.0.1:5173`; two API-only tests passed.
+  These results occur before feature assertions and do not replace live E2E
+  proof for this release.
