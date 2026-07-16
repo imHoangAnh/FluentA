@@ -1,5 +1,4 @@
 using FluentA.Application.BoundedContexts.Assets;
-using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
@@ -13,8 +12,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
-        var users = new FakeUserRepository();
-        var service = new AssetService(repository, storage, users);
+        var service = new AssetService(repository, storage);
 
         var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
 
@@ -30,7 +28,7 @@ public sealed class AssetServiceTests
     [Fact]
     public async Task Presign_RejectsUnsupportedContentType()
     {
-        var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage(), new FakeUserRepository());
+        var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage());
 
         var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/gif", "avatar.gif", 1024));
 
@@ -41,7 +39,7 @@ public sealed class AssetServiceTests
     [Fact]
     public async Task Presign_RejectsMissingOriginalNameAndOversizedClaim()
     {
-        var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage(), new FakeUserRepository());
+        var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage());
 
         var result = await service.PresignAsync(
             Guid.NewGuid(),
@@ -56,7 +54,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var service = new AssetService(repository, storage);
         var userId = Guid.NewGuid();
         var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
@@ -73,7 +71,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage { Prefix = [0x47, 0x49, 0x46, 0x38] };
-        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var service = new AssetService(repository, storage);
         var userId = Guid.NewGuid();
         var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
@@ -89,7 +87,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var service = new AssetService(repository, storage);
         var userId = Guid.NewGuid();
         var asset = Asset.CreatePending(
             Guid.NewGuid(),
@@ -112,7 +110,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository { FailOnUpdate = true };
         var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var service = new AssetService(repository, storage);
         var userId = Guid.NewGuid();
         var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
@@ -128,8 +126,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
-        var users = new FakeUserRepository();
-        var service = new AssetService(repository, storage, users);
+        var service = new AssetService(repository, storage);
         var userId = Guid.NewGuid();
         var pending = Asset.CreatePending(
             Guid.NewGuid(),
@@ -164,7 +161,7 @@ public sealed class AssetServiceTests
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var service = new AssetService(repository, storage);
         var success = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/success");
         var failed = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/failed");
         var due = DateTime.UtcNow.AddDays(-31);
@@ -223,11 +220,6 @@ public sealed class AssetServiceTests
             return Task.FromResult<IReadOnlyList<Asset>>(Assets
                 .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
                 .ToList());
-        }
-
-        public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null).OrderByDescending(asset => asset.CreatedAt).ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
@@ -290,40 +282,4 @@ public sealed class AssetServiceTests
         }
     }
 
-    private sealed class FakeUserRepository : IUserRepository
-    {
-        private readonly Dictionary<Guid, User> _users = new();
-
-        public void Add(User user)
-        {
-            _users[user.Id] = user;
-        }
-
-        public Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_users.Values.Any(user => user.Email == normalizedEmail));
-        }
-
-        public Task<User?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_users.Values.FirstOrDefault(user => user.Email == normalizedEmail));
-        }
-
-        public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_users.GetValueOrDefault(userId));
-        }
-
-        public Task AddAsync(User user, CancellationToken cancellationToken = default)
-        {
-            _users[user.Id] = user;
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
-        {
-            _users[user.Id] = user;
-            return Task.CompletedTask;
-        }
-    }
 }

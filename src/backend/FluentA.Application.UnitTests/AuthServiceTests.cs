@@ -506,14 +506,6 @@ public sealed class AuthServiceTests
                 .ToList());
         }
 
-        public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
-                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null)
-                .OrderByDescending(asset => asset.CreatedAt)
-                .ToList());
-        }
-
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values

@@ -44,14 +44,6 @@ public sealed class EfAssetRepository : IAssetRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Assets
-            .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null)
-            .OrderByDescending(asset => asset.CreatedAt)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Assets

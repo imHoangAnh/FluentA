@@ -1,7 +1,6 @@
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
-using FluentA.Application.BoundedContexts.Auth;
 
 namespace FluentA.Application.BoundedContexts.Assets;
 
@@ -17,13 +16,11 @@ public sealed class AssetService : IAssetService
 
     private readonly IAssetRepository _assets;
     private readonly IAssetObjectStorage _storage;
-    private readonly IUserRepository _users;
 
-    public AssetService(IAssetRepository assets, IAssetObjectStorage storage, IUserRepository users)
+    public AssetService(IAssetRepository assets, IAssetObjectStorage storage)
     {
         _assets = assets;
         _storage = storage;
-        _users = users;
     }
 
     public async Task<OperationResult<PresignedAssetUploadDto>> PresignAsync(Guid userId, PresignAssetRequest request, CancellationToken cancellationToken = default)
