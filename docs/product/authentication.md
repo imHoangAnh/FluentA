@@ -19,8 +19,6 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
   through the shared asset API, and save the finalized avatar asset through the
   split Settings routes rooted at `/settings/profile`,
   `/settings/practice`, and `/settings/review`.
-- A logged-in user can review saved avatar assets in Settings profile and delete either
-  a retired avatar or the current avatar directly from that surface.
 - A logged-in user can move between `/settings/profile`, `/settings/practice`,
   `/settings/review`, and `/settings/level5` inside one protected shared
   Settings shell.
@@ -48,8 +46,7 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - Email is normalized and unique.
 - Google subject ids are optional and unique when present.
 - User profiles store `full_name`, `bio`, and an optional avatar-asset
-  relationship. The legacy `avatar_url` column is transitional storage only
-  until US-ASSET-011 and is not exposed by profile APIs.
+  relationship. No avatar URL is persisted on the profile row.
 - Shared user-owned asset metadata lives in `assets`, and
   `auth_users.current_avatar_asset_id` can point at the current avatar asset.
 - The Avatar delivery flow points `current_avatar_asset_id` at the owned ready
@@ -57,9 +54,10 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
   `avatarDownloadUrl` on profile reads.
 - The shipped avatar runtime no longer stores or depends on any
   Cloudinary-specific profile identifier.
-- Deleting the current avatar asset clears both `current_avatar_asset_id` and
-  `avatar_url` and archives the asset for 30 days inside the same durable
-  profile/asset write. Archived assets cannot receive a download URL.
+- Replacing or removing the current avatar clears or rewires
+  `current_avatar_asset_id` and archives the retired asset for 30 days inside
+  the same durable profile/asset write. Archived assets cannot receive a
+  download URL.
 - Redis stores FluentA refresh sessions, email verification challenges, and password reset challenges; Google refresh tokens are not stored.
 
 ## API Contract
@@ -102,8 +100,6 @@ All responses use the FluentA envelope:
 | `GET` | `/api/v1/settings` | Returns the authenticated profile plus Practice and Review settings for the split Settings routes rooted at `/settings/profile`, `/settings/practice`, and `/settings/review`. |
 | `POST` | `/api/v1/assets/presign` | Creates a pending owned avatar asset and returns a presigned direct-upload target. |
 | `POST` | `/api/v1/assets/finalize` | Verifies the uploaded object for an owned pending avatar asset and marks it finalized. |
-| `GET` | `/api/v1/assets?assetType=avatar` | Lists the authenticated user's saved owned avatar assets for Settings management. |
-| `DELETE` | `/api/v1/assets/{assetId}` | Deletes an owned avatar asset and clears the current profile avatar when needed. |
 
 ## Validation And Error Rules
 
@@ -133,8 +129,6 @@ All responses use the FluentA envelope:
   `image/png`, or `image/webp`.
 - Asset finalize returns `422 ASSET_UPLOAD_INVALID` when the uploaded MinIO
   object is missing or violates avatar metadata rules.
-- Asset delete returns `404 ASSET_NOT_FOUND` when the selected asset does not
-  exist or is not owned by the authenticated user.
 - Asset presign or finalize return `503 ASSET_STORAGE_UNAVAILABLE` when shared
   asset storage is disabled or unavailable.
 
@@ -181,16 +175,11 @@ All responses use the FluentA envelope:
 - Profile saves update Settings and the existing authenticated identity
   surfaces by linking a ready owned avatar asset. Profile reads expose only the
   current avatar relationship and its short-lived authorized download URL.
-- Settings can list saved avatar assets, delete a retired asset without
-  changing the profile, and delete the current avatar while
-  `avatarAssetId`/`avatarDownloadUrl`, `avatar_url`, and
-  `current_avatar_asset_id` all clear together.
 - The shared asset API can presign an avatar upload, reject finalize before
   upload, and finalize the uploaded object after MinIO metadata verification.
-- Replacing or removing the current avatar clears or rewires
-  `current_avatar_asset_id`, archives the retired avatar asset for 30 days,
-  and leaves Settings plus other authenticated identity surfaces on the new
-  authorized signed avatar URL.
+- Replacing or removing the current avatar leaves Settings plus other
+  authenticated identity surfaces on the new authorized signed avatar URL or
+  no avatar.
 - Abandoned pending avatar uploads are cleaned from MinIO plus shared metadata
   by the recurring asset cleanup job.
 - Build and config proof show the shipped avatar path no longer registers or

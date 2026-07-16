@@ -28,7 +28,7 @@ public sealed class EfAssetRepository : IAssetRepository
     public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Assets.FirstOrDefaultAsync(
-            asset => asset.Id == assetId && asset.UserId == userId && asset.DeletedAt == null,
+            asset => asset.Id == assetId && asset.UploadedByUserId == userId && asset.DeletedAt == null,
             cancellationToken);
     }
 
@@ -40,14 +40,14 @@ public sealed class EfAssetRepository : IAssetRepository
         }
 
         return await _dbContext.Assets
-            .Where(asset => asset.UserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
+            .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Assets
-            .Where(asset => asset.UserId == userId && asset.DeletedAt == null)
+            .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null)
             .OrderByDescending(asset => asset.CreatedAt)
             .ToListAsync(cancellationToken);
     }

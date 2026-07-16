@@ -80,7 +80,6 @@ describe('NotesPage', () => {
       id: 'asset-1',
       assetType: 'note-image',
       status: 'finalized',
-      publicUrl: 'https://cdn.example.com/note-image.png',
       contentType: 'image/png',
       sizeBytes: 512,
       createdAtUtc: '2026-07-09T09:05:00Z',
@@ -366,7 +365,7 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledWith('page-1', {
       name: 'Week 1 reflections',
-      content: '<p>Saved content</p><p><img src="https://cdn.example.com/note-image.png" alt="diagram.png" data-note-asset-id="asset-1"></p>',
+      content: expect.stringMatching(/<img src="blob:[^"]+" alt="diagram.png" data-note-asset-id="asset-1">/),
     }))
     expect(await screen.findByTestId('note-save-status')).toHaveTextContent('Saved')
   })

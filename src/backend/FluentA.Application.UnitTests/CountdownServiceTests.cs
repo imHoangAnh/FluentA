@@ -85,8 +85,8 @@ public sealed class CountdownServiceTests
         var assets = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
         var userId = Guid.NewGuid();
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "users/u/countdown-cover/1", "https://cdn.example.com/1.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload(asset.PublicUrl, asset.ContentType, 1024);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "users/u/countdown-cover/1", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload(asset.ContentType, 1024);
         assets.Assets.Add(asset);
         var countdownEvent = CountdownEventEntity.Create(userId, "Exam", DateTime.UtcNow.AddDays(1), asset.Id);
         countdownEvent.AddAlert("OnTargetDay", "09:00", DateTime.UtcNow.AddHours(2));
@@ -109,8 +109,8 @@ public sealed class CountdownServiceTests
         var assets = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
         var userId = Guid.NewGuid();
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "countdown-covers/users/u/cover.png", "https://legacy.example.com/cover.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload(asset.PublicUrl, asset.ContentType, 1024);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "countdown-covers/users/u/cover.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload(asset.ContentType, 1024);
         assets.Assets.Add(asset);
         var service = new CountdownService(repository, assets, storage);
         var request = new CreateCountdownEventRequest("Exam", DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"), [new CreateCountdownAlertRequest("OnTargetDay", "09:00")], asset.Id);
@@ -176,15 +176,15 @@ public sealed class CountdownServiceTests
             Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId));
 
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Assets.FirstOrDefault(asset => asset.UserId == userId && asset.Id == assetId && asset.DeletedAt is null));
+            Task.FromResult(Assets.FirstOrDefault(asset => asset.UploadedByUserId == userId && asset.Id == assetId && asset.DeletedAt is null));
 
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Asset>>(Assets
-                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
 
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UserId == userId && asset.DeletedAt is null).ToList());
+            Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null).ToList());
 
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Asset>>([]);
@@ -201,8 +201,6 @@ public sealed class CountdownServiceTests
             new($"https://signed.example.com/{request.ObjectKey}", DateTime.UtcNow.AddMinutes(5));
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public string GetPublicUrl(string objectKey) => $"https://cdn.example.com/{objectKey}";
-
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             DeletedObjectKey = objectKey;

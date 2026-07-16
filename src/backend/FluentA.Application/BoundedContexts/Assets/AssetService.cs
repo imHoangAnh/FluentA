@@ -26,41 +26,6 @@ public sealed class AssetService : IAssetService
         _users = users;
     }
 
-    public async Task<OperationResult<IReadOnlyList<OwnedAssetDto>>> ListAsync(Guid userId, ListAssetsRequest request, CancellationToken cancellationToken = default)
-    {
-        var errors = ValidateAssetTypeRequest(request.AssetType);
-        if (errors.Count > 0)
-        {
-            return OperationResult<IReadOnlyList<OwnedAssetDto>>.Failure(AssetError.Validation(errors));
-        }
-
-        var assets = await _assets.ListOwnedAsync(userId, cancellationToken);
-        var user = await _users.GetByIdAsync(userId, cancellationToken);
-        var currentAvatarAssetId = user?.CurrentAvatarAssetId;
-
-        var requestedType = ParseAssetType(request.AssetType ?? "avatar");
-        var result = new List<OwnedAssetDto>();
-        foreach (var asset in assets.Where(asset => asset.Type == requestedType))
-        {
-            AssetPresignedDownload? download = null;
-            if (asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Ready)
-            {
-                try
-                {
-                    download = _storage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5)));
-                }
-                catch (AssetStorageUnavailableException)
-                {
-                    // A missing storage provider must not leak a durable URL.
-                }
-            }
-
-            result.Add(ToOwnedDto(asset, currentAvatarAssetId, download));
-        }
-
-        return OperationResult<IReadOnlyList<OwnedAssetDto>>.Success(result);
-    }
-
     public async Task<OperationResult<PresignedAssetUploadDto>> PresignAsync(Guid userId, PresignAssetRequest request, CancellationToken cancellationToken = default)
     {
         var errors = ValidatePresignRequest(request);
@@ -89,7 +54,6 @@ public sealed class AssetService : IAssetService
             userId,
             type,
             objectKey,
-            _storage.GetPublicUrl(objectKey),
             request.ContentType!,
             0,
             upload.ExpiresAtUtc,
@@ -158,7 +122,7 @@ public sealed class AssetService : IAssetService
 
         try
         {
-            asset.FinalizeUpload(_storage.GetPublicUrl(asset.ObjectKey), metadata.ContentType, metadata.SizeBytes);
+            asset.FinalizeUpload(metadata.ContentType, metadata.SizeBytes);
             await _assets.UpdateAsync(asset, cancellationToken);
         }
         catch
@@ -168,44 +132,6 @@ public sealed class AssetService : IAssetService
         }
 
         return OperationResult<AssetDto>.Success(ToDto(asset));
-    }
-
-    public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
-    {
-        if (assetId == Guid.Empty)
-        {
-            return OperationResult<bool>.Failure(AssetError.Validation(new Dictionary<string, string[]>
-            {
-                ["assetId"] = ["Asset id is required."]
-            }));
-        }
-
-        var asset = await _assets.GetOwnedAsync(userId, assetId, cancellationToken);
-        if (asset is null)
-        {
-            return OperationResult<bool>.Failure(AssetError.NotFound());
-        }
-
-        var user = await _users.GetByIdAsync(userId, cancellationToken);
-        if (user is null)
-        {
-            return OperationResult<bool>.Failure(AssetError.NotFound());
-        }
-
-        var wasCurrentAvatar = user.CurrentAvatarAssetId == asset.Id;
-        asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
-
-        if (wasCurrentAvatar)
-        {
-            user.UpdateProfile(user.FullName, user.Bio, null, null);
-            await _users.UpdateAsync(user, cancellationToken);
-        }
-        else
-        {
-            await _assets.UpdateAsync(asset, cancellationToken);
-        }
-
-        return OperationResult<bool>.Success(true);
     }
 
     public async Task<int> CleanupExpiredPendingAsync(CancellationToken cancellationToken = default)
@@ -427,28 +353,11 @@ public sealed class AssetService : IAssetService
             asset.Id,
             ToAssetTypeValue(asset.Type),
             ToAssetStatusValue(asset.Status),
-            asset.PublicUrl,
             asset.ContentType,
             asset.SizeBytes,
             asset.ExpiresAt,
             asset.CreatedAt,
             asset.UpdatedAt);
-    }
-
-    private static OwnedAssetDto ToOwnedDto(Asset asset, Guid? currentAvatarAssetId, AssetPresignedDownload? download = null)
-    {
-        return new OwnedAssetDto(
-            asset.Id,
-            ToAssetTypeValue(asset.Type),
-            ToAssetStatusValue(asset.Status),
-            asset.ContentType,
-            asset.SizeBytes,
-            asset.ExpiresAt,
-            asset.CreatedAt,
-            asset.UpdatedAt,
-            currentAvatarAssetId == asset.Id,
-            download?.Url,
-            download?.ExpiresAtUtc);
     }
 
     private static void Merge(Dictionary<string, string[]> target, Dictionary<string, string[]> source)

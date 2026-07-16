@@ -12,8 +12,6 @@ vi.mock('@/features/settings/api/avatar-assets.api', async () => {
   const actual = await vi.importActual<typeof import('@/features/settings/api/avatar-assets.api')>('@/features/settings/api/avatar-assets.api')
   return {
     ...actual,
-    listAvatarAssets: vi.fn(),
-    deleteAvatarAsset: vi.fn(),
     uploadAvatarAsset: vi.fn(),
   }
 })
@@ -77,7 +75,6 @@ describe('SettingsPage profile save', () => {
         recapAfterAnswer: true,
       },
     })
-    vi.mocked(assetsApi.listAvatarAssets).mockResolvedValue([])
   })
 
   it('reuses the finalized avatar asset on profile-save retry', async () => {
@@ -93,7 +90,6 @@ describe('SettingsPage profile save', () => {
       expiresAtUtc: null,
       createdAtUtc: '2026-07-03T00:00:00Z',
       updatedAtUtc: '2026-07-03T00:00:00Z',
-      isCurrentAvatar: false,
     })
     vi.mocked(settingsApi.updateProfile)
       .mockRejectedValueOnce(new Error('Temporary profile save failure.'))
@@ -132,30 +128,4 @@ describe('SettingsPage profile save', () => {
     })
   })
 
-  it('deletes the current saved avatar and clears cached profile state', async () => {
-    const user = userEvent.setup()
-
-    vi.mocked(assetsApi.listAvatarAssets).mockResolvedValue([{
-      id: 'asset-current',
-      assetType: 'avatar',
-      status: 'ready',
-      downloadUrl: 'https://signed.example.com/current.png',
-      contentType: 'image/png',
-      sizeBytes: 2048,
-      expiresAtUtc: null,
-      createdAtUtc: '2026-07-03T00:00:00Z',
-      updatedAtUtc: '2026-07-03T00:00:00Z',
-      isCurrentAvatar: true,
-    }])
-    vi.mocked(assetsApi.deleteAvatarAsset).mockResolvedValue(undefined)
-
-    renderPage()
-
-    expect(await screen.findByText('Current avatar')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /delete/i }))
-
-    await waitFor(() => expect(screen.getByText('Current avatar deleted.')).toBeInTheDocument())
-    expect(assetsApi.deleteAvatarAsset).toHaveBeenCalledWith('asset-current')
-    expect(useAuthStore.getState().user?.avatarDownloadUrl).toBeNull()
-  })
 })

@@ -15,15 +15,11 @@ public sealed class AssetTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             AssetType.Avatar,
-            "users/demo/avatar.png",
-            "http://127.0.0.1:9000/fluenta-assets-dev/users/demo/avatar.png",
-            "image/png",
+            "users/demo/avatar.png", "image/png",
             1024,
             expiresAt);
 
-        asset.FinalizeUpload(
-            "http://127.0.0.1:9000/fluenta-assets-dev/users/demo/avatar.png",
-            "image/png",
+        asset.FinalizeUpload("image/png",
             2048);
         asset.MarkDeleted(deletedAt);
 
@@ -41,9 +37,7 @@ public sealed class AssetTests
                 Guid.NewGuid(),
                 Guid.NewGuid(),
                 AssetType.Avatar,
-                "users/demo/avatar.png",
-                "http://127.0.0.1:9000/fluenta-assets-dev/users/demo/avatar.png",
-                "image/png",
+                "users/demo/avatar.png", "image/png",
                 0,
                 default));
     }
@@ -52,8 +46,8 @@ public sealed class AssetTests
     public void ReadyAsset_ArchivesClaimsRequeuesAndPurges()
     {
         var now = new DateTime(2026, 7, 17, 10, 0, 0, DateTimeKind.Utc);
-        var asset = Asset.CreatePending(Guid.NewGuid(), Guid.NewGuid(), AssetType.Avatar, "avatars/users/demo/avatar.png", "https://storage.example/avatar.png", "image/png", 0, now.AddHours(1));
-        asset.FinalizeUpload("https://storage.example/avatar.png", "image/png", 100);
+        var asset = Asset.CreatePending(Guid.NewGuid(), Guid.NewGuid(), AssetType.Avatar, "avatars/users/demo/avatar.png", "image/png", 0, now.AddHours(1));
+        asset.FinalizeUpload("image/png", 100);
 
         asset.Archive(now, TimeSpan.FromDays(30));
         Assert.Equal(AssetStatus.Archived, asset.Status);

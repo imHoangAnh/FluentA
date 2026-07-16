@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { getUserAvatarUrl } from '@/shared/lib/avatar'
+import { getUserAvatarImageUrl } from '@/shared/lib/avatar-image'
 
 export type ShellAccount = {
   email?: string | null
@@ -47,6 +47,6 @@ export function useShellEnvironment() {
   return {
     ...environment,
     displayName,
-    avatarUrl: getUserAvatarUrl(environment.account, displayName),
+    avatarImageUrl: getUserAvatarImageUrl(environment.account, displayName),
   }
 }

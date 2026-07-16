@@ -341,12 +341,8 @@ public sealed partial class AuthService : IAuthService
 
         var originalName = user.FullName;
         var originalBio = user.Bio;
-        var originalAvatarUrl = user.AvatarUrl;
         var originalCurrentAvatarAssetId = user.CurrentAvatarAssetId;
         var isSelectingNewAvatarAsset = selectedAvatarAsset is not null && selectedAvatarAsset.Id != originalCurrentAvatarAssetId;
-        var nextAvatarUrl = request.RemoveAvatar
-            ? null
-            : selectedAvatarAsset?.PublicUrl ?? originalAvatarUrl;
         var nextCurrentAvatarAssetId = request.RemoveAvatar
             ? (Guid?)null
             : selectedAvatarAsset?.Id ?? originalCurrentAvatarAssetId;
@@ -361,7 +357,7 @@ public sealed partial class AuthService : IAuthService
 
         try
         {
-            user.UpdateProfile(request.FullName!, request.Bio, nextAvatarUrl, nextCurrentAvatarAssetId);
+            user.UpdateProfile(request.FullName!, request.Bio, nextCurrentAvatarAssetId);
             await _users.UpdateAsync(user, cancellationToken);
         }
         catch
@@ -371,7 +367,7 @@ public sealed partial class AuthService : IAuthService
                 await TryDeleteAssetObjectAsync(selectedAvatarAsset.ObjectKey, cancellationToken);
             }
 
-            user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalCurrentAvatarAssetId);
+            user.UpdateProfile(originalName, originalBio, originalCurrentAvatarAssetId);
             throw;
         }
 

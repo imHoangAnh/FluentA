@@ -25,7 +25,7 @@ export function AppShell({ children, title, description, contentClassName }: App
   const {
     account,
     displayName,
-    avatarUrl,
+    avatarImageUrl,
     logout,
     navigationSections,
     notificationsMenu,
@@ -122,7 +122,7 @@ export function AppShell({ children, title, description, contentClassName }: App
             <span className={cn(collapsed && 'sr-only', 'max-[1100px]:sr-only')}>{settingsNavigation.label}</span>
           </Link>
           <div className={cn('flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-border bg-background p-2', collapsed && 'justify-center border-0 bg-transparent', 'max-[1100px]:justify-center max-[1100px]:border-0 max-[1100px]:bg-transparent')}>
-            <img className="size-8 shrink-0 rounded-full border border-border object-cover" src={avatarUrl} alt="" />
+            <img className="size-8 shrink-0 rounded-full border border-border object-cover" src={avatarImageUrl} alt="" />
             <div className={cn('min-w-0 flex-1 overflow-hidden', collapsed && 'hidden', 'max-[1100px]:hidden')}>
               <p className="m-0 max-w-full truncate text-xs font-semibold text-foreground">{displayName}</p>
               <p className="m-0 max-w-full truncate text-[11px] text-muted-foreground">{account?.email}</p>

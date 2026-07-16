@@ -8,17 +8,15 @@ public sealed class Asset : BaseEntity, IAggregateRoot
     private Asset()
     {
         ObjectKey = string.Empty;
-        PublicUrl = string.Empty;
         ContentType = string.Empty;
     }
 
     private Asset(
         Guid? assetId,
-        Guid userId,
+        Guid uploadedByUserId,
         AssetType type,
         AssetStatus status,
         string objectKey,
-        string publicUrl,
         string contentType,
         long sizeBytes,
         DateTime? expiresAtUtc,
@@ -30,9 +28,9 @@ public sealed class Asset : BaseEntity, IAggregateRoot
             Id = assetId.Value;
         }
 
-        if (userId == Guid.Empty)
+        if (uploadedByUserId == Guid.Empty)
         {
-            throw new ArgumentException("User id is required.", nameof(userId));
+            throw new ArgumentException("Uploader user id is required.", nameof(uploadedByUserId));
         }
 
         if (status == AssetStatus.PendingUpload && (!expiresAtUtc.HasValue || expiresAtUtc.Value == default))
@@ -40,11 +38,10 @@ public sealed class Asset : BaseEntity, IAggregateRoot
             throw new ArgumentException("Pending assets must have an expiry.", nameof(expiresAtUtc));
         }
 
-        UserId = userId;
+        UploadedByUserId = uploadedByUserId;
         Type = type;
         Status = status;
         ObjectKey = CleanObjectKey(objectKey);
-        PublicUrl = CleanPublicUrl(publicUrl);
         ContentType = CleanContentType(contentType);
         SizeBytes = ValidateSizeBytes(sizeBytes);
         ExpiresAt = expiresAtUtc;
@@ -52,11 +49,10 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         OriginalName = CleanOptionalOriginalName(originalName);
     }
 
-    public Guid UserId { get; private set; }
+    public Guid UploadedByUserId { get; private set; }
     public AssetType Type { get; private set; }
     public AssetStatus Status { get; private set; }
     public string ObjectKey { get; private set; }
-    public string PublicUrl { get; private set; }
     public string ContentType { get; private set; }
     public long SizeBytes { get; private set; }
     public DateTime? ExpiresAt { get; private set; }
@@ -67,10 +63,9 @@ public sealed class Asset : BaseEntity, IAggregateRoot
 
     public static Asset CreatePending(
         Guid assetId,
-        Guid userId,
+        Guid uploadedByUserId,
         AssetType type,
         string objectKey,
-        string publicUrl,
         string contentType,
         long sizeBytes,
         DateTime expiresAtUtc,
@@ -79,11 +74,10 @@ public sealed class Asset : BaseEntity, IAggregateRoot
     {
         return new Asset(
             assetId,
-            userId,
+            uploadedByUserId,
             type,
             AssetStatus.PendingUpload,
             objectKey,
-            publicUrl,
             contentType,
             sizeBytes,
             expiresAtUtc,
@@ -91,14 +85,13 @@ public sealed class Asset : BaseEntity, IAggregateRoot
             originalName);
     }
 
-    public void FinalizeUpload(string publicUrl, string contentType, long sizeBytes)
+    public void FinalizeUpload(string contentType, long sizeBytes)
     {
         if (Status != AssetStatus.PendingUpload)
         {
             throw new InvalidOperationException("Only pending assets can be finalized.");
         }
 
-        PublicUrl = CleanPublicUrl(publicUrl);
         ContentType = CleanContentType(contentType);
         SizeBytes = ValidateSizeBytes(sizeBytes);
         Status = AssetStatus.Ready;
@@ -175,17 +168,6 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         if (cleaned.Length is < 1 or > 1024)
         {
             throw new ArgumentException("Object key must be between 1 and 1024 characters.", nameof(objectKey));
-        }
-
-        return cleaned;
-    }
-
-    private static string CleanPublicUrl(string publicUrl)
-    {
-        var cleaned = publicUrl.Trim();
-        if (cleaned.Length is < 1 or > 2048 || !Uri.TryCreate(cleaned, UriKind.Absolute, out _))
-        {
-            throw new ArgumentException("Public URL must be a valid absolute URL.", nameof(publicUrl));
         }
 
         return cleaned;

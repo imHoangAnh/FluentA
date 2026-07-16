@@ -19,16 +19,6 @@ public sealed class AssetsController : ControllerBase
         _assets = assets;
     }
 
-    /// <summary>Lists owned avatar assets for the authenticated user.</summary>
-    [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? assetType, CancellationToken cancellationToken)
-    {
-        var result = await _assets.ListAsync(CurrentUserId(), new ListAssetsRequest(assetType), cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<OwnedAssetDto>>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
     /// <summary>Creates a presigned direct-upload target for a supported owned asset type.</summary>
     [HttpPost("presign")]
     public async Task<IActionResult> Presign(PresignAssetRequest request, CancellationToken cancellationToken)
@@ -46,16 +36,6 @@ public sealed class AssetsController : ControllerBase
         var result = await _assets.FinalizeAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiEnvelope<AssetDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Soft-deletes an owned asset and clears the current avatar when needed.</summary>
-    [HttpDelete("{assetId:guid}")]
-    public async Task<IActionResult> Delete(Guid assetId, CancellationToken cancellationToken)
-    {
-        var result = await _assets.DeleteAsync(CurrentUserId(), assetId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Asset deleted." }))
             : ToErrorResult(result);
     }
 

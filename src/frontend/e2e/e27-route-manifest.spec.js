@@ -5,7 +5,6 @@ const user = {
   email: 'route-proof@fluenta.local',
   fullName: 'Route Proof Learner',
   isEmailVerified: true,
-  avatarUrl: null,
 }
 
 const publicRoutes = [

@@ -9,29 +9,6 @@ namespace FluentA.Application.UnitTests;
 public sealed class AssetServiceTests
 {
     [Fact]
-    public async Task List_ReturnsOwnedAssetsWithCurrentAvatarFlag()
-    {
-        var repository = new FakeAssetRepository();
-        var storage = new FakeAssetObjectStorage();
-        var users = new FakeUserRepository();
-        var user = User.CreateWithPassword("learner@example.com", "Learner", "hash");
-        var currentAsset = CreateFinalizedAsset(user.Id, "users/demo/avatar-1");
-        var previousAsset = CreateFinalizedAsset(user.Id, "users/demo/avatar-2");
-        user.UpdateProfile(user.FullName, user.Bio, currentAsset.PublicUrl, currentAsset.Id);
-        users.Add(user);
-        await repository.AddAsync(previousAsset);
-        await repository.AddAsync(currentAsset);
-        var service = new AssetService(repository, storage, users);
-
-        var result = await service.ListAsync(user.Id, new ListAssetsRequest("avatar"));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value!.Count);
-        Assert.True(result.Value.Single(asset => asset.Id == currentAsset.Id).IsCurrentAvatar);
-        Assert.False(result.Value.Single(asset => asset.Id == previousAsset.Id).IsCurrentAvatar);
-    }
-
-    [Fact]
     public async Task Presign_CreatesPendingAssetAndReturnsUploadTarget()
     {
         var repository = new FakeAssetRepository();
@@ -118,9 +95,7 @@ public sealed class AssetServiceTests
             Guid.NewGuid(),
             userId,
             AssetType.Avatar,
-            "users/demo/avatar",
-            "http://cdn.local/users/demo/avatar",
-            "image/png",
+            "users/demo/avatar", "image/png",
             0,
             DateTime.UtcNow.AddMinutes(-1));
         await repository.AddAsync(asset);
@@ -149,28 +124,6 @@ public sealed class AssetServiceTests
     }
 
     [Fact]
-    public async Task Delete_ClearsCurrentAvatarAndArchivesObject()
-    {
-        var repository = new FakeAssetRepository();
-        var storage = new FakeAssetObjectStorage();
-        var users = new FakeUserRepository();
-        var user = User.CreateWithPassword("learner@example.com", "Learner", "hash");
-        var asset = CreateFinalizedAsset(user.Id, "users/demo/avatar-1");
-        user.UpdateProfile(user.FullName, user.Bio, asset.PublicUrl, asset.Id);
-        users.Add(user);
-        await repository.AddAsync(asset);
-        var service = new AssetService(repository, storage, users);
-
-        var result = await service.DeleteAsync(user.Id, asset.Id);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(AssetStatus.Archived, asset.Status);
-        Assert.Null(storage.DeletedObjectKey);
-        Assert.Null(user.CurrentAvatarAssetId);
-        Assert.Null(user.AvatarUrl);
-    }
-
-    [Fact]
     public async Task CleanupExpiredPending_DeletesPendingAndExpiredAssets()
     {
         var repository = new FakeAssetRepository();
@@ -182,18 +135,14 @@ public sealed class AssetServiceTests
             Guid.NewGuid(),
             userId,
             AssetType.Avatar,
-            "users/demo/pending",
-            "http://cdn.local/users/demo/pending",
-            "image/png",
+            "users/demo/pending", "image/png",
             0,
             DateTime.UtcNow.AddMinutes(-2));
         var expired = Asset.CreatePending(
             Guid.NewGuid(),
             userId,
             AssetType.Avatar,
-            "users/demo/expired",
-            "http://cdn.local/users/demo/expired",
-            "image/png",
+            "users/demo/expired", "image/png",
             0,
             DateTime.UtcNow.AddMinutes(-3));
         expired.MarkExpired(DateTime.UtcNow.AddMinutes(-1));
@@ -241,11 +190,10 @@ public sealed class AssetServiceTests
             userId,
             AssetType.Avatar,
             objectKey,
-            $"http://cdn.local/{objectKey}",
             "image/png",
             0,
             DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload($"http://cdn.local/{objectKey}", "image/png", 1024);
+        asset.FinalizeUpload("image/png", 1024);
         return asset;
     }
 
@@ -267,19 +215,19 @@ public sealed class AssetServiceTests
 
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId && asset.UserId == userId && asset.DeletedAt == null));
+            return Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId && asset.UploadedByUserId == userId && asset.DeletedAt == null));
         }
 
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(Assets
-                .Where(asset => asset.UserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
                 .ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UserId == userId && asset.DeletedAt == null).OrderByDescending(asset => asset.CreatedAt).ToList());
+            return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null).OrderByDescending(asset => asset.CreatedAt).ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
@@ -332,11 +280,6 @@ public sealed class AssetServiceTests
 
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>(Prefix);
-
-        public string GetPublicUrl(string objectKey)
-        {
-            return $"http://cdn.local/{objectKey}";
-        }
 
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {

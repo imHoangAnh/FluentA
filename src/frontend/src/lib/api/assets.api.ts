@@ -5,7 +5,6 @@ export type AssetPayload = {
   id: string
   assetType: string
   status: string
-  publicUrl: string
   contentType: string
   sizeBytes: number
   expiresAtUtc?: string | null

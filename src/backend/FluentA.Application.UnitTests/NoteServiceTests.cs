@@ -100,11 +100,11 @@ public sealed class NoteServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("Page"));
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/1", "https://cdn.example.com/1.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload("https://cdn.example.com/1.png", "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/1", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         assets.Assets.Add(asset);
 
-        await service.UpdatePageAsync(userId, page.Value!.Id, new UpdateNotePageRequest(Content: $"<p><img src=\"{asset.PublicUrl}\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>"));
+        await service.UpdatePageAsync(userId, page.Value!.Id, new UpdateNotePageRequest(Content: $"<p><img src=\"{"https://render.example/image.png"}\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>"));
         var updated = await service.UpdatePageAsync(userId, page.Value.Id, new UpdateNotePageRequest(Content: "<p>Removed image</p>"));
 
         Assert.True(updated.IsSuccess);
@@ -121,10 +121,10 @@ public sealed class NoteServiceTests
         var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
         var first = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("First"));
         var second = await service.CreatePageAsync(userId, board.Value.Id, new CreateNotePageRequest("Second"));
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/2", "https://cdn.example.com/2.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload("https://cdn.example.com/2.png", "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/2", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         assets.Assets.Add(asset);
-        var html = $"<p><img src=\"{asset.PublicUrl}\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>";
+        var html = $"<p><img src=\"{"https://render.example/image.png"}\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>";
 
         await service.UpdatePageAsync(userId, first.Value!.Id, new UpdateNotePageRequest(Content: html));
         await service.UpdatePageAsync(userId, second.Value!.Id, new UpdateNotePageRequest(Content: html));
@@ -144,8 +144,8 @@ public sealed class NoteServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("Page"));
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "note-images/users/demo/image.png", "https://legacy.example.com/image.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload(asset.PublicUrl, "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "note-images/users/demo/image.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         assets.Assets.Add(asset);
 
         var updated = await service.UpdatePageAsync(userId, page.Value!.Id, new UpdateNotePageRequest(Content: $"<p><img src=\"https://attacker.example/image.png\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>"));
@@ -168,8 +168,8 @@ public sealed class NoteServiceTests
         var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
         var first = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("First"));
         var second = await service.CreatePageAsync(userId, board.Value.Id, new CreateNotePageRequest("Second"));
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "note-images/users/demo/image.png", "https://legacy.example.com/image.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload(asset.PublicUrl, "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "note-images/users/demo/image.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         assets.Assets.Add(asset);
         var content = $"<p><img data-note-asset-id=\"{asset.Id}\"></p>";
 
@@ -288,19 +288,19 @@ public sealed class NoteServiceTests
 
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId && asset.UserId == userId && asset.DeletedAt is null));
+            return Task.FromResult(Assets.FirstOrDefault(asset => asset.Id == assetId && asset.UploadedByUserId == userId && asset.DeletedAt is null));
         }
 
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(Assets
-                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UserId == userId && asset.DeletedAt is null).ToList());
+            return Task.FromResult<IReadOnlyList<Asset>>(Assets.Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null).ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
@@ -346,7 +346,6 @@ public sealed class NoteServiceTests
         public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) => new($"https://signed.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public string GetPublicUrl(string objectKey) => $"https://cdn.example.com/{objectKey}";
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

@@ -262,7 +262,7 @@ export function NotesPage() {
       const asset = await assetsApi.uploadNoteImageAsset(file)
       return {
         id: asset.id,
-        publicUrl: asset.publicUrl,
+        displayUrl: URL.createObjectURL(file),
         alt: file.name,
       }
     }))

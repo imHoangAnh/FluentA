@@ -5,7 +5,6 @@ const user = {
   email: 'app-shell@fluenta.local',
   fullName: 'AppShell Learner',
   isEmailVerified: true,
-  avatarUrl: null,
 }
 
 test('keeps one AppShell mounted across protected client-side navigation', async ({ page }) => {

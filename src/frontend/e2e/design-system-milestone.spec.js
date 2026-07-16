@@ -5,7 +5,6 @@ const user = {
   email: 'learner@fluenta.local',
   fullName: 'FluentA Learner',
   isEmailVerified: true,
-  avatarUrl: null,
 }
 
 async function mockFrontendApis(page) {

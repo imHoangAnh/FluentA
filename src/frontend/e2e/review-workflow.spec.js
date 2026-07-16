@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const user = { id: 'review-user', email: 'review@fluenta.local', fullName: 'Review Learner', isEmailVerified: true, avatarUrl: null }
+const user = { id: 'review-user', email: 'review@fluenta.local', fullName: 'Review Learner', isEmailVerified: true }
 const session = { sessionId: 'review-session', boardId: 'board-1', boardName: 'Review board', orderType: 'sequential', mode: 'random', startDisposition: 'started', startedAt: '2026-07-14T00:00:00Z', totalWords: 2, startOptions: { hasActiveSameDaySession: false, remainingWords: 2, requiresDecision: false }, words: [
   { wordId: 'word-1', word: 'alpha', wordClass: 'other', meaningVn: 'alpha vn', meaningEn: 'alpha definition', example: 'alpha example', mode: 'meaningToWord' },
   { wordId: 'word-2', word: 'beta', wordClass: 'other', meaningVn: 'beta vn', meaningEn: 'beta definition', example: 'beta example', mode: 'meaningToWord' },

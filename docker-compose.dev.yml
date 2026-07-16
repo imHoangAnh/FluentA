@@ -59,7 +59,7 @@ services:
           sleep 1
         done
         mc mb --ignore-existing "local/$$MINIO_BUCKET"
-        mc anonymous set download "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
 
 volumes:
   fluenta_postgres_data:

@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddSingleton<IRefreshTokenStore, RedisRefreshTokenStore>();
         services.AddSingleton<IAccountChallengeStore, RedisAccountChallengeStore>();
         services.AddSingleton(assetStorageOptions);
+        services.AddHostedService<AssetStoragePrivacyStartupService>();
         if (assetStorageOptions.Enabled)
         {
             services.AddSingleton<IAmazonS3>(_ => CreateAssetStorageClient(assetStorageOptions));

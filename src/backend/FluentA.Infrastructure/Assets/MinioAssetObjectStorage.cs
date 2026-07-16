@@ -100,9 +100,23 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
         }
     }
 
-    public string GetPublicUrl(string objectKey)
+    public async Task EnsurePrivateBucketAsync(CancellationToken cancellationToken = default)
     {
-        return $"{_options.PublicBaseUrl.TrimEnd('/')}/{_options.Bucket}/{EscapeObjectKey(objectKey)}";
+        try
+        {
+            await _client.DeleteBucketPolicyAsync(new DeleteBucketPolicyRequest
+            {
+                BucketName = _options.Bucket
+            }, cancellationToken);
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // No bucket policy is the desired private default for MinIO.
+        }
+        catch (Exception)
+        {
+            throw new AssetStorageUnavailableException("Could not enforce private bucket policy.");
+        }
     }
 
     public async Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
@@ -114,9 +128,4 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
         }, cancellationToken);
     }
 
-    private static string EscapeObjectKey(string objectKey)
-    {
-        return string.Join("/", objectKey.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(Uri.EscapeDataString));
-    }
 }

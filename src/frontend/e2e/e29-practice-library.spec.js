@@ -5,7 +5,6 @@ const user = {
   email: 'e29-practice@fluenta.local',
   fullName: 'Practice Library Learner',
   isEmailVerified: true,
-  avatarUrl: null,
 }
 
 const words = [{

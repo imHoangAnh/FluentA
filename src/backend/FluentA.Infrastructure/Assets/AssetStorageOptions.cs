@@ -11,7 +11,6 @@ public sealed class AssetStorageOptions
     public string Bucket { get; init; } = string.Empty;
     public string AccessKey { get; init; } = string.Empty;
     public string SecretKey { get; init; } = string.Empty;
-    public string PublicBaseUrl { get; init; } = string.Empty;
     public string Region { get; init; } = "us-east-1";
     public bool UsePathStyle { get; init; } = true;
 
@@ -24,7 +23,6 @@ public sealed class AssetStorageOptions
             Bucket = configuration[$"{SectionName}:Bucket"] ?? string.Empty,
             AccessKey = configuration[$"{SectionName}:AccessKey"] ?? string.Empty,
             SecretKey = configuration[$"{SectionName}:SecretKey"] ?? string.Empty,
-            PublicBaseUrl = configuration[$"{SectionName}:PublicBaseUrl"] ?? string.Empty,
             Region = configuration[$"{SectionName}:Region"] ?? "us-east-1",
             UsePathStyle = configuration.GetValue<bool?>($"{SectionName}:UsePathStyle") ?? true
         };
@@ -40,8 +38,7 @@ public sealed class AssetStorageOptions
         if (string.IsNullOrWhiteSpace(Endpoint)
             || string.IsNullOrWhiteSpace(Bucket)
             || string.IsNullOrWhiteSpace(AccessKey)
-            || string.IsNullOrWhiteSpace(SecretKey)
-            || string.IsNullOrWhiteSpace(PublicBaseUrl))
+            || string.IsNullOrWhiteSpace(SecretKey))
         {
             throw new InvalidOperationException("AssetStorage configuration is incomplete.");
         }

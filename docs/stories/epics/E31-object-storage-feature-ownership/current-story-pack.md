@@ -1,51 +1,52 @@
-# Current Story Pack: US-ASSET-010 Archive And Purge Lifecycle
+# Current Story Pack: US-ASSET-011 Destructive Contract Migration And Release Proof
 
 ## Entry State
 
-- US-ASSET-007 through US-ASSET-009 establish signed, feature-owned delivery
-  for Avatar, Note images, and Countdown covers.
-- Feature detach already removes the visible relationship, but asset objects
-  need a recovery window and asynchronous physical deletion.
+- US-ASSET-007 through US-ASSET-010 establish private feature ownership and
+  the archive/purge lifecycle, while transitional URL-era columns remain.
+- The shared bucket previously permitted anonymous download and the application
+  still retained the generic Assets list/delete compatibility surface.
 - D1-D15 in `context.md` are approved.
 
 ## Exit State
 
-Detached Avatar, Note-image, and Countdown-cover assets have a recoverable,
-safe lifecycle:
+The coordinated release is intentionally destructive and private:
 
-- READY assets transition to ARCHIVED for 30 days when their feature detaches;
-  archive state blocks signed delivery immediately.
-- A bounded hourly job conditionally claims due archives, deletes their objects
-  idempotently, marks successes DELETED, and requeues storage failures.
-- Retention timestamps and indexed due scans are durable in PostgreSQL.
+- A migration queues every legacy object key, clears asset records and feature
+  links, removes Note image tags, and drops `public_url`/`avatar_url`.
+- New assets use `uploaded_by_user_id`, durable object metadata, private bucket
+  policy, and owning-feature signed reads only.
+- The registered retry job drains the durable legacy-object queue; no old object
+  is reachable through an application API during the drain.
 
 ## Scope
 
 In scope:
 
-- Archive transition and atomic feature detachment for Avatar, Note images, and
-  Countdown covers.
-- Retention migration, conditional purge claiming, idempotent storage delete,
-  retry, and hourly Hangfire registration.
-- Product docs plus domain, application, PostgreSQL, and build proof.
+- Irreversible reset migration, durable legacy object-deletion queue, and
+  uploader-audit rename.
+- Private MinIO bootstrap/startup enforcement and removal of URL-at-rest plus
+  generic Assets list/delete contracts.
+- Product/release docs plus static, unit, database, and build proof.
 
 Out of scope:
 
-- Archived list, Restore UI/API, manual/admin purge, or Recycle Bin UI.
-- Final public bucket shutdown and legacy `public_url` removal.
+- Recovery/backfill, compatibility API, environment guard, Restore UI/API, or
+  Recycle Bin UI.
 
 ## Primary Risks
 
-- A non-READY asset receiving a signed URL would defeat immediate access
-  revocation.
-- Two workers could attempt the same object delete without a conditional claim.
-- A storage failure could strand an asset in PENDING_DELETION without requeue.
+- The reset is irreversible and applies in every environment.
+- A forgotten legacy URL or anonymous policy would bypass feature authorization.
+- A stalled deletion queue must remain observable and retryable rather than
+  silently dropping object-cleanup evidence.
 
 ## Validation Gate
 
 Before story close, require:
 
-1. generated migration, model snapshot, and applied local PostgreSQL proof;
-2. domain and application proof for the state transitions, feature detach, and
-   successful/failed purge paths;
-3. hourly registration proof and full backend/frontend regression builds.
+1. generated irreversible migration, model snapshot, and applied local
+   PostgreSQL before/after counts;
+2. static contract scan and full backend/frontend regression builds;
+3. private MinIO bootstrap proof and scheduled queue registration;
+4. browser and live scheduled-drain proof before a production release.

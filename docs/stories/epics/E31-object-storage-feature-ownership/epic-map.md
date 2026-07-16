@@ -22,12 +22,10 @@ future S3-compatible adapter.
 
 ## Current Story
 
-`US-ASSET-007` is the smallest believable first slice because Avatar already
-has a complete upload/save UI and one feature-owned FK. It can prove the new
-storage seam, signed delivery, authorization, and browser behavior before the
-more complex Note association and archive concurrency work. The shared bucket
-cannot become private until US-ASSET-008 and US-ASSET-009 have eliminated their
-public URL dependencies; that policy activation remains US-ASSET-011.
+`US-ASSET-011` is the active release closeout. It owns the intentionally
+irreversible reset, removal of URL-era contracts, and private bucket activation
+after the earlier feature cutovers. Its final browser and live queue-drain proof
+must be captured before production release.
 
 ## Story Invariants
 

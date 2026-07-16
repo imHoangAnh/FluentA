@@ -105,7 +105,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
             {
                 var asset = await _dbContext.Assets.FirstOrDefaultAsync(
                     entity => entity.Id == countdown.CoverAssetId.Value
-                        && entity.UserId == countdown.UserId
+                        && entity.UploadedByUserId == countdown.UserId
                         && entity.DeletedAt == null,
                     cancellationToken);
 
@@ -140,6 +140,65 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     {
         var result = await _assetService.PurgeExpiredArchivedAsync(cancellationToken);
         _logger.LogInformation("ArchivedAssetPurgeJob claimed {Claimed} assets, deleted {Deleted}, failed {Failed}.", result.Claimed, result.Deleted, result.Failed);
+    }
+
+    public async Task DrainLegacyAssetDeletionQueueAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        await _assetStorage.EnsurePrivateBucketAsync(cancellationToken);
+
+        var candidates = await _dbContext.LegacyAssetDeletionQueue
+            .Where(item => item.Status == "pending")
+            .OrderBy(item => item.CreatedAt)
+            .Select(item => item.ObjectKey)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        var claimed = new List<string>();
+        foreach (var objectKey in candidates)
+        {
+            var updated = await _dbContext.LegacyAssetDeletionQueue
+                .Where(item => item.ObjectKey == objectKey && item.Status == "pending")
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.Status, "claimed")
+                    .SetProperty(item => item.ClaimedAt, now)
+                    .SetProperty(item => item.AttemptCount, item => item.AttemptCount + 1)
+                    .SetProperty(item => item.UpdatedAt, now), cancellationToken);
+            if (updated == 1)
+            {
+                claimed.Add(objectKey);
+            }
+        }
+
+        var deleted = 0;
+        var failed = 0;
+        foreach (var objectKey in claimed)
+        {
+            try
+            {
+                await _assetStorage.DeleteIfExistsAsync(objectKey, cancellationToken);
+                await _dbContext.LegacyAssetDeletionQueue
+                    .Where(item => item.ObjectKey == objectKey && item.Status == "claimed")
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(item => item.Status, "deleted")
+                        .SetProperty(item => item.DeletedAt, DateTime.UtcNow)
+                        .SetProperty(item => item.LastError, (string?)null)
+                        .SetProperty(item => item.UpdatedAt, DateTime.UtcNow), cancellationToken);
+                deleted++;
+            }
+            catch (AssetStorageUnavailableException exception)
+            {
+                await _dbContext.LegacyAssetDeletionQueue
+                    .Where(item => item.ObjectKey == objectKey && item.Status == "claimed")
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(item => item.Status, "pending")
+                        .SetProperty(item => item.LastError, exception.Message)
+                        .SetProperty(item => item.UpdatedAt, DateTime.UtcNow), cancellationToken);
+                failed++;
+            }
+        }
+
+        _logger.LogInformation("LegacyAssetDeletionQueueJob claimed {Claimed} objects, deleted {Deleted}, failed {Failed}.", claimed.Count, deleted, failed);
     }
 
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)

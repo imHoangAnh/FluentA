@@ -17,7 +17,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.Email).HasColumnName("email").HasMaxLength(320).IsRequired();
         builder.Property(user => user.FullName).HasColumnName("full_name").HasMaxLength(100).IsRequired();
         builder.Property(user => user.Bio).HasColumnName("bio").HasMaxLength(500).IsRequired();
-        builder.Property(user => user.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(2048);
         builder.Property(user => user.CurrentAvatarAssetId).HasColumnName("current_avatar_asset_id");
         builder.Property(user => user.PasswordHash).HasColumnName("password_hash").HasMaxLength(256);
         builder.Property(user => user.GoogleId).HasColumnName("google_id").HasMaxLength(128);

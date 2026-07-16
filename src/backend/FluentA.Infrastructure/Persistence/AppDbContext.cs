@@ -26,6 +26,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<LegacyAssetDeletionQueueItem> LegacyAssetDeletionQueue => Set<LegacyAssetDeletionQueueItem>();
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
     public DbSet<VocabWord> Words => Set<VocabWord>();

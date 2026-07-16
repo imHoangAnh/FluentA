@@ -318,9 +318,7 @@ public sealed class AuthServiceTests
             Guid.NewGuid(),
             login.Value!.User.Id,
             AssetType.Avatar,
-            "users/current/avatar-pending",
-            "https://cdn.example.com/avatar-pending.png",
-            "image/png",
+            "users/current/avatar-pending", "image/png",
             0,
             DateTime.UtcNow.AddHours(1));
         await assets.AddAsync(pendingAsset);
@@ -353,18 +351,17 @@ public sealed class AuthServiceTests
         Assert.Equal("VALIDATION_ERROR", error.Code);
     }
 
-    private static Asset CreateFinalizedAvatarAsset(Guid userId, string objectKey, string publicUrl)
+    private static Asset CreateFinalizedAvatarAsset(Guid userId, string objectKey, string ignoredLegacyValue)
     {
         var asset = Asset.CreatePending(
             Guid.NewGuid(),
             userId,
             AssetType.Avatar,
             objectKey,
-            publicUrl,
             "image/png",
             0,
             DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload(publicUrl, "image/png", 128);
+        asset.FinalizeUpload("image/png", 128);
         return asset;
     }
 
@@ -497,7 +494,7 @@ public sealed class AuthServiceTests
 
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(_assets.TryGetValue(assetId, out var asset) && asset.UserId == userId && asset.DeletedAt is null
+            return Task.FromResult(_assets.TryGetValue(assetId, out var asset) && asset.UploadedByUserId == userId && asset.DeletedAt is null
                 ? asset
                 : null);
         }
@@ -505,14 +502,14 @@ public sealed class AuthServiceTests
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
-                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
-                .Where(asset => asset.UserId == userId && asset.DeletedAt is null)
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null)
                 .OrderByDescending(asset => asset.CreatedAt)
                 .ToList());
         }
@@ -587,11 +584,6 @@ public sealed class AuthServiceTests
 
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-
-        public string GetPublicUrl(string objectKey)
-        {
-            return $"https://cdn.example.com/{objectKey}";
-        }
 
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {

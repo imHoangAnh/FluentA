@@ -12,8 +12,8 @@ public sealed class NoteContentProcessorTests
     public async Task ProcessAsync_PersistsOwnedReadyNoteImageReferencesWithoutSources()
     {
         var userId = Guid.NewGuid();
-        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/1", "https://cdn.example.com/1.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload("https://cdn.example.com/1.png", "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.NoteImage, "users/demo/note-image/1", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         var processor = new NoteContentProcessor(new FakeAssetRepository(asset));
 
         var result = await processor.ProcessAsync(
@@ -41,12 +41,12 @@ public sealed class NoteContentProcessorTests
     public async Task ProcessAsync_RejectsForeignOrNonFinalizedNoteImages()
     {
         var ownerId = Guid.NewGuid();
-        var asset = Asset.CreatePending(Guid.NewGuid(), Guid.NewGuid(), AssetType.NoteImage, "users/demo/note-image/2", "https://cdn.example.com/2.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
-        asset.FinalizeUpload("https://cdn.example.com/2.png", "image/png", 128);
+        var asset = Asset.CreatePending(Guid.NewGuid(), Guid.NewGuid(), AssetType.NoteImage, "users/demo/note-image/2", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
         var processor = new NoteContentProcessor(new FakeAssetRepository(asset));
 
         var exception = await Assert.ThrowsAsync<NoteContentValidationException>(() =>
-            processor.ProcessAsync(ownerId, $"<p><img src=\"{asset.PublicUrl}\" data-note-asset-id=\"{asset.Id}\"></p>"));
+            processor.ProcessAsync(ownerId, $"<p><img src=\"{"https://render.example/image.png"}\" data-note-asset-id=\"{asset.Id}\"></p>"));
 
         Assert.Contains("content", exception.Errors.Keys);
     }
@@ -73,19 +73,19 @@ public sealed class NoteContentProcessorTests
 
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(_assets.FirstOrDefault(asset => asset.Id == assetId && asset.UserId == userId && asset.DeletedAt is null));
+            return Task.FromResult(_assets.FirstOrDefault(asset => asset.Id == assetId && asset.UploadedByUserId == userId && asset.DeletedAt is null));
         }
 
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets
-                .Where(asset => asset.UserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
+                .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListOwnedAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Where(asset => asset.UserId == userId && asset.DeletedAt is null).ToList());
+            return Task.FromResult<IReadOnlyList<Asset>>(_assets.Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null).ToList());
         }
 
         public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)

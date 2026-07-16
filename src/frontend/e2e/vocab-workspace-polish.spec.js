@@ -5,7 +5,6 @@ const user = {
   email: 'workspace@fluenta.local',
   fullName: 'Workspace Learner',
   isEmailVerified: true,
-  avatarUrl: null,
 }
 
 const board = {

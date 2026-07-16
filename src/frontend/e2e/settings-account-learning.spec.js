@@ -44,7 +44,7 @@ test('Settings avatar uploads and renders through signed delivery without a dura
   expect(me.ok()).toBe(true)
   const profile = (await me.json()).data
   expect(profile.avatarDownloadUrl).toContain('X-Amz-Algorithm')
-  expect(profile).not.toHaveProperty('avatarUrl')
+  expect(profile).not.toHaveProperty('avatarImageUrl')
 
   await page.reload()
   await expect(page.locator('.settings-avatar-preview')).toHaveAttribute('src', /X-Amz-Algorithm/)

@@ -25,7 +25,7 @@ type JournalRichTextEditorProps = {
   content: string
   onChange: (html: string) => void
   onBlur?: () => void
-  onImageFiles?: (files: File[]) => Promise<Array<{ id: string; publicUrl: string; alt?: string }>>
+  onImageFiles?: (files: File[]) => Promise<Array<{ id: string; displayUrl: string; alt?: string }>>
   onImageUploadError?: (message: string) => void
 }
 
@@ -90,7 +90,7 @@ export function JournalRichTextEditor({
       }
 
       const html = uploads.map((upload) =>
-        `<p><img src="${upload.publicUrl}" alt="${escapeHtml(upload.alt ?? '')}" data-note-asset-id="${upload.id}" /></p>`).join('')
+        `<p><img src="${upload.displayUrl}" alt="${escapeHtml(upload.alt ?? '')}" data-note-asset-id="${upload.id}" /></p>`).join('')
       insertHtml(html)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Image upload failed.'

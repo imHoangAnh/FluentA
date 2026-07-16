@@ -20,12 +20,13 @@ adds `note-image` as shared image asset types.
   when an owned Note page attaches it through the Note feature.
 - Ready avatar assets are rendered through a short-lived signed download URL
   after the authenticated profile save links the asset as the current avatar.
-- The authenticated user can list saved owned avatar assets and delete any of
-  them from Settings.
 
 ## Ownership And Lifecycle Rules
 
-- Assets are owned by the authenticated user only.
+- Assets record `uploaded_by_user_id` for upload authorization and audit; the
+  owning feature relationship is authoritative after attachment.
+- The MinIO bucket is private. No durable provider, public, CDN, or presigned
+  URL is stored in PostgreSQL.
 - Supported `assetType` values are `avatar`, `countdown-cover`, and
   `note-image`.
 - Presign creates a `pending-upload` asset record with a 1-hour expiry and
@@ -39,20 +40,12 @@ adds `note-image` as shared image asset types.
   as the countdown cover during create only; an active cover asset cannot be
   attached to another active Countdown.
 - Authorized Countdown reads return a five-minute `coverDownloadUrl` and its
-  expiry rather than the asset's stored public URL.
+  expiry.
 - A Note page may link many ready owned `note-image` assets through
   `note_page_assets`; each image asset may belong to one active Note page only.
 - Note page persistence contains the durable asset id but never a provider or
   signed image URL. An authorized Note-page read hydrates a five-minute signed
   URL in memory for rendering.
-- `GET /api/v1/assets?assetType=avatar` returns the authenticated user's
-  non-deleted owned avatar assets, newest first, flags the current profile
-  avatar, and includes an authorized short-lived `downloadUrl` only for ready
-  avatar assets.
-- `DELETE /api/v1/assets/{assetId}` archives the owned ready avatar asset for
-  30 days; it never performs the object delete on the request path.
-- Deleting the current avatar asset clears the profile's current asset link and
-  archives the retired asset for 30 days.
 - Replacing or removing the current avatar archives the retired owned asset
   metadata after the durable profile update succeeds.
 - Pending avatar uploads that are never finalized expire after 1 hour and are
@@ -68,13 +61,13 @@ adds `note-image` as shared image asset types.
 ## Persistence Rules
 
 - Shared asset metadata is stored in PostgreSQL `assets`.
-- Each new row stores `user_id` (transitioning to `uploaded_by_user_id` in the
-  coordinated release), `bucket`, `asset_type`, `status`, `object_key`,
+- Each new row stores `uploaded_by_user_id`, `bucket`, `asset_type`, `status`,
+  `object_key`,
   sanitized `original_name`, `content_type`, `size_bytes`, optional
   `expires_at`, `archived_at`, and `purge_after_at`.
-- The legacy `public_url` column remains internal only while Notes and
-  Countdown finish their cutovers. US-ASSET-011 removes it; Avatar API DTOs
-  and profile responses must not use it.
+- The destructive E31 release resets pre-release asset rows and feature links,
+  records their object keys in `legacy_asset_deletion_queue`, and removes the
+  retired URL-era columns. The queue retries asynchronous object deletion.
 - `auth_users.current_avatar_asset_id` points at the owned finalized avatar
   asset currently displayed by the profile.
 - `note_page_assets.note_page_id` and `note_page_assets.asset_id` are durable
@@ -97,8 +90,6 @@ All responses use the FluentA envelope.
 | --- | --- | --- |
 | `POST` | `/api/v1/assets/presign` | Creates a pending owned image asset and returns a presigned direct-upload target. Requires asset type, content type, original file name, and claimed size. |
 | `POST` | `/api/v1/assets/finalize` | Verifies the uploaded MinIO object for an owned pending asset and marks it ready. |
-| `GET` | `/api/v1/assets?assetType=avatar` | Lists the authenticated user's saved owned avatar assets and marks the current profile avatar. |
-| `DELETE` | `/api/v1/assets/{assetId}` | Deletes an owned avatar asset, clearing the current profile avatar if that asset was active. |
 | `PUT` | `/api/v1/profile` | Links or removes the current owned finalized avatar asset after explicit Settings-page save. |
 
 ## Validation And Error Rules
@@ -114,8 +105,6 @@ All responses use the FluentA envelope.
   has expired.
 - Finalize returns `422 ASSET_UPLOAD_INVALID` when the MinIO object is missing,
   has the wrong content type, is empty, or exceeds 2MB.
-- Delete returns `404 ASSET_NOT_FOUND` when the selected asset does not exist
-  or is not owned by the authenticated user.
 - `PUT /api/v1/profile` returns `404 ASSET_NOT_FOUND` when the selected avatar
   asset is not owned by the authenticated user or does not exist.
 - `PUT /api/v1/profile` returns `409 AVATAR_ASSET_INVALID` when the selected
@@ -136,9 +125,6 @@ All responses use the FluentA envelope.
 - The finalized asset row is durable in PostgreSQL, remains owned by the
   authenticated user, and can become the current profile avatar through
   explicit Settings-page save.
-- The authenticated user can list saved avatar assets, delete a non-current
-  avatar asset without affecting the profile, and delete the current avatar
-  asset while the profile clears back to no avatar.
 - Replacing or removing the current avatar archives the old owned avatar asset
   for 30 days and leaves the profile on the new authorized signed URL or no
   avatar.
