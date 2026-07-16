@@ -94,8 +94,8 @@ All responses use the FluentA envelope.
   `data-note-asset-id` reference. It never stores a public, provider, or
   signed URL.
 - When a saved Note image disappears from the next saved Note content, its
-  `note_page_assets` association is removed in the same save. The ready asset
-  is retained until US-ASSET-010 archives and purges unreferenced assets.
+  `note_page_assets` association is removed and its ready asset is archived in
+  the same save. Archived objects are purged asynchronously after 30 days.
 
 ## Deferred Integration
 

@@ -101,8 +101,6 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         var retired = 0;
         foreach (var countdown in countdowns.Where(countdown => countdown.ShouldRetireAt(now)))
         {
-            countdown.SoftDelete(now);
-
             if (countdown.CoverAssetId.HasValue)
             {
                 var asset = await _dbContext.Assets.FirstOrDefaultAsync(
@@ -113,19 +111,12 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
                 if (asset is not null)
                 {
-                    asset.MarkDeleted(now);
-                    if (asset.Status == AssetStatus.Deleted)
-                    {
-                        try
-                        {
-                            await _assetStorage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
-                        }
-                        catch (AssetStorageUnavailableException)
-                        {
-                        }
-                    }
+                    asset.Archive(now, TimeSpan.FromDays(30));
                 }
             }
+
+            countdown.DetachCover();
+            countdown.SoftDelete(now);
 
             retired++;
             _logger.LogInformation("Countdown retirement queued for user {UserId}, countdown {CountdownId}.", countdown.UserId, countdown.Id);
@@ -143,6 +134,12 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     {
         var cleaned = await _assetService.CleanupExpiredPendingAsync(cancellationToken);
         _logger.LogInformation("PendingAssetCleanupJob retired {Count} expired pending assets.", cleaned);
+    }
+
+    public async Task PurgeExpiredArchivedAssetsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await _assetService.PurgeExpiredArchivedAsync(cancellationToken);
+        _logger.LogInformation("ArchivedAssetPurgeJob claimed {Claimed} assets, deleted {Deleted}, failed {Failed}.", result.Claimed, result.Deleted, result.Failed);
     }
 
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)

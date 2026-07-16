@@ -244,7 +244,7 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task UpdateProfile_ReplacesCurrentAvatarAndDeletesOldObject()
+    public async Task UpdateProfile_ReplacesCurrentAvatarAndArchivesOldObject()
     {
         var (service, _, _, users, assets, assetStorage) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
@@ -270,14 +270,14 @@ public sealed class AuthServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(secondAvatar.Id, result.Value!.AvatarAssetId);
         Assert.NotNull(result.Value.AvatarDownloadUrl);
-        Assert.Equal(AssetStatus.Deleted, firstAvatar.Status);
-        Assert.Contains(firstAvatar.ObjectKey, assetStorage.DeletedObjectKeys);
+        Assert.Equal(AssetStatus.Archived, firstAvatar.Status);
+        Assert.DoesNotContain(firstAvatar.ObjectKey, assetStorage.DeletedObjectKeys);
         var user = await users.GetByIdAsync(userId);
         Assert.Equal(secondAvatar.Id, user!.CurrentAvatarAssetId);
     }
 
     [Fact]
-    public async Task UpdateProfile_RemoveAvatarClearsCurrentAvatarAndDeletesOwnedAsset()
+    public async Task UpdateProfile_RemoveAvatarClearsCurrentAvatarAndArchivesOwnedAsset()
     {
         var (service, _, _, users, assets, assetStorage) = CreateService();
         var registration = await service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "FluentA Learner"));
@@ -301,8 +301,8 @@ public sealed class AuthServiceTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.AvatarAssetId);
         Assert.Null(result.Value.AvatarDownloadUrl);
-        Assert.Equal(AssetStatus.Deleted, avatarAsset.Status);
-        Assert.Contains(avatarAsset.ObjectKey, assetStorage.DeletedObjectKeys);
+        Assert.Equal(AssetStatus.Archived, avatarAsset.Status);
+        Assert.DoesNotContain(avatarAsset.ObjectKey, assetStorage.DeletedObjectKeys);
         var user = await users.GetByIdAsync(userId);
         Assert.Null(user!.CurrentAvatarAssetId);
     }

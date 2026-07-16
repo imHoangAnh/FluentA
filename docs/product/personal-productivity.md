@@ -176,8 +176,8 @@ All responses use the FluentA envelope.
 - Manual countdown delete cancels future unfired alerts, while already created
   notifications stay in the inbox.
 - Completed countdowns auto-retire seven days after `target_date`.
-- Manual delete detaches a linked cover asset. US-ASSET-010 owns its later
-  archive and physical purge lifecycle.
+- Manual delete detaches and archives a linked ready cover asset. Its object
+  is purged asynchronously after the 30-day archive retention period.
 
 ## Habit Foundation Outcomes
 

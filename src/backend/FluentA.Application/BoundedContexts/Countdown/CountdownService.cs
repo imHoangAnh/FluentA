@@ -76,6 +76,15 @@ public sealed class CountdownService : ICountdownService
             return OperationResult<bool>.Failure(CountdownError.NotFound());
         }
 
+        if (countdown.CoverAssetId.HasValue && _assets is not null)
+        {
+            var cover = await _assets.GetOwnedAsync(userId, countdown.CoverAssetId.Value, cancellationToken);
+            if (cover is not null && cover.Type == AssetType.CountdownCover && cover.Status == AssetStatus.Ready)
+            {
+                cover.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
+            }
+        }
+
         countdown.DetachCover();
         countdown.SoftDelete();
         await _repository.UpdateAsync(countdown, cancellationToken);

@@ -86,6 +86,19 @@ public sealed class NoteService : INoteService
             return OperationResult<bool>.Failure(NoteError.BoardNotFound());
         }
 
+        var pageIds = board.Pages.Where(page => page.DeletedAt is null).Select(page => page.Id).ToArray();
+        var assetIds = new HashSet<Guid>();
+        foreach (var pageId in pageIds)
+        {
+            assetIds.UnionWith(await _repository.GetPageAssetIdsAsync(pageId, cancellationToken));
+        }
+
+        var assets = await _assets.GetOwnedAsync(userId, assetIds.ToArray(), cancellationToken);
+        foreach (var asset in assets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
+        {
+            asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
+        }
+
         await _repository.SoftDeleteBoardAsync(board, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
@@ -154,6 +167,7 @@ public sealed class NoteService : INoteService
 
         if (request.Content is not null)
         {
+            var existingAssetIds = await _repository.GetPageAssetIdsAsync(page.Id, cancellationToken);
             NoteProcessedContent processedContent;
             try
             {
@@ -175,6 +189,13 @@ public sealed class NoteService : INoteService
 
             page.UpdateContent(processedContent.Html);
             await _repository.ReplacePageAssetLinksAsync(page.Id, processedContent.ReferencedAssetIds, cancellationToken);
+
+            var removedAssetIds = existingAssetIds.Except(processedContent.ReferencedAssetIds).ToArray();
+            var removedAssets = await _assets.GetOwnedAsync(userId, removedAssetIds, cancellationToken);
+            foreach (var removedAsset in removedAssets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
+            {
+                removedAsset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
+            }
         }
 
         await _repository.UpdatePageAsync(page, cancellationToken);
@@ -192,6 +213,13 @@ public sealed class NoteService : INoteService
         if (page is null)
         {
             return OperationResult<bool>.Failure(NoteError.PageNotFound());
+        }
+
+        var assetIds = await _repository.GetPageAssetIdsAsync(page.Id, cancellationToken);
+        var assets = await _assets.GetOwnedAsync(userId, assetIds.ToArray(), cancellationToken);
+        foreach (var asset in assets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
+        {
+            asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
         }
 
         await _repository.SoftDeletePageAsync(page, cancellationToken);

@@ -62,6 +62,8 @@ public sealed class Asset : BaseEntity, IAggregateRoot
     public DateTime? ExpiresAt { get; private set; }
     public string? Bucket { get; private set; }
     public string? OriginalName { get; private set; }
+    public DateTime? ArchivedAt { get; private set; }
+    public DateTime? PurgeAfterAt { get; private set; }
 
     public static Asset CreatePending(
         Guid assetId,
@@ -124,6 +126,46 @@ public sealed class Asset : BaseEntity, IAggregateRoot
 
         Status = AssetStatus.Deleted;
         DeletedAt = nowUtc;
+        UpdatedAt = nowUtc;
+    }
+
+    public void Archive(DateTime nowUtc, TimeSpan retention)
+    {
+        if (Status != AssetStatus.Ready)
+        {
+            throw new InvalidOperationException("Only ready assets can be archived.");
+        }
+
+        if (retention <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(retention));
+        }
+
+        Status = AssetStatus.Archived;
+        ArchivedAt = nowUtc;
+        PurgeAfterAt = nowUtc.Add(retention);
+        UpdatedAt = nowUtc;
+    }
+
+    public void ClaimPurge(DateTime nowUtc)
+    {
+        if (Status != AssetStatus.Archived || !PurgeAfterAt.HasValue || PurgeAfterAt.Value > nowUtc)
+        {
+            throw new InvalidOperationException("Only due archived assets can be claimed for purge.");
+        }
+
+        Status = AssetStatus.PendingDeletion;
+        UpdatedAt = nowUtc;
+    }
+
+    public void RequeuePurge(DateTime nowUtc)
+    {
+        if (Status != AssetStatus.PendingDeletion)
+        {
+            throw new InvalidOperationException("Only claimed assets can be requeued.");
+        }
+
+        Status = AssetStatus.Archived;
         UpdatedAt = nowUtc;
     }
 

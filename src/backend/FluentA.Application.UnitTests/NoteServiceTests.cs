@@ -92,7 +92,7 @@ public sealed class NoteServiceTests
     }
 
     [Fact]
-    public async Task UpdatePage_DetachesRemovedNoteImagesWithoutDeletingTheAssetBeforeArchiveLifecycle()
+    public async Task UpdatePage_ArchivesRemovedNoteImages()
     {
         var repository = new FakeNoteRepository();
         var assets = new FakeAssetRepository();
@@ -108,11 +108,11 @@ public sealed class NoteServiceTests
         var updated = await service.UpdatePageAsync(userId, page.Value.Id, new UpdateNotePageRequest(Content: "<p>Removed image</p>"));
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(AssetStatus.Ready, asset.Status);
+        Assert.Equal(AssetStatus.Archived, asset.Status);
     }
 
     [Fact]
-    public async Task UpdatePage_KeepsRemovedImageAlive_WhenAnotherOwnedPageStillReferencesIt()
+    public async Task UpdatePage_ArchivesRemovedImageAfterTheExclusiveAttachmentIsDetached()
     {
         var repository = new FakeNoteRepository();
         var assets = new FakeAssetRepository();
@@ -131,7 +131,7 @@ public sealed class NoteServiceTests
         var updated = await service.UpdatePageAsync(userId, first.Value.Id, new UpdateNotePageRequest(Content: "<p>Removed from first</p>"));
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(AssetStatus.Ready, asset.Status);
+        Assert.Equal(AssetStatus.Archived, asset.Status);
     }
 
     [Fact]

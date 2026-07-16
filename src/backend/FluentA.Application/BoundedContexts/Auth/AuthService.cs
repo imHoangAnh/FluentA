@@ -356,7 +356,7 @@ public sealed partial class AuthService : IAuthService
 
         if (retiringCurrentAvatarAsset)
         {
-            currentAvatarAsset!.MarkDeleted(DateTime.UtcNow);
+            currentAvatarAsset!.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
         }
 
         try
@@ -373,11 +373,6 @@ public sealed partial class AuthService : IAuthService
 
             user.UpdateProfile(originalName, originalBio, originalAvatarUrl, originalCurrentAvatarAssetId);
             throw;
-        }
-
-        if (retiringCurrentAvatarAsset)
-        {
-            await TryDeleteAssetObjectAsync(currentAvatarAsset!.ObjectKey, cancellationToken);
         }
 
         return OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));

@@ -193,7 +193,7 @@ public sealed class AssetService : IAssetService
         }
 
         var wasCurrentAvatar = user.CurrentAvatarAssetId == asset.Id;
-        asset.MarkDeleted(DateTime.UtcNow);
+        asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
 
         if (wasCurrentAvatar)
         {
@@ -204,8 +204,6 @@ public sealed class AssetService : IAssetService
         {
             await _assets.UpdateAsync(asset, cancellationToken);
         }
-
-        await TryDeleteUploadedObjectAsync(asset.ObjectKey, cancellationToken);
 
         return OperationResult<bool>.Success(true);
     }
@@ -231,6 +229,32 @@ public sealed class AssetService : IAssetService
         }
 
         return cleaned;
+    }
+
+    public async Task<AssetPurgeResult> PurgeExpiredArchivedAsync(CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var claimed = await _assets.ClaimDueArchivedAsync(nowUtc, 100, cancellationToken);
+        var deleted = 0;
+        var failed = 0;
+        foreach (var asset in claimed)
+        {
+            try
+            {
+                await _storage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
+                asset.MarkDeleted(DateTime.UtcNow);
+                await _assets.UpdateAsync(asset, cancellationToken);
+                deleted++;
+            }
+            catch (AssetStorageUnavailableException)
+            {
+                asset.RequeuePurge(DateTime.UtcNow);
+                await _assets.UpdateAsync(asset, cancellationToken);
+                failed++;
+            }
+        }
+
+        return new AssetPurgeResult(claimed.Count, deleted, failed);
     }
 
     private static Dictionary<string, string[]> ValidatePresignRequest(PresignAssetRequest request)

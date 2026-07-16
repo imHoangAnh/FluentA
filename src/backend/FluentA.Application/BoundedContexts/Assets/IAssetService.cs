@@ -9,4 +9,5 @@ public interface IAssetService
     Task<OperationResult<AssetDto>> FinalizeAsync(Guid userId, FinalizeAssetRequest request, CancellationToken cancellationToken = default);
     Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default);
     Task<int> CleanupExpiredPendingAsync(CancellationToken cancellationToken = default);
+    Task<AssetPurgeResult> PurgeExpiredArchivedAsync(CancellationToken cancellationToken = default);
 }

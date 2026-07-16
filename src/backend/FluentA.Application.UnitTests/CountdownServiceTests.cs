@@ -79,7 +79,7 @@ public sealed class CountdownServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_SoftDeletesOwnedCountdownAndDetachesItsReadyCover()
+    public async Task DeleteAsync_SoftDeletesOwnedCountdownAndArchivesItsCover()
     {
         var repository = new FakeCountdownRepository();
         var assets = new FakeAssetRepository();
@@ -98,7 +98,7 @@ public sealed class CountdownServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(countdownEvent.DeletedAt);
         Assert.Null(countdownEvent.CoverAssetId);
-        Assert.Equal(AssetStatus.Ready, asset.Status);
+        Assert.Equal(AssetStatus.Archived, asset.Status);
         Assert.Null(storage.DeletedObjectKey);
     }
 

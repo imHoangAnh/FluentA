@@ -10,6 +10,7 @@ public static class RecurringJobRegistration
     public const string CountdownAlertId = "countdown-alerts";
     public const string CountdownRetirementId = "countdown-retirement";
     public const string PendingAssetCleanupId = "pending-asset-cleanup";
+    public const string ArchivedAssetPurgeId = "archived-asset-purge";
     public const string DatabaseCleanupId = "database-cleanup";
 
     public static void Register(IRecurringJobManager jobs)
@@ -24,6 +25,8 @@ public static class RecurringJobRegistration
             CountdownRetirementId, job => job.CleanupRetiredCountdownsAsync(CancellationToken.None), "10 0 * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             PendingAssetCleanupId, job => job.CleanupExpiredPendingAssetsAsync(CancellationToken.None), "15 * * * *");
+        jobs.AddOrUpdate<IScheduledProductivityJobs>(
+            ArchivedAssetPurgeId, job => job.PurgeExpiredArchivedAssetsAsync(CancellationToken.None), "30 * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             DatabaseCleanupId, job => job.CleanupDeletedRecordsAsync(CancellationToken.None), "0 2 * * 0");
     }

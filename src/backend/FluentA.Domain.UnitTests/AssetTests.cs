@@ -49,6 +49,26 @@ public sealed class AssetTests
     }
 
     [Fact]
+    public void ReadyAsset_ArchivesClaimsRequeuesAndPurges()
+    {
+        var now = new DateTime(2026, 7, 17, 10, 0, 0, DateTimeKind.Utc);
+        var asset = Asset.CreatePending(Guid.NewGuid(), Guid.NewGuid(), AssetType.Avatar, "avatars/users/demo/avatar.png", "https://storage.example/avatar.png", "image/png", 0, now.AddHours(1));
+        asset.FinalizeUpload("https://storage.example/avatar.png", "image/png", 100);
+
+        asset.Archive(now, TimeSpan.FromDays(30));
+        Assert.Equal(AssetStatus.Archived, asset.Status);
+        Assert.Equal(now.AddDays(30), asset.PurgeAfterAt);
+        Assert.Throws<InvalidOperationException>(() => asset.ClaimPurge(now.AddDays(29)));
+
+        asset.ClaimPurge(now.AddDays(30));
+        asset.RequeuePurge(now.AddDays(30));
+        asset.ClaimPurge(now.AddDays(30));
+        asset.MarkDeleted(now.AddDays(30));
+
+        Assert.Equal(AssetStatus.Deleted, asset.Status);
+    }
+
+    [Fact]
     public void User_CurrentAvatarAssetLinkCanBeSetAndCleared()
     {
         var user = User.CreateWithPassword("learner@example.com", "Learner", "hash");

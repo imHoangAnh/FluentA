@@ -149,7 +149,7 @@ public sealed class AssetServiceTests
     }
 
     [Fact]
-    public async Task Delete_ClearsCurrentAvatarAndDeletesObject()
+    public async Task Delete_ClearsCurrentAvatarAndArchivesObject()
     {
         var repository = new FakeAssetRepository();
         var storage = new FakeAssetObjectStorage();
@@ -164,8 +164,8 @@ public sealed class AssetServiceTests
         var result = await service.DeleteAsync(user.Id, asset.Id);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(AssetStatus.Deleted, asset.Status);
-        Assert.Equal(asset.ObjectKey, storage.DeletedObjectKey);
+        Assert.Equal(AssetStatus.Archived, asset.Status);
+        Assert.Null(storage.DeletedObjectKey);
         Assert.Null(user.CurrentAvatarAssetId);
         Assert.Null(user.AvatarUrl);
     }
@@ -208,6 +208,30 @@ public sealed class AssetServiceTests
         Assert.Equal(2, storage.DeletedObjectKeys.Count);
         Assert.Contains(pending.ObjectKey, storage.DeletedObjectKeys);
         Assert.Contains(expired.ObjectKey, storage.DeletedObjectKeys);
+    }
+
+    [Fact]
+    public async Task PurgeExpiredArchived_DeletesClaimedObjectsAndRequeuesFailures()
+    {
+        var repository = new FakeAssetRepository();
+        var storage = new FakeAssetObjectStorage();
+        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var success = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/success");
+        var failed = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/failed");
+        var due = DateTime.UtcNow.AddDays(-31);
+        success.Archive(due, TimeSpan.FromDays(30));
+        failed.Archive(due, TimeSpan.FromDays(30));
+        await repository.AddAsync(success);
+        await repository.AddAsync(failed);
+        storage.FailObjectKey = failed.ObjectKey;
+
+        var result = await service.PurgeExpiredArchivedAsync();
+
+        Assert.Equal(2, result.Claimed);
+        Assert.Equal(1, result.Deleted);
+        Assert.Equal(1, result.Failed);
+        Assert.Equal(AssetStatus.Deleted, success.Status);
+        Assert.Equal(AssetStatus.Archived, failed.Status);
     }
 
     private static Asset CreateFinalizedAsset(Guid userId, string objectKey)
@@ -267,6 +291,13 @@ public sealed class AssetServiceTests
                 .ToList());
         }
 
+        public Task<IReadOnlyList<Asset>> ClaimDueArchivedAsync(DateTime nowUtc, int batchSize, CancellationToken cancellationToken = default)
+        {
+            var claimed = Assets.Where(asset => asset.Status == AssetStatus.Archived && asset.PurgeAfterAt <= nowUtc).Take(batchSize).ToList();
+            foreach (var asset in claimed) asset.ClaimPurge(nowUtc);
+            return Task.FromResult<IReadOnlyList<Asset>>(claimed);
+        }
+
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default)
         {
             if (FailOnUpdate)
@@ -284,6 +315,7 @@ public sealed class AssetServiceTests
         public byte[] Prefix { get; set; } = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
         public string? DeletedObjectKey { get; private set; }
         public List<string> DeletedObjectKeys { get; } = [];
+        public string? FailObjectKey { get; set; }
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
         {
@@ -308,6 +340,7 @@ public sealed class AssetServiceTests
 
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            if (objectKey == FailObjectKey) throw new AssetStorageUnavailableException("Simulated storage failure.");
             DeletedObjectKey = objectKey;
             DeletedObjectKeys.Add(objectKey);
             return Task.CompletedTask;

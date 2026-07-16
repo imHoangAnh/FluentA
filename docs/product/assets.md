@@ -49,27 +49,29 @@ adds `note-image` as shared image asset types.
   non-deleted owned avatar assets, newest first, flags the current profile
   avatar, and includes an authorized short-lived `downloadUrl` only for ready
   avatar assets.
-- `DELETE /api/v1/assets/{assetId}` soft-deletes the owned asset metadata and
-  performs best-effort object deletion.
-- Deleting the current avatar asset also clears the profile's
-  `current_avatar_asset_id` and `avatar_url`.
-- Replacing or removing the current avatar soft-deletes the retired owned
-  avatar asset metadata after the durable profile update succeeds.
+- `DELETE /api/v1/assets/{assetId}` archives the owned ready avatar asset for
+  30 days; it never performs the object delete on the request path.
+- Deleting the current avatar asset clears the profile's current asset link and
+  archives the retired asset for 30 days.
+- Replacing or removing the current avatar archives the retired owned asset
+  metadata after the durable profile update succeeds.
 - Pending avatar uploads that are never finalized expire after 1 hour and are
   cleaned automatically by a recurring cleanup job.
-- Deleting a Countdown clears its cover FK immediately. The detached ready
-  asset remains retained until US-ASSET-010 owns its archive/purge transition.
-- Removing a Note image or deleting its page detaches its `note_page_assets`
-  row immediately. The ready asset remains retained until the archive/purge
-  lifecycle in US-ASSET-010 owns its transition.
+- Deleting a Countdown clears its cover FK and archives its detached ready
+  cover asset in the same durable write.
+- Removing a Note image, deleting its page/board, or deleting a Countdown
+  detaches its feature relationship and archives its ready asset immediately.
+- Archived assets cannot receive a download URL, retain their object for 30
+  days, then an hourly job claims and purges them asynchronously. Storage
+  failures return the claim to `ARCHIVED` for retry.
 
 ## Persistence Rules
 
 - Shared asset metadata is stored in PostgreSQL `assets`.
 - Each new row stores `user_id` (transitioning to `uploaded_by_user_id` in the
   coordinated release), `bucket`, `asset_type`, `status`, `object_key`,
-  sanitized `original_name`, `content_type`, `size_bytes`, and optional
-  `expires_at`.
+  sanitized `original_name`, `content_type`, `size_bytes`, optional
+  `expires_at`, `archived_at`, and `purge_after_at`.
 - The legacy `public_url` column remains internal only while Notes and
   Countdown finish their cutovers. US-ASSET-011 removes it; Avatar API DTOs
   and profile responses must not use it.
@@ -81,7 +83,7 @@ adds `note-image` as shared image asset types.
 - The shipped runtime no longer stores any provider-specific avatar identifier
   on `auth_users`.
 - When a new finalized avatar replaces the current one, the retired asset row
-  is soft-deleted and the user record points at the replacement asset.
+  is archived for 30 days and the user record points at the replacement asset.
 - Cleanup treats expired pending avatar rows as soft-deleted metadata after
   best-effort MinIO object deletion.
 
@@ -137,7 +139,8 @@ All responses use the FluentA envelope.
 - The authenticated user can list saved avatar assets, delete a non-current
   avatar asset without affecting the profile, and delete the current avatar
   asset while the profile clears back to no avatar.
-- Replacing or removing the current avatar retires the old owned avatar asset
-  metadata and leaves the profile on the new durable avatar URL or no avatar.
+- Replacing or removing the current avatar archives the old owned avatar asset
+  for 30 days and leaves the profile on the new authorized signed URL or no
+  avatar.
 - An abandoned pending avatar upload is eventually removed from both MinIO and
   PostgreSQL metadata by the scheduled cleanup job.

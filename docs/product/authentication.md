@@ -58,7 +58,8 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - The shipped avatar runtime no longer stores or depends on any
   Cloudinary-specific profile identifier.
 - Deleting the current avatar asset clears both `current_avatar_asset_id` and
-  `avatar_url` inside the same durable profile/asset write.
+  `avatar_url` and archives the asset for 30 days inside the same durable
+  profile/asset write. Archived assets cannot receive a download URL.
 - Redis stores FluentA refresh sessions, email verification challenges, and password reset challenges; Google refresh tokens are not stored.
 
 ## API Contract
@@ -187,9 +188,9 @@ All responses use the FluentA envelope:
 - The shared asset API can presign an avatar upload, reject finalize before
   upload, and finalize the uploaded object after MinIO metadata verification.
 - Replacing or removing the current avatar clears or rewires
-  `current_avatar_asset_id`, soft-deletes the retired avatar asset metadata,
+  `current_avatar_asset_id`, archives the retired avatar asset for 30 days,
   and leaves Settings plus other authenticated identity surfaces on the new
-  durable avatar URL.
+  authorized signed avatar URL.
 - Abandoned pending avatar uploads are cleaned from MinIO plus shared metadata
   by the recurring asset cleanup job.
 - Build and config proof show the shipped avatar path no longer registers or
