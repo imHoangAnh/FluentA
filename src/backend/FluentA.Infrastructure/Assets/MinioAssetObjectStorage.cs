@@ -38,6 +38,21 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
         return new AssetPresignedUpload(url, expiresAtUtc);
     }
 
+    public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request)
+    {
+        var expiresAtUtc = DateTime.UtcNow.Add(request.Lifetime);
+        var url = _client.GetPreSignedURL(new GetPreSignedUrlRequest
+        {
+            BucketName = _options.Bucket,
+            Key = request.ObjectKey,
+            Verb = HttpVerb.GET,
+            Protocol = _presignProtocol,
+            Expires = expiresAtUtc
+        });
+
+        return new AssetPresignedDownload(url, expiresAtUtc);
+    }
+
     public async Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
     {
         try
@@ -53,6 +68,31 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
                 response.ContentLength,
                 response.Headers.ContentType ?? "application/octet-stream",
                 response.ETag);
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default)
+    {
+        if (maxBytes is < 1 or > 4096)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        }
+
+        try
+        {
+            using var response = await _client.GetObjectAsync(new GetObjectRequest
+            {
+                BucketName = _options.Bucket,
+                Key = objectKey,
+                ByteRange = new ByteRange(0, maxBytes - 1)
+            }, cancellationToken);
+            using var buffer = new MemoryStream();
+            await response.ResponseStream.CopyToAsync(buffer, cancellationToken);
+            return buffer.ToArray();
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

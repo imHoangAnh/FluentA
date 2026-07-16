@@ -64,7 +64,7 @@ export function SettingsPage() {
         ...current,
         fullName: profile.fullName,
         bio: profile.bio ?? '',
-        avatarUrl: profile.avatarUrl ?? null,
+        avatarUrl: profile.avatarDownloadUrl ?? profile.avatarUrl ?? null,
         avatarFile: null,
         avatarAssetId: null,
         removeAvatar: false,
@@ -118,7 +118,7 @@ export function SettingsPage() {
       fullName: settingsQuery.data.profile.fullName,
       email: settingsQuery.data.profile.email,
       bio: settingsQuery.data.profile.bio ?? '',
-      avatarUrl: settingsQuery.data.profile.avatarUrl ?? null,
+      avatarUrl: settingsQuery.data.profile.avatarDownloadUrl ?? settingsQuery.data.profile.avatarUrl ?? null,
       avatarFile: null,
       avatarAssetId: null,
       removeAvatar: false,
@@ -235,7 +235,7 @@ export function SettingsPage() {
             {ownedAssets.map((asset) => (
               <article key={asset.id} className="settings-asset-card">
                 {asset.status === 'finalized' ? (
-                  <img className="settings-asset-thumb" src={asset.publicUrl} alt="Saved avatar" />
+                  <img className="settings-asset-thumb" src={asset.downloadUrl ?? asset.publicUrl} alt="Saved avatar" />
                 ) : (
                   <div className="settings-asset-thumb settings-asset-thumb--placeholder">{asset.status}</div>
                 )}

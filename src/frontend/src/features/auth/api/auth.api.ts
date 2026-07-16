@@ -8,6 +8,9 @@ export type UserProfile = {
   isEmailVerified: boolean
   bio?: string | null
   avatarUrl?: string | null
+  avatarAssetId?: string | null
+  avatarDownloadUrl?: string | null
+  avatarDownloadUrlExpiresAtUtc?: string | null
 }
 
 export type AuthPayload = {

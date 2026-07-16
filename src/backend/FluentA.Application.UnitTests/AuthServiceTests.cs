@@ -574,10 +574,16 @@ public sealed class AuthServiceTests
             return new AssetPresignedUpload($"https://upload.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
         }
 
+        public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) =>
+            new($"https://download.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
+
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<AssetObjectMetadata?>(new AssetObjectMetadata(objectKey, 128, "image/png", "etag"));
         }
+
+        public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<byte[]?>([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
         public string GetPublicUrl(string objectKey)
         {

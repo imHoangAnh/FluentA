@@ -12,6 +12,8 @@ export type OwnedAvatarAsset = {
   createdAtUtc: string
   updatedAtUtc: string
   isCurrentAvatar: boolean
+  downloadUrl?: string | null
+  downloadUrlExpiresAtUtc?: string | null
 }
 
 type PresignedAvatarUpload = {
@@ -32,7 +34,7 @@ export async function deleteAvatarAsset(assetId: string) {
 
 export async function uploadAvatarAsset(file: File) {
   const presigned = await apiClient.post<ApiEnvelope<PresignedAvatarUpload>>('/assets/presign', {
-    assetType: 'avatar', contentType: file.type,
+    assetType: 'avatar', contentType: file.type, originalName: file.name, sizeBytes: file.size,
   })
   const target = presigned.data.data!
   const upload = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: { 'Content-Type': file.type }, body: file })

@@ -166,7 +166,9 @@ public sealed class CountdownServiceTests
         public string? DeletedObjectKey { get; private set; }
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request) => throw new NotSupportedException();
+        public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) => throw new NotSupportedException();
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public string GetPublicUrl(string objectKey) => $"https://cdn.example.com/{objectKey}";
 
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)

@@ -30,7 +30,9 @@ public sealed record OwnedAssetDto(
     DateTime? ExpiresAtUtc,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    bool IsCurrentAvatar);
+    bool IsCurrentAvatar,
+    string? DownloadUrl = null,
+    DateTime? DownloadUrlExpiresAtUtc = null);
 
 public sealed record PresignedAssetUploadDto(
     AssetDto Asset,

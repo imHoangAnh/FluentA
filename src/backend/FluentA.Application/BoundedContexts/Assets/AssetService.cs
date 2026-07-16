@@ -39,10 +39,26 @@ public sealed class AssetService : IAssetService
         var currentAvatarAssetId = user?.CurrentAvatarAssetId;
 
         var requestedType = ParseAssetType(request.AssetType ?? "avatar");
-        return OperationResult<IReadOnlyList<OwnedAssetDto>>.Success(assets
-            .Where(asset => asset.Type == requestedType)
-            .Select(asset => ToOwnedDto(asset, currentAvatarAssetId))
-            .ToList());
+        var result = new List<OwnedAssetDto>();
+        foreach (var asset in assets.Where(asset => asset.Type == requestedType))
+        {
+            AssetPresignedDownload? download = null;
+            if (asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Finalized)
+            {
+                try
+                {
+                    download = _storage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5)));
+                }
+                catch (AssetStorageUnavailableException)
+                {
+                    // A missing storage provider must not leak a durable URL.
+                }
+            }
+
+            result.Add(ToOwnedDto(asset, currentAvatarAssetId, download));
+        }
+
+        return OperationResult<IReadOnlyList<OwnedAssetDto>>.Success(result);
     }
 
     public async Task<OperationResult<PresignedAssetUploadDto>> PresignAsync(Guid userId, PresignAssetRequest request, CancellationToken cancellationToken = default)
@@ -55,7 +71,7 @@ public sealed class AssetService : IAssetService
 
         var assetId = Guid.NewGuid();
         var type = ParseAssetType(request.AssetType!);
-        var objectKey = BuildObjectKey(userId, type, assetId);
+        var objectKey = BuildObjectKey(userId, type, assetId, request.ContentType!);
         var uploadRequest = new AssetUploadRequest(objectKey, request.ContentType!, PendingLifetime);
 
         AssetPresignedUpload upload;
@@ -114,9 +130,13 @@ public sealed class AssetService : IAssetService
         }
 
         AssetObjectMetadata? metadata;
+        byte[]? objectPrefix;
         try
         {
             metadata = await _storage.GetObjectMetadataAsync(asset.ObjectKey, cancellationToken);
+            objectPrefix = metadata is null
+                ? null
+                : await _storage.GetObjectPrefixAsync(asset.ObjectKey, 32, cancellationToken);
         }
         catch (AssetStorageUnavailableException)
         {
@@ -128,7 +148,7 @@ public sealed class AssetService : IAssetService
             return OperationResult<AssetDto>.Failure(AssetError.InvalidUploadedObject("The uploaded object could not be found."));
         }
 
-        var metadataError = ValidateUploadedObject(asset, metadata);
+        var metadataError = ValidateUploadedObject(asset, metadata, objectPrefix);
         if (metadataError is not null)
         {
             return OperationResult<AssetDto>.Failure(metadataError);
@@ -250,12 +270,26 @@ public sealed class AssetService : IAssetService
         };
     }
 
-    private static string BuildObjectKey(Guid userId, AssetType type, Guid assetId)
+    private static string BuildObjectKey(Guid userId, AssetType type, Guid assetId, string contentType)
     {
-        return $"users/{userId:N}/{ToAssetTypeValue(type)}/{assetId:N}";
+        var extension = contentType.ToLowerInvariant() switch
+        {
+            "image/jpeg" => "jpg",
+            "image/png" => "png",
+            "image/webp" => "webp",
+            _ => throw new InvalidOperationException("Unsupported asset content type.")
+        };
+
+        return type switch
+        {
+            AssetType.Avatar => $"avatars/users/{userId:N}/avatar-{assetId:N}.{extension}",
+            AssetType.NoteImage => $"note-images/users/{userId:N}/image-{assetId:N}.{extension}",
+            AssetType.CountdownCover => $"countdown-covers/users/{userId:N}/cover-{assetId:N}.{extension}",
+            _ => throw new InvalidOperationException("Unsupported asset type.")
+        };
     }
 
-    private static AssetError? ValidateUploadedObject(Asset asset, AssetObjectMetadata metadata)
+    private static AssetError? ValidateUploadedObject(Asset asset, AssetObjectMetadata metadata, byte[]? objectPrefix)
     {
         if (!string.Equals(metadata.ObjectKey, asset.ObjectKey, StringComparison.Ordinal))
         {
@@ -282,7 +316,32 @@ public sealed class AssetService : IAssetService
             return AssetError.InvalidUploadedObject("The uploaded object must be 2MB or smaller.");
         }
 
+        if (!HasExpectedImageSignature(metadata.ContentType, objectPrefix))
+        {
+            return AssetError.InvalidUploadedObject("The uploaded object bytes do not match its image content type.");
+        }
+
         return null;
+    }
+
+    private static bool HasExpectedImageSignature(string contentType, byte[]? bytes)
+    {
+        if (bytes is null)
+        {
+            return false;
+        }
+
+        return contentType.ToLowerInvariant() switch
+        {
+            "image/png" => bytes.Length >= 8
+                && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+            "image/jpeg" => bytes.Length >= 3
+                && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
+            "image/webp" => bytes.Length >= 12
+                && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8)
+                && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+            _ => false
+        };
     }
 
     private static string NormalizeAssetType(string? assetType)
@@ -326,7 +385,7 @@ public sealed class AssetService : IAssetService
             asset.UpdatedAt);
     }
 
-    private static OwnedAssetDto ToOwnedDto(Asset asset, Guid? currentAvatarAssetId)
+    private static OwnedAssetDto ToOwnedDto(Asset asset, Guid? currentAvatarAssetId, AssetPresignedDownload? download = null)
     {
         return new OwnedAssetDto(
             asset.Id,
@@ -338,7 +397,9 @@ public sealed class AssetService : IAssetService
             asset.ExpiresAt,
             asset.CreatedAt,
             asset.UpdatedAt,
-            currentAvatarAssetId == asset.Id);
+            currentAvatarAssetId == asset.Id,
+            download?.Url,
+            download?.ExpiresAtUtc);
     }
 
     private static void Merge(Dictionary<string, string[]> target, Dictionary<string, string[]> source)

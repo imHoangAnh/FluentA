@@ -115,7 +115,7 @@ public sealed partial class AuthService : IAuthService
             await _users.UpdateAsync(user, cancellationToken);
         }
 
-        return OperationResult<UserProfileDto>.Success(ToProfile(user));
+        return OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<ResendVerificationOtpResponse>> ResendVerificationOtpAsync(ResendVerificationOtpRequest request, CancellationToken cancellationToken = default)
@@ -301,7 +301,7 @@ public sealed partial class AuthService : IAuthService
         var user = await _users.GetByIdAsync(userId, cancellationToken);
         return user is null
             ? OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized())
-            : OperationResult<UserProfileDto>.Success(ToProfile(user));
+            : OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<UserProfileDto>> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
@@ -380,7 +380,7 @@ public sealed partial class AuthService : IAuthService
             await TryDeleteAssetObjectAsync(currentAvatarAsset!.ObjectKey, cancellationToken);
         }
 
-        return OperationResult<UserProfileDto>.Success(ToProfile(user));
+        return OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<AuthResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default)
@@ -428,12 +428,44 @@ public sealed partial class AuthService : IAuthService
     private async Task<AuthResponse> BuildAuthResponseAsync(User user, CancellationToken cancellationToken)
     {
         var refreshToken = await _refreshTokens.IssueAsync(user.Id, cancellationToken);
-        var profile = ToProfile(user);
+        var profile = await BuildProfileAsync(user, cancellationToken);
         return new AuthResponse(_tokenService.CreateAccessToken(profile), profile, refreshToken.RawToken);
     }
 
-    private static UserProfileDto ToProfile(User user) =>
-        new(user.Id, user.Email, user.FullName, user.IsEmailVerified, user.Bio, user.AvatarUrl);
+    private async Task<UserProfileDto> BuildProfileAsync(User user, CancellationToken cancellationToken)
+    {
+        string? downloadUrl = null;
+        DateTime? downloadUrlExpiresAtUtc = null;
+
+        if (user.CurrentAvatarAssetId.HasValue)
+        {
+            var asset = await _assets.GetOwnedAsync(user.Id, user.CurrentAvatarAssetId.Value, cancellationToken);
+            if (asset is not null && asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Finalized)
+            {
+                try
+                {
+                    var download = _assetStorage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5)));
+                    downloadUrl = download.Url;
+                    downloadUrlExpiresAtUtc = download.ExpiresAtUtc;
+                }
+                catch (AssetStorageUnavailableException)
+                {
+                    // Fail closed: omit the image rather than expose a durable provider URL.
+                }
+            }
+        }
+
+        return new UserProfileDto(
+            user.Id,
+            user.Email,
+            user.FullName,
+            user.IsEmailVerified,
+            user.Bio,
+            user.AvatarUrl,
+            user.CurrentAvatarAssetId,
+            downloadUrl,
+            downloadUrlExpiresAtUtc);
+    }
 
     private static Dictionary<string, string[]> ValidateProfileUpdate(UpdateProfileRequest request)
     {

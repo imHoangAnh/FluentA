@@ -77,6 +77,22 @@ public sealed class AssetServiceTests
     }
 
     [Fact]
+    public async Task Finalize_RejectsMimeSpoofedObjectBytes()
+    {
+        var repository = new FakeAssetRepository();
+        var storage = new FakeAssetObjectStorage { Prefix = [0x47, 0x49, 0x46, 0x38] };
+        var service = new AssetService(repository, storage, new FakeUserRepository());
+        var userId = Guid.NewGuid();
+        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png"));
+        storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
+
+        var result = await service.FinalizeAsync(userId, new FinalizeAssetRequest(presign.Value!.Asset.Id));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("ASSET_UPLOAD_INVALID", ((AssetError)result.Error!).Code);
+    }
+
+    [Fact]
     public async Task Finalize_ExpiresPendingAssetAfterWindow()
     {
         var repository = new FakeAssetRepository();
@@ -250,6 +266,7 @@ public sealed class AssetServiceTests
     private sealed class FakeAssetObjectStorage : IAssetObjectStorage
     {
         public AssetObjectMetadata? Metadata { get; set; }
+        public byte[] Prefix { get; set; } = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
         public string? DeletedObjectKey { get; private set; }
         public List<string> DeletedObjectKeys { get; } = [];
 
@@ -258,10 +275,16 @@ public sealed class AssetServiceTests
             return new AssetPresignedUpload($"http://upload.local/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
         }
 
+        public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) =>
+            new($"http://download.local/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
+
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(Metadata);
         }
+
+        public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) =>
+            Task.FromResult<byte[]?>(Prefix);
 
         public string GetPublicUrl(string objectKey)
         {

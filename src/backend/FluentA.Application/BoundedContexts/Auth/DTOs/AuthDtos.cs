@@ -54,7 +54,10 @@ public sealed record UserProfileDto(
     string FullName,
     bool IsEmailVerified,
     string? Bio = null,
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    Guid? AvatarAssetId = null,
+    string? AvatarDownloadUrl = null,
+    DateTime? AvatarDownloadUrlExpiresAtUtc = null);
 
 public sealed record RefreshTokenIssue(string RawToken, DateTime ExpiresAt);
 

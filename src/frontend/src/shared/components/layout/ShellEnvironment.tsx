@@ -7,6 +7,7 @@ export type ShellAccount = {
   email?: string | null
   fullName?: string | null
   avatarUrl?: string | null
+  avatarDownloadUrl?: string | null
 }
 
 export type ShellNavigationItem = {
