@@ -35,8 +35,11 @@ adds `note-image` as shared image asset types.
   image content type for the selected asset type, and is at most 2MB.
 - `PUT /api/v1/profile` can link an owned ready avatar asset as the
   current profile avatar.
-- `POST /api/v1/countdowns` can link one owned finalized `countdown-cover`
-  asset as the countdown cover during create only.
+- `POST /api/v1/countdowns` can link one owned ready `countdown-cover` asset
+  as the countdown cover during create only; an active cover asset cannot be
+  attached to another active Countdown.
+- Authorized Countdown reads return a five-minute `coverDownloadUrl` and its
+  expiry rather than the asset's stored public URL.
 - A Note page may link many ready owned `note-image` assets through
   `note_page_assets`; each image asset may belong to one active Note page only.
 - Note page persistence contains the durable asset id but never a provider or
@@ -54,8 +57,8 @@ adds `note-image` as shared image asset types.
   avatar asset metadata after the durable profile update succeeds.
 - Pending avatar uploads that are never finalized expire after 1 hour and are
   cleaned automatically by a recurring cleanup job.
-- Countdown cover assets retire when the owning countdown is manually deleted
-  or auto-retired after the seven-day completed window.
+- Deleting a Countdown clears its cover FK immediately. The detached ready
+  asset remains retained until US-ASSET-010 owns its archive/purge transition.
 - Removing a Note image or deleting its page detaches its `note_page_assets`
   row immediately. The ready asset remains retained until the archive/purge
   lifecycle in US-ASSET-010 owns its transition.

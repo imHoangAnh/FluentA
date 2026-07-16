@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using FluentA.Domain.BoundedContexts.Assets.Entities;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
 
 namespace FluentA.Infrastructure.Persistence.Configurations;
@@ -22,6 +23,14 @@ public sealed class CountdownEventConfiguration : IEntityTypeConfiguration<Count
         builder.Property(countdownEvent => countdownEvent.DeletedAt).HasColumnName("deleted_at");
 
         builder.HasIndex(countdownEvent => new { countdownEvent.UserId, countdownEvent.TargetDate });
+        builder.HasIndex(countdownEvent => countdownEvent.CoverAssetId)
+            .IsUnique()
+            .HasFilter("\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+
+        builder.HasOne<Asset>()
+            .WithMany()
+            .HasForeignKey(countdownEvent => countdownEvent.CoverAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(countdownEvent => countdownEvent.Alerts)
             .WithOne()

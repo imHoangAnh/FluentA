@@ -6,7 +6,8 @@ export type CountdownEvent = {
   name: string
   targetDate: string
   coverAssetId?: string | null
-  coverUrl?: string | null
+  coverDownloadUrl?: string | null
+  coverDownloadUrlExpiresAt?: string | null
   isCompleted: boolean
   alerts: CountdownAlert[]
   createdAt: string

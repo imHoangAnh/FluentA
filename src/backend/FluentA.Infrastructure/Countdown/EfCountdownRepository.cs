@@ -35,6 +35,13 @@ public sealed class EfCountdownRepository : ICountdownRepository
                 cancellationToken);
     }
 
+    public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.CountdownEvents.AnyAsync(
+            countdownEvent => countdownEvent.CoverAssetId == coverAssetId && countdownEvent.DeletedAt == null,
+            cancellationToken);
+    }
+
     public async Task AddAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
     {
         await _dbContext.CountdownEvents.AddAsync(countdownEvent, cancellationToken);

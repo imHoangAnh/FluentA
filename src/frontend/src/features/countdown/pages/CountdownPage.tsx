@@ -131,7 +131,7 @@ export function CountdownPage() {
                 {countdowns.map((item) => (
                   <article key={item.id} className="event-list-item active">
                     <div className="event-icon-box">
-                      {item.coverUrl ? <img className="countdown-cover-image" src={item.coverUrl} alt={item.name} /> : <CalendarClock size={28} />}
+                      {item.coverDownloadUrl ? <img className="countdown-cover-image" src={item.coverDownloadUrl} alt={item.name} /> : <CalendarClock size={28} />}
                     </div>
                     <div className="event-info">
                       <h4 className="event-title">{item.name}</h4>

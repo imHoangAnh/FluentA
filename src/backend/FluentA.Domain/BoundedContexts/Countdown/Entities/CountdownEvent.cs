@@ -81,6 +81,12 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
         }
     }
 
+    public void DetachCover()
+    {
+        CoverAssetId = null;
+        Touch();
+    }
+
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;

@@ -9,8 +9,8 @@ not attached elsewhere.
 ## Application Flow
 
 Create validates and attaches the ready cover. List/get generates a presigned
-GET only after owner-scoped Countdown lookup. Delete clears the relationship
-and archives the asset in the same transaction.
+GET only after owner-scoped Countdown lookup. Delete clears the relationship;
+US-ASSET-010 owns the subsequent archive transition and purge transaction.
 
 ## Interface Contract
 
@@ -30,4 +30,3 @@ expiry.
 ## Alternatives Considered
 
 1. Return a shared asset URL. Rejected by D4 and D15.
-

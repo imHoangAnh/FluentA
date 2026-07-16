@@ -79,7 +79,7 @@ public sealed class CountdownServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_SoftDeletesOwnedCountdownAndCover()
+    public async Task DeleteAsync_SoftDeletesOwnedCountdownAndDetachesItsReadyCover()
     {
         var repository = new FakeCountdownRepository();
         var assets = new FakeAssetRepository();
@@ -97,8 +97,34 @@ public sealed class CountdownServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(countdownEvent.DeletedAt);
-        Assert.Equal(AssetStatus.Deleted, asset.Status);
-        Assert.Equal(asset.ObjectKey, storage.DeletedObjectKey);
+        Assert.Null(countdownEvent.CoverAssetId);
+        Assert.Equal(AssetStatus.Ready, asset.Status);
+        Assert.Null(storage.DeletedObjectKey);
+    }
+
+    [Fact]
+    public async Task CreateAndListAsync_UseAnExclusiveReadyCoverAndReturnSignedDeliveryData()
+    {
+        var repository = new FakeCountdownRepository();
+        var assets = new FakeAssetRepository();
+        var storage = new FakeAssetObjectStorage();
+        var userId = Guid.NewGuid();
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "countdown-covers/users/u/cover.png", "https://legacy.example.com/cover.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload(asset.PublicUrl, asset.ContentType, 1024);
+        assets.Assets.Add(asset);
+        var service = new CountdownService(repository, assets, storage);
+        var request = new CreateCountdownEventRequest("Exam", DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"), [new CreateCountdownAlertRequest("OnTargetDay", "09:00")], asset.Id);
+
+        var created = await service.CreateAsync(userId, request);
+        var duplicate = await service.CreateAsync(userId, request with { Name = "Duplicate" });
+        var listed = await service.ListAsync(userId);
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal("https://signed.example.com/countdown-covers/users/u/cover.png", created.Value!.CoverDownloadUrl);
+        Assert.NotNull(created.Value.CoverDownloadUrlExpiresAt);
+        Assert.False(duplicate.IsSuccess);
+        Assert.Equal("VALIDATION_ERROR", Assert.IsType<CountdownError>(duplicate.Error).Code);
+        Assert.Equal(created.Value.CoverDownloadUrl, Assert.Single(listed.Value!).CoverDownloadUrl);
     }
 
     private sealed class FakeCountdownRepository : ICountdownRepository
@@ -121,6 +147,11 @@ public sealed class CountdownServiceTests
                 countdownEvent.UserId == userId
                 && countdownEvent.Id == countdownId
                 && countdownEvent.DeletedAt is null));
+        }
+
+        public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(Events.Any(countdownEvent => countdownEvent.CoverAssetId == coverAssetId && countdownEvent.DeletedAt is null));
         }
 
         public Task AddAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
@@ -166,7 +197,8 @@ public sealed class CountdownServiceTests
         public string? DeletedObjectKey { get; private set; }
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request) => throw new NotSupportedException();
-        public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) => throw new NotSupportedException();
+        public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) =>
+            new($"https://signed.example.com/{request.ObjectKey}", DateTime.UtcNow.AddMinutes(5));
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public string GetPublicUrl(string objectKey) => $"https://cdn.example.com/{objectKey}";

@@ -57,9 +57,17 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
   await newCountdownButton.click();
   await page.getByTestId('countdown-name-input').fill('IELTS Exam');
   await page.getByTestId('countdown-target-input').fill(localDateTimeInput(21).slice(0, 10));
+  await page.getByLabel('Cover image (optional)').setInputFiles({
+    name: 'ielts-cover.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==', 'base64'),
+  });
   await page.getByTestId('save-countdown-button').click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
   await expect(page.getByText(/days? left/)).toBeVisible();
+  const cover = page.getByRole('img', { name: 'IELTS Exam' });
+  await expect(cover).toBeVisible();
+  await expect(cover).toHaveAttribute('src', /X-Amz-Algorithm=/);
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByLabel('Delete IELTS Exam').click();

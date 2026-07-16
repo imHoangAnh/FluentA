@@ -8,6 +8,8 @@ public interface ICountdownRepository
 
     Task<CountdownEventEntity?> GetAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default);
 
+    Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default);
+
     Task AddAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default);

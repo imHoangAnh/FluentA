@@ -41,14 +41,7 @@ public sealed class CountdownService : ICountdownService
         var visible = new List<CountdownEventDto>(visibleEvents.Count);
         foreach (var countdown in visibleEvents)
         {
-            string? coverUrl = null;
-            if (countdown.CoverAssetId.HasValue && _assets is not null)
-            {
-                var asset = await _assets.GetByIdAsync(countdown.CoverAssetId.Value, cancellationToken);
-                coverUrl = asset?.DeletedAt is null ? asset?.PublicUrl : null;
-            }
-
-            visible.Add(ToDto(countdown, coverUrl));
+            visible.Add(await ToDtoAsync(userId, countdown, cancellationToken));
         }
 
         return OperationResult<IReadOnlyList<CountdownEventDto>>.Success(visible);
@@ -72,7 +65,7 @@ public sealed class CountdownService : ICountdownService
         }
 
         await _repository.AddAsync(countdown, cancellationToken);
-        return OperationResult<CountdownEventDto>.Success(ToDto(countdown, validation.CoverUrl));
+        return OperationResult<CountdownEventDto>.Success(await ToDtoAsync(userId, countdown, cancellationToken));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
@@ -83,34 +76,14 @@ public sealed class CountdownService : ICountdownService
             return OperationResult<bool>.Failure(CountdownError.NotFound());
         }
 
+        countdown.DetachCover();
         countdown.SoftDelete();
         await _repository.UpdateAsync(countdown, cancellationToken);
-
-        if (countdown.CoverAssetId.HasValue && _assets is not null)
-        {
-            var asset = await _assets.GetOwnedAsync(userId, countdown.CoverAssetId.Value, cancellationToken);
-            if (asset is not null && asset.DeletedAt is null)
-            {
-                asset.MarkDeleted(DateTime.UtcNow);
-                await _assets.UpdateAsync(asset, cancellationToken);
-
-                if (_assetStorage is not null)
-                {
-                    try
-                    {
-                        await _assetStorage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
-                    }
-                    catch (AssetStorageUnavailableException)
-                    {
-                    }
-                }
-            }
-        }
 
         return OperationResult<bool>.Success(true);
     }
 
-    private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts, string? CoverUrl)> ValidateCreateAsync(
+    private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts)> ValidateCreateAsync(
         Guid userId,
         CreateCountdownEventRequest request,
         CancellationToken cancellationToken)
@@ -118,8 +91,8 @@ public sealed class CountdownService : ICountdownService
         var errors = ValidateName(request.Name);
         var targetDate = ParseTargetDate(request.TargetDate, errors);
         var alerts = ValidateAlerts(request.Alerts, targetDate, errors);
-        var coverUrl = await ValidateCoverAssetAsync(userId, request.CoverAssetId, errors, cancellationToken);
-        return (errors, targetDate, alerts, coverUrl);
+        await ValidateCoverAssetAsync(userId, request.CoverAssetId, errors, cancellationToken);
+        return (errors, targetDate, alerts);
     }
 
     private static Dictionary<string, string[]> ValidateName(string name)
@@ -203,7 +176,7 @@ public sealed class CountdownService : ICountdownService
         return validated;
     }
 
-    private async Task<string?> ValidateCoverAssetAsync(
+    private async Task ValidateCoverAssetAsync(
         Guid userId,
         Guid? coverAssetId,
         Dictionary<string, string[]> errors,
@@ -211,23 +184,26 @@ public sealed class CountdownService : ICountdownService
     {
         if (!coverAssetId.HasValue)
         {
-            return null;
+            return;
         }
 
         if (_assets is null)
         {
             errors["coverAssetId"] = ["Cover assets are unavailable in the current runtime."];
-            return null;
+            return;
         }
 
         var asset = await _assets.GetOwnedAsync(userId, coverAssetId.Value, cancellationToken);
         if (asset is null || asset.Type != AssetType.CountdownCover || asset.Status != AssetStatus.Ready)
         {
             errors["coverAssetId"] = ["Cover asset must be an owned finalized countdown-cover asset."];
-            return null;
+            return;
         }
 
-        return asset.PublicUrl;
+        if (await _repository.IsCoverAssetAttachedAsync(asset.Id, cancellationToken))
+        {
+            errors["coverAssetId"] = ["Cover asset is already attached to another countdown."];
+        }
     }
 
     private static DateTime BuildScheduledAtUtc(DateTime targetDate, string alertDay, TimeOnly localTime)
@@ -246,14 +222,32 @@ public sealed class CountdownService : ICountdownService
         return TimeZoneInfo.ConvertTimeToUtc(local, CountdownTimeZone.Vietnam());
     }
 
-    private static CountdownEventDto ToDto(CountdownEventEntity countdownEvent, string? coverUrlOverride = null)
+    private async Task<CountdownEventDto> ToDtoAsync(Guid userId, CountdownEventEntity countdownEvent, CancellationToken cancellationToken)
     {
+        AssetPresignedDownload? coverDownload = null;
+        if (countdownEvent.CoverAssetId.HasValue && _assets is not null && _assetStorage is not null)
+        {
+            var asset = await _assets.GetOwnedAsync(userId, countdownEvent.CoverAssetId.Value, cancellationToken);
+            if (asset is not null && asset.Type == AssetType.CountdownCover && asset.Status == AssetStatus.Ready)
+            {
+                try
+                {
+                    coverDownload = _assetStorage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5)));
+                }
+                catch (AssetStorageUnavailableException)
+                {
+                    // Fail closed: a missing storage provider must not expose a durable URL.
+                }
+            }
+        }
+
         return new CountdownEventDto(
             countdownEvent.Id,
             countdownEvent.Name,
             countdownEvent.TargetDate.ToString(DateFormat, CultureInfo.InvariantCulture),
             countdownEvent.CoverAssetId,
-            coverUrlOverride,
+            coverDownload?.Url,
+            coverDownload?.ExpiresAtUtc,
             countdownEvent.IsCompletedAt(DateTime.UtcNow),
             countdownEvent.Alerts
                 .Where(alert => alert.DeletedAt is null)

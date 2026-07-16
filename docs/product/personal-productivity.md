@@ -136,7 +136,8 @@ All responses use the FluentA envelope.
 - Countdown create requires at least one alert and allows up to five alerts.
 - Alerts use the milestones `OnTargetDay`, `1DayBefore`, `3DaysBefore`, and
   `7DaysBefore`. The same milestone may be reused when alert times differ.
-- Countdown create optionally links one finalized shared cover asset.
+- Countdown create optionally links one owned ready `countdown-cover` asset.
+  One active cover asset can attach to only one active Countdown.
 - Countdown cards are ordered with active/upcoming items first by nearest
   `target_date`, then completed items.
 - Countdown cards use the cover image as the primary visual when present, or a
@@ -150,7 +151,7 @@ All responses use the FluentA envelope.
 
 | Method | Endpoint | Behavior |
 | --- | --- | --- |
-| `GET` | `/api/v1/countdowns` | List owned countdowns visible in the current contract window. |
+| `GET` | `/api/v1/countdowns` | List owned countdowns visible in the current contract window, including an authorized short-lived cover download URL when attached. |
 | `POST` | `/api/v1/countdowns` | Create a countdown with date-based alerts and optional cover asset linkage. |
 | `DELETE` | `/api/v1/countdowns/{id}` | Soft-delete a countdown and cancel future unfired alerts. |
 
@@ -163,8 +164,8 @@ All responses use the FluentA envelope.
 - Create fails when any alert would already be in the past at submit time.
 - Alert scheduling uses fixed `Asia/Ho_Chi_Minh` business rules and persists
   computed `scheduled_at_utc`.
-- Cover asset, when supplied, must be an owned finalized shared asset valid for
-  countdown cover usage.
+- Cover asset, when supplied, must be an owned ready `countdown-cover` asset
+  that is not attached to another active Countdown.
 - Validation failures return `422 VALIDATION_ERROR`.
 - Missing countdown ownership returns `404 COUNTDOWN_NOT_FOUND`.
 
@@ -175,8 +176,8 @@ All responses use the FluentA envelope.
 - Manual countdown delete cancels future unfired alerts, while already created
   notifications stay in the inbox.
 - Completed countdowns auto-retire seven days after `target_date`.
-- Linked cover assets retire on manual delete and on automatic countdown
-  retirement.
+- Manual delete detaches a linked cover asset. US-ASSET-010 owns its later
+  archive and physical purge lifecycle.
 
 ## Habit Foundation Outcomes
 
