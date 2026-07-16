@@ -6,7 +6,7 @@ import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeed
 describe('route feedback', () => {
   it('announces route loading', () => {
     render(<RouteLoading />)
-    expect(screen.getByRole('status')).toHaveTextContent('Loading FluentA...')
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...')
   })
 
   it('renders an accessible fallback when a lazy route fails', async () => {
@@ -18,6 +18,6 @@ describe('route feedback', () => {
 
     render(<RouterProvider router={router} />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load this page.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Load failed this page.')
   })
 })

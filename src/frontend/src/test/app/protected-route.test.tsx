@@ -30,7 +30,7 @@ describe('ProtectedRoute session states', () => {
 
     renderGuard()
 
-    expect(screen.getByRole('status')).toHaveTextContent('Checking your FluentA session...')
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your session...')
     expect(loadMe).toHaveBeenCalledTimes(1)
   })
 
