@@ -2,7 +2,6 @@ import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as todoApi from '../api/todo.api'
 import { TodoWeekView } from './TodoWeekView'
-import { AppShell } from '@/shared/components/layout/AppShell'
 
 type TodoView = 'day' | 'week'
 
@@ -131,7 +130,7 @@ export function TodoPage() {
   }
 
   return (
-    <AppShell title="Todo" description="Plan the day, then finish the work that matters.">
+    <>
         <div className="todo-content-v2">
           {/* Hero Header */}
           <div className="todo-hero-v2">
@@ -406,6 +405,6 @@ export function TodoPage() {
             />
           ) : null}
         </div>
-    </AppShell>
+    </>
   )
 }

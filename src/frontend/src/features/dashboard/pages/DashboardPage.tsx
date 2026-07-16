@@ -2,7 +2,6 @@ import { CalendarClock, Check, CheckCircle2, Circle, Timer, TrendingUp } from 'l
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -29,10 +28,10 @@ function toDateInput(date: Date) {
 }
 
 function greeting(hour: number, name: string) {
-  if (hour >= 5 && hour < 12) return `Good morning, ${name}`
-  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}`
-  if (hour >= 17 && hour < 21) return `Good evening, ${name}`
-  return `Burning midnight oil, ${name}?`
+  if (hour >= 5 && hour < 12) return `Good morning 🌅, ${name}`
+  if (hour >= 12 && hour < 17) return `Good afternoon ☀️, ${name}`
+  if (hour >= 17 && hour < 21) return `Good evening 🌇, ${name}`
+  return `Good night 🌙 , ${name}`
 }
 
 function remainingText(targetDate: string, now: Date) {
@@ -91,9 +90,7 @@ export function DashboardPage() {
   const isLoading = todosQuery.isLoading || habitsQuery.isLoading || countdownsQuery.isLoading || flashcardDashboardQuery.isLoading
 
   return (
-    <AppShell
-      title="Overview"
-    >
+    <>
       <section className="mb-6 flex flex-wrap items-end justify-between gap-4" aria-labelledby="welcome-heading">
         <div>
           <h2 id="welcome-heading" className="m-0 text-3xl font-semibold tracking-[-0.035em] text-foreground">{greeting(now.getHours(), displayName)}</h2>
@@ -111,10 +108,12 @@ export function DashboardPage() {
           <Skeleton className="col-span-6 h-56 max-xl:col-span-12" />
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-4">
-          <Card className="col-span-8 max-xl:col-span-12">
+        <div className="grid grid-cols-12 gap-3">
+          <Card className="col-span-6 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between">
-              <div><CardTitle>Review queue</CardTitle><CardDescription>Cards ready for your next focused session.</CardDescription></div>
+              <div>
+                <CardTitle>Review queue</CardTitle>
+              </div>
               <Badge variant={dueCards > 0 ? 'default' : 'outline'}>{dueCards} due</Badge>
             </CardHeader>
             <CardContent className="grid grid-cols-[180px_1fr] items-center gap-8 max-md:grid-cols-1">
@@ -136,7 +135,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="col-span-4 max-xl:col-span-12">
+          <Card className="col-span-6 max-xl:col-span-12">
             <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Daily todo</CardTitle><CardDescription>Your three most relevant tasks.</CardDescription></div><Check className="size-5 text-primary" /></CardHeader>
             <CardContent className="flex h-[226px] flex-col">
               <ul className="m-0 grid list-none gap-2 p-0" role="list">
@@ -191,6 +190,6 @@ export function DashboardPage() {
           </Card>
         </div>
       )}
-    </AppShell>
+    </>
   )
 }

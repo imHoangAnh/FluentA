@@ -1,7 +1,6 @@
 import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3 } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import * as journalApi from '../api/journal.api'
 
 const JournalRichTextEditor = lazy(() =>
@@ -266,7 +265,7 @@ export function JournalPage() {
   const showEmptyState = !selectedId && !title && !content && !isOpening;
 
   return (
-    <AppShell title="Journal" description="Capture learning reflections and keep them organized by date." contentClassName="max-w-none p-0">
+    <>
         <div className="journal-page">
       <header className="journal-header">
         <div>
@@ -504,6 +503,6 @@ export function JournalPage() {
         </form>
       </div>
         </div>
-    </AppShell>
+    </>
   )
 }

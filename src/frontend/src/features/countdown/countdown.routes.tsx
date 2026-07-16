@@ -1,2 +1,11 @@
 import type { RouteObject } from 'react-router-dom'
-export const countdownRoutes: RouteObject[] = [{ path: 'countdowns', lazy: async () => ({ Component: (await import('./pages/CountdownPage')).CountdownPage }) }]
+import { appShellRoute } from '@/shared/components/layout/app-shell-route'
+
+export const countdownRoutes: RouteObject[] = [{
+  path: 'countdowns',
+  handle: appShellRoute({
+    title: 'Countdowns',
+    description: 'Track important dates and reminder alerts.',
+  }),
+  lazy: async () => ({ Component: (await import('./pages/CountdownPage')).CountdownPage }),
+}]

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
 import { LearningDeckLibrary, listBoards, type FlashcardBoard, type FlashcardPage, useFlashcardSync } from '@/features/flashcards'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { PracticeLaunchDialog } from '../components/PracticeLaunchDialog'
@@ -25,7 +24,7 @@ export function PracticeLibraryPage() {
   }, [decksQuery.isSuccess, requestedDeckId, selectedPracticeDeck, setSearchParams])
 
   return (
-    <AppShell title="Practice">
+    <>
       <div className="grid gap-5">
         {decksQuery.isLoading ? <div className="grid gap-4" aria-busy="true" aria-label="Loading flashcards">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div> : null}
         {decksQuery.isError ? <Card className="border-destructive/40"><CardContent className="p-5"><p role="alert" className="m-0 text-sm text-destructive">Unable to load flashcards. Try again when your connection is available.</p></CardContent></Card> : null}
@@ -33,6 +32,6 @@ export function PracticeLibraryPage() {
         {!decksQuery.isLoading && !decksQuery.isError && boardGroups.length > 0 ? <LearningDeckLibrary boards={boardGroups} mode="practice" onSelectPracticeDeck={(page) => setSearchParams({ deck: page.pageId })} /> : null}
       </div>
       <PracticeLaunchDialog page={selectedPracticeDeck} onClose={() => setSearchParams({}, { replace: true })} onStart={(pageId, order) => navigate(`/practice/${pageId}?order=${order}`)} />
-    </AppShell>
+    </>
   )
 }

@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../api/flashcard.api'
 import { getLanguageProfile } from '@/shared/lib/language'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 
@@ -47,7 +46,10 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
   }
 
   return (
-    <AppShell title="Flashcard viewer" description="Flip cards and move at your pace." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>}>
+    <>
+      <div className="mb-4 flex justify-end">
+        <Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>
+      </div>
       {sessionQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading flashcard viewer...</p> : null}
       {sessionQuery.isError ? <p role="alert" className="text-sm text-destructive">This page is unavailable.</p> : null}
 
@@ -94,6 +96,6 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
           </div>
         </section>
       ) : null}
-    </AppShell>
+    </>
   )
 }

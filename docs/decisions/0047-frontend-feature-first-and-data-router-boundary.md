@@ -61,3 +61,5 @@ Tradeoffs:
   feature public APIs.
 - `US-FE-016` removes the legacy route/runtime seam and proves the final
   dependency graph.
+- Decision 0048 and `US-FE-017` make AppShell a persistent protected route
+  layout while retaining this decision's app/feature/shared dependency rules.

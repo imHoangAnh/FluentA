@@ -27,7 +27,10 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - A logged-in user can refresh access without re-entering credentials while the refresh cookie is valid.
 - A logged-in user can log out and lose access to protected routes.
 - A user can continue with Google when local Google credentials are configured.
-- The React app exposes `/login`, `/register`, and a protected authenticated app shell.
+- The React app exposes `/login`, `/register`, and one persistent protected
+  authenticated app shell. Client-side navigation between protected routes
+  replaces feature content without remounting the shared sidebar/account
+  chrome.
 
 ## Token Rules
 
@@ -193,4 +196,7 @@ All responses use the FluentA envelope:
 - Redis stores and revokes refresh sessions.
 - Google OAuth is covered by deterministic tests and returns configuration/provider errors through the auth envelope.
 - The React UI supports login, registration, email verification OTP entry, forgot password, reset password, protected routing, token refresh, and logout.
+- Protected client-side navigation keeps the shared AppShell mounted, preserves
+  its collapse state, and updates accessible route title/content metadata for
+  the matched feature page.
 - Access token is not persisted in browser storage.

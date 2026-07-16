@@ -2,23 +2,29 @@
 
 ## Current Story
 
-- ID: `US-FE-016`
-- Title: Legacy boundary retirement and release proof
+- ID: `US-FE-017`
+- Title: Persistent protected AppShell route layout
 - Lane: high-risk
-- Status: implemented, reviewed, verified, and locally committed on 2026-07-14
+- Status: implemented, reviewed, and verified on 2026-07-16; not committed
 
 ## Objective
 
-Retire the empty legacy route manifest and record final E30 release proof.
+Move AppShell from page-owned wrappers to one persistent protected route layout
+without changing URLs, visible page behavior, auth, queries, or realtime.
 
 ## Inputs
 
 - `context.md` D1-D17
 - `approach.md`
 - `story-map.md`
-- `US-FE-016-legacy-boundary-retirement-and-release-proof/overview.md`
-- `US-FE-016-legacy-boundary-retirement-and-release-proof/validation.md`
+- `US-FE-017-persistent-protected-appshell-route-layout/overview.md`
+- `US-FE-017-persistent-protected-appshell-route-layout/design.md`
+- `US-FE-017-persistent-protected-appshell-route-layout/execplan.md`
+- `US-FE-017-persistent-protected-appshell-route-layout/validation.md`
 
 ## Gate
 
-US-FE-016 must leave no legacy route manifest, legacy ownership paths, or cross-feature deep imports, with full release proof.
+US-FE-017 leaves one mounted AppShell for protected navigation, preserves the
+approved route/UI/API/query/realtime contracts, and keeps unrelated worktree
+changes intact. Full-suite failures from those pre-existing user edits remain
+documented in the story validation.

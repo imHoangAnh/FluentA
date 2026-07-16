@@ -6,7 +6,6 @@ import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { getReviewSettings } from './api/review-settings.api'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
 
 type BrowserSpeechRecognition = {
@@ -281,7 +280,10 @@ export function ReviewSessionPage() {
   const isPronunciation = currentWord?.mode === 'pronunciation'
 
   return (
-    <AppShell title="Review" description="Practice your due words and keep your learning streak moving." headerActions={<Button asChild variant="outline" size="sm"><Link to="/flashcards">Flashcards</Link></Button>}>
+    <>
+      <div className="mb-4 flex justify-end">
+        <Button asChild variant="outline" size="sm"><Link to="/flashcards">Flashcards</Link></Button>
+      </div>
       <div className="flex flex-col">
         {!session ? (
           <div className="review-setup-container">
@@ -510,6 +512,6 @@ export function ReviewSessionPage() {
           </div>
         ) : null}
       </div>
-    </AppShell>
+    </>
   )
 }

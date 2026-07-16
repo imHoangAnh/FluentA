@@ -13,9 +13,9 @@ export function ProtectedRoute() {
     }
   }, [loadMe, status])
 
-  if (status === 'idle' || status === 'checking') {
-    return <div className="screen-status" role="status" aria-live="polite">Checking your FluentA session...</div>
-  }
+  // if (status === 'idle' || status === 'checking') {
+  //   return <div className="screen-status" role="status" aria-live="polite">Checking your session...</div>
+  // }
 
   if (!user) {
     return <Navigate to="/login" replace />

@@ -110,10 +110,17 @@ public `index.ts`; domain-neutral UI and infrastructure live under `src/shared`.
 Unit/component test infrastructure lives under `src/test`, and global styling
 lives under `src/styles`.
 
-`src/app/legacy-routes.tsx` is the explicit temporary seam for product domains
-that have not completed their E30 migration. Each later feature story replaces
-its legacy lazy route entries with that feature's public route objects. The
-manifest must shrink and is removed by the final migration story.
+The E30 migration is complete: each product feature exports its lazy route
+objects through its public API, and `app/router.tsx` composes them without a
+legacy route manifest.
+
+The authenticated route tree composes one persistent shell boundary:
+`ProtectedRoute` resolves session access, `ProtectedRuntime` starts
+application-wide authenticated realtime hooks, and `AppShellRouteLayout`
+renders the shared AppShell around the matched feature `Outlet`. Feature route
+handles provide static shell title, description, and content-container
+metadata. Dynamic actions remain inside their owning page so app composition
+does not own feature mutation state.
 
 Responsibilities are divided as follows:
 
@@ -312,8 +319,10 @@ The React frontend has one canonical styling entrypoint:
 `src/frontend/src/styles/design-system.css`. It owns Tailwind theme, Preflight,
 semantic `--ds-*` tokens, reduced-motion behavior, and the audited semantic
 component layer. Public authentication routes use their separate AuthShell;
-protected routes use AppShell, including nested Habit Stats, Settings, and
-page-specific learning routes.
+protected routes share one persistent AppShell route layout, including nested
+Habit Stats, Settings, and page-specific learning routes. The shell remains
+mounted during protected client-side navigation while its active route
+metadata and feature content change.
 
 Superseded global and route stylesheets are not runtime dependencies. Stable
 presentation uses utilities and shared primitives. Inline values are limited

@@ -3,7 +3,6 @@ import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useStat
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as assetsApi from '@/lib/api/assets.api'
 import * as countdownApi from '../api/countdown.api'
-import { AppShell } from '@/shared/components/layout/AppShell'
 
 const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
 
@@ -112,7 +111,7 @@ export function CountdownPage() {
   }
 
   return (
-    <AppShell title="Countdowns" description="Track important dates and reminder alerts.">
+    <>
       <main className="countdown-main">
         <header className="countdown-header">
           <div className="countdown-header-title">
@@ -223,6 +222,6 @@ export function CountdownPage() {
           </div>
         ) : null}
       </main>
-    </AppShell>
+    </>
   )
 }

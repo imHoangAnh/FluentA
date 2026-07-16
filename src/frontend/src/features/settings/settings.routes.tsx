@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
+import { appShellRoute } from '@/shared/components/layout/app-shell-route'
 import { SettingsLayout } from './pages/SettingsLayout'
 
 function lazySettingsPage<T extends Record<string, unknown>>(load: () => Promise<T>, name: keyof T) {
@@ -8,6 +9,10 @@ function lazySettingsPage<T extends Record<string, unknown>>(load: () => Promise
 
 export const settingsRoutes: RouteObject[] = [{
   path: 'settings',
+  handle: appShellRoute({
+    title: 'Settings',
+    description: 'Manage your profile and learning preferences.',
+  }),
   Component: SettingsLayout,
   children: [
     { index: true, element: <Navigate to="profile" replace /> },

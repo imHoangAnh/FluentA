@@ -6,7 +6,6 @@ import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
 
 type PracticeOutcome = 'correct' | 'wrong'
@@ -265,8 +264,10 @@ export function PracticeSessionPage() {
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
   return (
-    <AppShell title="Practice" description="Work through a page deck using your configured learning modes." headerActions={<Button asChild variant="outline" size="sm"><Link to="/practice">Back to decks</Link></Button>}>
-
+    <>
+      <div className="mb-4 flex justify-end">
+        <Button asChild variant="outline" size="sm"><Link to="/practice">Back to decks</Link></Button>
+      </div>
       {sessionQuery.isLoading || practiceSettingsQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading practice session...</p> : null}
       {sessionQuery.isError || practiceSettingsQuery.isError ? <p role="alert" className="text-sm text-destructive">This practice session is unavailable.</p> : null}
       {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length === 0 ? <p role="status" className="text-sm text-muted-foreground">This page has no words to practice.</p> : null}
@@ -415,6 +416,6 @@ export function PracticeSessionPage() {
           </article>
         </section>
       ) : null}
-    </AppShell>
+    </>
   )
 }

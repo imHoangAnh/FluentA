@@ -16,11 +16,10 @@ type AppShellProps = {
   children: ReactNode
   title: string
   description?: string
-  headerActions?: ReactNode
   contentClassName?: string
 }
 
-export function AppShell({ children, title, description, headerActions, contentClassName }: AppShellProps) {
+export function AppShell({ children, title, description, contentClassName }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const {
@@ -139,7 +138,6 @@ export function AppShell({ children, title, description, headerActions, contentC
         <main id="main-content" className={cn('mx-auto w-full max-w-[1480px] p-6 lg:p-8', contentClassName)}>
           <h1 className="sr-only">{title}</h1>
           {description ? <p className="sr-only">{description}</p> : null}
-          {headerActions ? <div className="mb-4 flex justify-end">{headerActions}</div> : null}
           {children}
         </main>
       </div>

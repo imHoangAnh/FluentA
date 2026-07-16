@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as habitApi from '../api/habit.api'
 import { HabitIconGlyph } from '../components/habit-icons'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Button } from '@/shared/components/ui/button'
 
 function browserTimeZone() {
@@ -32,11 +31,10 @@ export function HabitStatsPage() {
   const stats = statsQuery.data
 
   return (
-    <AppShell
-      title="Habit statistics"
-      description="Review streaks, completion rates, and schedule details."
-      headerActions={<Button asChild variant="outline" size="sm"><Link to="/habits"><ArrowLeft /> Habits</Link></Button>}
-    >
+    <>
+      <div className="mb-4 flex justify-end">
+        <Button asChild variant="outline" size="sm"><Link to="/habits"><ArrowLeft /> Habits</Link></Button>
+      </div>
       <section className="habit-shell">
         <div className="habit-hero">
           <div>
@@ -91,6 +89,6 @@ export function HabitStatsPage() {
           </>
         ) : null}
       </section>
-    </AppShell>
+    </>
   )
 }

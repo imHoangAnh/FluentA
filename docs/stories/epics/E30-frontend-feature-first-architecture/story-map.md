@@ -18,6 +18,7 @@
 | 14 | Focus and Time | `US-FE-014` Countdown feature boundary | normal | `/countdowns`, event/reminder behavior, API, and tests live in `features/countdown`. | `US-FE-013` |
 | 15 | Habit Tracking | `US-FE-015` Habits feature boundary | high-risk | `/habits` and `/habits/:habitId/stats`, semantic icons, API, realtime, and tests live in `features/habits`. | `US-FE-014` |
 | 16 | Final Cleanup | `US-FE-016` Legacy boundary retirement and release proof | high-risk | Temporary route/import allowlists and superseded `routes`, `components`, `lib`, and `stores` ownership paths are gone; global boundary checks, route regression, docs, decision, and Harness records agree. | `US-FE-015` |
+| 17 | Platform and Identity follow-up | `US-FE-017` Persistent protected AppShell route layout | high-risk | One AppShell route layout remains mounted across protected navigation, all protected feature routes supply shell metadata, and page-level AppShell wrappers are gone without URL, UI, auth, query, or realtime drift. | `US-FE-016` |
 
 ## Phase Checkpoints
 
@@ -32,6 +33,6 @@
 
 ## Current Story
 
-`US-FE-001` through `US-FE-009` are implemented, reviewed, verified, and
-locally committed. `US-FE-010` may begin only after its own planning and
-validation gate is recorded.
+`US-FE-001` through `US-FE-017` are implemented, reviewed, and verified.
+`US-FE-017` is not committed and retains documented external baseline failures
+from pre-existing user edits in `ProtectedRoute` and RouteFeedback.

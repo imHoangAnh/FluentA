@@ -1,7 +1,6 @@
 import { BookOpenText, ChevronRight, FileText, FolderPlus, Layers3, Loader2, Plus, Save } from 'lucide-react'
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
@@ -303,7 +302,7 @@ export function NotesPage() {
   }
 
   return (
-    <AppShell title="Notes" description="Organize boards, pages, and rich-text drafts in one workspace." contentClassName="h-screen max-w-none">
+    <>
       <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={() => setIsBoardFormOpen((value) => !value)}><FolderPlus /></Button></div>
@@ -398,6 +397,6 @@ export function NotesPage() {
           onConfirm={confirmDelete}
         />
       ) : null}
-    </AppShell>
+    </>
   )
 }

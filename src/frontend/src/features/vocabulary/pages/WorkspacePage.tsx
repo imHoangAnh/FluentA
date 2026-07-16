@@ -1,7 +1,6 @@
 import { BookOpenText, ChevronRight, FileText, Filter, FolderPlus, Plus, Search } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { ColumnSettings } from '../components/ColumnSettings'
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog'
@@ -181,10 +180,7 @@ export function WorkspacePage() {
   const deletePending = deleteBoard.isPending || deletePage.isPending
 
   return (
-    <AppShell
-      title="Vocabulary"
-      contentClassName="h-screen max-w-none"
-    >
+    <>
       <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -325,6 +321,6 @@ export function WorkspacePage() {
           onConfirm={confirmRename}
         />
       ) : null}
-    </AppShell>
+    </>
   )
 }

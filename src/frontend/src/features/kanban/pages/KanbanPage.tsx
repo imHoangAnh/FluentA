@@ -2,7 +2,6 @@ import { AlertCircle, ArrowDown, CalendarDays, ChevronRight, Columns3, Plus, Tra
 import { type DragEvent, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as kanbanApi from '../api/kanban.api'
-import { AppShell } from '@/shared/components/layout/AppShell'
 
 const priorities = ['Low', 'Medium', 'High', 'Critical'] as const
 const today = new Date()
@@ -231,7 +230,7 @@ export function KanbanPage() {
   }
 
   return (
-    <AppShell title="Kanban" description="Organize work across boards and columns.">
+    <>
       <main className="kanban-main-wrapper">
         <header className="kanban-header" aria-label="Kanban filters">
           <div className="kanban-filter-bar">
@@ -475,6 +474,6 @@ export function KanbanPage() {
         {message ? <p className="flashcard-status flashcard-status--error kanban-status-notice" role="alert">{message}</p> : null}
         {(boardQuery.isError || boardsQuery.isError) ? <p className="flashcard-status flashcard-status--error kanban-status-notice" role="alert">Could not load Kanban data.</p> : null}
       </main>
-    </AppShell>
+    </>
   )
 }

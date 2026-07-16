@@ -126,6 +126,10 @@ The target tree is an ownership model, not a requirement to add empty folders.
 - **D17 - Realtime infrastructure is shared, domain subscriptions are not.**
   `shared/lib/realtime/connection.ts` creates/configures connections. Feature
   realtime hooks own domain events, subscriptions, and query invalidation.
+- **D18 - Persistent protected AppShell.** One pathless route layout below
+  `ProtectedRuntime` owns AppShell for all protected content routes. Feature
+  route handles provide static shell metadata; dynamic page actions stay in
+  their owning pages. Public Auth routes remain outside this composition.
 
 ## Migration Phases
 

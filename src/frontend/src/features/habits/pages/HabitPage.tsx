@@ -2,7 +2,6 @@ import { BarChart3, CalendarClock, CheckSquare, ChevronLeft, ChevronRight, Edit3
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import * as habitApi from '../api/habit.api'
 import { HabitIconGlyph } from '../components/habit-icons'
 import { habitIconOptions } from '../components/habit-icon-options'
@@ -298,7 +297,7 @@ export function HabitPage() {
   }
 
   return (
-    <AppShell title="Habits" description="Build consistency with small actions every day.">
+    <>
       <div className="habit-tracker-main">
         {/* LEFT: HABIT LIST */}
         <div className="habit-tracker-sidebar">
@@ -594,6 +593,6 @@ export function HabitPage() {
           </div>
         )}
       </div>
-    </AppShell>
+    </>
   )
 }

@@ -4,7 +4,6 @@ import { BookOpen } from 'lucide-react'
 import * as flashcardApi from '../api/flashcard.api'
 import { LearningDeckLibrary } from '../components/LearningDeckLibrary'
 import { useFlashcardSync } from '../hooks/useFlashcardSync'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 
@@ -14,7 +13,7 @@ export function FlashcardsPage() {
   const boardGroups = useMemo(() => decksQuery.data ?? [], [decksQuery.data])
 
   return (
-    <AppShell title="Flashcards">
+    <>
       <div className="grid gap-5">
         {decksQuery.isLoading ? <div className="grid gap-4" aria-busy="true" aria-label="Loading flashcards">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div> : null}
         {decksQuery.isError ? <Card className="border-destructive/40"><CardContent className="p-5"><p role="alert" className="m-0 text-sm text-destructive">Unable to load flashcards. Try again when your connection is available.</p></CardContent></Card> : null}
@@ -23,6 +22,6 @@ export function FlashcardsPage() {
         ) : null}
         {!decksQuery.isLoading && !decksQuery.isError && boardGroups.length > 0 ? <LearningDeckLibrary boards={boardGroups} mode="flashcards" /> : null}
       </div>
-    </AppShell>
+    </>
   )
 }

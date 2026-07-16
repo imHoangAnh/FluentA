@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, CircleAlert, Inbox, LoaderCircle } from 'lucide-react'
-import { AppShell } from '@/shared/components/layout/AppShell'
 import { Alert } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -19,15 +18,12 @@ export function NotificationsPage() {
   const unreadCount = query.data?.filter((item) => !item.readAt).length ?? 0
 
   return (
-    <AppShell
-      title="Notifications"
-      description="Keep up with reminders and completed countdowns."
-      headerActions={
+    <>
+      <div className="mb-4 flex justify-end">
         <Button type="button" variant="outline" size="sm" disabled={unreadCount === 0 || readAll.isPending} onClick={() => readAll.mutate()}>
           <CheckCheck /> {readAll.isPending ? 'Marking read…' : 'Mark all read'}
         </Button>
-      }
-    >
+      </div>
       <Card>
         <CardHeader className="border-b border-border">
           <CardTitle>Inbox</CardTitle>
@@ -44,6 +40,6 @@ export function NotificationsPage() {
           })}</ul> : null}
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   )
 }

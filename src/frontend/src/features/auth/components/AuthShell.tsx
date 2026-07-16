@@ -3,7 +3,7 @@ import { type ReactNode } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 const orbitCards = [
-  { language: 'Vietnamese', phrase: 'Xin chào', position: 'left-1/2 top-1/2 z-10 size-[180px] -translate-x-1/2 -translate-y-1/2', accent: 'bg-slate-400' },
+  { language: 'Vietnamese', phrase: 'Xin chào', position: 'left-1/2 top-1/2 z-10 size-[150px] -translate-x-1/2 -translate-y-1/2', accent: 'bg-slate-400' },
   { language: 'Japanese', phrase: 'こんにちは', position: 'left-1/2 top-1/2 size-[120px] -translate-x-[260px] -translate-y-[170px]', accent: 'bg-purple-400' },
   { language: 'English', phrase: 'Hello', position: 'left-1/2 top-1/2 size-[120px] translate-x-[140px] -translate-y-[90px]', accent: 'bg-teal-400' },
   { language: 'Spanish', phrase: 'Hola', position: 'left-1/2 top-1/2 size-[120px] translate-x-[140px] translate-y-[90px]', accent: 'bg-yellow-400' },

@@ -15,6 +15,7 @@ import { pomodoroRoutes } from '@/features/pomodoro'
 import { countdownRoutes } from '@/features/countdown'
 import { habitsRoutes } from '@/features/habits'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
+import { AppShellRouteLayout } from './layouts/AppShellRouteLayout'
 import { ProtectedRoute } from './route-guards/ProtectedRoute'
 import { ProtectedRuntime } from './runtime/ProtectedRuntime'
 
@@ -24,13 +25,33 @@ const publicRoutes = authRoutes.map((route) => ({
   HydrateFallback: RouteLoading,
 }))
 
+export const protectedAppRoutes: RouteObject[] = [
+  ...dashboardRoutes,
+  ...settingsRoutes,
+  ...notificationsRoutes,
+  ...vocabularyRoutes,
+  ...flashcardRoutes,
+  ...practiceRoutes,
+  ...reviewRoutes,
+  ...todoRoutes,
+  ...kanbanRoutes,
+  ...journalRoutes,
+  ...notesRoutes,
+  ...pomodoroRoutes,
+  ...countdownRoutes,
+  ...habitsRoutes,
+]
+
 export const appRoutes: RouteObject[] = [
   ...publicRoutes,
   {
     element: <ProtectedRoute />,
     errorElement: <RouteError />,
     HydrateFallback: RouteLoading,
-    children: [{ element: <ProtectedRuntime />, children: [...dashboardRoutes, ...settingsRoutes, ...notificationsRoutes, ...vocabularyRoutes, ...flashcardRoutes, ...practiceRoutes, ...reviewRoutes, ...todoRoutes, ...kanbanRoutes, ...journalRoutes, ...notesRoutes, ...pomodoroRoutes, ...countdownRoutes, ...habitsRoutes] }],
+    children: [{
+      element: <ProtectedRuntime />,
+      children: [{ element: <AppShellRouteLayout />, children: protectedAppRoutes }],
+    }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

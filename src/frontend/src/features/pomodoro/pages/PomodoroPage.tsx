@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../api/pomodoro.api'
 import * as todoApi from '@/features/todo'
 import * as kanbanApi from '@/features/kanban'
-import { AppShell } from '@/shared/components/layout/AppShell'
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)
@@ -151,7 +150,7 @@ export function PomodoroPage() {
   const strokeDashoffset = 753.98 - (progressRatio * 753.98);
 
   return (
-    <AppShell title="Pomodoro" description="Focus with a server-synchronized timer.">
+    <>
       <main className="pomodoro-main">
         <header className="pomodoro-header">
           <div className="pomodoro-header-title">
@@ -347,6 +346,6 @@ export function PomodoroPage() {
           </div>
         </div>
       </main>
-    </AppShell>
+    </>
   )
 }
