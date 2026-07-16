@@ -58,7 +58,6 @@ describe('SettingsPage profile save', () => {
         fullName: 'FluentA Learner',
         isEmailVerified: true,
         bio: '',
-        avatarUrl: null,
       },
     })
 
@@ -69,7 +68,6 @@ describe('SettingsPage profile save', () => {
         fullName: 'FluentA Learner',
         isEmailVerified: true,
         bio: '',
-        avatarUrl: null,
       },
       practiceSettings: {
         modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
@@ -89,8 +87,7 @@ describe('SettingsPage profile save', () => {
     vi.mocked(assetsApi.uploadAvatarAsset).mockResolvedValue({
       id: 'asset-2',
       assetType: 'avatar',
-      status: 'finalized',
-      publicUrl: 'https://cdn.example.com/avatar-2.png',
+      status: 'ready',
       contentType: 'image/png',
       sizeBytes: 6,
       expiresAtUtc: null,
@@ -106,7 +103,8 @@ describe('SettingsPage profile save', () => {
         fullName: 'FluentA Learner',
         isEmailVerified: true,
         bio: '',
-        avatarUrl: 'https://cdn.example.com/avatar-2.png',
+        avatarAssetId: 'asset-2',
+        avatarDownloadUrl: 'https://signed.example.com/avatar-2.png',
       })
 
     renderPage()
@@ -140,8 +138,8 @@ describe('SettingsPage profile save', () => {
     vi.mocked(assetsApi.listAvatarAssets).mockResolvedValue([{
       id: 'asset-current',
       assetType: 'avatar',
-      status: 'finalized',
-      publicUrl: 'https://cdn.example.com/current.png',
+      status: 'ready',
+      downloadUrl: 'https://signed.example.com/current.png',
       contentType: 'image/png',
       sizeBytes: 2048,
       expiresAtUtc: null,
@@ -158,6 +156,6 @@ describe('SettingsPage profile save', () => {
 
     await waitFor(() => expect(screen.getByText('Current avatar deleted.')).toBeInTheDocument())
     expect(assetsApi.deleteAvatarAsset).toHaveBeenCalledWith('asset-current')
-    expect(useAuthStore.getState().user?.avatarUrl).toBeNull()
+    expect(useAuthStore.getState().user?.avatarDownloadUrl).toBeNull()
   })
 })

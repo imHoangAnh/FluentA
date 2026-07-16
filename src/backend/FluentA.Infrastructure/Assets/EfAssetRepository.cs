@@ -56,8 +56,8 @@ public sealed class EfAssetRepository : IAssetRepository
     {
         return await _dbContext.Assets
             .Where(asset => asset.DeletedAt == null
-                && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Expired
-                    || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Pending
+                && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Failed
+                    || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.PendingUpload
                         && asset.ExpiresAt.HasValue
                         && asset.ExpiresAt.Value <= nowUtc)))
             .OrderBy(asset => asset.CreatedAt)

@@ -6,7 +6,6 @@ import { getUserAvatarUrl } from '@/shared/lib/avatar'
 export type ShellAccount = {
   email?: string | null
   fullName?: string | null
-  avatarUrl?: string | null
   avatarDownloadUrl?: string | null
 }
 

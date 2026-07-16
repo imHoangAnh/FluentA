@@ -35,7 +35,7 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
             ContentType = request.ContentType
         });
 
-        return new AssetPresignedUpload(url, expiresAtUtc);
+        return new AssetPresignedUpload(url, expiresAtUtc, _options.Bucket);
     }
 
     public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request)

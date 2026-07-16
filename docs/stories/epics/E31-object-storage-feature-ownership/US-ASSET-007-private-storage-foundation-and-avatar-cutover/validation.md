@@ -100,3 +100,40 @@ The exact next authorized slice is **US-ASSET-007 only**: private,
 provider-neutral storage foundation plus the end-to-end Avatar cutover. It does
 not authorize Notes, Countdown, archive/purge, or the release-wide destructive
 reset.
+
+## Implementation Evidence (2026-07-17)
+
+- `dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj --no-restore`: **113 passed**.
+- Asset tests cover controlled key generation, claimed MIME/size/name validation,
+  a PNG MIME-spoofed object whose GIF bytes are rejected at finalize, bounded
+  signature inspection, and the `pending-upload -> ready` transition.
+- `dotnet build src/backend/FluentA.API/FluentA.API.csproj --no-restore`:
+  **passed**; the existing `Microsoft.OpenApi` NU1903 warning remains.
+- `npm --prefix src/frontend run test:run`: **17 files, 64 tests passed**.
+- `npm --prefix src/frontend run lint`: **passed**.
+- `npm --prefix src/frontend run build`: **passed**; existing dependency-only
+  SignalR/Rolldown pure-annotation warnings remain.
+- `npm --prefix src/frontend audit --omit=dev --audit-level=high`: **0
+  vulnerabilities**.
+- EF migration `20260716184235_AddAssetUploadMetadata` was generated and
+  applied locally. PostgreSQL proof for a disposable upload returned
+  `fluenta-assets-dev|e31-avatar.png|Ready` for
+  `bucket|original_name|status`.
+- Direct API/MinIO runtime proof used two disposable authenticated users:
+  owner `presign -> PUT -> finalize -> profile attach -> signed GET` returned
+  `status=ready`, signed GET **200**, and foreign avatar attach **404**. The
+  profile response did not contain `avatarUrl`.
+- Playwright browser proof passed:
+  `npx playwright test e2e/settings-account-learning.spec.js --grep
+  'Settings avatar uploads'` (**1 passed**). It uploads through Settings,
+  renders the `X-Amz-Algorithm` signed URL, verifies `/auth/me` omits
+  `avatarUrl`, and reloads to obtain a usable signed avatar URL.
+- The pre-existing route assertions were reconciled in the separately scoped
+  local commit `14390c6`; the restored ProtectedRoute status prevents an
+  idle/checking session from redirecting to Login before `loadMe()` completes.
+
+The shared bucket remains anonymous-download until US-ASSET-011 by the
+coordinated release gate. This story proves feature-authorized signed Avatar
+delivery and removes durable Avatar URLs from the client/profile contract; the
+temporary legacy `public_url` storage remains only for unfinished Note and
+Countdown consumers and is not exposed by Avatar APIs.

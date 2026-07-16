@@ -22,6 +22,8 @@ public sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(asset => asset.ContentType).HasColumnName("content_type").HasMaxLength(255).IsRequired();
         builder.Property(asset => asset.SizeBytes).HasColumnName("size_bytes").IsRequired();
         builder.Property(asset => asset.ExpiresAt).HasColumnName("expires_at");
+        builder.Property(asset => asset.Bucket).HasColumnName("bucket").HasMaxLength(255);
+        builder.Property(asset => asset.OriginalName).HasColumnName("original_name").HasMaxLength(255);
         builder.Property(asset => asset.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(asset => asset.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(asset => asset.DeletedAt).HasColumnName("deleted_at");

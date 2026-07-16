@@ -64,7 +64,7 @@ export function SettingsPage() {
         ...current,
         fullName: profile.fullName,
         bio: profile.bio ?? '',
-        avatarUrl: profile.avatarDownloadUrl ?? profile.avatarUrl ?? null,
+        avatarUrl: profile.avatarDownloadUrl ?? null,
         avatarFile: null,
         avatarAssetId: null,
         removeAvatar: false,
@@ -86,13 +86,15 @@ export function SettingsPage() {
       queryClient.setQueryData(['assets', 'avatar'], (current: assetsApi.OwnedAvatarAsset[] | undefined) =>
         current ? current.filter((item) => item.id !== asset.id) : current)
       if (asset.isCurrentAvatar && authUser) {
-        const nextUser = { ...authUser, avatarUrl: null }
+        const nextUser = { ...authUser, avatarAssetId: null, avatarDownloadUrl: null, avatarDownloadUrlExpiresAtUtc: null }
         setUser(nextUser)
         queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current ? {
           ...current,
           profile: {
             ...current.profile,
-            avatarUrl: null,
+            avatarAssetId: null,
+            avatarDownloadUrl: null,
+            avatarDownloadUrlExpiresAtUtc: null,
           },
         } : current)
         setProfileDraft((current) => current ? {
@@ -118,7 +120,7 @@ export function SettingsPage() {
       fullName: settingsQuery.data.profile.fullName,
       email: settingsQuery.data.profile.email,
       bio: settingsQuery.data.profile.bio ?? '',
-      avatarUrl: settingsQuery.data.profile.avatarDownloadUrl ?? settingsQuery.data.profile.avatarUrl ?? null,
+      avatarUrl: settingsQuery.data.profile.avatarDownloadUrl ?? null,
       avatarFile: null,
       avatarAssetId: null,
       removeAvatar: false,
@@ -140,7 +142,7 @@ export function SettingsPage() {
   const profileAvatarPreview = useMemo(() => {
     if (!resolvedProfile) return getUserAvatarUrl(authUser, 'Learner')
     if (resolvedProfile.removeAvatar) {
-      return getUserAvatarUrl({ avatarUrl: null }, resolvedProfile.fullName || 'Learner')
+      return getUserAvatarUrl(null, resolvedProfile.fullName || 'Learner')
     }
 
     if (avatarPreviewUrl) {
@@ -234,8 +236,8 @@ export function SettingsPage() {
           <div className="settings-asset-grid">
             {ownedAssets.map((asset) => (
               <article key={asset.id} className="settings-asset-card">
-                {asset.status === 'finalized' ? (
-                  <img className="settings-asset-thumb" src={asset.downloadUrl ?? asset.publicUrl} alt="Saved avatar" />
+                {asset.status === 'ready' && asset.downloadUrl ? (
+                  <img className="settings-asset-thumb" src={asset.downloadUrl} alt="Saved avatar" />
                 ) : (
                   <div className="settings-asset-thumb settings-asset-thumb--placeholder">{asset.status}</div>
                 )}

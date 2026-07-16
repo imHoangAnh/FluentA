@@ -80,7 +80,7 @@ public sealed partial class NoteContentProcessor : INoteContentProcessor
         {
             if (!ownedAssets.TryGetValue(assetId, out var asset)
                 || asset.Type != AssetType.NoteImage
-                || asset.Status != AssetStatus.Finalized)
+                || asset.Status != AssetStatus.Ready)
             {
                 throw new NoteContentValidationException(new Dictionary<string, string[]>
                 {

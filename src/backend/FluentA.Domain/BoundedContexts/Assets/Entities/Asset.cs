@@ -21,7 +21,9 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         string publicUrl,
         string contentType,
         long sizeBytes,
-        DateTime? expiresAtUtc)
+        DateTime? expiresAtUtc,
+        string? bucket,
+        string? originalName)
     {
         if (assetId.HasValue && assetId.Value != Guid.Empty)
         {
@@ -33,7 +35,7 @@ public sealed class Asset : BaseEntity, IAggregateRoot
             throw new ArgumentException("User id is required.", nameof(userId));
         }
 
-        if (status == AssetStatus.Pending && (!expiresAtUtc.HasValue || expiresAtUtc.Value == default))
+        if (status == AssetStatus.PendingUpload && (!expiresAtUtc.HasValue || expiresAtUtc.Value == default))
         {
             throw new ArgumentException("Pending assets must have an expiry.", nameof(expiresAtUtc));
         }
@@ -46,6 +48,8 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         ContentType = CleanContentType(contentType);
         SizeBytes = ValidateSizeBytes(sizeBytes);
         ExpiresAt = expiresAtUtc;
+        Bucket = CleanOptionalBucket(bucket);
+        OriginalName = CleanOptionalOriginalName(originalName);
     }
 
     public Guid UserId { get; private set; }
@@ -56,6 +60,8 @@ public sealed class Asset : BaseEntity, IAggregateRoot
     public string ContentType { get; private set; }
     public long SizeBytes { get; private set; }
     public DateTime? ExpiresAt { get; private set; }
+    public string? Bucket { get; private set; }
+    public string? OriginalName { get; private set; }
 
     public static Asset CreatePending(
         Guid assetId,
@@ -65,23 +71,27 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         string publicUrl,
         string contentType,
         long sizeBytes,
-        DateTime expiresAtUtc)
+        DateTime expiresAtUtc,
+        string? bucket = null,
+        string? originalName = null)
     {
         return new Asset(
             assetId,
             userId,
             type,
-            AssetStatus.Pending,
+            AssetStatus.PendingUpload,
             objectKey,
             publicUrl,
             contentType,
             sizeBytes,
-            expiresAtUtc);
+            expiresAtUtc,
+            bucket,
+            originalName);
     }
 
     public void FinalizeUpload(string publicUrl, string contentType, long sizeBytes)
     {
-        if (Status != AssetStatus.Pending)
+        if (Status != AssetStatus.PendingUpload)
         {
             throw new InvalidOperationException("Only pending assets can be finalized.");
         }
@@ -89,19 +99,19 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         PublicUrl = CleanPublicUrl(publicUrl);
         ContentType = CleanContentType(contentType);
         SizeBytes = ValidateSizeBytes(sizeBytes);
-        Status = AssetStatus.Finalized;
+        Status = AssetStatus.Ready;
         ExpiresAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
 
     public void MarkExpired(DateTime nowUtc)
     {
-        if (Status != AssetStatus.Pending)
+        if (Status != AssetStatus.PendingUpload)
         {
             throw new InvalidOperationException("Only pending assets can expire.");
         }
 
-        Status = AssetStatus.Expired;
+        Status = AssetStatus.Failed;
         UpdatedAt = nowUtc;
     }
 
@@ -148,6 +158,38 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         }
 
         return cleaned;
+    }
+
+    private static string? CleanOptionalBucket(string? bucket)
+    {
+        if (string.IsNullOrWhiteSpace(bucket))
+        {
+            return null;
+        }
+
+        var cleaned = bucket.Trim();
+        if (cleaned.Length > 255)
+        {
+            throw new ArgumentException("Bucket must be 255 characters or fewer.", nameof(bucket));
+        }
+
+        return cleaned;
+    }
+
+    private static string? CleanOptionalOriginalName(string? originalName)
+    {
+        if (string.IsNullOrWhiteSpace(originalName))
+        {
+            return null;
+        }
+
+        var fileName = Path.GetFileName(originalName.Trim().Replace('\\', '/'));
+        if (fileName.Length is < 1 or > 255 || fileName.Contains('\0'))
+        {
+            throw new ArgumentException("Original name must be a safe file name of 255 characters or fewer.", nameof(originalName));
+        }
+
+        return fileName;
     }
 
     private static long ValidateSizeBytes(long sizeBytes)

@@ -221,7 +221,7 @@ public sealed class CountdownService : ICountdownService
         }
 
         var asset = await _assets.GetOwnedAsync(userId, coverAssetId.Value, cancellationToken);
-        if (asset is null || asset.Type != AssetType.CountdownCover || asset.Status != AssetStatus.Finalized)
+        if (asset is null || asset.Type != AssetType.CountdownCover || asset.Status != AssetStatus.Ready)
         {
             errors["coverAssetId"] = ["Cover asset must be an owned finalized countdown-cover asset."];
             return null;

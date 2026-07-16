@@ -239,7 +239,8 @@ public sealed class AuthServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Updated Learner", result.Value!.FullName);
         Assert.Equal("Studies every morning.", result.Value.Bio);
-        Assert.Equal(avatarAsset.PublicUrl, result.Value.AvatarUrl);
+        Assert.Equal(avatarAsset.Id, result.Value.AvatarAssetId);
+        Assert.NotNull(result.Value.AvatarDownloadUrl);
     }
 
     [Fact]
@@ -267,7 +268,8 @@ public sealed class AuthServiceTests
             AvatarAssetId: secondAvatar.Id));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(secondAvatar.PublicUrl, result.Value!.AvatarUrl);
+        Assert.Equal(secondAvatar.Id, result.Value!.AvatarAssetId);
+        Assert.NotNull(result.Value.AvatarDownloadUrl);
         Assert.Equal(AssetStatus.Deleted, firstAvatar.Status);
         Assert.Contains(firstAvatar.ObjectKey, assetStorage.DeletedObjectKeys);
         var user = await users.GetByIdAsync(userId);
@@ -297,7 +299,8 @@ public sealed class AuthServiceTests
             RemoveAvatar: true));
 
         Assert.True(result.IsSuccess);
-        Assert.Null(result.Value!.AvatarUrl);
+        Assert.Null(result.Value!.AvatarAssetId);
+        Assert.Null(result.Value.AvatarDownloadUrl);
         Assert.Equal(AssetStatus.Deleted, avatarAsset.Status);
         Assert.Contains(avatarAsset.ObjectKey, assetStorage.DeletedObjectKeys);
         var user = await users.GetByIdAsync(userId);
@@ -518,8 +521,8 @@ public sealed class AuthServiceTests
         {
             return Task.FromResult<IReadOnlyList<Asset>>(_assets.Values
                 .Where(asset => asset.DeletedAt is null
-                    && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Expired
-                        || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Pending
+                    && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Failed
+                        || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.PendingUpload
                             && asset.ExpiresAt.HasValue
                             && asset.ExpiresAt.Value <= nowUtc)))
                 .OrderBy(asset => asset.CreatedAt)
@@ -571,7 +574,7 @@ public sealed class AuthServiceTests
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
         {
-            return new AssetPresignedUpload($"https://upload.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
+            return new AssetPresignedUpload($"https://upload.example.com/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime), "test-assets");
         }
 
         public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) =>

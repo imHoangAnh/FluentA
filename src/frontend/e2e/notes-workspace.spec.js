@@ -107,7 +107,7 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   const noteAssetId = assetIdMatch[1];
 
   const listedAssets = (await (await page.request.get('http://127.0.0.1:5000/api/v1/assets?assetType=note-image', { headers })).json()).data;
-  expect(listedAssets.some((asset) => asset.id === noteAssetId && asset.status === 'finalized')).toBe(true);
+  expect(listedAssets.some((asset) => asset.id === noteAssetId && asset.status === 'ready')).toBe(true);
 
   await page.goto('/journal');
   await expect(page).toHaveURL('http://127.0.0.1:5173/journal');

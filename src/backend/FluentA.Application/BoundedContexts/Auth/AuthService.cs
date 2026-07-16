@@ -327,7 +327,7 @@ public sealed partial class AuthService : IAuthService
                 return OperationResult<UserProfileDto>.Failure(AuthError.AssetNotFound());
             }
 
-            if (selectedAvatarAsset.Type != AssetType.Avatar || selectedAvatarAsset.Status != AssetStatus.Finalized)
+            if (selectedAvatarAsset.Type != AssetType.Avatar || selectedAvatarAsset.Status != AssetStatus.Ready)
             {
                 return OperationResult<UserProfileDto>.Failure(AuthError.AvatarAssetInvalid());
             }
@@ -440,7 +440,7 @@ public sealed partial class AuthService : IAuthService
         if (user.CurrentAvatarAssetId.HasValue)
         {
             var asset = await _assets.GetOwnedAsync(user.Id, user.CurrentAvatarAssetId.Value, cancellationToken);
-            if (asset is not null && asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Finalized)
+            if (asset is not null && asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Ready)
             {
                 try
                 {
@@ -461,7 +461,6 @@ public sealed partial class AuthService : IAuthService
             user.FullName,
             user.IsEmailVerified,
             user.Bio,
-            user.AvatarUrl,
             user.CurrentAvatarAssetId,
             downloadUrl,
             downloadUrlExpiresAtUtc);

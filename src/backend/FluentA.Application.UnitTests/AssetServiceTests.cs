@@ -39,13 +39,15 @@ public sealed class AssetServiceTests
         var users = new FakeUserRepository();
         var service = new AssetService(repository, storage, users);
 
-        var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/png"));
+        var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("avatar", result.Value!.Asset.AssetType);
-        Assert.Equal("pending", result.Value.Asset.Status);
+        Assert.Equal("pending-upload", result.Value.Asset.Status);
         Assert.Equal("PUT", result.Value.Method);
         Assert.Single(repository.Assets);
+        Assert.Equal("test-assets", repository.Assets.Single().Bucket);
+        Assert.Equal("avatar.png", repository.Assets.Single().OriginalName);
     }
 
     [Fact]
@@ -53,7 +55,20 @@ public sealed class AssetServiceTests
     {
         var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage(), new FakeUserRepository());
 
-        var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/gif"));
+        var result = await service.PresignAsync(Guid.NewGuid(), new PresignAssetRequest("avatar", "image/gif", "avatar.gif", 1024));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("VALIDATION_ERROR", ((AssetError)result.Error!).Code);
+    }
+
+    [Fact]
+    public async Task Presign_RejectsMissingOriginalNameAndOversizedClaim()
+    {
+        var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage(), new FakeUserRepository());
+
+        var result = await service.PresignAsync(
+            Guid.NewGuid(),
+            new PresignAssetRequest("avatar", "image/png", null, 2 * 1024 * 1024 + 1));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((AssetError)result.Error!).Code);
@@ -66,13 +81,13 @@ public sealed class AssetServiceTests
         var storage = new FakeAssetObjectStorage();
         var service = new AssetService(repository, storage, new FakeUserRepository());
         var userId = Guid.NewGuid();
-        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png"));
+        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
 
         var result = await service.FinalizeAsync(userId, new FinalizeAssetRequest(presign.Value!.Asset.Id));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("finalized", result.Value!.Status);
+        Assert.Equal("ready", result.Value!.Status);
         Assert.Equal(1024, result.Value.SizeBytes);
     }
 
@@ -83,7 +98,7 @@ public sealed class AssetServiceTests
         var storage = new FakeAssetObjectStorage { Prefix = [0x47, 0x49, 0x46, 0x38] };
         var service = new AssetService(repository, storage, new FakeUserRepository());
         var userId = Guid.NewGuid();
-        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png"));
+        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
 
         var result = await service.FinalizeAsync(userId, new FinalizeAssetRequest(presign.Value!.Asset.Id));
@@ -114,7 +129,7 @@ public sealed class AssetServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ASSET_UPLOAD_EXPIRED", ((AssetError)result.Error!).Code);
-        Assert.Equal(AssetStatus.Expired, repository.Assets.Single().Status);
+        Assert.Equal(AssetStatus.Failed, repository.Assets.Single().Status);
     }
 
     [Fact]
@@ -124,7 +139,7 @@ public sealed class AssetServiceTests
         var storage = new FakeAssetObjectStorage();
         var service = new AssetService(repository, storage, new FakeUserRepository());
         var userId = Guid.NewGuid();
-        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png"));
+        var presign = await service.PresignAsync(userId, new PresignAssetRequest("avatar", "image/png", "avatar.png", 1024));
         storage.Metadata = new AssetObjectMetadata(repository.Assets.Single().ObjectKey, 1024, "image/png", "etag");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -247,8 +262,8 @@ public sealed class AssetServiceTests
         {
             return Task.FromResult<IReadOnlyList<Asset>>(Assets
                 .Where(asset => asset.DeletedAt == null
-                    && (asset.Status == AssetStatus.Expired
-                        || (asset.Status == AssetStatus.Pending && asset.ExpiresAt <= nowUtc)))
+                    && (asset.Status == AssetStatus.Failed
+                        || (asset.Status == AssetStatus.PendingUpload && asset.ExpiresAt <= nowUtc)))
                 .ToList());
         }
 
@@ -272,7 +287,7 @@ public sealed class AssetServiceTests
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
         {
-            return new AssetPresignedUpload($"http://upload.local/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime));
+            return new AssetPresignedUpload($"http://upload.local/{request.ObjectKey}", DateTime.UtcNow.Add(request.Lifetime), "test-assets");
         }
 
         public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request) =>

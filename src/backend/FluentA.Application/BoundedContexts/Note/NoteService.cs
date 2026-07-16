@@ -193,7 +193,7 @@ public sealed class NoteService : INoteService
             }
 
             var asset = await _assets.GetOwnedAsync(userId, assetId, cancellationToken);
-            if (asset is null || asset.Type != AssetType.NoteImage || asset.Status != AssetStatus.Finalized)
+            if (asset is null || asset.Type != AssetType.NoteImage || asset.Status != AssetStatus.Ready)
             {
                 continue;
             }

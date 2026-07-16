@@ -2,7 +2,9 @@ namespace FluentA.Application.BoundedContexts.Assets;
 
 public sealed record PresignAssetRequest(
     string? AssetType = null,
-    string? ContentType = null);
+    string? ContentType = null,
+    string? OriginalName = null,
+    long? SizeBytes = null);
 
 public sealed record ListAssetsRequest(
     string? AssetType = null);
@@ -24,7 +26,6 @@ public sealed record OwnedAssetDto(
     Guid Id,
     string AssetType,
     string Status,
-    string PublicUrl,
     string ContentType,
     long SizeBytes,
     DateTime? ExpiresAtUtc,

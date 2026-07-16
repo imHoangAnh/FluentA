@@ -16,9 +16,8 @@ adds `note-image` as shared image asset types.
   backend verifies MinIO object metadata.
 - The authenticated user can finalize one optional countdown cover asset during
   countdown create after the backend verifies MinIO object metadata.
-- Finalized avatar assets expose a public URL that the frontend can render
-  immediately after the authenticated profile save links the asset as the
-  current avatar.
+- Ready avatar assets are rendered through a short-lived signed download URL
+  after the authenticated profile save links the asset as the current avatar.
 - The authenticated user can list saved owned avatar assets and delete any of
   them from Settings.
 
@@ -27,17 +26,19 @@ adds `note-image` as shared image asset types.
 - Assets are owned by the authenticated user only.
 - Supported `assetType` values are `avatar`, `countdown-cover`, and
   `note-image`.
-- Presign creates a pending asset record with a 1-hour expiry.
+- Presign creates a `pending-upload` asset record with a 1-hour expiry and
+  records the server-selected bucket plus sanitized original file name.
 - Finalize requires the owned asset to still be pending and unexpired.
 - Finalize verifies the MinIO object exists at the pending key, has an allowed
   image content type for the selected asset type, and is at most 2MB.
-- `PUT /api/v1/profile` can link an owned finalized avatar asset as the
+- `PUT /api/v1/profile` can link an owned ready avatar asset as the
   current profile avatar.
 - `POST /api/v1/countdowns` can link one owned finalized `countdown-cover`
   asset as the countdown cover during create only.
 - `GET /api/v1/assets?assetType=avatar` returns the authenticated user's
-  non-deleted owned avatar assets, newest first, and flags which one is the
-  current profile avatar.
+  non-deleted owned avatar assets, newest first, flags the current profile
+  avatar, and includes an authorized short-lived `downloadUrl` only for ready
+  avatar assets.
 - `DELETE /api/v1/assets/{assetId}` soft-deletes the owned asset metadata and
   performs best-effort object deletion.
 - Deleting the current avatar asset also clears the profile's
@@ -52,8 +53,13 @@ adds `note-image` as shared image asset types.
 ## Persistence Rules
 
 - Shared asset metadata is stored in PostgreSQL `assets`.
-- Each row stores `user_id`, `asset_type`, `status`, `object_key`,
-  `public_url`, `content_type`, `size_bytes`, and optional `expires_at`.
+- Each new row stores `user_id` (transitioning to `uploaded_by_user_id` in the
+  coordinated release), `bucket`, `asset_type`, `status`, `object_key`,
+  sanitized `original_name`, `content_type`, `size_bytes`, and optional
+  `expires_at`.
+- The legacy `public_url` column remains internal only while Notes and
+  Countdown finish their cutovers. US-ASSET-011 removes it; Avatar API DTOs
+  and profile responses must not use it.
 - `auth_users.current_avatar_asset_id` points at the owned finalized avatar
   asset currently displayed by the profile.
 - The shipped runtime no longer stores any provider-specific avatar identifier
@@ -104,8 +110,9 @@ All responses use the FluentA envelope.
 - The presigned URL accepts a direct browser PUT with the requested content
   type.
 - Finalize fails when no object exists at the pending key.
-- Finalize succeeds after upload and returns finalized asset metadata with the
-  public URL and durable size/content-type values.
+- Finalize succeeds after upload and returns ready asset metadata with durable
+  size/content-type values. Avatar list/profile reads issue short-lived signed
+  URLs after authorization rather than returning a durable URL.
 - The finalized asset row is durable in PostgreSQL, remains owned by the
   authenticated user, and can become the current profile avatar through
   explicit Settings-page save.

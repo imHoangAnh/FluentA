@@ -130,7 +130,7 @@ public sealed class NoteServiceTests
         var updated = await service.UpdatePageAsync(userId, first.Value.Id, new UpdateNotePageRequest(Content: "<p>Removed from first</p>"));
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(AssetStatus.Finalized, asset.Status);
+        Assert.Equal(AssetStatus.Ready, asset.Status);
     }
 
     private sealed class FakeNoteRepository : INoteRepository

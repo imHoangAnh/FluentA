@@ -67,7 +67,6 @@ function createQueryClient() {
       fullName: 'FluentA Learner',
       isEmailVerified: true,
       bio: '',
-      avatarUrl: null,
     },
     practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
     reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },

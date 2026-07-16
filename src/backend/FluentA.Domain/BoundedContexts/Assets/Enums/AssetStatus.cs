@@ -2,8 +2,17 @@ namespace FluentA.Domain.BoundedContexts.Assets.Enums;
 
 public enum AssetStatus
 {
-    Pending = 1,
-    Finalized = 2,
-    Expired = 3,
-    Deleted = 4
+    PendingUpload = 1,
+    Ready = 2,
+    Failed = 3,
+    Archived = 4,
+    PendingDeletion = 5,
+    Deleted = 6,
+
+    [Obsolete("Use PendingUpload.")]
+    Pending = PendingUpload,
+    [Obsolete("Use Ready.")]
+    Finalized = Ready,
+    [Obsolete("Use Failed.")]
+    Expired = Failed
 }

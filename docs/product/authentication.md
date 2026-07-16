@@ -47,12 +47,14 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
 - PostgreSQL stores auth users in `auth_users` through EF Core migrations.
 - Email is normalized and unique.
 - Google subject ids are optional and unique when present.
-- User profiles store `full_name`, `bio`, and optional `avatar_url`.
+- User profiles store `full_name`, `bio`, and an optional avatar-asset
+  relationship. The legacy `avatar_url` column is transitional storage only
+  until US-ASSET-011 and is not exposed by profile APIs.
 - Shared user-owned asset metadata lives in `assets`, and
   `auth_users.current_avatar_asset_id` can point at the current avatar asset.
-- The current shipped MinIO avatar flow stores the public avatar URL on the
-  user profile and points `current_avatar_asset_id` at the owned finalized
-  avatar asset.
+- The Avatar delivery flow points `current_avatar_asset_id` at the owned ready
+  avatar asset and returns a feature-authorized short-lived
+  `avatarDownloadUrl` on profile reads.
 - The shipped avatar runtime no longer stores or depends on any
   Cloudinary-specific profile identifier.
 - Deleting the current avatar asset clears both `current_avatar_asset_id` and
@@ -171,15 +173,17 @@ All responses use the FluentA envelope:
 - Password reset links are single-use and allow login with the new password without revoking other sessions.
 - Email/password login returns an access token and sets an HttpOnly refresh cookie.
 - `/me` returns the logged-in user with a valid access token.
-- `/me` and login/refresh responses expose the current `fullName`, optional `bio`, and optional `avatarUrl`.
+- `/me` and login/refresh responses expose the current `fullName`, optional
+  `bio`, `avatarAssetId`, and an optional short-lived `avatarDownloadUrl`.
 - Refresh returns a new access token while the refresh cookie is valid.
 - Logout revokes the refresh token, clears the cookie, and the protected UI no longer shows authenticated content.
 - Profile saves update Settings and the existing authenticated identity
-  surfaces by linking a finalized owned avatar asset without exposing internal
-  asset-management identifiers to clients.
+  surfaces by linking a ready owned avatar asset. Profile reads expose only the
+  current avatar relationship and its short-lived authorized download URL.
 - Settings can list saved avatar assets, delete a retired asset without
-  changing the profile, and delete the current avatar while `avatarUrl`,
-  `avatar_url`, and `current_avatar_asset_id` all clear together.
+  changing the profile, and delete the current avatar while
+  `avatarAssetId`/`avatarDownloadUrl`, `avatar_url`, and
+  `current_avatar_asset_id` all clear together.
 - The shared asset API can presign an avatar upload, reject finalize before
   upload, and finalize the uploaded object after MinIO metadata verification.
 - Replacing or removing the current avatar clears or rewires

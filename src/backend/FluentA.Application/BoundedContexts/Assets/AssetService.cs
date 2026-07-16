@@ -43,7 +43,7 @@ public sealed class AssetService : IAssetService
         foreach (var asset in assets.Where(asset => asset.Type == requestedType))
         {
             AssetPresignedDownload? download = null;
-            if (asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Finalized)
+            if (asset.Type == AssetType.Avatar && asset.Status == AssetStatus.Ready)
             {
                 try
                 {
@@ -92,7 +92,9 @@ public sealed class AssetService : IAssetService
             _storage.GetPublicUrl(objectKey),
             request.ContentType!,
             0,
-            upload.ExpiresAtUtc);
+            upload.ExpiresAtUtc,
+            upload.Bucket,
+            request.OriginalName);
         await _assets.AddAsync(asset, cancellationToken);
 
         return OperationResult<PresignedAssetUploadDto>.Success(new PresignedAssetUploadDto(
@@ -117,7 +119,7 @@ public sealed class AssetService : IAssetService
             return OperationResult<AssetDto>.Failure(AssetError.NotFound());
         }
 
-        if (asset.Status != AssetStatus.Pending)
+        if (asset.Status != AssetStatus.PendingUpload)
         {
             return OperationResult<AssetDto>.Failure(AssetError.InvalidUploadedObject("Only pending assets can be finalized."));
         }
@@ -218,7 +220,7 @@ public sealed class AssetService : IAssetService
         {
             await TryDeleteUploadedObjectAsync(asset.ObjectKey, cancellationToken);
 
-            if (asset.Status == AssetStatus.Pending)
+            if (asset.Status == AssetStatus.PendingUpload)
             {
                 asset.MarkExpired(nowUtc);
             }
@@ -240,6 +242,16 @@ public sealed class AssetService : IAssetService
         if (string.IsNullOrWhiteSpace(request.ContentType) || !AllowedImageMimeTypes.Contains(request.ContentType.Trim()))
         {
             errors["contentType"] = ["Uploads must be JPG, PNG, or WebP."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OriginalName) || request.OriginalName.Trim().Length > 255)
+        {
+            errors["originalName"] = ["Original file name is required and must be 255 characters or fewer."];
+        }
+
+        if (!request.SizeBytes.HasValue || request.SizeBytes.Value is < 1 or > 2 * 1024 * 1024)
+        {
+            errors["sizeBytes"] = ["Claimed upload size must be between 1 byte and 2MB."];
         }
 
         return errors;
@@ -360,6 +372,20 @@ public sealed class AssetService : IAssetService
         };
     }
 
+    private static string ToAssetStatusValue(AssetStatus status)
+    {
+        return status switch
+        {
+            AssetStatus.PendingUpload => "pending-upload",
+            AssetStatus.Ready => "ready",
+            AssetStatus.Failed => "failed",
+            AssetStatus.Archived => "archived",
+            AssetStatus.PendingDeletion => "pending-deletion",
+            AssetStatus.Deleted => "deleted",
+            _ => throw new InvalidOperationException("Unsupported asset status.")
+        };
+    }
+
     private async Task TryDeleteUploadedObjectAsync(string objectKey, CancellationToken cancellationToken)
     {
         try
@@ -376,7 +402,7 @@ public sealed class AssetService : IAssetService
         return new AssetDto(
             asset.Id,
             ToAssetTypeValue(asset.Type),
-            asset.Status.ToString().ToLowerInvariant(),
+            ToAssetStatusValue(asset.Status),
             asset.PublicUrl,
             asset.ContentType,
             asset.SizeBytes,
@@ -390,8 +416,7 @@ public sealed class AssetService : IAssetService
         return new OwnedAssetDto(
             asset.Id,
             ToAssetTypeValue(asset.Type),
-            asset.Status.ToString().ToLowerInvariant(),
-            asset.PublicUrl,
+            ToAssetStatusValue(asset.Status),
             asset.ContentType,
             asset.SizeBytes,
             asset.ExpiresAt,
