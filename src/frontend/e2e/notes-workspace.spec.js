@@ -107,8 +107,8 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   expect(assetIdMatch).not.toBeNull();
   const noteAssetId = assetIdMatch[1];
 
-  const listedAssets = (await (await page.request.get('http://127.0.0.1:5000/api/v1/assets?assetType=note-image', { headers })).json()).data;
-  expect(listedAssets.some((asset) => asset.id === noteAssetId && asset.status === 'ready')).toBe(true);
+  const genericAssetsListResponse = await page.request.get('http://127.0.0.1:5000/api/v1/assets?assetType=note-image', { headers });
+  expect(genericAssetsListResponse.status()).toBe(404);
 
   await page.goto('/journal');
   await expect(page).toHaveURL('http://127.0.0.1:5173/journal');
@@ -133,9 +133,6 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
 
   const cleanupPage = (await (await page.request.get(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, { headers })).json()).data;
   expect(cleanupPage.content).not.toContain(noteAssetId);
-
-  const assetsAfterCleanup = (await (await page.request.get('http://127.0.0.1:5000/api/v1/assets?assetType=note-image', { headers })).json()).data;
-  expect(assetsAfterCleanup.some((asset) => asset.id === noteAssetId && asset.status === 'ready')).toBe(true);
 
   const foreignPage = await browser.newPage();
   const foreignUser = await registerAndLogin(foreignPage, 'notes-foreign');

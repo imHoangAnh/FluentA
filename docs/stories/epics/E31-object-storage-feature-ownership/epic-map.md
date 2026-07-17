@@ -20,12 +20,12 @@ future S3-compatible adapter.
 | US-ASSET-010 | Delete/replace archives assets for 30 days and an hourly job claims, retries, and purges expired objects | US-ASSET-007, US-ASSET-008, US-ASSET-009 | state-machine tests, atomic detach/archive integration, concurrent claim/retry MinIO proof |
 | US-ASSET-011 | Destructive reset, legacy URL removal, private bucket cutover, docs, and full release proof are reconciled | US-ASSET-008, US-ASSET-009, US-ASSET-010 | seeded legacy migration, deletion-queue drain, static/OpenAPI scan, backend/frontend/E2E/platform proof |
 
-## Current Story
+## Release Status
 
-`US-ASSET-011` is the active release closeout. It owns the intentionally
-irreversible reset, removal of URL-era contracts, and private bucket activation
-after the earlier feature cutovers. Its final browser and live queue-drain proof
-must be captured before production release.
+E31 is implemented and release-proven through US-ASSET-011. The intentionally
+irreversible reset, URL-era contract removal, private bucket activation, live
+21-key deletion-queue drain, and focused Avatar/Note/Countdown browser proof
+are captured in the tracked story evidence.
 
 ## Story Invariants
 

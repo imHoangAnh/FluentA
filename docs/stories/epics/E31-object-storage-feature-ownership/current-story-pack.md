@@ -43,10 +43,19 @@ Out of scope:
 
 ## Validation Gate
 
-Before story close, require:
+Story close requires:
 
 1. generated irreversible migration, model snapshot, and applied local
    PostgreSQL before/after counts;
 2. static contract scan and full backend/frontend regression builds;
 3. private MinIO bootstrap proof and scheduled queue registration;
 4. browser and live scheduled-drain proof before a production release.
+
+## Closeout Status
+
+All four gates are satisfied. The applied migration reset 21 tracked legacy
+assets into the durable deletion queue, the live worker drained all 21 keys,
+the bucket is private with direct anonymous access denied, and the focused
+Avatar/Note/Countdown browser release suite passed 5/5. Full command evidence
+and the seven private, untracked local-development residual objects are recorded
+in the US-ASSET-011 `validation.md`.

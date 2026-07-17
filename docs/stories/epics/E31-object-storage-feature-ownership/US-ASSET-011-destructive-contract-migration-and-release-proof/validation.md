@@ -75,15 +75,34 @@ backfill, compatibility API, recovery switch, or environment guard.
   tests with one worker; API and frontend production builds passed. Existing
   warnings are `NU1903` for Microsoft.OpenApi and SignalR annotation warnings.
 
-## Remaining Release Proof
+## Final Runtime And Release Proof
 
-- The durable queue is observable locally as `pending=21`, and the five-minute
-  `legacy-asset-deletion-queue` Hangfire registration is present. The desktop
-  terminal wrapper terminated the API before a scheduled tick, so this run did
-  not observe a live queue drain or browser E2E flow. Do not treat either as
-  completed platform/browser evidence.
-- `npm --prefix src/frontend run test:e2e` confirmed the browser prerequisite
-  is unavailable in this desktop run: 54 tests stopped at
-  `ERR_CONNECTION_REFUSED` for `127.0.0.1:5173`; two API-only tests passed.
-  These results occur before feature assertions and do not replace live E2E
-  proof for this release.
+- A live API/Hangfire worker drained all 21 rows in
+  `legacy_asset_deletion_queue` to `deleted`. A MinIO/queue key-set comparison
+  found `remaining_queued_keys=0`, proving that none of the 21 tracked legacy
+  objects remains in the bucket.
+- MinIO reports the bucket policy as `private`, and a direct anonymous request
+  for a current READY object returned HTTP `403`.
+- Focused Playwright release proof passed 5/5 with one worker: Countdown CRUD
+  and cover lifecycle, anonymous Notes protection, Note image
+  upload/hydration/reload/cleanup and cross-user denial, signed Avatar upload
+  and rendering without a durable profile URL, and the Settings persistence
+  flow. The Note smoke also verifies that the retired generic Assets list route
+  returns `404`.
+- Final regression proof passed: backend solution tests 40 domain + 115
+  application, frontend Vitest 17 files / 63 tests, frontend ESLint, and the
+  production frontend build. The existing SignalR/Rolldown pure-annotation
+  warnings remain non-blocking.
+- Final static/OpenAPI/schema scans found no active URL-era identifiers, no
+  generic Assets list/delete route, no `publicUrl`, `avatarUrl`, or `coverUrl`
+  OpenAPI fields, and no `public_url`/`avatar_url` database columns;
+  `uploaded_by_user_id` is present.
+
+## Known Non-Blocking Local Residual
+
+- The local development bucket contains seven pre-E31 objects that had no
+  `assets` row when the migration ran. They are not part of the 21-key durable
+  deletion queue, cannot be reached through an owning-feature relationship,
+  and are not anonymously readable under the private policy. They were left in
+  place because deleting user-owned, untracked local objects is outside the
+  database-keyed reset contract; all DB-tracked legacy objects were removed.
