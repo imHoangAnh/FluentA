@@ -94,9 +94,9 @@ separate approval.
    no feature-scoped replacement is available, or if bounded signature
    inspection cannot be implemented without full-object unbounded reads.
 
-## Implementation Authorization Requested
+## Approved Implementation Boundary
 
-The exact next authorized slice is **US-ASSET-007 only**: private,
+The approved slice was **US-ASSET-007 only**: private,
 provider-neutral storage foundation plus the end-to-end Avatar cutover. It does
 not authorize Notes, Countdown, archive/purge, or the release-wide destructive
 reset.

@@ -27,8 +27,6 @@ dotnet test src/backend/FluentA.Application.UnitTests/FluentA.Application.UnitTe
 dotnet build src/backend/FluentA.API/FluentA.API.csproj
 ```
 
-## Acceptance Evidence
-
 ## Validation Readiness
 
 | Assumption | Risk | Evidence | Result |
