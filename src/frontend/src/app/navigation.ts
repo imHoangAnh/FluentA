@@ -18,7 +18,7 @@ const practiceRoute = (pathname: string) => pathname === '/practice'
 
 export const shellNavigationSections: ShellNavigationSection[] = [
   {
-    label: 'Learning',
+    label: 'Studying',
     items: [
       { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
       { to: '/vocabulary', label: 'Vocabulary', icon: BookOpenText },
