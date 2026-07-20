@@ -1,4 +1,3 @@
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
@@ -22,9 +21,6 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
         builder.Property(history => history.TimeSpentSeconds).HasColumnName("time_spent_seconds").IsRequired();
         builder.Property(history => history.ReviewedAt).HasColumnName("reviewed_at").IsRequired();
         builder.Property(history => history.Result).HasColumnName("result").HasConversion<string>().HasMaxLength(20).IsRequired();
-        builder.Property(history => history.LevelBefore).HasColumnName("level_before").IsRequired();
-        builder.Property(history => history.LevelAfter).HasColumnName("level_after").IsRequired();
-        builder.Property(history => history.NextReviewDate).HasColumnName("next_review_date").IsRequired();
         builder.Property(history => history.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(history => history.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(history => history.DeletedAt).HasColumnName("deleted_at");

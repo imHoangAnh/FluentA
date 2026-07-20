@@ -8,6 +8,5 @@ public interface IScheduledProductivityJobs
     Task CleanupRetiredCountdownsAsync(CancellationToken cancellationToken = default);
     Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default);
     Task PurgeExpiredArchivedAssetsAsync(CancellationToken cancellationToken = default);
-    Task DrainLegacyAssetDeletionQueueAsync(CancellationToken cancellationToken = default);
     Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default);
 }

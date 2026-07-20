@@ -4,7 +4,6 @@ using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 

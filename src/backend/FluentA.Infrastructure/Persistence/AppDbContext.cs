@@ -1,6 +1,5 @@
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
 using FluentA.Domain.BoundedContexts.Note.Entities;
@@ -26,13 +25,10 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Asset> Assets => Set<Asset>();
-    public DbSet<LegacyAssetDeletionQueueItem> LegacyAssetDeletionQueue => Set<LegacyAssetDeletionQueueItem>();
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();
     public DbSet<VocabWord> Words => Set<VocabWord>();
     public DbSet<VocabBoardPreference> VocabBoardPreferences => Set<VocabBoardPreference>();
-    public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
-    public DbSet<FlashcardCard> FlashcardCards => Set<FlashcardCard>();
     public DbSet<WordReviewState> WordReviewStates => Set<WordReviewState>();
     public DbSet<WordReviewHistory> WordReviewHistories => Set<WordReviewHistory>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();

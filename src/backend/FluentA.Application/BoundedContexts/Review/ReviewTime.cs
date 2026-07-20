@@ -36,11 +36,6 @@ public static class ReviewTime
         return LocalDate(reviewedAtUtc, timeZone).AddDays(intervalDays);
     }
 
-    public static DateTime HistoryDueAtUtc(DateOnly nextReviewDate)
-    {
-        return nextReviewDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-    }
-
     public static (DateTime StartUtc, DateTime EndUtc) LocalDayBoundsUtc(DateTime utcNow, TimeZoneInfo timeZone)
     {
         var localDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;

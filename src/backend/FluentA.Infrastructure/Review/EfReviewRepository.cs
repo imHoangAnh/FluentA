@@ -476,10 +476,7 @@ public sealed class EfReviewRepository : IReviewRepository
             sessionId,
             timeSpentSeconds,
             reviewedAt,
-            correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong,
-            levelBefore,
-            schedule.LevelAfter,
-            ReviewTime.HistoryDueAtUtc(nextReviewDate));
+            correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong);
         await _dbContext.WordReviewHistories.AddAsync(review, cancellationToken);
         sessionItem.MarkReviewed();
 

@@ -1,5 +1,4 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using Microsoft.EntityFrameworkCore;

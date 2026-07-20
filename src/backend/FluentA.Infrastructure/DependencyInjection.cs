@@ -118,7 +118,6 @@ public static class DependencyInjection
         services.AddHttpClient<IPronunciationAssessmentProvider, AzurePronunciationAssessmentProvider>();
         services.AddScoped<IReviewEnrollmentPort>(provider => provider.GetRequiredService<IReviewService>() as IReviewEnrollmentPort
             ?? throw new InvalidOperationException("Review service must implement review enrollment."));
-        services.AddScoped<IFlashcardVocabularySyncPort, EfFlashcardVocabularySyncPort>();
         services.AddScoped<IVocabularyReviewCleanupPort, EfVocabularyReviewCleanupPort>();
         services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();

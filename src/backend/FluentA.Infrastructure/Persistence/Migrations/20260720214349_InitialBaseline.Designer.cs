@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FluentA.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260709072143_AddNoteWorkspaceFoundation")]
-    partial class AddNoteWorkspaceFoundation
+    [Migration("20260720214349_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,6 +31,15 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Bucket")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("bucket");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
@@ -56,11 +65,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1024)")
                         .HasColumnName("object_key");
 
-                    b.Property<string>("PublicUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("public_url");
+                    b.Property<string>("OriginalName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("original_name");
+
+                    b.Property<DateTime?>("PurgeAfterAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purge_after_at");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint")
@@ -82,18 +94,20 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid>("UploadedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("uploaded_by_user_id");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ObjectKey")
                         .IsUnique();
 
-                    b.HasIndex("UserId", "Status", "DeletedAt");
+                    b.HasIndex("Status", "PurgeAfterAt");
 
-                    b.HasIndex("UserId", "Type", "DeletedAt");
+                    b.HasIndex("UploadedByUserId", "Status", "DeletedAt");
+
+                    b.HasIndex("UploadedByUserId", "Type", "DeletedAt");
 
                     b.ToTable("assets", (string)null);
                 });
@@ -104,11 +118,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<string>("AvatarUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
-                        .HasColumnName("avatar_url");
 
                     b.Property<string>("Bio")
                         .IsRequired()
@@ -265,171 +274,13 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CoverAssetId")
+                        .IsUnique()
+                        .HasFilter("\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+
                     b.HasIndex("UserId", "TargetDate");
 
                     b.ToTable("countdowns", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Collocation")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("collocation");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DeckId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deck_id");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<float>("EaseFactor")
-                        .HasColumnType("real")
-                        .HasColumnName("ease_factor");
-
-                    b.Property<string>("Example")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("example");
-
-                    b.Property<int>("Interval")
-                        .HasColumnType("integer")
-                        .HasColumnName("interval");
-
-                    b.Property<string>("MeaningEn")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("meaning_en");
-
-                    b.Property<string>("MeaningVn")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("meaning_vn");
-
-                    b.Property<DateTime?>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_review_date");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("note");
-
-                    b.Property<int>("Repetitions")
-                        .HasColumnType("integer")
-                        .HasColumnName("repetitions");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("state");
-
-                    b.Property<string>("Thesaurus")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("thesaurus");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Word")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("word");
-
-                    b.Property<string>("WordClass")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("word_class");
-
-                    b.Property<Guid>("WordId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("word_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WordId");
-
-                    b.HasIndex("DeckId", "WordId")
-                        .IsUnique();
-
-                    b.HasIndex("NextReviewDate", "State");
-
-                    b.ToTable("flashcard_cards", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BoardId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("board_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid?>("PageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("page_id");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("type");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PageId")
-                        .IsUnique()
-                        .HasFilter("page_id IS NOT NULL");
-
-                    b.HasIndex("BoardId", "Type");
-
-                    b.HasIndex("UserId", "BoardId");
-
-                    b.ToTable("flashcard_decks", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", b =>
@@ -438,11 +289,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<string>("Color")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -469,8 +315,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnName("frequency");
 
                     b.Property<string>("Icon")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Default")
                         .HasColumnName("icon");
 
                     b.Property<DateTime?>("LastReminderSentOn")
@@ -806,6 +655,43 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("BoardId", "CreatedAt");
 
                     b.ToTable("note_pages", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NotePageAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("NotePageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("note_page_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId")
+                        .IsUnique();
+
+                    b.HasIndex("NotePageId", "DeletedAt");
+
+                    b.ToTable("note_page_assets", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Notification.Entities.Notification", b =>
@@ -1233,18 +1119,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<int>("LevelAfter")
-                        .HasColumnType("integer")
-                        .HasColumnName("level_after");
-
-                    b.Property<int>("LevelBefore")
-                        .HasColumnType("integer")
-                        .HasColumnName("level_before");
-
-                    b.Property<DateTime>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_review_date");
-
                     b.Property<string>("Result")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1308,16 +1182,16 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lapse_count");
 
-                    b.Property<DateTime?>("LastReviewedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateOnly?>("LastReviewedAt")
+                        .HasColumnType("date")
                         .HasColumnName("last_reviewed_at");
 
                     b.Property<int>("Level")
                         .HasColumnType("integer")
                         .HasColumnName("level");
 
-                    b.Property<DateTime>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateOnly>("NextReviewDate")
+                        .HasColumnType("date")
                         .HasColumnName("next_review_date");
 
                     b.Property<string>("Status")
@@ -1383,6 +1257,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("note");
 
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(240)
@@ -1399,7 +1277,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Date");
+                    b.HasIndex("UserId", "Date", "SortOrder");
 
                     b.HasIndex("UserId", "IsCompleted", "Date");
 
@@ -1620,7 +1498,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -1642,13 +1520,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardCard", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Flashcards.Entities.FlashcardDeck", null)
+                    b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
                         .WithMany()
-                        .HasForeignKey("DeckId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("CoverAssetId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Habit.Entities.HabitEntry", b =>
@@ -1693,6 +1570,21 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany("Pages")
                         .HasForeignKey("BoardId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NotePageAsset", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Note.Entities.NotePage", null)
+                        .WithMany()
+                        .HasForeignKey("NotePageId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

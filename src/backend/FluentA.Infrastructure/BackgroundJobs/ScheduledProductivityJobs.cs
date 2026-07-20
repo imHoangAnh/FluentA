@@ -4,8 +4,6 @@ using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
-using FluentA.Domain.BoundedContexts.Assets.Enums;
-using FluentA.Domain.BoundedContexts.Countdown.Entities;
 
 namespace FluentA.Infrastructure.BackgroundJobs;
 
@@ -14,14 +12,12 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
     private readonly IAssetService _assetService;
-    private readonly IAssetObjectStorage _assetStorage;
 
-    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService, IAssetObjectStorage assetStorage)
+    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService)
     {
         _dbContext = dbContext;
         _logger = logger;
         _assetService = assetService;
-        _assetStorage = assetStorage;
     }
 
     public async Task CarryOverTodosAsync(CancellationToken cancellationToken = default)
@@ -140,65 +136,6 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     {
         var result = await _assetService.PurgeExpiredArchivedAsync(cancellationToken);
         _logger.LogInformation("ArchivedAssetPurgeJob claimed {Claimed} assets, deleted {Deleted}, failed {Failed}.", result.Claimed, result.Deleted, result.Failed);
-    }
-
-    public async Task DrainLegacyAssetDeletionQueueAsync(CancellationToken cancellationToken = default)
-    {
-        var now = DateTime.UtcNow;
-        await _assetStorage.EnsurePrivateBucketAsync(cancellationToken);
-
-        var candidates = await _dbContext.LegacyAssetDeletionQueue
-            .Where(item => item.Status == "pending")
-            .OrderBy(item => item.CreatedAt)
-            .Select(item => item.ObjectKey)
-            .Take(100)
-            .ToListAsync(cancellationToken);
-
-        var claimed = new List<string>();
-        foreach (var objectKey in candidates)
-        {
-            var updated = await _dbContext.LegacyAssetDeletionQueue
-                .Where(item => item.ObjectKey == objectKey && item.Status == "pending")
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(item => item.Status, "claimed")
-                    .SetProperty(item => item.ClaimedAt, now)
-                    .SetProperty(item => item.AttemptCount, item => item.AttemptCount + 1)
-                    .SetProperty(item => item.UpdatedAt, now), cancellationToken);
-            if (updated == 1)
-            {
-                claimed.Add(objectKey);
-            }
-        }
-
-        var deleted = 0;
-        var failed = 0;
-        foreach (var objectKey in claimed)
-        {
-            try
-            {
-                await _assetStorage.DeleteIfExistsAsync(objectKey, cancellationToken);
-                await _dbContext.LegacyAssetDeletionQueue
-                    .Where(item => item.ObjectKey == objectKey && item.Status == "claimed")
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(item => item.Status, "deleted")
-                        .SetProperty(item => item.DeletedAt, DateTime.UtcNow)
-                        .SetProperty(item => item.LastError, (string?)null)
-                        .SetProperty(item => item.UpdatedAt, DateTime.UtcNow), cancellationToken);
-                deleted++;
-            }
-            catch (AssetStorageUnavailableException exception)
-            {
-                await _dbContext.LegacyAssetDeletionQueue
-                    .Where(item => item.ObjectKey == objectKey && item.Status == "claimed")
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(item => item.Status, "pending")
-                        .SetProperty(item => item.LastError, exception.Message)
-                        .SetProperty(item => item.UpdatedAt, DateTime.UtcNow), cancellationToken);
-                failed++;
-            }
-        }
-
-        _logger.LogInformation("LegacyAssetDeletionQueueJob claimed {Claimed} objects, deleted {Deleted}, failed {Failed}.", claimed.Count, deleted, failed);
     }
 
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)

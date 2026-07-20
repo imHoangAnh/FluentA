@@ -1,9 +1,7 @@
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Review;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
-using FluentA.Domain.BoundedContexts.Vocabulary.Events;
 
 namespace FluentA.Domain.UnitTests;
 
@@ -54,40 +52,6 @@ public sealed class VocabularyTests
         Assert.Equal("reduction", word.Synonyms);
         Assert.Equal("aggravation", word.Antonyms);
         Assert.Null(word.Definition);
-    }
-
-    [Fact]
-    public void WordLifecycle_RaisesSynchronizationEvents()
-    {
-        var word = VocabWord.Create(Guid.NewGuid(), "mitigate", "giam nhe", "/mItIgeIt/", WordClass.Verb, "reduce harm", "Mitigate the risk.");
-
-        Assert.IsType<WordAddedEvent>(Assert.Single(word.DomainEvents));
-
-        word.ClearDomainEvents();
-        word.Update("mitigation", "su giam nhe", "/mItI'geISn/", WordClass.Noun, "risk reduction", "Mitigation matters.", null, null, null);
-        Assert.IsType<WordUpdatedEvent>(Assert.Single(word.DomainEvents));
-
-        word.ClearDomainEvents();
-        word.SoftDelete();
-        Assert.IsType<WordDeletedEvent>(Assert.Single(word.DomainEvents));
-    }
-
-    [Fact]
-    public void CardSyncFromWord_MapsDefinitionSynonymsAndAntonyms()
-    {
-        var word = VocabWord.Create(Guid.NewGuid(), "mitigate", "giam nhe", "/mItIgeIt/", WordClass.Verb, "reduce harm", "Mitigate the risk.", null, "reduce", "worsen");
-        var card = FlashcardCard.Create(Guid.NewGuid(), word);
-        var nextReview = DateTime.UtcNow.AddDays(7);
-        card.RecordReviewResult(7, 2.7f, 3, nextReview, CardState.Review);
-
-        word.Update("mitigation", "su giam nhe", "/mItI'geISn/", WordClass.Noun, "risk reduction", "Mitigation matters.", "formal", "reduction", "aggravation");
-        card.SyncFromWord(word);
-
-        Assert.Equal("risk reduction", card.MeaningEn);
-        Assert.Equal("reduction", card.Thesaurus);
-        Assert.Equal("aggravation", card.Collocation);
-        Assert.Equal(7, card.Interval);
-        Assert.Equal(CardState.Review, card.State);
     }
 
     [Fact]

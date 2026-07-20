@@ -2,7 +2,6 @@ using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
-using FluentA.Domain.BoundedContexts.Flashcards.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
 namespace FluentA.Application.UnitTests;
@@ -10,7 +9,7 @@ namespace FluentA.Application.UnitTests;
 public sealed class VocabularyServiceTests
 {
     [Fact]
-    public async Task CreateBoard_DoesNotCreateDeckUntilPagesExist()
+    public async Task CreateBoard_ReturnsDefaultVocabularyPreferences()
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
@@ -18,25 +17,22 @@ public sealed class VocabularyServiceTests
         var result = await service.CreateBoardAsync(Guid.NewGuid(), new CreateBoardRequest("IELTS Vocabulary", "en"));
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(repository.Decks);
         Assert.Equal("word", result.Value!.Preferences.ColumnOrder[0]);
     }
 
     [Fact]
-    public async Task CreatePage_CreatesPageDeck()
+    public async Task CreatePage_UsesVocabularyPageAsLearningDeck()
     {
         var repository = new FakeVocabularyRepository();
-        var flashcardSync = new FakeFlashcardVocabularySyncPort(repository);
-        var service = new VocabularyService(repository, flashcardSync: flashcardSync);
+        var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
 
         var result = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1 - Education"));
 
         Assert.True(result.IsSuccess);
-        Assert.Single(repository.Decks);
-        Assert.Equal(DeckType.PageDeck, repository.Decks[0].Type);
-        Assert.Equal(result.Value!.Id, repository.Decks[0].PageId);
+        Assert.Equal(board.Value.Id, result.Value!.BoardId);
+        Assert.Equal("Unit 1 - Education", result.Value.Name);
     }
 
     [Fact]
@@ -67,9 +63,8 @@ public sealed class VocabularyServiceTests
     {
         var repository = new FakeVocabularyRepository();
         var notifier = new RecordingFlashcardSyncNotifier();
-        var flashcardSync = new FakeFlashcardVocabularySyncPort(repository);
         var reviewCleanup = new RecordingVocabularyReviewCleanupPort();
-        var service = new VocabularyService(repository, notifier, flashcardSync, reviewCleanup);
+        var service = new VocabularyService(repository, notifier, reviewCleanup);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
@@ -90,6 +85,7 @@ public sealed class VocabularyServiceTests
         Assert.True(deleted.IsSuccess);
         Assert.DoesNotContain(repository.Words, word => word.DeletedAt is null);
         Assert.Equal(2, notifier.SavedWords.Count);
+        Assert.All(notifier.UpdatedDeckGroups, update => Assert.Contains(page.Value.Id, update.DeckIds));
         Assert.Equal([created.Value.Id], reviewCleanup.RemovedWordIds);
     }
 
@@ -147,8 +143,7 @@ public sealed class VocabularyServiceTests
     {
         var repository = new FakeVocabularyRepository();
         var notifier = new RecordingFlashcardSyncNotifier();
-        var flashcardSync = new FakeFlashcardVocabularySyncPort(repository);
-        var service = new VocabularyService(repository, notifier, flashcardSync);
+        var service = new VocabularyService(repository, notifier);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
@@ -208,8 +203,7 @@ public sealed class VocabularyServiceTests
     {
         var repository = new FakeVocabularyRepository();
         var notifier = new RecordingFlashcardSyncNotifier();
-        var flashcardSync = new FakeFlashcardVocabularySyncPort(repository);
-        var service = new VocabularyService(repository, notifier, flashcardSync);
+        var service = new VocabularyService(repository, notifier);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
@@ -248,8 +242,6 @@ public sealed class VocabularyServiceTests
     {
         private readonly List<VocabBoard> _boards = [];
         private readonly List<VocabPage> _pages = [];
-        public List<FlashcardDeck> Decks { get; } = [];
-        public List<FlashcardCard> Cards { get; } = [];
         public List<VocabWord> Words { get; } = [];
         public List<VocabBoardPreference> Preferences { get; } = [];
         public bool FailCommits { get; set; }
@@ -352,73 +344,6 @@ public sealed class VocabularyServiceTests
         public Task DecksUpdatedAsync(Guid userId, Guid boardId, IReadOnlyList<Guid> deckIds, CancellationToken cancellationToken = default)
         {
             UpdatedDeckGroups.Add((userId, boardId, deckIds));
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeFlashcardVocabularySyncPort : IFlashcardVocabularySyncPort
-    {
-        private readonly FakeVocabularyRepository _repository;
-
-        public FakeFlashcardVocabularySyncPort(FakeVocabularyRepository repository)
-        {
-            _repository = repository;
-        }
-
-        public Task<IReadOnlyList<Guid>> ListActiveDeckIdsAsync(Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Guid>>(_repository.Decks
-                .Where(deck => deck.BoardId == boardId && deck.PageId == pageId && deck.DeletedAt is null)
-                .Select(deck => deck.Id)
-                .ToList());
-        }
-
-        public Task CreatePageDeckAsync(Guid userId, Guid boardId, Guid pageId, string boardName, string pageName, CancellationToken cancellationToken = default)
-        {
-            _repository.Decks.Add(FlashcardDeck.CreatePageDeck(userId, boardId, pageId, boardName, pageName));
-            return Task.CompletedTask;
-        }
-
-        public Task RenamePageDeckAsync(Guid pageId, string boardName, string pageName, CancellationToken cancellationToken = default)
-        {
-            _repository.Decks.Single(deck => deck.PageId == pageId && deck.DeletedAt is null).Rename($"{boardName} - {pageName}");
-            return Task.CompletedTask;
-        }
-
-        public Task UpsertCardsForWordAsync(VocabWord word, CancellationToken cancellationToken = default)
-        {
-            var cards = _repository.Cards.Where(card => card.WordId == word.Id).ToList();
-            if (cards.Count == 0)
-            {
-                var deck = _repository.Decks.Single(deck => deck.PageId == word.PageId && deck.DeletedAt is null);
-                _repository.Cards.Add(FlashcardCard.Create(deck.Id, word));
-                return Task.CompletedTask;
-            }
-
-            cards[0].SyncFromWord(word);
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveCardsForWordsAsync(IEnumerable<Guid> wordIds, CancellationToken cancellationToken = default)
-        {
-            var ids = wordIds.ToHashSet();
-            _repository.Cards.RemoveAll(card => ids.Contains(card.WordId));
-            return Task.CompletedTask;
-        }
-
-        public Task SoftDeleteDecksForBoardAsync(Guid boardId, CancellationToken cancellationToken = default)
-        {
-            foreach (var deck in _repository.Decks.Where(deck => deck.BoardId == boardId && deck.DeletedAt is null))
-            {
-                deck.SoftDelete();
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public Task SoftDeleteDeckForPageAsync(Guid pageId, CancellationToken cancellationToken = default)
-        {
-            _repository.Decks.SingleOrDefault(deck => deck.PageId == pageId && deck.DeletedAt is null)?.SoftDelete();
             return Task.CompletedTask;
         }
     }

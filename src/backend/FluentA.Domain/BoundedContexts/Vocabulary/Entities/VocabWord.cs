@@ -1,4 +1,3 @@
-using FluentA.Domain.BoundedContexts.Vocabulary.Events;
 using FluentA.Domain.SeedWork;
 
 namespace FluentA.Domain.BoundedContexts.Vocabulary.Entities;
@@ -58,9 +57,7 @@ public sealed class VocabWord : BaseEntity
             throw new ArgumentException("Page id is required.", nameof(pageId));
         }
 
-        var vocabWord = new VocabWord(pageId, word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
-        vocabWord.AddDomainEvent(new WordAddedEvent(vocabWord.Id, vocabWord.PageId, DateTime.UtcNow));
-        return vocabWord;
+        return new VocabWord(pageId, word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
     }
 
     public void Update(
@@ -76,14 +73,12 @@ public sealed class VocabWord : BaseEntity
     {
         Apply(word, meaningVn, ipaPronunciation, wordClass, definition, example, note, synonyms, antonyms);
         UpdatedAt = DateTime.UtcNow;
-        AddDomainEvent(new WordUpdatedEvent(Id, PageId, UpdatedAt));
     }
 
     public void SoftDelete()
     {
         DeletedAt = DateTime.UtcNow;
         UpdatedAt = DeletedAt.Value;
-        AddDomainEvent(new WordDeletedEvent(Id, PageId, UpdatedAt));
     }
 
     private void Apply(
