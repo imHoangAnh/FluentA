@@ -7,5 +7,11 @@ public enum WordClass
     Adj,
     Adv,
     Phrase,
+    Collocation,
+    PhrasalVerb,
+    Idiom,
+    Proverb,
+    NounPhrase,
+    VerbPhrase,
     Other
 }

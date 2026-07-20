@@ -9,7 +9,18 @@ import { AppProviders } from '@/app/providers'
 
 vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
   const actual = await vi.importActual<typeof import('@/features/vocabulary/api/vocabulary.api')>('@/features/vocabulary/api/vocabulary.api')
-  return { ...actual, updateBoard: vi.fn(), updatePage: vi.fn(), deleteBoard: vi.fn(), deletePage: vi.fn(), listWords: vi.fn() }
+  return {
+    ...actual,
+    listBoards: vi.fn(),
+    createBoard: vi.fn(),
+    getBoard: vi.fn(),
+    updateBoard: vi.fn(),
+    createPage: vi.fn(),
+    updatePage: vi.fn(),
+    deleteBoard: vi.fn(),
+    deletePage: vi.fn(),
+    listWords: vi.fn(),
+  }
 })
 
 const preferences: vocabularyApi.BoardPreferences = { hiddenColumns: [], columnOrder: [...vocabularyApi.DEFAULT_VOCAB_COLUMN_ORDER], columnWidths: {} }
@@ -23,6 +34,12 @@ const newestBoard: vocabularyApi.BoardDetail = {
 const olderBoard: vocabularyApi.BoardDetail = {
   id: 'board-old', name: 'Older board', language: 'en', pageCount: 1, createdAt: '2026-07-12T00:00:00Z', updatedAt: '2026-07-12T00:00:00Z', preferences,
   pages: [{ id: 'page-old', boardId: 'board-old', name: 'Older page', createdAt: '2026-07-12T00:00:00Z', updatedAt: '2026-07-12T00:00:00Z' }],
+}
+const createdBoard: vocabularyApi.BoardDetail = {
+  id: 'board-created', name: 'Expressions', language: 'en', pageCount: 0, createdAt: '2026-07-14T00:00:00Z', updatedAt: '2026-07-14T00:00:00Z', preferences, pages: [],
+}
+const createdPage: vocabularyApi.Page = {
+  id: 'page-created', boardId: newestBoard.id, name: 'Fresh page', createdAt: '2026-07-14T00:00:00Z', updatedAt: '2026-07-14T00:00:00Z',
 }
 
 function renderWorkspace() {
@@ -39,6 +56,70 @@ describe('WorkspacePage board and page context actions', () => {
     vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue(undefined)
     vi.mocked(vocabularyApi.deletePage).mockResolvedValue(undefined)
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([])
+    vi.mocked(vocabularyApi.listBoards).mockResolvedValue([newestBoard, olderBoard])
+    vi.mocked(vocabularyApi.getBoard).mockImplementation(async (boardId) => {
+      if (boardId === createdBoard.id) return createdBoard
+      if (boardId === olderBoard.id) return olderBoard
+      return newestBoard
+    })
+    vi.mocked(vocabularyApi.createBoard).mockResolvedValue(createdBoard)
+    vi.mocked(vocabularyApi.createPage).mockResolvedValue(createdPage)
+  })
+
+  it('keeps Add page before every Page in the active Board', async () => {
+    renderWorkspace()
+
+    const addPage = await screen.findByRole('button', { name: 'Add page' })
+    const newestPage = screen.getByRole('button', { name: 'Newest page' })
+    const earlierPage = screen.getByRole('button', { name: 'Earlier page' })
+
+    expect(addPage.compareDocumentPosition(newestPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(addPage.compareDocumentPosition(earlierPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('creates a Board from a modal and Escape cancels without a request', async () => {
+    const user = userEvent.setup()
+    renderWorkspace()
+
+    expect(screen.queryByLabelText('Board name')).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Create new board' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Create board')
+    fireEvent.change(screen.getByLabelText('Board name'), { target: { value: 'Ignored board' } })
+    await user.keyboard('{Escape}')
+    expect(vocabularyApi.createBoard).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Board name')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create new board' }))
+    fireEvent.change(screen.getByLabelText('Board name'), { target: { value: '  Expressions  ' } })
+    await user.click(screen.getByRole('button', { name: 'Create board' }))
+
+    await waitFor(() => expect(vocabularyApi.createBoard).toHaveBeenCalledWith(
+      { name: 'Expressions', language: 'en' },
+      expect.anything(),
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('creates a Page from a modal and Cancel makes no request', async () => {
+    const user = userEvent.setup()
+    vi.mocked(vocabularyApi.getBoard).mockImplementation(async (boardId) => boardId === newestBoard.id
+      ? { ...newestBoard, pageCount: 3, pages: [createdPage, ...newestBoard.pages] }
+      : olderBoard)
+    renderWorkspace()
+
+    expect(screen.queryByLabelText('Page name')).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Add page' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Add a vocabulary page to “Newest board”.')
+    fireEvent.change(screen.getByLabelText('Page name'), { target: { value: 'Ignored page' } })
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(vocabularyApi.createPage).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Add page' }))
+    fireEvent.change(screen.getByLabelText('Page name'), { target: { value: '  Fresh page  ' } })
+    await user.click(screen.getByRole('button', { name: 'Create page' }))
+
+    await waitFor(() => expect(vocabularyApi.createPage).toHaveBeenCalledWith('board-new', { name: 'Fresh page' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('confirms the exact right-clicked Board, preserves it on Cancel, then selects the newest replacement after Delete', async () => {

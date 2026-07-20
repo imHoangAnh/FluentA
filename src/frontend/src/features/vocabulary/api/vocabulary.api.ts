@@ -56,7 +56,34 @@ export type BoardDetail = BoardSummary & {
   preferences: BoardPreferences
 }
 
-export type WordClass = 'noun' | 'verb' | 'adj' | 'adv' | 'phrase' | 'other'
+export type WordClass =
+  | 'noun'
+  | 'verb'
+  | 'adj'
+  | 'adv'
+  | 'phrase'
+  | 'collocation'
+  | 'phrasalverb'
+  | 'idiom'
+  | 'proverb'
+  | 'nounphrase'
+  | 'verbphrase'
+  | 'other'
+
+export const WORD_CLASS_OPTIONS: ReadonlyArray<{ value: WordClass; label: string }> = [
+  { value: 'noun', label: 'Noun' },
+  { value: 'verb', label: 'Verb' },
+  { value: 'adj', label: 'Adjective' },
+  { value: 'adv', label: 'Adverb' },
+  { value: 'phrase', label: 'Phrase' },
+  { value: 'collocation', label: 'Collocation' },
+  { value: 'phrasalverb', label: 'Phrasal Verb' },
+  { value: 'idiom', label: 'Idiom' },
+  { value: 'proverb', label: 'Proverb' },
+  { value: 'nounphrase', label: 'Noun Phrase' },
+  { value: 'verbphrase', label: 'Verb Phrase' },
+  { value: 'other', label: 'Other' },
+]
 
 export type WordInput = {
   word: string

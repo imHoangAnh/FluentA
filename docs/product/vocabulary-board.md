@@ -11,6 +11,8 @@ this document.
 
 - A logged-in user can create boards with a name and target language.
 - The create-board form requires the user to choose a supported target language.
+- Board and Page creation opens in accessible modal forms; Cancel and Escape
+  close the form without creating data.
 - A logged-in user can see only their own boards.
 - A logged-in user can update or soft-delete their own boards.
 - A logged-in user can create, rename, and delete pages within their own
@@ -30,6 +32,8 @@ this document.
   widths.
 - Board and page lists show the newest created item first. Their order is not
   manually configurable.
+- The active Board's `Add page` action is always shown before its Page list, so
+  it remains immediately accessible as new Pages are added.
 - Every Board row displays its language code beside its Page count; language is
   not repeated in the workspace header.
 - Right-clicking a Board or Page selects that target and opens matching
@@ -61,8 +65,9 @@ this document.
 - Vocabulary uses the compact density of the shared design system so fixed
   columns remain practical without shrinking editable controls below usable
   sizes.
-- Board creation and page creation use visible inline forms rather than
-  browser prompts. Existing API validation and ownership rules are unchanged.
+- Board creation and Page creation use accessible Radix-backed modal forms
+  rather than inline forms or browser prompts. Existing API validation and
+  ownership rules are unchanged.
 - Board/Page context menus, rename dialogs, and destructive confirmation use
   accessible Radix-backed primitives. After a successful delete removes its
   trigger, focus moves to a surviving Vocabulary region rather than a removed
@@ -143,7 +148,10 @@ All responses use the FluentA envelope.
 - Word, Vietnamese meaning, IPA pronunciation, class, and example are required.
 - `definition` and `note` are at most 4000 characters.
 - `synonyms` and `antonyms` are at most 2000 characters.
-- Word class must be `noun`, `verb`, `adj`, `adv`, `phrase`, or `other`.
+- Word class must be `noun`, `verb`, `adj`, `adv`, `phrase`, `collocation`,
+  `phrasalverb`, `idiom`, `proverb`, `nounphrase`, `verbphrase`, or `other`.
+  The UI presents multi-word values with readable labels such as
+  `Phrasal Verb`, `Noun Phrase`, and `Verb Phrase`.
 - Validation failures return `422 VALIDATION_ERROR`.
 - Missing board/page/word ownership returns `404 VOCAB_NOT_FOUND`.
 
@@ -163,6 +171,8 @@ All responses use the FluentA envelope.
 - `vocab_boards` and `vocab_pages` do not persist a `sort_order` field.
 - Board and page reads use `created_at` descending with `id` descending as the
   deterministic tie-breaker.
+- `Add page` is a fixed action rendered before the active Board's sorted Pages;
+  it is not part of persisted Page ordering.
 - Vocabulary table column order is independent and remains stored in the
   board preference row.
 

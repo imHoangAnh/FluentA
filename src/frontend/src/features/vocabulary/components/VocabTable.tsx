@@ -23,8 +23,6 @@ const emptyWord = (): vocabularyApi.WordInput => ({
   antonyms: '',
 })
 
-const classOptions = ['noun', 'verb', 'adj', 'adv', 'phrase', 'other']
-
 type Column = {
   key: string
   label: string
@@ -162,7 +160,7 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
       {type === 'select' ? (
         <div className="relative">
           <select className={`${cellClassName} appearance-none pr-7`} ref={register} {...shared}>
-            {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
@@ -385,7 +383,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
       return (
         <div className="relative">
           <select className={`${cellClassName} appearance-none pr-7`} {...shared}>
-            {classOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>

@@ -108,6 +108,27 @@ public sealed class VocabularyServiceTests
         Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
     }
 
+    [Theory]
+    [InlineData("collocation")]
+    [InlineData("phrasalverb")]
+    [InlineData("idiom")]
+    [InlineData("proverb")]
+    [InlineData("nounphrase")]
+    [InlineData("verbphrase")]
+    public async Task CreateWord_AcceptsAndReturnsExtendedClasses(string wordClass)
+    {
+        var repository = new FakeVocabularyRepository();
+        var service = new VocabularyService(repository);
+        var userId = Guid.NewGuid();
+        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("Expressions", "en"));
+        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
+
+        var result = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("take part", wordClass));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(wordClass, result.Value!.Class);
+    }
+
     [Fact]
     public async Task CreateWord_DoesNotNotifyWhenValidationFails()
     {

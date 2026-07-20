@@ -2,26 +2,25 @@
 
 ## Current Story
 
-- ID: `US-VOCAB-009`
-- Title: Safe Vocabulary deletion and success feedback
+- ID: `US-VOCAB-010`
+- Title: Modal creation and expanded Word classes
 - Lane: normal
-- Status: implemented - review evidence recorded; live API/database browser proof remains unavailable locally
+- Status: implemented - focused, full-unit, bundle, and mocked-browser evidence recorded 2026-07-20
 
 ## Objective
 
-Deliver approved Board/Page/Word deletion confirmation and scoped Vocabulary
-success feedback without changing existing delete endpoints, data ownership,
-flashcard/review cleanup, or autosave behavior.
+Move Board/Page creation into accessible modal forms, keep `Add page` above the
+active Board's Pages, and support six additional Word classes without changing
+existing endpoints, persistence shape, or sync ownership.
 
 ## Inputs
 
-- `context.md` D1-D4, D14-D15, D18
-- `approach.md`
-- `US-VOCAB-009-safe-deletion-success-feedback/overview.md`
-- `US-VOCAB-009-safe-deletion-success-feedback/design.md`
-- `US-VOCAB-009-safe-deletion-success-feedback/validation.md`
+- `docs/product/vocabulary-board.md`
+- `US-VOCAB-010-modal-creation-expanded-word-classes/overview.md`
+- `US-VOCAB-010-modal-creation-expanded-word-classes/design.md`
+- `US-VOCAB-010-modal-creation-expanded-word-classes/validation.md`
 
 ## Gate
 
-Do not implement until `harness-validating` records a truthful readiness result
-and the user explicitly approves `US-VOCAB-009`.
+Implementation is limited to `US-VOCAB-010`. Stop if the work requires a new
+endpoint, database migration, ownership change, or broader Vocabulary redesign.

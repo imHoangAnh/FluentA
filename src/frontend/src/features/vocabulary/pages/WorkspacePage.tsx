@@ -3,16 +3,15 @@ import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { ColumnSettings } from '../components/ColumnSettings'
+import { CreateBoardDialog, CreatePageDialog } from '../components/CreateVocabularyDialog'
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog'
 import { VocabTable } from '../components/VocabTable'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
-import { Input } from '@/shared/components/ui/input'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
 import { toast } from '@/lib/toast'
 import * as vocabularyApi from '../api/vocabulary.api'
-import { supportedLanguageProfiles } from '@/shared/lib/language'
 import { cn } from '@/shared/lib/utils'
 
 type DeleteTarget =
@@ -33,9 +32,6 @@ export function WorkspacePage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [isCreatingBoard, setIsCreatingBoard] = useState(false)
   const [isCreatingPage, setIsCreatingPage] = useState(false)
-  const [newBoardName, setNewBoardName] = useState('')
-  const [newBoardLanguage, setNewBoardLanguage] = useState('en')
-  const [newPageName, setNewPageName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
@@ -67,8 +63,6 @@ export function WorkspacePage() {
     onSuccess: async (board) => {
       setSelectedBoardId(board.id)
       setSelectedPageId(null)
-      setNewBoardName('')
-      setNewBoardLanguage('en')
       setIsCreatingBoard(false)
       toast.success('Board created successfully')
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
@@ -79,7 +73,6 @@ export function WorkspacePage() {
     mutationFn: (input: { boardId: string; name: string }) => vocabularyApi.createPage(input.boardId, { name: input.name }),
     onSuccess: async (page) => {
       setSelectedPageId(page.id)
-      setNewPageName('')
       setIsCreatingPage(false)
       toast.success('Page created successfully')
       await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
@@ -165,6 +158,16 @@ export function WorkspacePage() {
     setIsCreatingPage(false)
   }
 
+  function openCreateBoardDialog() {
+    createBoard.reset()
+    setIsCreatingBoard(true)
+  }
+
+  function openCreatePageDialog() {
+    createPage.reset()
+    setIsCreatingPage(true)
+  }
+
   function confirmDelete() {
     if (!deleteTarget) return
     if (deleteTarget.kind === 'board') deleteBoard.mutate(deleteTarget)
@@ -185,23 +188,8 @@ export function WorkspacePage() {
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div>
-            <Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={() => setIsCreatingBoard((value) => !value)}><FolderPlus /></Button>
+            <Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={openCreateBoardDialog}><FolderPlus /></Button>
           </div>
-
-          {isCreatingBoard ? (
-            <form
-              className="grid gap-3 border-b border-border bg-secondary/30 p-3"
-              onSubmit={(event) => {
-                event.preventDefault()
-                const name = newBoardName.trim()
-                if (name) createBoard.mutate({ name, language: newBoardLanguage })
-              }}
-            >
-              <div className="grid gap-1.5"><label className="text-xs font-medium" htmlFor="new-board-name">Board name</label><Input id="new-board-name" data-testid="board-name-input" value={newBoardName} onChange={(event) => setNewBoardName(event.target.value)} maxLength={120} autoFocus required /></div>
-              <div className="grid gap-1.5"><label className="text-xs font-medium" htmlFor="new-board-language">Language</label><select id="new-board-language" data-testid="board-language-select" className="h-10 rounded-md border border-input bg-card px-3 text-sm" value={newBoardLanguage} onChange={(event) => setNewBoardLanguage(event.target.value)}>{supportedLanguageProfiles.map((profile) => <option key={profile.code} value={profile.code}>{profile.name}</option>)}</select></div>
-              <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" onClick={() => setIsCreatingBoard(false)}>Cancel</Button><Button data-testid="create-board-button" type="submit" size="sm" disabled={createBoard.isPending || !newBoardName.trim()}>Create</Button></div>
-            </form>
-          ) : null}
 
           <div ref={railFocusRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2 outline-none" data-testid="vocabulary-rail-scroll">
             {sortedBoards.map((board) => (
@@ -229,6 +217,7 @@ export function WorkspacePage() {
                 </ContextMenu>
                 {activeBoard?.id === board.id ? (
                   <div className="ml-4 mt-1 grid gap-1 border-l border-border pl-2">
+                    <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={openCreatePageDialog}><Plus /> Add page</Button>
                     {sortedPages.map((page) => (
                       <ContextMenu key={page.id}>
                         <ContextMenuTrigger asChild>
@@ -247,7 +236,6 @@ export function WorkspacePage() {
                         </ContextMenuContent>
                       </ContextMenu>
                     ))}
-                    <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={() => setIsCreatingPage(true)}><Plus /> Add page</Button>
                   </div>
                 ) : null}
               </div>
@@ -270,16 +258,6 @@ export function WorkspacePage() {
                 </div>
               </Card>
 
-              {isCreatingPage ? (
-                <Card className="shrink-0">
-                  <form className="flex items-end gap-3 p-4" onSubmit={(event) => { event.preventDefault(); const name = newPageName.trim(); if (name) createPage.mutate({ boardId: activeBoard.id, name }) }}>
-                    <div className="grid flex-1 gap-1.5"><label className="text-xs font-medium" htmlFor="new-page-name">Page name</label><Input id="new-page-name" data-testid="page-name-input" value={newPageName} onChange={(event) => setNewPageName(event.target.value)} autoFocus required /></div>
-                    <Button type="button" variant="ghost" onClick={() => setIsCreatingPage(false)}>Cancel</Button>
-                    <Button type="submit" data-testid="create-page-button" disabled={!newPageName.trim() || createPage.isPending}>Create page</Button>
-                  </form>
-                </Card>
-              ) : null}
-
               {activePage ? (
                 <VocabTable
                   key={`${activeBoard.id}:${activeBoard.preferences.updatedAt ?? 'default'}`}
@@ -289,14 +267,31 @@ export function WorkspacePage() {
                   onPreferencesChange={async (preferences) => { await updatePreferences.mutateAsync(preferences) }}
                 />
               ) : (
-                <Card className="grid min-h-0 flex-1 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then add your first vocabulary row.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingPage(true)}><Plus /> Create page</Button></Card>
+                <Card className="grid min-h-0 flex-1 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then add your first vocabulary row.</p><Button className="mx-auto mt-5" onClick={openCreatePageDialog}><Plus /> Create page</Button></Card>
               )}
             </div>
           ) : (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center"><BookOpenText className="mx-auto mb-4 size-12 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a vocabulary board</h2><p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Boards keep related pages and learning material together.</p><Button className="mx-auto mt-5" onClick={() => setIsCreatingBoard(true)}><FolderPlus /> Create board</Button></Card>
+            <Card className="grid min-h-0 flex-1 place-content-center text-center"><BookOpenText className="mx-auto mb-4 size-12 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a vocabulary board</h2><p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Boards keep related pages and learning material together.</p><Button className="mx-auto mt-5" onClick={openCreateBoardDialog}><FolderPlus /> Create board</Button></Card>
           )}
         </section>
       </div>
+      {isCreatingBoard ? (
+        <CreateBoardDialog
+          pending={createBoard.isPending}
+          error={createBoard.isError ? 'Could not create the board right now.' : null}
+          onOpenChange={(open) => { if (!open) { setIsCreatingBoard(false); createBoard.reset() } }}
+          onConfirm={(name, language) => createBoard.mutate({ name, language })}
+        />
+      ) : null}
+      {isCreatingPage && activeBoard ? (
+        <CreatePageDialog
+          boardName={activeBoard.name}
+          pending={createPage.isPending}
+          error={createPage.isError ? 'Could not create the page right now.' : null}
+          onOpenChange={(open) => { if (!open) { setIsCreatingPage(false); createPage.reset() } }}
+          onConfirm={(name) => createPage.mutate({ boardId: activeBoard.id, name })}
+        />
+      ) : null}
       {deleteTarget ? (
         <DeleteConfirmationDialog
           entity={deleteTarget.kind === 'board' ? 'Board' : 'Page'}
