@@ -65,9 +65,9 @@ adds `note-image` as shared image asset types.
   `object_key`,
   sanitized `original_name`, `content_type`, `size_bytes`, optional
   `expires_at`, `archived_at`, and `purge_after_at`.
-- The destructive E31 release resets pre-release asset rows and feature links,
-  records their object keys in `legacy_asset_deletion_queue`, and removes the
-  retired URL-era columns. The queue retries asynchronous object deletion.
+- The destructive E31 release used a temporary deletion queue to retire
+  pre-release object keys. That migration completed before the clean local
+  baseline; current runtime storage has no legacy deletion-queue table or job.
 - `auth_users.current_avatar_asset_id` points at the owned finalized avatar
   asset currently displayed by the profile.
 - `note_page_assets.note_page_id` and `note_page_assets.asset_id` are durable

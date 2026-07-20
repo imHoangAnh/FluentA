@@ -143,6 +143,15 @@ Result -> show a technical retry message; attempt counter remains zero
   This follow-up supersedes only the original Flashcards-library-density
   exclusion; Flashcard viewer behavior and deck navigation remain unchanged.
 
+## Superseded Storage Constraint - 2026-07-21
+
+E32 D11 preserved `flashcard_cards` because the synchronization writer still
+existed during that story. After the page-owned read workflow was proven, the
+separately approved `US-DBCLN-001` retired that write-only projection in the
+clean local baseline. E32's pronunciation and Review-history behavior remains
+unchanged; `word_review_histories` stays active with a reduced result/timing
+contract.
+
 ## Planning Questions
 
 - Select the authenticated audio upload contract, accepted codec/size/duration,

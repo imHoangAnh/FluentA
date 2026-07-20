@@ -74,3 +74,11 @@ Tradeoffs:
 - Update the learning product docs as each slice lands.
 - Replace remaining deck/card-based review and cleanup code before closing the
   feature.
+
+## Fulfillment
+
+`US-DBCLN-001` completed the deferred storage boundary on 2026-07-21 for the
+approved empty local database baseline. `flashcard_decks`, `flashcard_cards`,
+their synchronization port, and copied scheduling/content fields are no longer
+part of the active model. Vocabulary pages and words now serve Flashcard and
+Practice directly, as this decision originally required.

@@ -16,29 +16,28 @@ file reflects implementation truth.
 - A zero-word Page Deck remains visible but cannot open the viewer or Practice.
 - Flashcard cards open the existing viewer. Practice cards open a preparation
   dialog rather than starting a session immediately.
-- Legacy `All Words` decks are removed from synchronization, reads, and
-  shipped learning flows.
-- Every vocabulary page now synchronizes to exactly one Page Deck.
+- Legacy `All Words` decks and synchronized Flashcard projection storage are
+  removed from shipped learning flows.
+- Every active vocabulary page is presented directly as one Page Deck; its
+  `pageId` is the learning deck identity.
 - Dedicated SRS ownership lives in `word_review_states`, linked to `VocabWord`.
 - Practice completion saves the practice summary first, then lets the learner
   choose `Finish` or `Add to Review`.
-- Review submissions read and update dedicated review state instead of mutating
-  scheduling fields on `flashcard_cards`.
+- Review submissions read and update dedicated review state without a
+  Flashcard-card scheduling record.
 - Protected navigation exposes distinct `Flashcard`, `Practice`, and `Review`
   entry points.
 
-## Synchronization Rules
+## Source-Of-Truth Rules
 
-- Every active vocabulary word has exactly one active synchronized card in its
-  owning page deck.
-- Word create and synchronized card create succeed or fail in one database
-  transaction.
-- Word updates synchronize copied card content.
-- Word deletion soft-deletes the vocabulary word and hard-deletes the
-  synchronized card, any related `word_review_states` row, and any related
-  `word_review_histories` rows.
-- Page and board deletion remove all affected synchronized cards, review
-  history, and word review state.
+- `vocab_pages` owns Page Deck identity and `vocab_words` owns all displayed
+  card content. There is no copied Flashcard deck/card table.
+- Word create and update commit only vocabulary content, then emit the existing
+  owner-scoped SignalR invalidation after the durable write.
+- Word deletion soft-deletes the vocabulary word and hard-deletes related
+  `word_review_states` and `word_review_histories` rows.
+- Page and board deletion remove affected Review progress while their active
+  learning reads disappear with the soft-deleted vocabulary hierarchy.
 
 ## Card Content
 
@@ -88,5 +87,5 @@ Empty optional fields stay hidden in the viewer and practice/review recaps.
   due tomorrow in the learner-local timezone.
 - Re-practicing a word does not reset an existing review-state row.
 - Review answers apply FluentA SRS updates to the review-state row and persist
-  a matching `word_review_histories` record with before/after levels and the
-  next due date.
+  a matching `word_review_histories` result with session, duration, and review
+  timestamp data.

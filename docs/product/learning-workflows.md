@@ -144,7 +144,8 @@ target behavior for that split and the data ownership rules that support it.
 ## Learning Data Ownership
 
 - All Words decks are removed from the product model.
-- Each vocabulary page synchronizes to exactly one page deck.
+- Each active vocabulary page is presented directly as exactly one Page Deck;
+  no synchronized deck/card projection is stored.
 - Review state is stored in a dedicated table linked to `VocabWord`.
 - New vocabulary words do not create review state automatically.
 - Practice alone does not create review state automatically.
@@ -155,8 +156,9 @@ target behavior for that split and the data ownership rules that support it.
 - `nextReviewDate` and nullable `lastReviewedAt` are date-only values in the
   domain, JSON contracts (`yyyy-MM-dd`), and PostgreSQL. Review-history
   `reviewedAt` remains a timestamp.
-- Review history stores `wordId`, `reviewedAt`, `result`, `levelBefore`,
-  `levelAfter`, and `nextReviewDate`.
+- Review history stores `userId`, `wordId`, `sessionId`, `reviewedAt`, `result`,
+  and `timeSpentSeconds`. SRS level and due-date state lives only in
+  `word_review_states`.
 - Deleting a word, page, or board hard-deletes related review-state records.
 - Destructive migration from the old All Words review model is acceptable for
   this redesign.

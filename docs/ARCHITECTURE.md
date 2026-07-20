@@ -197,9 +197,16 @@ concerns.
 ## Data Ownership
 
 PostgreSQL stores durable user and product data, including users, shared asset
-metadata, vocabulary, flashcards, review history and settings, productivity
-entities, journal data, Kanban data, Pomodoro configuration and history,
-notifications, and Hangfire state.
+metadata, vocabulary-owned Flashcard/Practice content, review state/history and
+settings, productivity entities, journal data, Kanban data, Pomodoro
+configuration and history, notifications, and Hangfire state. Flashcard Page
+Decks are vocabulary pages; there is no duplicate Flashcard deck/card
+persistence model.
+
+The checked-in EF migration chain is a single clean baseline for a fresh local
+database. It is not an in-place upgrade contract for environments that applied
+the superseded pre-baseline migrations; those environments require a separate
+forward-migration plan.
 
 Redis stores only state with an expiration or revocation lifecycle:
 
