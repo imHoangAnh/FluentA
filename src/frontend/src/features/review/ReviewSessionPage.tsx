@@ -1,23 +1,11 @@
-import { CheckCircle2, ChevronDown, Layers, Play, Volume2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, Layers, Mic, MicOff, Play, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { getReviewSettings } from './api/review-settings.api'
+import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { Button } from '@/shared/components/ui/button'
-
-type BrowserSpeechRecognition = {
-  lang: string
-  interimResults: boolean
-  maxAlternatives: number
-  start(): void
-  stop(): void
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onerror: ((event: { error?: string }) => void) | null
-  onend: (() => void) | null
-}
 
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
@@ -27,6 +15,15 @@ function speakWord(word: string, language: string) {
   utterance.lang = getLanguageProfile(language).speechLanguage
   utterance.voice = selectSpeechVoice(window.speechSynthesis.getVoices(), language)
   window.speechSynthesis.speak(utterance)
+}
+
+function formatIpa(value: string) {
+  const cleaned = value.trim().replace(/^\/+|\/+$/g, '')
+  return `/${cleaned}/`
+}
+
+function formatWordClass(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
 function buildBoardOptions(boards: FlashcardBoard[]) {
@@ -61,19 +58,19 @@ export function ReviewSessionPage() {
   const [session, setSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
-  const [transcript, setTranscript] = useState('')
-  const [feedback, setFeedback] = useState<string | null>(null)
-  const [recognitionError, setRecognitionError] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
+  const [pronunciationError, setPronunciationError] = useState<string | null>(null)
   const [correctCount, setCorrectCount] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
   const [showRecap, setShowRecap] = useState(false)
   const [lastOutcome, setLastOutcome] = useState<'correct' | 'wrong' | null>(null)
   const [completedElapsedSeconds, setCompletedElapsedSeconds] = useState(0)
   const [pronunciationAttempts, setPronunciationAttempts] = useState(0)
-  const [isListening, setIsListening] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [completed, setCompleted] = useState(false)
   const sessionStartedAt = useRef(0)
   const cardStartedAt = useRef(0)
-  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const recordingRef = useRef<ActivePcmRecording | null>(null)
 
   const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: listBoards })
   const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: getReviewSettings })
@@ -97,21 +94,22 @@ export function ReviewSessionPage() {
   })
 
   const submitReviewMutation = useMutation({ mutationFn: reviewApi.submitReview })
+  const pronunciationMutation = useMutation({ mutationFn: ({ wordId, audio }: { wordId: string; audio: Blob }) => assessPronunciation(wordId, audio) })
 
   useEffect(() => {
     if (!currentWord) return
     cardStartedAt.current = Date.now()
-    // A newly active word must not display the prior word's answer or transcript.
+    // A newly active word must not display the prior word's answer or pronunciation state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTypedAnswer('')
-    setTranscript('')
     setFeedback(null)
-    setRecognitionError(null)
+    setPronunciationError(null)
     setPronunciationAttempts(0)
     setShowRecap(false)
     setLastOutcome(null)
-    recognitionRef.current?.stop()
-    setIsListening(false)
+    void recordingRef.current?.cancel()
+    recordingRef.current = null
+    setIsRecording(false)
 
     if (currentWord.mode !== 'meaningToWord' && activeBoard) {
       speakWord(currentWord.word, activeBoard.boardLanguage)
@@ -119,7 +117,7 @@ export function ReviewSessionPage() {
   }, [activeBoard, currentLanguage, currentWord])
 
   useEffect(() => () => {
-    recognitionRef.current?.stop()
+    void recordingRef.current?.cancel()
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
@@ -130,15 +128,15 @@ export function ReviewSessionPage() {
     setSession(nextSession)
     setCurrentIndex(0)
     setTypedAnswer('')
-    setTranscript('')
     setFeedback(null)
-    setRecognitionError(null)
+    setPronunciationError(null)
     setCorrectCount(0)
     setWrongCount(0)
     setShowRecap(false)
     setLastOutcome(null)
     setPronunciationAttempts(0)
     setCompletedElapsedSeconds(0)
+    setCompleted(false)
     sessionStartedAt.current = Date.now()
     cardStartedAt.current = Date.now()
   }
@@ -148,55 +146,50 @@ export function ReviewSessionPage() {
     setResumeModalSession(null)
     setBoardId('')
     setTypedAnswer('')
-    setTranscript('')
     setFeedback(null)
-    setRecognitionError(null)
+    setPronunciationError(null)
     setCorrectCount(0)
     setWrongCount(0)
     setShowRecap(false)
     setLastOutcome(null)
     setPronunciationAttempts(0)
     setCompletedElapsedSeconds(0)
+    setCompleted(false)
   }
 
   function normalizeAnswer(value: string) {
     return value.trim().toLowerCase()
   }
 
-  function recognitionConstructor() {
-    const browserWindow = window as Window & {
-      SpeechRecognition?: new () => BrowserSpeechRecognition
-      webkitSpeechRecognition?: new () => BrowserSpeechRecognition
-    }
+  async function handlePronunciationAudio(audio: Blob) {
+    recordingRef.current = null
+    setIsRecording(false)
+    if (!currentWord) return
 
-    return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition ?? null
+    try {
+      const result = await pronunciationMutation.mutateAsync({ wordId: currentWord.wordId, audio })
+      const attempts = pronunciationAttempts + 1
+      setPronunciationAttempts(attempts)
+      setFeedback(result.correct ? 'correct' : 'wrong')
+      if (result.correct) {
+        await submitOutcome(true)
+      } else if (attempts >= 2) {
+        await submitOutcome(false)
+      }
+    } catch {
+      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
+    }
   }
 
-  function startListening() {
-    const Constructor = recognitionConstructor()
-    if (!Constructor) {
-      setRecognitionError('Speech recognition is not supported in this browser.')
-      return
+  async function startRecording() {
+    setPronunciationError(null)
+    pronunciationMutation.reset()
+    try {
+      recordingRef.current = await startPcmRecording(handlePronunciationAudio)
+      setIsRecording(true)
+    } catch {
+      setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
-
-    const recognition = new Constructor()
-    recognition.lang = getLanguageProfile(currentLanguage).speechLanguage
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.onresult = (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      const value = event.results[0]?.[0]?.transcript?.trim() ?? ''
-      setTranscript(value)
-      setRecognitionError(null)
-    }
-    recognition.onerror = (event: { error?: string }) => {
-      setRecognitionError(event.error ? `Speech recognition error: ${event.error}.` : 'Speech recognition could not capture your speech.')
-      setIsListening(false)
-    }
-    recognition.onend = () => setIsListening(false)
-    recognitionRef.current = recognition
-    setTranscript('')
-    setIsListening(true)
-    recognition.start()
   }
 
   async function startReview(startBehavior: reviewApi.ReviewStartBehavior) {
@@ -228,24 +221,23 @@ export function ReviewSessionPage() {
       setWrongCount((value) => value + 1)
     }
 
-    const isFinalWord = currentIndex + 1 >= words.length
-    if (isFinalWord) {
-      setCompletedElapsedSeconds(Math.max(0, Math.round((Date.now() - sessionStartedAt.current) / 1000)))
-      setLastOutcome(correct ? 'correct' : 'wrong')
-      setShowRecap(recapAfterAnswer)
-      return
-    }
-
-    if (!recapAfterAnswer) {
+    setLastOutcome(correct ? 'correct' : 'wrong')
+    setFeedback(correct ? 'correct' : 'wrong')
+    if (correct && !recapAfterAnswer) {
       moveToNextWord()
       return
     }
 
-    setLastOutcome(correct ? 'correct' : 'wrong')
     setShowRecap(true)
   }
 
   function moveToNextWord() {
+    if (currentIndex + 1 >= words.length) {
+      setCompletedElapsedSeconds(Math.max(0, Math.round((Date.now() - sessionStartedAt.current) / 1000)))
+      setCompleted(true)
+      return
+    }
+
     setCurrentIndex((value) => value + 1)
   }
 
@@ -255,42 +247,20 @@ export function ReviewSessionPage() {
     void submitOutcome(correct)
   }
 
-  function checkTranscriptAnswer() {
-    if (!currentWord) return
-    const attempts = pronunciationAttempts + 1
-    setPronunciationAttempts(attempts)
-    const correct = normalizeAnswer(transcript) === normalizeAnswer(currentWord.word)
-    if (correct) {
-      void submitOutcome(true)
-      return
-    }
-
-    if (attempts >= 2) {
-      void submitOutcome(false)
-      return
-    }
-
-    setFeedback('Transcript did not match the target word. You can try once more.')
-  }
-
-  const completed = Boolean(session) && currentIndex + 1 >= words.length && (lastOutcome !== null || !currentWord)
   const noBoardSelected = !boardId
   const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0 && !resumeModalSession?.startOptions.hasActiveSameDaySession
   const isMeaningToWord = currentWord?.mode === 'meaningToWord'
   const isPronunciation = currentWord?.mode === 'pronunciation'
+  const recordingSupported = supportsPcmRecording()
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button asChild variant="outline" size="sm"><Link to="/flashcards">Flashcards</Link></Button>
-      </div>
       <div className="flex flex-col">
         {!session ? (
           <div className="review-setup-container">
             <div className="review-setup-card">
               <div className="review-setup-header">
                 <span className="review-setup-badge">Review</span>
-                <h2>Select a board to start review</h2>
               </div>
 
               <div className="review-setup-body">
@@ -317,22 +287,25 @@ export function ReviewSessionPage() {
                   </div>
                 </div>
 
-                <div className="review-setup-options" role="group" aria-label="Review order">
+              <div className="review-setup-options" role="group" aria-label="Review order">
                   <button
-                    className={orderType === 'sequential' ? 'review-mode review-mode--active' : 'review-mode'}
                     type="button"
-                    onClick={() => setOrderType('sequential')}
+                    className={`review-mode ${
+                      orderType === "sequential" ? "review-mode--active" : ""
+                    }`}
+                    onClick={() => setOrderType("sequential")}
                   >
-                    Sequential
-                    <small>Lower level first, then older words.</small>
+                    <span>Sequential</span>
                   </button>
+
                   <button
-                    className={orderType === 'shuffle' ? 'review-mode review-mode--active' : 'review-mode'}
                     type="button"
-                    onClick={() => setOrderType('shuffle')}
+                    className={`review-mode ${
+                      orderType === "shuffle" ? "review-mode--active" : ""
+                    }`}
+                    onClick={() => setOrderType("shuffle")}
                   >
-                    Shuffle
-                    <small>Shuffle after due-word queue selection.</small>
+                    <span>Shuffle</span>
                   </button>
                 </div>
 
@@ -340,7 +313,6 @@ export function ReviewSessionPage() {
                   <div className="empty-panel flashcard-empty">
                     <Layers size={28} />
                     <h2>Select a board to start review</h2>
-                    <p>Review stays board-scoped and starts only after you choose the board you want to study.</p>
                   </div>
                 ) : null}
 
@@ -348,7 +320,6 @@ export function ReviewSessionPage() {
                   <div className="empty-panel flashcard-empty">
                     <CheckCircle2 size={28} />
                     <h2>No words due today</h2>
-                    <p>This board has no due words right now, so Review can stay parked here until something becomes due again.</p>
                   </div>
                 ) : null}
 
@@ -393,7 +364,7 @@ export function ReviewSessionPage() {
               <progress value={currentIndex + 1} max={words.length} />
             </div>
 
-            <article className="review-card" data-testid="active-review-card">
+            <article className="review-card review-card--soft" data-testid="active-review-card">
               <div className="review-card__front">
                 <span>{modeLabel(currentWord.mode)}</span>
                 {isMeaningToWord ? (
@@ -416,22 +387,13 @@ export function ReviewSessionPage() {
                 <div className="practice-answer-panel">
                   {isPronunciation ? (
                     <>
-                      <label className="practice-label" htmlFor="review-transcript">Transcript</label>
-                      <textarea
-                        id="review-transcript"
-                        className="practice-input practice-input--multiline"
-                        value={transcript}
-                        onChange={(event) => setTranscript(event.target.value)}
-                      />
+                      <span className="practice-label">Record your pronunciation · attempt {pronunciationAttempts + 1} of 2</span>
                       <div className="deck-actions">
-                        <button className="secondary-button" type="button" onClick={startListening} disabled={isListening}>
-                          Start listening
+                        <button className="secondary-button" type="button" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationAttempts >= 2 || !recordingSupported}>
+                          <Mic size={16} /> Record
                         </button>
-                        <button className="secondary-button" type="button" onClick={() => recognitionRef.current?.stop()} disabled={!isListening}>
-                          Stop
-                        </button>
-                        <button className="primary-button" type="button" onClick={checkTranscriptAnswer} disabled={normalizeAnswer(transcript).length === 0}>
-                          Check transcript
+                        <button className="secondary-button" type="button" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
+                          <MicOff size={16} /> Stop
                         </button>
                       </div>
                     </>
@@ -453,15 +415,20 @@ export function ReviewSessionPage() {
                     </>
                   )}
 
-                  {recognitionError ? <p className="flashcard-status flashcard-status--error">{recognitionError}</p> : null}
-                  {feedback ? <p className="practice-feedback">{feedback}</p> : null}
+                  {feedback ? <p className={`answer-feedback answer-feedback--${feedback}`} role="status">{feedback === 'correct' ? 'Correct' : 'Wrong'}</p> : null}
+                  {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
                 </div>
               ) : (
-                <div className="review-card__answer" data-testid="review-answer">
-                  <div><span>Word</span><strong>{currentWord.word}</strong></div>
-                  <div><span>Vietnamese</span><strong>{currentWord.meaningVn}</strong></div>
-                  <div><span>English meaning</span><p>{currentWord.meaningEn}</p></div>
-                  <div><span>Example</span><p>{currentWord.example}</p></div>
+                <div className="learning-recap" data-testid="review-answer">
+                  {lastOutcome ? <p className={`answer-feedback answer-feedback--${lastOutcome}`} role="status">{lastOutcome === 'correct' ? 'Correct' : 'Wrong'}</p> : null}
+                  <div className="learning-recap__word">
+                    <h2>{currentWord.word} <span>({formatWordClass(currentWord.wordClass)})</span></h2>
+                    <button className="icon-button" type="button" aria-label="Play pronunciation" onClick={() => speakWord(currentWord.word, currentLanguage)}><Volume2 size={18} /></button>
+                  </div>
+                  <p className="learning-recap__ipa">{formatIpa(currentWord.ipaPronunciation)}</p>
+                  <p><em>Definition:</em> {currentWord.meaningEn}</p>
+                  <p><em>Meaning:</em> {currentWord.meaningVn}</p>
+                  <p><em>Example:</em> {currentWord.example}</p>
                   <button className="primary-button" type="button" onClick={moveToNextWord}>
                     {currentIndex + 1 >= words.length ? 'Finish review' : 'Next'}
                   </button>

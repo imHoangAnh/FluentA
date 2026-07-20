@@ -1,36 +1,29 @@
-import { CheckCircle2, Mic, MicOff, PenSquare, TriangleAlert, Volume2 } from 'lucide-react'
+import { CheckCircle2, Mic, MicOff, PenSquare, RotateCcw, TriangleAlert, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
+import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { Button } from '@/shared/components/ui/button'
 
 type PracticeOutcome = 'correct' | 'wrong'
 type PracticeOrderType = 'sequential' | 'shuffle'
-type BrowserSpeechWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionConstructor
-  webkitSpeechRecognition?: SpeechRecognitionConstructor
-}
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance
-type SpeechRecognitionInstance = {
-  lang: string
-  interimResults: boolean
-  maxAlternatives: number
-  start(): void
-  stop(): void
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
-  onend: (() => void) | null
-}
-type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<{ transcript: string }>> }
-type SpeechRecognitionErrorEventLike = { error?: string }
+type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
 function normalizeAnswer(value: string) {
   return value.trim().toLowerCase()
+}
+
+function formatIpa(value: string) {
+  const cleaned = value.trim().replace(/^\/+|\/+$/g, '')
+  return `/${cleaned}/`
+}
+
+function formatWordClass(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
 function speakWord(word: string, language: string) {
@@ -42,16 +35,9 @@ function speakWord(word: string, language: string) {
   window.speechSynthesis.speak(utterance)
 }
 
-function getSpeechRecognitionConstructor() {
-  const browserWindow = window as BrowserSpeechWindow
-  return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition ?? null
-}
-
 function shuffleCards(cards: FlashcardCard[]) {
   return [...cards].sort(() => Math.random() - 0.5)
 }
-
-type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
 export function PracticeSessionPage() {
   const { pageId = '' } = useParams()
@@ -61,31 +47,33 @@ export function PracticeSessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
-  const [transcript, setTranscript] = useState('')
-  const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<PracticeOutcome | null>(null)
   const [resolvedOutcome, setResolvedOutcome] = useState<PracticeOutcome | null>(null)
-  const [revealedAnswer, setRevealedAnswer] = useState(false)
   const [wordHasMistake, setWordHasMistake] = useState(false)
-  const [isListening, setIsListening] = useState(false)
-  const [recognitionError, setRecognitionError] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [pronunciationError, setPronunciationError] = useState<string | null>(null)
+  const [pronunciationAttempts, setPronunciationAttempts] = useState(0)
+  const [pronunciationRetryUsed, setPronunciationRetryUsed] = useState(false)
+  const [pronunciationPairExhausted, setPronunciationPairExhausted] = useState(false)
   const [correctWords, setCorrectWords] = useState(0)
   const [wrongWords, setWrongWords] = useState(0)
   const [sessionCards, setSessionCards] = useState<FlashcardCard[]>([])
   const [completedSession, setCompletedSession] = useState<{ correctCards: number; wrongCards: number } | null>(null)
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const recordingRef = useRef<ActivePcmRecording | null>(null)
   const initializedSessionKeyRef = useRef<string | null>(null)
 
   const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => getPageSession(pageId), enabled: Boolean(pageId) })
   const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: getPracticeSettings })
   const saveSummaryMutation = useMutation({ mutationFn: practiceApi.createPracticeSessionSummary })
   const addToReviewMutation = useMutation({ mutationFn: practiceApi.addPracticeWordsToReview })
+  const pronunciationMutation = useMutation({ mutationFn: ({ wordId, audio }: { wordId: string; audio: Blob }) => assessPronunciation(wordId, audio) })
 
   const currentCard = sessionCards[currentIndex] ?? null
   const language = sessionQuery.data?.boardLanguage ?? 'en'
   const modeSequence = useMemo(() => [...(practiceSettingsQuery.data?.modeSequence ?? []), 'recap' as const], [practiceSettingsQuery.data?.modeSequence])
   const currentStep = modeSequence[currentStepIndex] ?? 'recap'
-  const recognitionSupported = Boolean(getSpeechRecognitionConstructor())
+  const recordingSupported = supportsPcmRecording()
 
   useEffect(() => {
     if (!sessionStarted || !currentCard || resolvedOutcome || currentStep === 'meaningToWord' || currentStep === 'recap') return
@@ -93,10 +81,8 @@ export function PracticeSessionPage() {
   }, [currentCard, currentStep, language, resolvedOutcome, sessionStarted])
 
   useEffect(() => () => {
-    recognitionRef.current?.stop()
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
+    void recordingRef.current?.cancel()
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }, [])
 
   useEffect(() => {
@@ -115,31 +101,35 @@ export function PracticeSessionPage() {
     setCurrentIndex(0)
     setCurrentStepIndex(0)
     setTypedAnswer('')
-    setTranscript('')
     setFeedback(null)
     setResolvedOutcome(null)
-    setRevealedAnswer(false)
     setWordHasMistake(false)
-    setRecognitionError(null)
-    recognitionRef.current?.stop()
-    setIsListening(false)
+    setPronunciationError(null)
+    setPronunciationAttempts(0)
+    setPronunciationRetryUsed(false)
+    setPronunciationPairExhausted(false)
+    setIsRecording(false)
     setCorrectWords(0)
     setWrongWords(0)
     setCompletedSession(null)
     setReviewStatuses(initialReviewStatuses)
     saveSummaryMutation.reset()
     addToReviewMutation.reset()
-  }, [addToReviewMutation, orderType, pageId, practiceSettingsQuery.isSuccess, saveSummaryMutation, sessionQuery.data])
+    pronunciationMutation.reset()
+  }, [addToReviewMutation, orderType, pageId, practiceSettingsQuery.isSuccess, pronunciationMutation, saveSummaryMutation, sessionQuery.data])
 
   function resetStepState() {
     setTypedAnswer('')
-    setTranscript('')
     setFeedback(null)
     setResolvedOutcome(null)
-    setRevealedAnswer(false)
-    setRecognitionError(null)
-    recognitionRef.current?.stop()
-    setIsListening(false)
+    setPronunciationError(null)
+    setPronunciationAttempts(0)
+    setPronunciationRetryUsed(false)
+    setPronunciationPairExhausted(false)
+    void recordingRef.current?.cancel()
+    recordingRef.current = null
+    setIsRecording(false)
+    pronunciationMutation.reset()
   }
 
   async function persistCompletion(nextCorrectCards: number, nextWrongCards: number) {
@@ -171,26 +161,13 @@ export function PracticeSessionPage() {
     resetStepState()
   }
 
-  function moveToNextStep(outcome: PracticeOutcome) {
-    if (currentStep === 'recap') {
-      advanceAfterRecap(outcome)
-      return
-    }
-
+  function resolveStep(outcome: PracticeOutcome) {
     setResolvedOutcome(outcome)
-    setRevealedAnswer(true)
-    if (outcome === 'wrong') {
-      setWordHasMistake(true)
-    }
-    setFeedback(outcome === 'correct' ? 'Step complete.' : 'Step skipped. The word will count as wrong for this session.')
+    setFeedback(outcome)
+    if (outcome === 'wrong') setWordHasMistake(true)
   }
 
-  function continueFromReveal() {
-    if (currentStep === 'recap') {
-      advanceAfterRecap(resolvedOutcome ?? 'wrong')
-      return
-    }
-
+  function continueResolvedStep() {
     setCurrentStepIndex((value) => value + 1)
     resetStepState()
   }
@@ -198,52 +175,55 @@ export function PracticeSessionPage() {
   function submitTypedAnswer() {
     if (!currentCard || resolvedOutcome || currentStep === 'recap') return
     if (normalizeAnswer(typedAnswer) === normalizeAnswer(currentCard.word)) {
-      moveToNextStep('correct')
+      resolveStep('correct')
       return
     }
-
-    setFeedback('That answer does not match yet. Try again or reveal the answer.')
-  }
-
-  function submitTranscriptAnswer() {
-    if (!currentCard || resolvedOutcome) return
-    if (normalizeAnswer(transcript) === normalizeAnswer(currentCard.word)) {
-      moveToNextStep('correct')
-      return
-    }
-
-    setFeedback('Transcript did not match the target word. Listen and try again.')
+    setFeedback('wrong')
   }
 
   function revealAndSkip() {
-    if (!currentCard) return
-    moveToNextStep('wrong')
+    if (currentCard) resolveStep('wrong')
   }
 
-  function startListening() {
-    const RecognitionConstructor = getSpeechRecognitionConstructor()
-    if (!RecognitionConstructor) {
-      setRecognitionError('Speech recognition is not supported in this browser.')
-      return
-    }
+  async function handlePronunciationAudio(audio: Blob) {
+    recordingRef.current = null
+    setIsRecording(false)
+    if (!currentCard) return
 
-    const recognition = new RecognitionConstructor()
-    recognition.lang = getLanguageProfile(language).speechLanguage
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.onresult = (event) => {
-      setTranscript(event.results[0]?.[0]?.transcript?.trim() ?? '')
-      setRecognitionError(null)
+    try {
+      const result = await pronunciationMutation.mutateAsync({ wordId: currentCard.wordId, audio })
+      const nextAttempt = pronunciationAttempts + 1
+      setPronunciationAttempts(nextAttempt)
+      if (result.correct) {
+        resolveStep('correct')
+        return
+      }
+
+      setFeedback('wrong')
+      if (nextAttempt >= 2) setPronunciationPairExhausted(true)
+    } catch {
+      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
     }
-    recognition.onerror = (event) => {
-      setRecognitionError(event.error ? `Speech recognition error: ${event.error}.` : 'Speech recognition could not capture your speech.')
-      setIsListening(false)
+  }
+
+  async function startRecording() {
+    setPronunciationError(null)
+    pronunciationMutation.reset()
+    try {
+      recordingRef.current = await startPcmRecording(handlePronunciationAudio)
+      setIsRecording(true)
+    } catch {
+      setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
-    recognition.onend = () => setIsListening(false)
-    recognitionRef.current = recognition
-    setTranscript('')
-    setIsListening(true)
-    recognition.start()
+  }
+
+  function retryPronunciationPair() {
+    setPronunciationRetryUsed(true)
+    setPronunciationAttempts(0)
+    setPronunciationPairExhausted(false)
+    setFeedback(null)
+    setPronunciationError(null)
+    pronunciationMutation.reset()
   }
 
   async function addCurrentWordToReview() {
@@ -257,8 +237,7 @@ export function PracticeSessionPage() {
   }
 
   async function finalizePractice() {
-    if (!completedSession) return
-    await persistCompletion(completedSession.correctCards, completedSession.wrongCards)
+    if (completedSession) await persistCompletion(completedSession.correctCards, completedSession.wrongCards)
   }
 
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
@@ -271,25 +250,15 @@ export function PracticeSessionPage() {
       {sessionQuery.isLoading || practiceSettingsQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading practice session...</p> : null}
       {sessionQuery.isError || practiceSettingsQuery.isError ? <p role="alert" className="text-sm text-destructive">This practice session is unavailable.</p> : null}
       {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length === 0 ? <p role="status" className="text-sm text-muted-foreground">This page has no words to practice.</p> : null}
-      {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length > 0 && !sessionStarted && !completedSession ? <p role="status" className="text-sm text-muted-foreground">Starting practice...</p> : null}
 
       {!sessionStarted && completedSession ? (
         <section className="review-summary practice-summary" data-testid="practice-summary">
           <CheckCircle2 size={38} />
           <span className="preview-label">Practice complete</span>
           <h1>{sessionQuery.data?.pageName}</h1>
-          <p>{correctWords} words completed cleanly and {wrongWords} words needed reveal/skip across {sessionCards.length} practiced words.</p>
-          {saveSummaryMutation.isSuccess ? (
-            <Link className="primary-button review-summary__done" to="/practice">Done</Link>
-          ) : (
-            <button
-              className="primary-button review-summary__done"
-              type="button"
-              onClick={() => void finalizePractice()}
-              disabled={saveSummaryMutation.isPending}
-            >
-              Finish
-            </button>
+          <p>{correctWords} correct and {wrongWords} wrong across {sessionCards.length} practiced words.</p>
+          {saveSummaryMutation.isSuccess ? <Link className="primary-button review-summary__done" to="/practice">Done</Link> : (
+            <button className="primary-button review-summary__done" type="button" onClick={() => void finalizePractice()} disabled={saveSummaryMutation.isPending}>Finish</button>
           )}
           {saveSummaryMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to save this practice result. Try again.</p> : null}
         </section>
@@ -299,26 +268,24 @@ export function PracticeSessionPage() {
         <section className="review-session practice-session">
           <div className="review-progress">
             <div>
-              <span className="preview-label">{currentStep === 'meaningToWord' ? 'Meaning -> Word' : currentStep} · {orderType}</span>
+              <span className="preview-label">{currentStep === 'meaningToWord' ? 'Meaning → Word' : currentStep} · {orderType}</span>
               <strong>{currentIndex + 1} / {sessionCards.length}</strong>
             </div>
             <progress value={currentIndex + 1} max={sessionCards.length} />
           </div>
 
-          <article className={revealedAnswer ? 'review-card review-card--revealed' : 'review-card'} data-testid="active-practice-card">
+          <article className="review-card review-card--soft" data-testid="active-practice-card">
             {currentStep === 'dictation' ? (
               <div className="practice-prompt">
                 <span className="preview-label">Dictation</span>
                 <h2>Listen, then type the exact word</h2>
-                <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}>
-                  <Volume2 size={18} />
-                </button>
+                <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
               </div>
             ) : null}
 
             {currentStep === 'meaningToWord' ? (
               <div className="practice-prompt">
-                <span className="preview-label">Meaning -&gt; Word</span>
+                <span className="preview-label">Meaning → Word</span>
                 <h2>Type the target word</h2>
                 <p>{currentCard.meaningVn}</p>
                 <p>{currentCard.meaningEn}</p>
@@ -328,91 +295,58 @@ export function PracticeSessionPage() {
             {currentStep === 'pronunciation' ? (
               <div className="practice-prompt">
                 <span className="preview-label">Pronunciation</span>
-                <h2>Listen, speak, then check the transcript</h2>
-                {!recognitionSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Speech recognition is unavailable in this browser.</p> : null}
+                <h2>Listen, then record your pronunciation</h2>
+                <p className="practice-attempt-copy">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2{pronunciationRetryUsed ? ' · retry pair' : ''}</p>
+                {!recordingSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
                 <div className="practice-pronunciation-controls">
-                  <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}>
-                    <Volume2 size={18} />
-                  </button>
-                  <button className="secondary-button" type="button" onClick={startListening} disabled={isListening || !recognitionSupported}>
-                    <Mic size={16} /> Start listening
-                  </button>
-                  <button className="secondary-button" type="button" onClick={() => recognitionRef.current?.stop()} disabled={!isListening}>
-                    <MicOff size={16} /> Stop
-                  </button>
+                  <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
+                  <button className="secondary-button" type="button" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationPairExhausted || !recordingSupported}><Mic size={16} /> Record</button>
+                  <button className="secondary-button" type="button" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}><MicOff size={16} /> Stop</button>
                 </div>
               </div>
             ) : null}
 
             {currentStep === 'recap' ? (
-              <div className="review-card__answer practice-answer-reveal" data-testid="practice-answer-reveal">
-                <div><span>Word</span><strong>{currentCard.word}</strong></div>
-                <div><span>Vietnamese meaning</span><p>{currentCard.meaningVn}</p></div>
-                <div><span>English meaning</span><p>{currentCard.meaningEn}</p></div>
-                <div className="deck-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}
-                  >
-                    Previous
-                  </button>
-                  {currentReviewStatus === 'alreadyInReview' ? (
-                    <button className="secondary-button" type="button" disabled>
-                      Already in Review
-                    </button>
-                  ) : currentReviewStatus === 'added' ? (
-                    <button className="secondary-button" type="button" disabled>
-                      Added
-                    </button>
-                  ) : (
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => void addCurrentWordToReview()}
-                      disabled={addToReviewMutation.isPending}
-                    >
-                      Add to Review
-                    </button>
-                  )}
-                  <button className="primary-button" type="button" onClick={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')} data-testid="practice-next-card">
-                    {currentIndex + 1 >= sessionCards.length ? 'Finish practice' : 'Next'}
-                  </button>
+              <div className="learning-recap" data-testid="practice-answer-reveal">
+                <div className="learning-recap__word">
+                  <h2>{currentCard.word} <span>({formatWordClass(currentCard.wordClass)})</span></h2>
+                  <button className="icon-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
+                </div>
+                <p className="learning-recap__ipa">{formatIpa(currentCard.ipaPronunciation)}</p>
+                <p><em>Definition:</em> {currentCard.meaningEn}</p>
+                <p><em>Meaning:</em> {currentCard.meaningVn}</p>
+                <p><em>Example:</em> {currentCard.example}</p>
+                <div className="deck-actions learning-recap__actions">
+                  <button className="secondary-button" type="button" onClick={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}>Previous</button>
+                  {currentReviewStatus === 'alreadyInReview' ? <button className="secondary-button" type="button" disabled>Already in Review</button>
+                    : currentReviewStatus === 'added' ? <button className="secondary-button" type="button" disabled>Added</button>
+                      : <button className="secondary-button" type="button" onClick={() => void addCurrentWordToReview()} disabled={addToReviewMutation.isPending}>Add to Review</button>}
+                  <button className="primary-button" type="button" onClick={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')} data-testid="practice-next-card">{currentIndex + 1 >= sessionCards.length ? 'Finish practice' : 'Next'}</button>
                 </div>
                 {addToReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to add this word to Review. Try again.</p> : null}
               </div>
             ) : (
               <div className="practice-answer-panel">
-                {currentStep === 'pronunciation' ? (
-                  <>
-                    <label className="practice-label" htmlFor="practice-transcript">Transcript</label>
-                    <textarea id="practice-transcript" className="practice-input practice-input--multiline" value={transcript} onChange={(event) => setTranscript(event.target.value)} data-testid="practice-transcript" />
-                    <button className="primary-button" type="button" onClick={submitTranscriptAnswer} disabled={normalizeAnswer(transcript).length === 0}>Check transcript</button>
-                  </>
-                ) : (
+                {currentStep !== 'pronunciation' && !resolvedOutcome ? (
                   <>
                     <label className="practice-label" htmlFor="practice-answer-input">Type the target word</label>
                     <input id="practice-answer-input" className="practice-input" value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} data-testid="practice-answer-input" />
                     <button className="primary-button" type="button" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0}><PenSquare size={16} /> Submit answer</button>
+                    <button className="secondary-button practice-skip-button" type="button" onClick={revealAndSkip}>Reveal / skip</button>
                   </>
-                )}
+                ) : null}
 
-                <button className="secondary-button practice-skip-button" type="button" onClick={revealAndSkip}>Reveal / skip</button>
-                {recognitionError ? <p className="flashcard-status flashcard-status--error">{recognitionError}</p> : null}
-                {feedback ? <p className="practice-feedback">{feedback}</p> : null}
+                {feedback ? <p className={`answer-feedback answer-feedback--${feedback}`} role="status">{feedback === 'correct' ? 'Correct' : 'Wrong'}</p> : null}
+                {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
+                {pronunciationPairExhausted && !resolvedOutcome ? (
+                  <div className="deck-actions">
+                    {!pronunciationRetryUsed ? <button className="secondary-button" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
+                    <button className="primary-button" type="button" onClick={revealAndSkip}>Skip</button>
+                  </div>
+                ) : null}
+                {resolvedOutcome ? <button className="primary-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
               </div>
             )}
-
-            {revealedAnswer && currentStep !== 'recap' ? (
-              <div className="review-card__answer practice-answer-reveal" data-testid="practice-answer-reveal">
-                <div><span>Target word</span><strong>{currentCard.word}</strong></div>
-                <div><span>Vietnamese meaning</span><p>{currentCard.meaningVn}</p></div>
-                <div><span>English meaning</span><p>{currentCard.meaningEn}</p></div>
-                <button className="primary-button" type="button" onClick={continueFromReveal} data-testid="practice-next-card">
-                  Continue
-                </button>
-              </div>
-            ) : null}
           </article>
         </section>
       ) : null}

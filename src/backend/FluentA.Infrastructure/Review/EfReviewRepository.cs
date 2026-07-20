@@ -48,7 +48,7 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
-        var nextReviewDate = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
+        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, intervalDays: 1, timeZone);
         var existingState = await _dbContext.WordReviewStates
             .SingleOrDefaultAsync(
                 state => state.UserId == userId
@@ -102,8 +102,8 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
-        var localToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
-        var sessionDate = DateOnly.FromDateTime(localToday);
+        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
+        var sessionDate = localToday;
         var activeSession = await _dbContext.ReviewSessions
             .SingleOrDefaultAsync(
                 session => session.UserId == userId
@@ -153,7 +153,6 @@ public sealed class EfReviewRepository : IReviewRepository
             }
         }
 
-        var (_, endUtc) = ReviewTime.LocalDayBoundsUtc(utcNow, timeZone);
         var settings = await _dbContext.ReviewSettings
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
@@ -172,13 +171,14 @@ public sealed class EfReviewRepository : IReviewRepository
                 && word.DeletedAt == null
                 && page.DeletedAt == null
                 && boardEntity.DeletedAt == null
-                && state.NextReviewDate < endUtc
+                && state.NextReviewDate <= localToday
             select new
             {
                 state,
                 WordId = word.Id,
                 word.Word,
                 WordClass = word.Class,
+                word.IpaPronunciation,
                 MeaningVn = word.MeaningVn,
                 MeaningEn = word.Definition,
                 word.Example,
@@ -195,7 +195,7 @@ public sealed class EfReviewRepository : IReviewRepository
         var overflow = dueWords.Skip(dailyLimit).ToList();
         if (overflow.Count > 0)
         {
-            var tomorrow = ReviewTime.NextReviewUtc(utcNow, intervalDays: 1, timeZone);
+            var tomorrow = localToday.AddDays(1);
             foreach (var item in overflow)
             {
                 item.state.MoveDueDate(tomorrow);
@@ -231,6 +231,7 @@ public sealed class EfReviewRepository : IReviewRepository
             item.WordId,
             item.Word,
             item.WordClass.ToString(),
+            item.IpaPronunciation,
             item.MeaningVn,
             item.MeaningEn,
             item.Example,
@@ -342,18 +343,15 @@ public sealed class EfReviewRepository : IReviewRepository
             }
         }
 
-        var (startUtc, endUtc) = ReviewTime.LocalDayBoundsUtc(utcNow, timeZone);
-        var localToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), timeZone).Date;
+        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
         var activeWords = QueryActiveBoardWords(userId, boardId);
         var reviewStates = QueryActiveReviewStates(userId, boardId);
         var reviews = QueryActiveReviewHistories(userId, boardId);
 
         var totalCards = await activeWords.CountAsync(cancellationToken);
         var reviewStateCount = await reviewStates.CountAsync(cancellationToken);
-        var overdue = await reviewStates.CountAsync(state => state.NextReviewDate < startUtc, cancellationToken);
-        var dueToday = await reviewStates.CountAsync(
-            state => state.NextReviewDate >= startUtc && state.NextReviewDate < endUtc,
-            cancellationToken);
+        var overdue = await reviewStates.CountAsync(state => state.NextReviewDate < localToday, cancellationToken);
+        var dueToday = await reviewStates.CountAsync(state => state.NextReviewDate == localToday, cancellationToken);
         var reviewSummary = await reviews
             .GroupBy(_ => 1)
             .Select(group => new
@@ -368,18 +366,19 @@ public sealed class EfReviewRepository : IReviewRepository
         var retentionRate = totalReviews == 0
             ? 0
             : (int)Math.Round((double)retained / totalReviews * 100, MidpointRounding.AwayFromZero);
-        var streak = await CountCurrentStreakAsync(reviews, localToday, timeZone, cancellationToken);
+        var streak = await CountCurrentStreakAsync(
+            reviews,
+            localToday.ToDateTime(TimeOnly.MinValue),
+            timeZone,
+            cancellationToken);
 
         var forecast = new List<DashboardForecastPointDto>(capacity: 7);
         for (var offset = 0; offset < 7; offset++)
         {
             var day = localToday.AddDays(offset);
-            var (dayStartUtc, dayEndUtc) = ReviewTime.LocalDateBoundsUtc(day, timeZone);
-            var count = await reviewStates.CountAsync(
-                state => state.NextReviewDate >= dayStartUtc && state.NextReviewDate < dayEndUtc,
-                cancellationToken);
+            var count = await reviewStates.CountAsync(state => state.NextReviewDate == day, cancellationToken);
             forecast.Add(new DashboardForecastPointDto(
-                DateOnly.FromDateTime(day).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 count));
         }
 
@@ -451,7 +450,7 @@ public sealed class EfReviewRepository : IReviewRepository
         }
 
         var reviewedAt = DateTime.UtcNow;
-        var (_, endUtc) = ReviewTime.LocalDayBoundsUtc(reviewedAt, timeZone);
+        var reviewedOn = ReviewTime.LocalDate(reviewedAt, timeZone);
         var reviewState = await _dbContext.WordReviewStates
             .SingleOrDefaultAsync(
                 state => state.UserId == userId
@@ -459,7 +458,7 @@ public sealed class EfReviewRepository : IReviewRepository
                     && state.DeletedAt == null
                     && state.Status == WordReviewStatus.Active,
                 cancellationToken);
-        if (reviewState is null || reviewState.NextReviewDate >= endUtc)
+        if (reviewState is null || reviewState.NextReviewDate > reviewedOn)
         {
             return null;
         }
@@ -468,8 +467,8 @@ public sealed class EfReviewRepository : IReviewRepository
         var schedule = correct
             ? FluentAsrsScheduler.ApplyCorrect(reviewState.Level, reviewState.LapseCount)
             : FluentAsrsScheduler.ApplyWrong(reviewState.Level, reviewState.LapseCount);
-        var nextReviewDate = ReviewTime.NextReviewUtc(reviewedAt, schedule.IntervalDays, timeZone);
-        reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedAt);
+        var nextReviewDate = ReviewTime.NextReviewDate(reviewedAt, schedule.IntervalDays, timeZone);
+        reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedOn);
 
         var review = WordReviewHistory.Create(
             userId,
@@ -480,7 +479,7 @@ public sealed class EfReviewRepository : IReviewRepository
             correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong,
             levelBefore,
             schedule.LevelAfter,
-            nextReviewDate);
+            ReviewTime.HistoryDueAtUtc(nextReviewDate));
         await _dbContext.WordReviewHistories.AddAsync(review, cancellationToken);
         sessionItem.MarkReviewed();
 
@@ -603,6 +602,7 @@ public sealed class EfReviewRepository : IReviewRepository
                 WordId = word.Id,
                 word.Word,
                 WordClass = word.Class,
+                word.IpaPronunciation,
                 MeaningVn = word.MeaningVn,
                 MeaningEn = word.Definition,
                 word.Example,
@@ -620,6 +620,7 @@ public sealed class EfReviewRepository : IReviewRepository
             item.WordId,
             item.Word,
             item.WordClass.ToString(),
+            item.IpaPronunciation,
             item.MeaningVn,
             item.MeaningEn ?? string.Empty,
             item.Example,
@@ -656,7 +657,7 @@ public sealed class EfReviewRepository : IReviewRepository
         DateOnly sessionDate,
         CancellationToken cancellationToken)
     {
-        var tomorrow = sessionDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var tomorrow = sessionDate.AddDays(1);
         var states = await (
             from state in _dbContext.WordReviewStates
             join word in _dbContext.Words on state.WordId equals word.Id
@@ -674,11 +675,9 @@ public sealed class EfReviewRepository : IReviewRepository
 
         foreach (var state in states)
         {
-            var localTime = TimeOnly.FromDateTime(state.NextReviewDate);
-            var moved = DateTime.SpecifyKind(tomorrow.Add(localTime.ToTimeSpan()), DateTimeKind.Utc);
-            if (state.NextReviewDate < moved)
+            if (state.NextReviewDate < tomorrow)
             {
-                state.MoveDueDate(moved);
+                state.MoveDueDate(tomorrow);
             }
         }
     }

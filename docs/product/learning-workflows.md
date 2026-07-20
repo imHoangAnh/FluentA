@@ -23,8 +23,14 @@ target behavior for that split and the data ownership rules that support it.
   Next/Previous controls.
 - The final card offers `Finish` and `Let's practice`. `Let's practice`
   redirects to Practice for that exact page deck.
-- Card front shows `word`, `class`, and optional `meaningEn`.
-- Card back shows `meaningVn`, `example`, and optional `thesaurus`.
+- Card front shows centered `word (class)`, required slash-normalized IPA, and
+  an independent Board-language speaker action.
+- Card back shows italic inline labels and values in this order: optional
+  `Definition` (`meaningEn`), `Meaning` (`meaningVn`), `Example`, optional
+  `Synonyms` (`synonyms`), and optional `Antonyms` (`antonyms`).
+- The responsive rectangular card stays bounded, wraps long content, reduces
+  text density before using internal vertical scrolling, and never introduces
+  horizontal content overflow.
 - Empty optional fields are hidden.
 
 ## Practice
@@ -35,6 +41,10 @@ target behavior for that split and the data ownership rules that support it.
   Page Deck selection flow. An external Page Deck action uses
   `/practice?deck=:pageId`, which opens that Page Deck's preparation dialog
   after its Board data loads; closing the dialog returns to `/practice`.
+- Flashcards and Practice Page Deck cards share the same compact presentation,
+  center the Page name and word count, and render ten columns on a wide
+  desktop. Tablet and mobile reduce the column count without horizontal
+  overflow; only the enabled-card action differs between the two libraries.
 - The preparation dialog defaults to Sequential each time, offers Shuffle, and
   shows the ordered configured Practice mode names. Its single Start action
   navigates to `/practice/:pageId?order=sequential|shuffle` and starts the
@@ -55,6 +65,20 @@ target behavior for that split and the data ownership rules that support it.
 - Wrong answers stay on the current step until the learner answers correctly
   or uses skip/reveal.
 - Skip/reveal completes the current step.
+- Typed submissions show only `Correct` or `Wrong`; they do not reveal a
+  detailed answer panel between the exercise and recap.
+- Pronunciation records at most five seconds of microphone audio as 16-kHz,
+  16-bit, mono PCM WAV and sends it to an authenticated FluentA endpoint. The
+  backend resolves the owned target word and Board language, calls Azure
+  Pronunciation Assessment, and treats `AccuracyScore >= 70` as Correct.
+- Practice Pronunciation permits two assessed attempts. Two Wrong results show
+  `Retry` and `Skip`; Retry grants one fresh pair of two attempts. Microphone,
+  invalid-audio, timeout, quota, throttling, and provider failures consume no
+  attempt. The UI never displays an Azure score or transcript.
+- The final recap is a centered rounded panel showing `word (class)` with its
+  speaker action, slash-normalized IPA, Definition, Meaning, and Example in
+  that order. Labels are italic, long content wraps, and Synonyms/Antonyms are
+  omitted.
 - Practice tracks completion in the UI during the session. After the full
   page-deck session finishes, the learner chooses `Finish` or `Add to Review`.
 - `Finish` saves the practice summary without creating new review state.
@@ -79,6 +103,14 @@ target behavior for that split and the data ownership rules that support it.
   each word.
 - Review uses automatic correct/wrong results. It does not show
   Easy/Good/Hard/Again buttons.
+- Typed Review modes receive one normalized exact-match submission.
+- Review Pronunciation receives two assessed attempts. The first Wrong permits
+  one more recording; the second Wrong persists immediately and always opens
+  recap. Review has no pronunciation Retry or Skip. Technical/provider errors
+  consume no attempt and persist no result.
+- Submission feedback contains only `Correct` or `Wrong`. Review recap uses the
+  same centered word/class, speaker, IPA, Definition, Meaning, and Example
+  presentation as Practice, without Synonyms or Antonyms.
 - Correct advances one FluentA SRS level; wrong resets or keeps the word at
   `Level 0` and schedules tomorrow.
 - Review persists each answered word immediately.
@@ -120,6 +152,9 @@ target behavior for that split and the data ownership rules that support it.
   it.
 - Review state stores `level`, `nextReviewDate`, `lapseCount`, and
   `lastReviewedAt`.
+- `nextReviewDate` and nullable `lastReviewedAt` are date-only values in the
+  domain, JSON contracts (`yyyy-MM-dd`), and PostgreSQL. Review-history
+  `reviewedAt` remains a timestamp.
 - Review history stores `wordId`, `reviewedAt`, `result`, `levelBefore`,
   `levelAfter`, and `nextReviewDate`.
 - Deleting a word, page, or board hard-deletes related review-state records.
@@ -134,3 +169,18 @@ target behavior for that split and the data ownership rules that support it.
 - Practice mode overrides per session are out of scope; Practice mode sequence
   is global.
 - Review remains board-level and is not page-deck scoped.
+
+## Pronunciation Provider Operations
+
+- Azure Speech is disabled by default. Operators enable it with
+  `AzureSpeech__Enabled=true`, then supply `AzureSpeech__Region` and
+  `AzureSpeech__SubscriptionKey` through environment configuration. Optional
+  `AzureSpeech__TimeoutSeconds` and `AzureSpeech__AccuracyThreshold` default to
+  `10` and `70`.
+- The subscription key, reference word, raw provider response, and learner
+  audio are never returned to the browser or persisted. Automated tests use a
+  fake HTTP provider; a credentialed Azure smoke test is an operator step.
+- The authenticated endpoint is
+  `POST /api/v1/pronunciation/words/{wordId}/assessment` with raw `audio/wav`.
+  Success returns only `{ "correct": true|false }`; provider unavailability is
+  a generic `503` so the client can retry without decrementing attempts.

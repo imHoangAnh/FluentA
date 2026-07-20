@@ -1353,16 +1353,16 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lapse_count");
 
-                    b.Property<DateTime?>("LastReviewedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateOnly?>("LastReviewedAt")
+                        .HasColumnType("date")
                         .HasColumnName("last_reviewed_at");
 
                     b.Property<int>("Level")
                         .HasColumnType("integer")
                         .HasColumnName("level");
 
-                    b.Property<DateTime>("NextReviewDate")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateOnly>("NextReviewDate")
+                        .HasColumnType("date")
                         .HasColumnName("next_review_date");
 
                     b.Property<string>("Status")

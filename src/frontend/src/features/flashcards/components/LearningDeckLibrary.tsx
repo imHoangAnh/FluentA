@@ -54,7 +54,7 @@ export function LearningDeckLibrary({ boards, mode, onSelectPracticeDeck }: Lear
             {expanded ? (
               <CardContent className="p-4 sm:p-5">
                 {deckCount === 0 ? <p className="m-0 text-sm text-muted-foreground">No decks in this board yet.</p> : (
-                  <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 min-[520px]:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-10">
                     {board.pages.map((page) => <DeckCard key={page.pageId} mode={mode} page={page} onSelectPracticeDeck={onSelectPracticeDeck} />)}
                   </div>
                 )}
@@ -70,7 +70,7 @@ export function LearningDeckLibrary({ boards, mode, onSelectPracticeDeck }: Lear
 function DeckCard({ mode, page, onSelectPracticeDeck }: { mode: LearningDeckLibraryProps['mode']; page: FlashcardPage; onSelectPracticeDeck?: (page: FlashcardPage) => void }) {
   const hasWords = page.words.length > 0
   const content = <><span className="line-clamp-2 break-words text-sm font-semibold leading-5 tracking-[-0.01em]">{page.pageName}</span><span className="text-xs text-muted-foreground">{page.words.length} {page.words.length === 1 ? 'word' : 'words'}</span></>
-  const cardClassName = 'flex aspect-square min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  const cardClassName = 'flex min-h-24 min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border bg-card p-2.5 text-center transition-all hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
   if (!hasWords) {
     return <div data-testid={`flashcard-page-${page.pageId}`} aria-disabled="true" className={`${cardClassName} cursor-not-allowed bg-muted/50 text-muted-foreground`}>{content}</div>

@@ -17,7 +17,7 @@ public sealed record AddPracticeWordsToReviewDto(
     Guid PageId,
     Guid WordId,
     string Status,
-    DateTime NextReviewDate);
+    DateOnly NextReviewDate);
 
 public sealed record PracticeSessionSummaryDto(
     Guid Id,

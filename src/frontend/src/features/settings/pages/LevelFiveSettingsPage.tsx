@@ -4,6 +4,11 @@ import * as reviewApi from '@/features/review'
 
 type FilterMode = 'all' | 'active' | 'inactive'
 
+function formatDateOnly(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString()
+}
+
 export function LevelFiveSettingsPage() {
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<FilterMode>('all')
@@ -74,7 +79,7 @@ export function LevelFiveSettingsPage() {
                 <div>
                   <strong>{item.word}</strong>
                   <p>{item.boardName} / {item.pageName}</p>
-                  <small>Status: {item.status}{item.lastReviewDate ? ` • ${new Date(item.lastReviewDate).toLocaleDateString()}` : ''}</small>
+                  <small>Status: {item.status}{item.lastReviewDate ? ` • ${formatDateOnly(item.lastReviewDate)}` : ''}</small>
                 </div>
                 <div className="deck-actions">
                   {item.status === 'active' ? (

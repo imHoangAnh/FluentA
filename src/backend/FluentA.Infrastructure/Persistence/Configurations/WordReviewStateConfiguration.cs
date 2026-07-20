@@ -20,9 +20,9 @@ public sealed class WordReviewStateConfiguration : IEntityTypeConfiguration<Word
         builder.Property(state => state.WordId).HasColumnName("word_id").IsRequired();
         builder.Property(state => state.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(state => state.Level).HasColumnName("level").IsRequired();
-        builder.Property(state => state.NextReviewDate).HasColumnName("next_review_date").IsRequired();
+        builder.Property(state => state.NextReviewDate).HasColumnName("next_review_date").HasColumnType("date").IsRequired();
         builder.Property(state => state.LapseCount).HasColumnName("lapse_count").IsRequired();
-        builder.Property(state => state.LastReviewedAt).HasColumnName("last_reviewed_at");
+        builder.Property(state => state.LastReviewedAt).HasColumnName("last_reviewed_at").HasColumnType("date");
         builder.Property(state => state.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(state => state.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(state => state.DeletedAt).HasColumnName("deleted_at");

@@ -2,8 +2,11 @@
 
 ## Status
 
-Exploration complete. Product decisions D1-D16 were approved by the user on
-2026-07-14. Planning is active; implementation remains gated.
+Product decisions D1-D16 were approved and implemented on 2026-07-14. On
+2026-07-21 the user approved and implemented a follow-up that supersedes only
+D5's density and D6's square-card shape: Flashcards and Practice now share the
+compact centered 10/7/2/1 responsive deck presentation. Their different
+enabled-card actions remain unchanged.
 
 ## Intake
 

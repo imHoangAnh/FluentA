@@ -120,26 +120,26 @@ public sealed class VocabularyTests
     [Fact]
     public void WordReviewState_CreatesAndAppliesFluentAsrsState()
     {
-        var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
+        var nextReviewDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
         var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), nextReviewDate);
 
         Assert.Equal(WordReviewStatus.Active, state.Status);
 
-        var reviewedAt = DateTime.UtcNow;
-        state.ApplyResult(1, nextReviewDate.AddDays(1), 0, reviewedAt);
+        var reviewedOn = DateOnly.FromDateTime(DateTime.UtcNow);
+        state.ApplyResult(1, nextReviewDate.AddDays(1), 0, reviewedOn);
 
         Assert.Equal(1, state.Level);
-        Assert.Equal(reviewedAt, state.LastReviewedAt);
+        Assert.Equal(reviewedOn, state.LastReviewedAt);
     }
 
     [Fact]
     public void WordReviewState_ReactivatesInactiveWordsAtLevelZero()
     {
-        var nextReviewDate = DateTime.UtcNow.Date.AddDays(1);
+        var nextReviewDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
         var reactivatedDate = nextReviewDate.AddDays(3);
         var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), nextReviewDate);
 
-        state.ApplyResult(4, nextReviewDate.AddDays(10), 2, DateTime.UtcNow);
+        state.ApplyResult(4, nextReviewDate.AddDays(10), 2, DateOnly.FromDateTime(DateTime.UtcNow));
         state.Deactivate();
         state.ReactivateLevelZero(reactivatedDate);
 

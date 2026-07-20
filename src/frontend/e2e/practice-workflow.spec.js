@@ -21,6 +21,7 @@ async function registerAndLogin(page, prefix) {
   const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const token = (await (await loginResponsePromise).json()).data.accessToken;
+  await page.waitForURL((url) => url.pathname === '/');
 
   return { headers: { Authorization: `Bearer ${token}` } };
 }
@@ -77,20 +78,22 @@ async function completeMeaningToWordPractice(page) {
   await expect(page.getByText('1 / 2')).toBeVisible();
   await page.getByTestId('practice-answer-input').fill('wrong');
   await page.getByRole('button', { name: 'Submit answer' }).click();
-  await expect(page.getByText('That answer does not match yet. Try again or reveal the answer.')).toBeVisible();
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible();
   await page.getByTestId('practice-answer-input').fill('mitigate');
   await page.getByRole('button', { name: 'Submit answer' }).click();
-  await page.getByTestId('practice-next-card').click();
+  await expect(page.getByText('Correct', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('practice-answer-reveal')).toContainText('mitigate');
   await page.getByTestId('practice-next-card').click();
 
   await expect(page.getByText('2 / 2')).toBeVisible();
   await page.getByRole('button', { name: 'Reveal / skip' }).click();
-  await page.getByTestId('practice-next-card').click();
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('practice-answer-reveal')).toContainText('nuance');
   await page.getByTestId('practice-next-card').click();
 
-  await expect(page.getByTestId('practice-summary')).toContainText('1 words completed cleanly and 1 words needed reveal/skip');
+  await expect(page.getByTestId('practice-summary')).toContainText('1 correct and 1 wrong');
 }
 
 test('practice completion keeps finish separate from per-word add-to-review', async ({ page }) => {
@@ -117,7 +120,7 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   });
   expect(practiceSettingsResponse.status()).toBe(200);
 
-  await page.goto('/practice');
+  await page.getByRole('link', { name: 'Practice', exact: true }).click();
   const pageCard = page.getByTestId(`flashcard-page-${pageDeck.pageId}`);
   await expect(pageCard).toHaveAccessibleName('Practice Practice Workflow Page, 2 words');
 
@@ -153,7 +156,7 @@ test('practice completion keeps finish separate from per-word add-to-review', as
   await page.getByRole('button', { name: 'Start practice' }).click();
   await page.getByTestId('practice-answer-input').fill('mitigate');
   await page.getByRole('button', { name: 'Submit answer' }).click();
-  await page.getByTestId('practice-next-card').click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Add to Review' }).click();
   await expect(page.getByRole('button', { name: 'Added' })).toBeDisabled();
 });

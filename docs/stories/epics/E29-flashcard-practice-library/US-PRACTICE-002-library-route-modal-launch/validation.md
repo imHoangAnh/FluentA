@@ -2,8 +2,8 @@
 
 ## Readiness Status
 
-`READY WITH CONSTRAINTS` - validated 2026-07-14. Implementation still requires
-explicit user approval.
+`READY WITH CONSTRAINTS` - validated 2026-07-14. This pre-implementation gate
+was explicitly approved and satisfied before the implementation review below.
 
 The story is a coherent frontend-only slice. Existing Board/Page Deck and
 Practice Settings responses contain all data required for the library and
@@ -156,3 +156,40 @@ redesign, or modification of the user's unrelated Dashboard/Workspace intent.
 - Browser proof uses a temporary Vite server bound to `127.0.0.1`; it was
   stopped after each run. The pre-existing Vite server is IPv6-only (`::1`),
   while Playwright is configured for IPv4.
+
+## Compact Shared Deck Follow-Up - 2026-07-21
+
+The user approved making the Flashcards Page Deck list visually identical to
+Practice. `LearningDeckLibrary` now uses one compact centered card style and
+one responsive grid for both modes. The mode branch remains only at the
+interaction boundary: Flashcards uses a native link to the viewer and Practice
+uses a native button to open its preparation dialog.
+
+### Acceptance Evidence
+
+- Both `/flashcards` and `/practice` render 10 cards on the first row at
+  1440px, 7 at 1024px, 2 at 375px, and 1 at 320px.
+- Every card remains 90-110px high, center-aligned, and contained without
+  horizontal page overflow.
+- A zero-word deck remains visible with `aria-disabled="true"` and no link or
+  button behavior.
+- Flashcards still navigates to `/flashcards/pages/:pageId`; Practice still
+  opens the preparation modal. No API, schema, SRS, or persistence code
+  changed.
+
+### Commands And Results
+
+| Command | Result |
+| --- | --- |
+| `npm --prefix src/frontend run test:run` | Passed `69/69` across 18 files. |
+| Focused ESLint for `LearningDeckLibrary.tsx` and `e29-practice-library.spec.js` | Passed. |
+| Direct `vite build` from `src/frontend` | Passed, 2,081 modules transformed; existing SignalR annotation warnings only. |
+| `npm run test:e2e -- e2e/e29-practice-library.spec.js` | Passed `9/9`, including responsive geometry for both routes at all four widths. |
+| `npm run build` | Blocked only by the unrelated existing `TodoPage.tsx:22` unused `formatDay` declaration. |
+| `npm run lint` | Blocked by the same unrelated existing `TodoPage.tsx:22` declaration; changed-file ESLint passed. |
+| Scoped `git diff --check` | Passed with line-ending notices only. |
+
+No P1 or P2 finding remains. Full `npm run build` remains outside the scoped
+proof because the unrelated dirty `TodoPage.tsx` still contains the previously
+recorded unused `formatDay` declaration; the direct production bundle and
+changed-file lint both pass.

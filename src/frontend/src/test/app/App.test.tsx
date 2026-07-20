@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
 import { AppProviders } from '@/app/providers'
 import { createAppRouter } from '@/app/router'
@@ -114,7 +114,7 @@ async function renderApp(initialEntry: string) {
   return view
 }
 
-async function renderAppWithDeck(initialEntry: string) {
+async function renderAppWithDeck(initialEntry: string, wordOverrides: Record<string, unknown> = {}) {
   const queryClient = createQueryClient()
 
   const board = {
@@ -129,13 +129,17 @@ async function renderAppWithDeck(initialEntry: string) {
       wordId: 'word-1',
       word: '你好',
       wordClass: 'phrase',
+      ipaPronunciation: 'niː haʊ',
       meaningVn: 'xin chào',
       meaningEn: 'ni hao',
       example: '你好！',
+      synonyms: '您好',
+      antonyms: '再见',
       isInReview: false,
       reviewLevel: null,
       nextReviewDate: null,
       lapseCount: 0,
+      ...wordOverrides,
       }],
       isPracticed: false,
     }],
@@ -170,6 +174,10 @@ async function renderAppWithDeck(initialEntry: string) {
 describe('FluentA app routes', async () => {
   beforeEach(() => {
     useAuthStore.setState({ accessToken: null, user: null, status: 'anonymous', error: null })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders the login route with auth controls', async () => {
@@ -276,6 +284,23 @@ describe('FluentA app routes', async () => {
   })
 
   it('renders the one-card flashcard viewer route from cached data', async () => {
+    const cancelSpeech = vi.fn()
+    const speak = vi.fn()
+    vi.stubGlobal('speechSynthesis', {
+      cancel: cancelSpeech,
+      getVoices: () => [],
+      speak,
+    })
+    vi.stubGlobal('SpeechSynthesisUtterance', class {
+      lang = ''
+      voice = null
+      text: string
+
+      constructor(text: string) {
+        this.text = text
+      }
+    })
+
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
@@ -287,7 +312,36 @@ describe('FluentA app routes', async () => {
     expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
     expect(screen.getByText('1 / 1')).toBeInTheDocument()
     expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
+    expect(screen.getByText('你好 (phrase)')).toBeInTheDocument()
+    expect(screen.getByText('/niː haʊ/')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Listen to 你好' }))
+    expect(speak).toHaveBeenCalledTimes(1)
+    expect(speak.mock.calls[0][0]).toMatchObject({ text: '你好', lang: 'zh-CN' })
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show card back' }))
+    const stage = screen.getByTestId('flashcard-stage')
+    expect(stage).toHaveTextContent('Definition: ni hao')
+    expect(stage).toHaveTextContent('Meaning: xin chào')
+    expect(stage).toHaveTextContent('Example: 你好！')
+    expect(stage).toHaveTextContent('Synonyms: 您好')
+    expect(stage).toHaveTextContent('Antonyms: 再见')
     expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/practice?deck=page-1')
+  })
+
+  it('keeps the viewer route usable when a stale API response omits IPA', async () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderAppWithDeck('/flashcards/pages/page-1', { ipaPronunciation: undefined })
+
+    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('IPA is unavailable. Refresh after the API restarts.')
+    expect(screen.queryByText('Load failed this page.')).not.toBeInTheDocument()
   })
 
   it('renders protected settings from cached data', async () => {

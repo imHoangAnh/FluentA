@@ -12,6 +12,7 @@ const words = [{
   wordId: 'word-1',
   word: 'mitigate',
   wordClass: 'verb',
+  ipaPronunciation: '/ˈmɪt.ɪ.ɡeɪt/',
   meaningVn: 'giam nhe',
   meaningEn: 'make less severe',
   example: 'We mitigate risk.',
@@ -21,10 +22,10 @@ const words = [{
   lapseCount: 0,
 }]
 
-const pages = Array.from({ length: 5 }, (_, index) => ({
+const pages = Array.from({ length: 12 }, (_, index) => ({
   pageId: `page-${index + 1}`,
   pageName: `Practice deck ${index + 1}`,
-  words: index === 4 ? [] : words.map((word) => ({ ...word, id: `card-${index + 1}`, wordId: `word-${index + 1}` })),
+  words: index === 11 ? [] : words.map((word) => ({ ...word, id: `card-${index + 1}`, wordId: `word-${index + 1}` })),
   isPracticed: false,
 }))
 
@@ -69,28 +70,31 @@ test('E29 opens a query-selected deck, preserves Shuffle in the session URL, and
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 })
 
-for (const [width, expectedFirstRow, expectedSecondRow] of [
-  [1440, 5, false],
-  [1024, 3, true],
-  [375, 2, true],
-  [320, 1, true],
-]) {
-  test(`E29 renders ${expectedFirstRow} deck cards per first row at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await mockPracticeLibraryApis(page)
-    await page.goto('/flashcards')
+for (const route of ['/flashcards', '/practice']) {
+  for (const [width, expectedFirstRow, expectedSecondRow] of [
+    [1440, 10, true],
+    [1024, 7, true],
+    [375, 2, true],
+    [320, 1, true],
+  ]) {
+    test(`E29 renders ${expectedFirstRow} compact ${route} deck cards per first row at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await mockPracticeLibraryApis(page)
+      await page.goto(route)
 
-    const cards = page.locator('[data-testid^="flashcard-page-"]')
-    await expect(cards).toHaveCount(5)
-    await expect(cards.nth(4)).toHaveAttribute('aria-disabled', 'true')
-    const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
-      const box = element.getBoundingClientRect()
-      return { x: box.x, y: box.y, width: box.width, height: box.height }
-    }))
+      const cards = page.locator('[data-testid^="flashcard-page-"]')
+      await expect(cards).toHaveCount(12)
+      await expect(cards.nth(11)).toHaveAttribute('aria-disabled', 'true')
+      const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
+        const box = element.getBoundingClientRect()
+        return { x: box.x, y: box.y, width: box.width, height: box.height }
+      }))
 
-    expect(boxes.slice(0, expectedFirstRow).every((box) => Math.abs(box.y - boxes[0].y) < 2)).toBe(true)
-    if (expectedSecondRow) expect(boxes[expectedFirstRow].y).toBeGreaterThan(boxes[0].y)
-    expect(boxes.every((box) => Math.abs(box.width - box.height) < 2)).toBe(true)
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  })
+      expect(boxes.slice(0, expectedFirstRow).every((box) => Math.abs(box.y - boxes[0].y) < 2)).toBe(true)
+      if (expectedSecondRow) expect(boxes[expectedFirstRow].y).toBeGreaterThan(boxes[0].y)
+      expect(boxes.every((box) => box.height >= 90 && box.height <= 110)).toBe(true)
+      expect(await cards.first().evaluate((element) => getComputedStyle(element).textAlign)).toBe('center')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    })
+  }
 }

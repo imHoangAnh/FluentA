@@ -4,6 +4,7 @@ public sealed record ReviewSessionWordDto(
     Guid WordId,
     string Word,
     string WordClass,
+    string IpaPronunciation,
     string MeaningVn,
     string MeaningEn,
     string Example,
@@ -78,7 +79,7 @@ public sealed record ReviewResultDto(
     int LevelBefore,
     int LevelAfter,
     int LapseCount,
-    DateTime NextReviewDate);
+    DateOnly NextReviewDate);
 
 public sealed record LevelFiveReviewItemDto(
     Guid WordId,
@@ -88,6 +89,6 @@ public sealed record LevelFiveReviewItemDto(
     Guid PageId,
     string PageName,
     string Status,
-    DateTime? LastReviewDate);
+    DateOnly? LastReviewDate);
 
 public sealed record RemoveLevelFiveWordsRequest(IReadOnlyList<Guid> WordIds);

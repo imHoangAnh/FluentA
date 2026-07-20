@@ -13,9 +13,9 @@ public sealed class WordReviewState : BaseEntity
         Guid wordId,
         WordReviewStatus status,
         int level,
-        DateTime nextReviewDate,
+        DateOnly nextReviewDate,
         int lapseCount,
-        DateTime? lastReviewedAt)
+        DateOnly? lastReviewedAt)
     {
         if (userId == Guid.Empty || wordId == Guid.Empty)
         {
@@ -36,25 +36,25 @@ public sealed class WordReviewState : BaseEntity
     public Guid WordId { get; private set; }
     public WordReviewStatus Status { get; private set; }
     public int Level { get; private set; }
-    public DateTime NextReviewDate { get; private set; }
+    public DateOnly NextReviewDate { get; private set; }
     public int LapseCount { get; private set; }
-    public DateTime? LastReviewedAt { get; private set; }
+    public DateOnly? LastReviewedAt { get; private set; }
 
-    public static WordReviewState CreateLevelZero(Guid userId, Guid wordId, DateTime nextReviewDate) =>
+    public static WordReviewState CreateLevelZero(Guid userId, Guid wordId, DateOnly nextReviewDate) =>
         new(userId, wordId, WordReviewStatus.Active, level: 0, nextReviewDate, lapseCount: 0, lastReviewedAt: null);
 
-    public void ApplyResult(int levelAfter, DateTime nextReviewDate, int lapseCountAfter, DateTime reviewedAtUtc)
+    public void ApplyResult(int levelAfter, DateOnly nextReviewDate, int lapseCountAfter, DateOnly reviewedOn)
     {
         ValidateState(levelAfter, nextReviewDate, lapseCountAfter);
         Status = WordReviewStatus.Active;
         Level = levelAfter;
         NextReviewDate = nextReviewDate;
         LapseCount = lapseCountAfter;
-        LastReviewedAt = reviewedAtUtc;
+        LastReviewedAt = reviewedOn;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void MoveDueDate(DateTime nextReviewDate)
+    public void MoveDueDate(DateOnly nextReviewDate)
     {
         ValidateState(Level, nextReviewDate, LapseCount);
         NextReviewDate = nextReviewDate;
@@ -67,7 +67,7 @@ public sealed class WordReviewState : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void ReactivateLevelZero(DateTime nextReviewDate)
+    public void ReactivateLevelZero(DateOnly nextReviewDate)
     {
         ValidateState(0, nextReviewDate, LapseCount);
         Status = WordReviewStatus.Active;
@@ -77,7 +77,7 @@ public sealed class WordReviewState : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
-    private static void ValidateState(int level, DateTime nextReviewDate, int lapseCount)
+    private static void ValidateState(int level, DateOnly nextReviewDate, int lapseCount)
     {
         if (level is < 0 or > 5)
         {

@@ -25,10 +25,20 @@ public static class ReviewTime
         }
     }
 
-    public static DateTime NextReviewUtc(DateTime reviewedAtUtc, int intervalDays, TimeZoneInfo timeZone)
+    public static DateOnly LocalDate(DateTime utcDateTime, TimeZoneInfo timeZone)
     {
-        var localReviewDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(reviewedAtUtc, DateTimeKind.Utc), timeZone).Date;
-        return LocalDateStartUtc(localReviewDate.AddDays(intervalDays), timeZone);
+        var localDateTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), timeZone);
+        return DateOnly.FromDateTime(localDateTime);
+    }
+
+    public static DateOnly NextReviewDate(DateTime reviewedAtUtc, int intervalDays, TimeZoneInfo timeZone)
+    {
+        return LocalDate(reviewedAtUtc, timeZone).AddDays(intervalDays);
+    }
+
+    public static DateTime HistoryDueAtUtc(DateOnly nextReviewDate)
+    {
+        return nextReviewDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
     }
 
     public static (DateTime StartUtc, DateTime EndUtc) LocalDayBoundsUtc(DateTime utcNow, TimeZoneInfo timeZone)

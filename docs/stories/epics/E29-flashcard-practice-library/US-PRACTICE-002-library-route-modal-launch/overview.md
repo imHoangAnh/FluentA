@@ -34,9 +34,10 @@ selected order encoded in the URL.
   collapsible Boards.
 - Each Board header contains only its name, `deck/decks` count, divider, and
   expansion icon; `Vocabulary board` is absent.
-- Page Decks are square and render 5/3/2/1 per row at wide desktop/tablet/mobile/
-  very-small widths. Each shows only Page name and word count;
-  `Vocabulary page`, description, badges, and separate buttons are absent.
+- Page Decks use the same compact centered presentation in Flashcards and
+  Practice and render 10/7/2/1 per row at wide desktop/tablet/mobile/very-small
+  widths. Each shows only Page name and word count; `Vocabulary page`,
+  description, badges, and separate buttons are absent.
 - An enabled Flashcards Page Deck card opens its existing viewer. An enabled
   Practice Page Deck card opens the preparation dialog. A zero-word card shows
   `0 words`, remains visible, and activates neither destination.
@@ -67,7 +68,8 @@ selected order encoded in the URL.
   one-time Shuffle initialization.
 - Route-manifest and navigation tests for new routes and removed legacy routes.
 - Focused Chromium proof for external Practice links, refresh, dialog keyboard
-  behavior, direct session start, and responsive 5/3/2/1 square grid.
+  behavior, direct session start, and the shared responsive 10/7/2/1 compact
+  grid.
 - Existing Practice workflow regression proof to retain summary/Add to Review/
   no-SRS-mutation behavior.
 - Frontend lint, full unit suite, production build, targeted legacy-reference

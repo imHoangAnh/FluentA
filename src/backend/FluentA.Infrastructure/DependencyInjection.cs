@@ -1,3 +1,4 @@
+using System.Globalization;
 using Amazon.S3;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth;
@@ -9,6 +10,7 @@ using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Practice;
+using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Vocabulary;
@@ -28,6 +30,7 @@ using FluentA.Infrastructure.Note;
 using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Pomodoro;
 using FluentA.Infrastructure.Practice;
+using FluentA.Infrastructure.Pronunciation;
 using FluentA.Infrastructure.Review;
 using FluentA.Infrastructure.Todo;
 using FluentA.Infrastructure.Vocabulary;
@@ -64,6 +67,7 @@ public static class DependencyInjection
             DefaultHangfireWorkerCount);
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
         var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
+        var pronunciationOptions = CreatePronunciationOptions(configuration);
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
             postgresConnection,
@@ -104,10 +108,14 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFlashcardRepository, EfFlashcardRepository>();
         services.AddScoped<IPracticeRepository, EfPracticeRepository>();
+        services.AddScoped<IPronunciationWordRepository, EfPronunciationWordRepository>();
         services.AddScoped<IReviewRepository, EfReviewRepository>();
         services.AddScoped<IFlashcardService, FlashcardService>();
         services.AddScoped<IPracticeService, PracticeService>();
+        services.AddScoped<IPronunciationService, PronunciationService>();
         services.AddScoped<IReviewService, ReviewService>();
+        services.AddSingleton(pronunciationOptions);
+        services.AddHttpClient<IPronunciationAssessmentProvider, AzurePronunciationAssessmentProvider>();
         services.AddScoped<IReviewEnrollmentPort>(provider => provider.GetRequiredService<IReviewService>() as IReviewEnrollmentPort
             ?? throw new InvalidOperationException("Review service must implement review enrollment."));
         services.AddScoped<IFlashcardVocabularySyncPort, EfFlashcardVocabularySyncPort>();
@@ -132,6 +140,24 @@ public static class DependencyInjection
         services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
+    }
+
+    private static PronunciationAssessmentOptions CreatePronunciationOptions(IConfiguration configuration)
+    {
+        var threshold = double.TryParse(
+            configuration["AzureSpeech:AccuracyThreshold"],
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var configuredThreshold)
+            ? configuredThreshold
+            : 70d;
+
+        return new PronunciationAssessmentOptions(
+            configuration.GetValue<bool>("AzureSpeech:Enabled"),
+            configuration["AzureSpeech:Region"]?.Trim() ?? string.Empty,
+            configuration["AzureSpeech:SubscriptionKey"] ?? string.Empty,
+            GetPositiveInt(configuration, "AzureSpeech:TimeoutSeconds", 10),
+            threshold);
     }
 
     private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)

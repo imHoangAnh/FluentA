@@ -884,7 +884,7 @@
 .review-summary {
   padding: 38px;
   border: 1px solid var(--ds-border);
-  border-radius: 8px;
+  border-radius: 20px;
   background:
     linear-gradient(145deg, rgba(15, 159, 143, 0.12), rgba(244, 197, 66, 0.1)),
     #ffffff;
@@ -1140,19 +1140,12 @@
 }
 
 .review-mode {
-  min-height: 104px;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 8px;
-  padding: 18px;
-  border: 1px solid var(--ds-border);
-  border-radius: 8px;
-  color: var(--ds-foreground);
-  background: #ffffff;
-  font-weight: 900;
-  text-align: left;
-  cursor: pointer;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 9999px;
+  padding: 10px 0;
+  font-weight: 600;
 }
 
 .review-mode small {
@@ -1161,8 +1154,8 @@
 }
 
 .review-mode--active {
-  border-color: var(--ds-primary);
-  background: var(--ds-secondary);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
 }
 
 .practice-setup,
@@ -1311,7 +1304,7 @@
   gap: 24px;
   padding: 38px;
   border: 1px solid var(--ds-border);
-  border-radius: 8px;
+  border-radius: 24px;
   background:
     radial-gradient(circle at top right, rgba(244, 197, 66, 0.18), transparent 35%),
     #ffffff;
@@ -1385,6 +1378,100 @@
   width: auto;
   padding: 0 28px;
   text-decoration: none;
+}
+
+.review-card--soft {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 5%, rgba(15, 159, 143, 0.13), transparent 28%),
+    radial-gradient(circle at 10% 90%, rgba(244, 197, 66, 0.12), transparent 32%),
+    #ffffff;
+}
+
+.learning-recap {
+  width: min(680px, 100%);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12px;
+  margin: 0 auto;
+  padding: 28px clamp(8px, 3vw, 28px) 4px;
+  border-top: 1px solid var(--ds-border);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.learning-recap__word {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.learning-recap__word h2 {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  font-size: clamp(25px, 4vw, 36px);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.learning-recap__word h2 span {
+  color: var(--ds-muted-foreground);
+  font-size: 0.62em;
+  font-weight: 650;
+}
+
+.learning-recap__ipa {
+  color: var(--ds-secondary-foreground);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.learning-recap > p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ds-foreground);
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.learning-recap > p em {
+  font-weight: 750;
+}
+
+.learning-recap__actions {
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.answer-feedback {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.answer-feedback--correct {
+  color: #08705f;
+  background: #def8ef;
+}
+
+.answer-feedback--wrong {
+  color: #a12a20;
+  background: #fee9e7;
+}
+
+.practice-attempt-copy {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .todo-empty {
@@ -3292,8 +3379,9 @@
 
 .review-setup-options {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  padding: 4px;
 }
 
 .rs-selection-card.active {

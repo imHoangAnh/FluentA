@@ -8,6 +8,10 @@
 - Status: implemented - review evidence recorded; live API/database regression
   remains unavailable because PostgreSQL is not listening locally
 
+The 2026-07-21 frontend-only follow-up makes Flashcards use the same compact
+10/7/2/1 responsive deck presentation as Practice. Viewer navigation, modal
+launch, and empty-deck behavior are preserved.
+
 ## Objective
 
 Replace the legacy Practice routes and duplicated setup with the approved

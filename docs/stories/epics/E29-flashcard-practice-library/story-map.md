@@ -6,13 +6,14 @@
 
 ## Current Story
 
-`US-PRACTICE-002` is planned and awaits readiness validation. Production code
-must not change until validation is recorded and the user explicitly approves
-implementation.
+`US-PRACTICE-002` is implemented. Its 2026-07-21 approved follow-up unifies the
+Flashcards and Practice compact deck presentation without changing routes,
+modal behavior, viewer navigation, or Practice launch behavior.
 
 ## Completion Rule
 
 E29 is complete only when the new routes, external modal targeting, direct
-session start, responsive 5/3/2/1 grid, zero-word behavior, accessibility,
-product documentation, legacy-route removal search, and Harness evidence all
-match the approved context without changing backend or SRS behavior.
+session start, shared responsive 10/7/2/1 compact grid, zero-word behavior,
+accessibility, product documentation, legacy-route removal search, and Harness
+evidence all match the approved context without changing backend or SRS
+behavior.

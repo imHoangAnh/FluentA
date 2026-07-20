@@ -6,11 +6,12 @@ export type FlashcardCard = {
   wordId: string
   word: string
   wordClass: string
+  ipaPronunciation: string
   meaningVn: string
   meaningEn: string
   example: string
-  thesaurus?: string | null
-  collocation?: string | null
+  synonyms?: string | null
+  antonyms?: string | null
   note?: string | null
   isInReview: boolean
   reviewLevel?: number | null

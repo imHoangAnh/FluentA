@@ -26,6 +26,9 @@ public sealed class FlashcardServiceTests
         Assert.Single(boards[0].Pages);
         Assert.Single(boards[0].Pages[0].Words);
         Assert.Equal("zh", boards[0].BoardLanguage);
+        Assert.Equal("/ˈmɪt.ɪ.ɡeɪt/", boards[0].Pages[0].Words[0].IpaPronunciation);
+        Assert.Equal("reduce", boards[0].Pages[0].Words[0].Synonyms);
+        Assert.Equal("worsen", boards[0].Pages[0].Words[0].Antonyms);
     }
 
     [Fact]
@@ -205,9 +208,9 @@ public sealed class FlashcardServiceTests
     {
         var zone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
-        var result = ReviewTime.NextReviewUtc(new DateTime(2026, 3, 8, 7, 30, 0, DateTimeKind.Utc), 1, zone);
+        var result = ReviewTime.NextReviewDate(new DateTime(2026, 3, 8, 7, 30, 0, DateTimeKind.Utc), 1, zone);
 
-        Assert.Equal(new DateTime(2026, 3, 9, 4, 0, 0, DateTimeKind.Utc), result);
+        Assert.Equal(new DateOnly(2026, 3, 9), result);
     }
 
     [Fact]
@@ -320,8 +323,8 @@ public sealed class FlashcardServiceTests
         {
             RequestedUserId = userId;
             var word = new FlashcardCardDto(
-                Guid.NewGuid(), Guid.NewGuid(), "mitigate", "verb", "giam nhe", "make less severe",
-                "Mitigate the risk.", null, null, null, false, null, null, 0);
+                Guid.NewGuid(), Guid.NewGuid(), "mitigate", "verb", "/ˈmɪt.ɪ.ɡeɪt/", "giam nhe", "make less severe",
+                "Mitigate the risk.", "reduce", "worsen", null, false, null, null, 0);
             var page = new FlashcardPageDto(Guid.NewGuid(), "HSK - Unit 1", false, [word]);
             var board = new FlashcardBoardDto(Guid.NewGuid(), "HSK", "zh", [page]);
             return Task.FromResult<IReadOnlyList<FlashcardBoardDto>>([board]);
@@ -418,7 +421,7 @@ public sealed class FlashcardServiceTests
             RequestedPageId = pageId;
             RequestedWordId = wordId;
             RequestedTimeZone = timeZone;
-            return Task.FromResult<AddPracticeWordsToReviewDto?>(new AddPracticeWordsToReviewDto(pageId, wordId, "added", utcNow.AddDays(1)));
+            return Task.FromResult<AddPracticeWordsToReviewDto?>(new AddPracticeWordsToReviewDto(pageId, wordId, "added", DateOnly.FromDateTime(utcNow).AddDays(1)));
         }
 
         public Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
@@ -448,7 +451,7 @@ public sealed class FlashcardServiceTests
                 4,
                 new ReviewStartOptionsDto(false, null, 4, false),
                 [
-                    new ReviewSessionWordDto(Guid.NewGuid(), "mitigate", "verb", "giam nhe", "make less severe", "Mitigate risk.", null, null, null, "dictation")
+                    new ReviewSessionWordDto(Guid.NewGuid(), "mitigate", "verb", "/mɪtɪɡeɪt/", "giam nhe", "make less severe", "Mitigate risk.", null, null, null, "dictation")
                 ]));
         }
 
@@ -517,7 +520,7 @@ public sealed class FlashcardServiceTests
                 0,
                 correct ? 1 : 0,
                 correct ? 0 : 1,
-                DateTime.UtcNow.AddDays(correct ? 2 : 1)));
+                DateOnly.FromDateTime(DateTime.UtcNow).AddDays(correct ? 2 : 1)));
         }
 
         public Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(

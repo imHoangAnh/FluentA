@@ -5,15 +5,16 @@ public sealed record FlashcardCardDto(
     Guid WordId,
     string Word,
     string WordClass,
+    string IpaPronunciation,
     string MeaningVn,
     string MeaningEn,
     string Example,
-    string? Thesaurus,
-    string? Collocation,
+    string? Synonyms,
+    string? Antonyms,
     string? Note,
     bool IsInReview,
     int? ReviewLevel,
-    DateTime? NextReviewDate,
+    DateOnly? NextReviewDate,
     int LapseCount);
 
 public sealed record FlashcardPageDto(
