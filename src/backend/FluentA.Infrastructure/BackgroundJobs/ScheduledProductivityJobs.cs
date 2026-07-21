@@ -27,6 +27,58 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         _logger.LogInformation("TodoCarryOverJob skipped because carry-over is no longer part of the current Todo contract.");
     }
 
+    public async Task ProcessTodoRemindersAsync(CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var dueItems = await _dbContext.TodoItems
+            .FromSqlInterpolated($"SELECT * FROM todo_items WHERE deleted_at IS NULL AND is_completed = FALSE AND reminder_scheduled_at_utc IS NOT NULL AND reminder_scheduled_at_utc <= {nowUtc} AND reminder_sent_at_utc IS NULL ORDER BY reminder_scheduled_at_utc, id LIMIT 100 FOR UPDATE SKIP LOCKED")
+            .ToListAsync(cancellationToken);
+
+        if (dueItems.Count == 0)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogInformation("TodoReminderJob found no due reminders at {NowUtc}.", nowUtc);
+            return;
+        }
+
+        var deduplicationKeys = dueItems.ToDictionary(
+            item => item.Id,
+            item => TodoReminderDeduplicationKey(item.Id, item.ReminderScheduledAtUtc!.Value));
+        var keys = deduplicationKeys.Values.ToArray();
+        var existingKeys = await _dbContext.Notifications
+            .Where(notification => keys.Contains(notification.DeduplicationKey))
+            .Select(notification => notification.DeduplicationKey)
+            .ToHashSetAsync(cancellationToken);
+
+        var queued = 0;
+        foreach (var item in dueItems)
+        {
+            var deduplicationKey = deduplicationKeys[item.Id];
+            if (!existingKeys.Contains(deduplicationKey))
+            {
+                _dbContext.Notifications.Add(Notification.Create(
+                    item.UserId,
+                    "TodoReminder",
+                    "Todo reminder",
+                    item.Title,
+                    deduplicationKey,
+                    $"/todo?taskId={item.Id}"));
+                queued++;
+            }
+
+            item.MarkReminderSent(nowUtc);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        _logger.LogInformation(
+            "TodoReminderJob claimed {ClaimedCount} due reminders and queued {QueuedCount} notifications at {NowUtc}.",
+            dueItems.Count,
+            queued,
+            nowUtc);
+    }
+
     public async Task SendHabitRemindersAsync(CancellationToken cancellationToken = default)
     {
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone);
@@ -189,5 +241,10 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         }
 
         throw new InvalidOperationException("The Vietnam timezone is not available on this host.");
+    }
+
+    private static string TodoReminderDeduplicationKey(Guid todoId, DateTime scheduledAtUtc)
+    {
+        return $"todo:{todoId}:reminder:{scheduledAtUtc.ToUniversalTime():yyyyMMddTHHmmssfffffffZ}";
     }
 }

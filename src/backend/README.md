@@ -129,13 +129,13 @@ frontend nằm tại `../frontend/src/shared/types/api.ts`.
 
 ```text
 src/backend/
-  FluentA.API/                    Controller, middleware, SignalR và composition root
+  FluentA.API/                    Controller, middleware, SignalR, Hangfire worker và composition root
   FluentA.Application/            Use case, service và port
   FluentA.Domain/                 Entity, value object và business rule
   FluentA.Infrastructure/         EF Core, PostgreSQL, Redis, MinIO và provider
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
-  FluentA.Worker/                 Host dành cho background processing
+  FluentA.Worker/                 Chỉ còn launch profile cũ; không có project/host buildable
   FluentA.slnx                    .NET solution
 ```
 

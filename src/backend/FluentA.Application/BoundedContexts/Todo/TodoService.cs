@@ -3,6 +3,7 @@ using FluentA.Application.BoundedContexts.Todo.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Enums;
+using FluentA.Domain.BoundedContexts.Todo.Services;
 
 namespace FluentA.Application.BoundedContexts.Todo;
 
@@ -10,6 +11,8 @@ public sealed class TodoService : ITodoService
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string RecurrenceNextRetainedWarning = "recurrence-next-retained";
+    private const string ReminderClearedAfterDateChangeWarning = "reminder-cleared-after-date-change";
+    private const string TimeFormat = "HH:mm";
     private readonly ITodoRepository _repository;
     private readonly ITodoSyncNotifier _syncNotifier;
 
@@ -64,6 +67,17 @@ public sealed class TodoService : ITodoService
         return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => ToDto(item)).ToList());
     }
 
+    public async Task<OperationResult<TodoItemDto>> GetAsync(
+        Guid userId,
+        Guid todoId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await _repository.GetAsync(userId, todoId, cancellationToken);
+        return item is null
+            ? OperationResult<TodoItemDto>.Failure(TodoError.NotFound())
+            : OperationResult<TodoItemDto>.Success(ToDto(item));
+    }
+
     public async Task<OperationResult<TodoItemDto>> CreateAsync(
         Guid userId,
         CreateTodoItemRequest request,
@@ -83,6 +97,9 @@ public sealed class TodoService : ITodoService
             request.Note,
             request.IsImportant,
             validation.RepeatPattern,
+            validation.Reminder?.Time,
+            validation.Reminder?.TimeZoneId,
+            validation.Reminder?.ScheduledAtUtc,
             sortOrder);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(ToDto(item));
@@ -100,7 +117,8 @@ public sealed class TodoService : ITodoService
             return OperationResult<TodoItemDto>.Failure(TodoError.NotFound());
         }
 
-        var validation = ValidateUpdate(request);
+        var nowUtc = DateTime.UtcNow;
+        var validation = ValidateUpdate(request, item.Date, item.IsCompleted, nowUtc);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
@@ -111,8 +129,13 @@ public sealed class TodoService : ITodoService
         var originalNote = item.Note;
         var originalImportant = item.IsImportant;
         var originalRepeat = item.RepeatPattern;
+        var originalReminderTime = item.ReminderTime;
+        var originalReminderTimeZoneId = item.ReminderTimeZoneId;
+        var originalReminderScheduledAtUtc = item.ReminderScheduledAtUtc;
+        var originalReminderSentAtUtc = item.ReminderSentAtUtc;
         var originalDate = item.Date;
         var originalSortOrder = item.SortOrder;
+        string? warningCode = null;
         if (request.Title is not null)
         {
             item.Rename(request.Title);
@@ -133,9 +156,47 @@ public sealed class TodoService : ITodoService
             item.SetRepeatPattern(validation.RepeatPattern);
         }
 
+        if (request.IsReminderSpecified)
+        {
+            if (validation.Reminder is null)
+            {
+                item.ClearReminder();
+            }
+            else
+            {
+                item.SetReminder(
+                    validation.Reminder.Time,
+                    validation.Reminder.TimeZoneId,
+                    validation.Reminder.ScheduledAtUtc);
+            }
+        }
+
         if (request.Date is not null || request.SortOrder is not null)
         {
-            var destinationDate = request.Date is null ? item.Date : ParseDate(request.Date);
+            var destinationDate = validation.Date ?? item.Date;
+            if (request.Date is not null
+                && !request.IsReminderSpecified
+                && item.ReminderTime is not null
+                && item.ReminderTimeZoneId is not null)
+            {
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(item.ReminderTimeZoneId);
+                var scheduledAtUtc = TodoReminderSchedule.ResolveUtc(destinationDate, item.ReminderTime.Value, timeZone);
+                if (scheduledAtUtc <= nowUtc)
+                {
+                    item.ClearReminder();
+                    warningCode = ReminderClearedAfterDateChangeWarning;
+                }
+                else
+                {
+                    item.SetReminder(item.ReminderTime.Value, item.ReminderTimeZoneId, scheduledAtUtc);
+                }
+            }
+
+            if ((request.IsCompleted ?? item.IsCompleted) && item.ReminderSentAtUtc is null)
+            {
+                item.CancelUnsentReminder();
+            }
+
             var destination = (await _repository.ListByDateAsync(userId, destinationDate, cancellationToken))
                 .Where(candidate => candidate.Id != item.Id)
                 .OrderBy(candidate => candidate.IsCompleted)
@@ -155,6 +216,10 @@ public sealed class TodoService : ITodoService
                 originalNote,
                 originalImportant,
                 originalRepeat,
+                originalReminderTime,
+                originalReminderTimeZoneId,
+                originalReminderScheduledAtUtc,
+                originalReminderSentAtUtc,
                 originalDate,
                 originalSortOrder);
             await _repository.UpdateRangeAsync(destination, cancellationToken);
@@ -162,7 +227,8 @@ public sealed class TodoService : ITodoService
         else if (request.Title is not null
             || request.Note is not null
             || request.IsImportant is not null
-            || request.IsRepeatPatternSpecified)
+            || request.IsRepeatPatternSpecified
+            || request.IsReminderSpecified)
         {
             MarkGeneratedOccurrenceEditedWhenChanged(
                 item,
@@ -170,6 +236,10 @@ public sealed class TodoService : ITodoService
                 originalNote,
                 originalImportant,
                 originalRepeat,
+                originalReminderTime,
+                originalReminderTimeZoneId,
+                originalReminderScheduledAtUtc,
+                originalReminderSentAtUtc,
                 originalDate,
                 originalSortOrder);
             await _repository.UpdateAsync(item, cancellationToken);
@@ -182,7 +252,7 @@ public sealed class TodoService : ITodoService
                 userId,
                 todoId,
                 request.IsCompleted.Value,
-                DateTime.UtcNow,
+                nowUtc,
                 cancellationToken);
             if (completionResult is null)
             {
@@ -197,9 +267,12 @@ public sealed class TodoService : ITodoService
             await _syncNotifier.TodoItemCheckedAsync(userId, item.Id, item.IsCompleted, cancellationToken);
         }
 
-        return OperationResult<TodoItemDto>.Success(ToDto(
-            item,
-            completionResult?.NextOccurrenceRetained == true ? RecurrenceNextRetainedWarning : null));
+        if (completionResult?.NextOccurrenceRetained == true)
+        {
+            warningCode = RecurrenceNextRetainedWarning;
+        }
+
+        return OperationResult<TodoItemDto>.Success(ToDto(item, warningCode));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
@@ -215,7 +288,11 @@ public sealed class TodoService : ITodoService
         return OperationResult<bool>.Success(true);
     }
 
-    private static (Dictionary<string, string[]> Errors, DateTime Date, TodoRepeatPattern? RepeatPattern) ValidateCreate(CreateTodoItemRequest request)
+    private static (
+        Dictionary<string, string[]> Errors,
+        DateTime Date,
+        TodoRepeatPattern? RepeatPattern,
+        ValidatedReminder? Reminder) ValidateCreate(CreateTodoItemRequest request)
     {
         var errors = ValidateTitleAndNote(request.Title, request.Note);
         if (!TryParseDate(request.Date, "date", out var date, out var dateErrors))
@@ -224,11 +301,22 @@ public sealed class TodoService : ITodoService
         }
 
         var repeatPattern = ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors);
+        var reminder = errors.ContainsKey("date")
+            ? null
+            : ValidateReminder(request.Reminder, date, DateTime.UtcNow, errors);
 
-        return (errors, date, repeatPattern);
+        return (errors, date, repeatPattern, reminder);
     }
 
-    private static (Dictionary<string, string[]> Errors, TodoRepeatPattern? RepeatPattern) ValidateUpdate(UpdateTodoItemRequest request)
+    private static (
+        Dictionary<string, string[]> Errors,
+        DateTime? Date,
+        TodoRepeatPattern? RepeatPattern,
+        ValidatedReminder? Reminder) ValidateUpdate(
+            UpdateTodoItemRequest request,
+            DateTime currentDate,
+            bool currentIsCompleted,
+            DateTime nowUtc)
     {
         var errors = new Dictionary<string, string[]>();
         if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
@@ -245,9 +333,17 @@ public sealed class TodoService : ITodoService
             errors["note"] = ["Note must be at most 4000 characters."];
         }
 
-        if (request.Date is not null && !TryParseDate(request.Date, "date", out _, out var dateErrors))
+        DateTime? parsedDate = null;
+        if (request.Date is not null)
         {
-            errors["date"] = dateErrors["date"];
+            if (!TryParseDate(request.Date, "date", out var candidateDate, out var dateErrors))
+            {
+                errors["date"] = dateErrors["date"];
+            }
+            else
+            {
+                parsedDate = candidateDate;
+            }
         }
 
         if (request.SortOrder is < 0)
@@ -258,8 +354,76 @@ public sealed class TodoService : ITodoService
         var repeatPattern = request.IsRepeatPatternSpecified
             ? ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors)
             : null;
+        var reminder = request.IsReminderSpecified && !errors.ContainsKey("date")
+            ? ValidateReminder(request.Reminder, parsedDate ?? currentDate, nowUtc, errors)
+            : null;
+        if (request.IsReminderSpecified
+            && request.Reminder is not null
+            && (request.IsCompleted ?? currentIsCompleted))
+        {
+            errors["reminder"] = ["Reopen the task before setting a reminder."];
+            reminder = null;
+        }
 
-        return (errors, repeatPattern);
+        return (errors, parsedDate, repeatPattern, reminder);
+    }
+
+    private static ValidatedReminder? ValidateReminder(
+        TodoReminderRequest? request,
+        DateTime taskDate,
+        DateTime nowUtc,
+        Dictionary<string, string[]> errors)
+    {
+        if (request is null)
+        {
+            return null;
+        }
+
+        if (!TimeOnly.TryParseExact(request.Time, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        {
+            errors["reminder.time"] = ["Reminder time must use HH:mm format."];
+        }
+
+        TimeZoneInfo? timeZone = null;
+        var timeZoneId = request.TimeZoneId?.Trim() ?? string.Empty;
+        if (timeZoneId.Length is < 1 or > 100)
+        {
+            errors["reminder.timeZoneId"] = ["Reminder timezone id is required and must be at most 100 characters."];
+        }
+        else
+        {
+            try
+            {
+                timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
+            }
+            catch (InvalidTimeZoneException)
+            {
+                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
+            }
+        }
+
+        if (request.ScheduledAtUtc.Kind != DateTimeKind.Utc)
+        {
+            errors["reminder.scheduledAtUtc"] = ["Reminder scheduled instant must be UTC."];
+        }
+        else if (request.ScheduledAtUtc <= nowUtc)
+        {
+            errors["reminder.scheduledAtUtc"] = ["Reminder must be scheduled in the future."];
+        }
+        else if (!errors.ContainsKey("reminder.time")
+            && timeZone is not null
+            && !TodoReminderSchedule.Matches(taskDate, time, request.ScheduledAtUtc, timeZone))
+        {
+            errors["reminder.scheduledAtUtc"] = ["Reminder date, time, timezone, and UTC instant do not match."];
+        }
+
+        return errors.Keys.Any(key => key.StartsWith("reminder.", StringComparison.Ordinal))
+            ? null
+            : new ValidatedReminder(time, timeZoneId, request.ScheduledAtUtc);
     }
 
     private static Dictionary<string, string[]> ValidateTitleAndNote(string title, string? note)
@@ -323,6 +487,10 @@ public sealed class TodoService : ITodoService
         string? originalNote,
         bool originalImportant,
         TodoRepeatPattern? originalRepeat,
+        TimeOnly? originalReminderTime,
+        string? originalReminderTimeZoneId,
+        DateTime? originalReminderScheduledAtUtc,
+        DateTime? originalReminderSentAtUtc,
         DateTime originalDate,
         int originalSortOrder)
     {
@@ -330,6 +498,10 @@ public sealed class TodoService : ITodoService
             || item.Note != originalNote
             || item.IsImportant != originalImportant
             || item.RepeatPattern != originalRepeat
+            || item.ReminderTime != originalReminderTime
+            || item.ReminderTimeZoneId != originalReminderTimeZoneId
+            || item.ReminderScheduledAtUtc != originalReminderScheduledAtUtc
+            || item.ReminderSentAtUtc != originalReminderSentAtUtc
             || item.Date != originalDate
             || item.SortOrder != originalSortOrder)
         {
@@ -348,6 +520,15 @@ public sealed class TodoService : ITodoService
             item.IsCompleted,
             item.IsImportant,
             item.RepeatPattern?.ToString(),
+            item.ReminderTime is not null
+                && item.ReminderTimeZoneId is not null
+                && item.ReminderScheduledAtUtc is not null
+                ? new TodoReminderDto(
+                    item.ReminderTime.Value.ToString(TimeFormat, CultureInfo.InvariantCulture),
+                    item.ReminderTimeZoneId,
+                    item.ReminderScheduledAtUtc.Value,
+                    item.ReminderSentAtUtc)
+                : null,
             item.CompletedAt,
             item.CreatedAt,
             item.UpdatedAt,
@@ -359,9 +540,5 @@ public sealed class TodoService : ITodoService
         return date.ToString(DateFormat, CultureInfo.InvariantCulture);
     }
 
-    private static DateTime ParseDate(string value)
-    {
-        TryParseDate(value, "date", out var parsed, out _);
-        return parsed;
-    }
+    private sealed record ValidatedReminder(TimeOnly Time, string TimeZoneId, DateTime ScheduledAtUtc);
 }

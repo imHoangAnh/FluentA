@@ -185,12 +185,17 @@ the API process. The public Hangfire dashboard is intentionally disabled.
 
 Scheduled jobs currently:
 
-- Carry overdue incomplete todos into the current day.
+- Scan due Todo reminders every minute and create one deduplicated in-app
+  notification in the same transaction that marks the reminder sent.
 - Create due habit reminder notifications.
 - Create notifications for completed countdowns.
 - Permanently remove selected records soft-deleted for more than 30 days.
 
 Notification records are owner-scoped and use per-user deduplication keys.
+Their optional `action_path` accepts only a validated relative application
+path; Todo navigation resolves the referenced task through an owner-scoped API
+read. The legacy Todo carry-over registration remains a no-op because My Day no
+longer carries past incomplete tasks forward.
 Audit/product records and operational application logs remain separate
 concerns.
 

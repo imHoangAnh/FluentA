@@ -21,7 +21,7 @@ public sealed class NotificationsController : ControllerBase
         var userId = CurrentUserId();
         var items = await _db.Notifications.Where(x => x.UserId == userId && x.DeletedAt == null)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new { x.Id, x.Type, x.Title, x.Message, x.ReadAt, x.CreatedAt })
+            .Select(x => new { x.Id, x.Type, x.Title, x.Message, x.ActionPath, x.ReadAt, x.CreatedAt })
             .ToListAsync(cancellationToken);
         return Ok(ApiEnvelope<object>.Ok(items));
     }

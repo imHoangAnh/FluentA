@@ -21,6 +21,10 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
         builder.Property(item => item.IsCompleted).HasColumnName("is_completed").IsRequired();
         builder.Property(item => item.IsImportant).HasColumnName("is_important").HasDefaultValue(false).IsRequired();
         builder.Property(item => item.RepeatPattern).HasColumnName("repeat_pattern").HasConversion<string>().HasMaxLength(16);
+        builder.Property(item => item.ReminderTime).HasColumnName("reminder_time").HasColumnType("time without time zone");
+        builder.Property(item => item.ReminderTimeZoneId).HasColumnName("reminder_time_zone_id").HasMaxLength(100);
+        builder.Property(item => item.ReminderScheduledAtUtc).HasColumnName("reminder_scheduled_at_utc");
+        builder.Property(item => item.ReminderSentAtUtc).HasColumnName("reminder_sent_at_utc");
         builder.Property(item => item.GeneratedFromTodoId).HasColumnName("generated_from_todo_id");
         builder.Property(item => item.IsGeneratedOccurrencePristine)
             .HasColumnName("is_generated_occurrence_pristine")
@@ -33,6 +37,8 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
 
         builder.HasIndex(item => new { item.UserId, item.Date, item.SortOrder });
         builder.HasIndex(item => new { item.UserId, item.IsCompleted, item.Date });
+        builder.HasIndex(item => item.ReminderScheduledAtUtc)
+            .HasFilter("reminder_scheduled_at_utc IS NOT NULL AND reminder_sent_at_utc IS NULL AND is_completed = FALSE AND deleted_at IS NULL");
         builder.HasOne<TodoItem>()
             .WithMany()
             .HasForeignKey(item => item.GeneratedFromTodoId)

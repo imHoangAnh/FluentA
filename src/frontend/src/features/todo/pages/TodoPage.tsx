@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 import * as todoApi from '../api/todo.api'
 import { DeleteTodoConfirmationDialog } from '../components/DeleteTodoConfirmationDialog'
@@ -48,8 +49,11 @@ function WeekQuickAdd({ date, pending, onCreate }: { date: string; pending: bool
 
 export function TodoPage() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTaskId = searchParams.get('taskId')
   const today = useMemo(() => toDateInput(new Date()), [])
   const [view, setView] = useState<TodoView>('my-day')
+  const activeView: TodoView = requestedTaskId ? 'my-day' : view
   const [weekAnchor, setWeekAnchor] = useState(today)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<todoApi.TodoItem | null>(null)
@@ -63,21 +67,34 @@ export function TodoPage() {
   const todosQuery = useQuery({
     queryKey: dayKey,
     queryFn: () => todoApi.listByDate(today),
-    enabled: view === 'my-day',
+    enabled: activeView === 'my-day',
   })
 
   const weekQuery = useQuery({
     queryKey: weekKey,
     queryFn: () => todoApi.listByRange(dates[0], dates[6]),
-    enabled: view === 'week',
+    enabled: activeView === 'week',
+  })
+
+  const requestedTaskQuery = useQuery({
+    queryKey: ['todo-item', requestedTaskId],
+    queryFn: () => todoApi.getTodo(requestedTaskId!),
+    enabled: Boolean(requestedTaskId),
+    retry: false,
   })
 
   const todos = useMemo(() => todosQuery.data ?? [], [todosQuery.data])
   const weekTodos = useMemo(() => weekQuery.data ?? [], [weekQuery.data])
-  const selectedTask = todos.find((item) => item.id === selectedTaskId) ?? null
+  const effectiveSelectedTaskId = requestedTaskQuery.data?.id ?? selectedTaskId
+  const selectedTask = todos.find((item) => item.id === effectiveSelectedTaskId)
+    ?? weekTodos.find((item) => item.id === effectiveSelectedTaskId)
+    ?? (requestedTaskQuery.data?.id === effectiveSelectedTaskId ? requestedTaskQuery.data : null)
 
   const refresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['todo'] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['todo'] }),
+      queryClient.invalidateQueries({ queryKey: ['todo-item'] }),
+    ])
   }, [queryClient])
 
   const createTodo = useMutation({
@@ -107,8 +124,11 @@ export function TodoPage() {
       queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
         items.map((item) => item.id === updated.id ? updated : item),
       )
+      queryClient.setQueryData(['todo-item', updated.id], updated)
       if (updated.warningCode === 'recurrence-next-retained') {
         toast.warning('The edited next occurrence was kept. Both tasks now exist.')
+      } else if (updated.warningCode === 'reminder-cleared-after-date-change') {
+        toast.warning('The task moved, but its reminder was cleared because that time is already past.')
       }
     },
     onError: (_error, _variables, context) => {
@@ -125,6 +145,7 @@ export function TodoPage() {
         items.filter((item) => item.id !== deletedId),
       )
       if (selectedTaskId === deletedId) setSelectedTaskId(null)
+      queryClient.removeQueries({ queryKey: ['todo-item', deletedId] })
       setDeleteTarget(null)
       await refresh()
     },
@@ -179,24 +200,38 @@ export function TodoPage() {
   function changeView(nextView: TodoView) {
     setView(nextView)
     setSelectedTaskId(null)
+    if (requestedTaskId) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('taskId')
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  function closeDetails() {
+    setSelectedTaskId(null)
+    if (requestedTaskId) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('taskId')
+      setSearchParams(next, { replace: true })
+    }
   }
 
   return (
     <div className="todo-workspace-page">
       <TodoPageHeader
-        view={view}
-        subtitle={view === 'my-day' ? formatMyDayDate(today) : undefined}
+        view={activeView}
+        subtitle={activeView === 'my-day' ? formatMyDayDate(today) : undefined}
         sortMode={sortMode}
         onSortChange={changeSortMode}
         onViewChange={changeView}
         onShiftWeek={(days) => setWeekAnchor((current) => shiftDate(current, days))}
       />
 
-      {view === 'my-day' ? (
+      {activeView === 'my-day' ? (
         <main className={`todo-main-layout${selectedTask ? ' todo-main-layout--details' : ''}`}>
           <MyDayView
             items={todos}
-            selectedId={selectedTaskId}
+            selectedId={effectiveSelectedTaskId}
             sortMode={sortMode}
             loading={todosQuery.isLoading}
             error={todosQuery.isError}
@@ -208,12 +243,20 @@ export function TodoPage() {
             onDelete={setDeleteTarget}
             onPersistOrder={persistManualOrder}
           />
+          {requestedTaskId && requestedTaskQuery.isLoading ? (
+            <p className="todo-my-day__status" role="status">Opening task...</p>
+          ) : null}
+          {requestedTaskId && requestedTaskQuery.isError ? (
+            <p className="todo-my-day__status todo-my-day__status--error" role="alert">
+              This task is unavailable or no longer exists.
+            </p>
+          ) : null}
           {selectedTask ? (
             <TodoDetailsPanel
               key={selectedTask.id}
               item={selectedTask}
               pending={updateTodo.isPending}
-              onClose={() => setSelectedTaskId(null)}
+              onClose={closeDetails}
               onUpdate={updateTask}
               onDelete={setDeleteTarget}
             />

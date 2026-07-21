@@ -102,8 +102,11 @@ public sealed class EfTodoRepository : ITodoRepository
         var nextOccurrenceRetained = false;
         if (isCompleted)
         {
+            var reminderTime = item.ReminderTime;
+            var reminderTimeZoneId = item.ReminderTimeZoneId;
             item.MarkGeneratedOccurrenceEdited();
             item.SetCompleted(true, nowUtc);
+            item.CancelUnsentReminder();
 
             if (item.RepeatPattern is not null)
             {
@@ -117,9 +120,17 @@ public sealed class EfTodoRepository : ITodoRepository
                 {
                     var nextDate = TodoRepeatSchedule.NextDate(item.Date, item.RepeatPattern.Value);
                     var sortOrder = await NextSortOrderAsync(userId, nextDate, cancellationToken);
-                    await _dbContext.TodoItems.AddAsync(
-                        TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder),
-                        cancellationToken);
+                    var child = TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder);
+                    if (reminderTime is not null && reminderTimeZoneId is not null)
+                    {
+                        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(reminderTimeZoneId);
+                        child.SetReminder(
+                            reminderTime.Value,
+                            reminderTimeZoneId,
+                            TodoReminderSchedule.ResolveUtc(nextDate, reminderTime.Value, timeZone));
+                    }
+
+                    await _dbContext.TodoItems.AddAsync(child, cancellationToken);
                 }
             }
         }

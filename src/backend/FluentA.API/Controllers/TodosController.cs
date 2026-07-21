@@ -20,6 +20,16 @@ public sealed class TodosController : ControllerBase
         _todos = todos;
     }
 
+    /// <summary>Gets one active todo item owned by the authenticated user.</summary>
+    [HttpGet("{todoId:guid}")]
+    public async Task<IActionResult> Get(Guid todoId, CancellationToken cancellationToken)
+    {
+        var result = await _todos.GetAsync(CurrentUserId(), todoId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Lists todo items by date or inclusive date range for the authenticated user.</summary>
     [HttpGet]
     public async Task<IActionResult> List(

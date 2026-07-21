@@ -16,6 +16,7 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.Property(x => x.Title).HasColumnName("title").HasMaxLength(180).IsRequired();
         builder.Property(x => x.Message).HasColumnName("message").HasMaxLength(500).IsRequired();
         builder.Property(x => x.DeduplicationKey).HasColumnName("deduplication_key").HasMaxLength(240).IsRequired();
+        builder.Property(x => x.ActionPath).HasColumnName("action_path").HasMaxLength(500);
         builder.Property(x => x.ReadAt).HasColumnName("read_at");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();

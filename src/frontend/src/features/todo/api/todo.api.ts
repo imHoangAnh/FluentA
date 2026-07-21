@@ -3,6 +3,16 @@ import type { ApiEnvelope } from '@/shared/types/api'
 
 export type TodoRepeatPattern = 'Daily' | 'Weekdays' | 'Weekly' | 'Monthly' | 'Yearly'
 
+export type TodoReminderInput = {
+  time: string
+  timeZoneId: string
+  scheduledAtUtc: string
+}
+
+export type TodoReminder = TodoReminderInput & {
+  sentAtUtc?: string | null
+}
+
 export type TodoItem = {
   id: string
   title: string
@@ -12,10 +22,11 @@ export type TodoItem = {
   isCompleted: boolean
   isImportant: boolean
   repeatPattern?: TodoRepeatPattern | null
+  reminder?: TodoReminder | null
   completedAt?: string | null
   createdAt: string
   updatedAt: string
-  warningCode?: 'recurrence-next-retained' | null
+  warningCode?: 'recurrence-next-retained' | 'reminder-cleared-after-date-change' | null
 }
 
 export type CreateTodoInput = {
@@ -24,6 +35,7 @@ export type CreateTodoInput = {
   note?: string | null
   isImportant?: boolean
   repeatPattern?: TodoRepeatPattern | null
+  reminder?: TodoReminderInput | null
 }
 
 export type UpdateTodoInput = {
@@ -32,6 +44,7 @@ export type UpdateTodoInput = {
   isCompleted?: boolean
   isImportant?: boolean
   repeatPattern?: TodoRepeatPattern | null
+  reminder?: TodoReminderInput | null
   date?: string
   sortOrder?: number
 }
@@ -44,6 +57,11 @@ export async function listByDate(date: string) {
 export async function listByRange(startDate: string, endDate: string) {
   const response = await apiClient.get<ApiEnvelope<TodoItem[]>>('/todos', { params: { startDate, endDate } })
   return response.data.data ?? []
+}
+
+export async function getTodo(id: string) {
+  const response = await apiClient.get<ApiEnvelope<TodoItem>>(`/todos/${id}`)
+  return response.data.data!
 }
 
 export async function createTodo(input: CreateTodoInput) {

@@ -66,8 +66,9 @@ external notification delivery and mobile drag-and-drop remain deferred.
   opens the new task's details. Note remains optional in details.
 - A logged-in user can create a task for any day in the visible week.
 - A logged-in user can toggle task completion without reloading the page.
-- A logged-in user can update task title, note, importance, Repeat, completion,
-  assigned date, and sort order through field-scoped API behavior.
+- A logged-in user can update task title, note, importance, Repeat, one optional
+  time-only reminder, completion, assigned date, and sort order through
+  field-scoped API behavior.
 - My Day rows contain only independent completion, title, and icon-only
   importance controls. Selecting the title opens a side-by-side detail panel.
 - Title saves on Enter or blur, note saves on blur, and X or Escape closes the
@@ -90,6 +91,16 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - Reopening removes an unchanged generated next occurrence. If that occurrence
   has been edited, it remains and the user is warned that both tasks exist.
 - Deleting one occurrence never cascades to another occurrence.
+- Reminder is optional and chooses one `HH:mm` time only; its date is always
+  the task date. The browser timezone and exact browser-resolved UTC instant
+  are retained, so changing device timezone later does not move delivery.
+- Completing a task cancels an unsent reminder. A recurring child receives the
+  copied reminder time and timezone on its new date.
+- Moving a task recomputes its reminder for the destination date. If that
+  instant is already past, the move succeeds, clears Reminder, and warns the
+  user.
+- Selecting a Todo reminder Notification marks it read, opens `/todo`, and
+  selects the owned task details even when the task is outside My Day.
 
 ## Todo Ownership And Authorization Rules
 
@@ -110,8 +121,9 @@ All responses use the FluentA envelope.
 | --- | --- | --- |
 | `GET` | `/api/v1/todos?date=YYYY-MM-DD` | List active tasks for the selected date. |
 | `GET` | `/api/v1/todos?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active tasks in an inclusive date range for week planning. |
+| `GET` | `/api/v1/todos/{id}` | Read one active owned task for notification deep-link selection; missing, deleted, and foreign tasks share `404`. |
 | `POST` | `/api/v1/todos` | Create a task. |
-| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, Repeat, completion, assigned date, or sort order. Completing or reopening applies the recurrence lifecycle atomically. |
+| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, Repeat, Reminder, completion, assigned date, or sort order. Completing or reopening applies recurrence and reminder lifecycle atomically. |
 | `DELETE` | `/api/v1/todos/{id}` | Soft-delete a task. |
 
 ## Todo Validation And Error Rules
@@ -123,10 +135,28 @@ All responses use the FluentA envelope.
   the task's current position unless a date move requires normalization.
 - `repeatPattern` is optional and accepts only `Daily`, `Weekdays`, `Weekly`,
   `Monthly`, `Yearly`, or explicit `null` to clear it.
+- `reminder` is optional and atomic. When present it requires `time` in exact
+  `HH:mm`, a supported browser IANA `timeZoneId`, and UTC `scheduledAtUtc` that
+  converts back to the task date and selected minute. The instant must be in
+  the future; explicit `null` clears the reminder.
 - Date ranges must include both `startDate` and `endDate`, and `startDate` must
   be on or before `endDate`.
 - Validation failures return `422 VALIDATION_ERROR`.
 - Missing task ownership returns `404 TODO_NOT_FOUND`.
+
+## Todo Reminder And Notification Rules
+
+- `FluentA.API` hosts one Hangfire recurring job named `todo-reminders` every
+  minute. PostgreSQL remains the reminder source of truth; there is no external
+  job per task.
+- The scanner claims a bounded due batch with row locks, adds the Notification,
+  and marks the reminder sent in one transaction/save.
+- A deterministic task-and-instant deduplication key plus the existing unique
+  Notification index prevents duplicate delivery across retries.
+- Todo notifications may store only the relative action
+  `/todo?taskId={ownedTaskId}`. Absolute, protocol-relative, backslash, control
+  character, and external paths are rejected by server and client validation.
+- Existing Habit and Countdown notifications remain valid with no action path.
 
 ## Todo Week Planning Rules
 

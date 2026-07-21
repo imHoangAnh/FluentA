@@ -9,6 +9,8 @@ public interface ITodoService
     Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByDateAsync(Guid userId, string date, CancellationToken cancellationToken = default);
     /// <summary>Lists todo items for an inclusive date range after applying carry-over.</summary>
     Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByRangeAsync(Guid userId, string startDate, string endDate, CancellationToken cancellationToken = default);
+    /// <summary>Gets one owned, active todo item without disclosing foreign ownership.</summary>
+    Task<OperationResult<TodoItemDto>> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
     /// <summary>Creates a todo item for the authenticated user.</summary>
     Task<OperationResult<TodoItemDto>> CreateAsync(Guid userId, CreateTodoItemRequest request, CancellationToken cancellationToken = default);
     /// <summary>Updates supplied fields on an owned todo item.</summary>

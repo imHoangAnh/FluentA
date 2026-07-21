@@ -6,6 +6,7 @@ namespace FluentA.API.BackgroundJobs;
 public static class RecurringJobRegistration
 {
     public const string TodoCarryOverId = "todo-carry-over";
+    public const string TodoReminderId = "todo-reminders";
     public const string HabitReminderId = "habit-reminders";
     public const string CountdownAlertId = "countdown-alerts";
     public const string CountdownRetirementId = "countdown-retirement";
@@ -17,6 +18,8 @@ public static class RecurringJobRegistration
     {
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             TodoCarryOverId, job => job.CarryOverTodosAsync(CancellationToken.None), "5 0 * * *");
+        jobs.AddOrUpdate<IScheduledProductivityJobs>(
+            TodoReminderId, job => job.ProcessTodoRemindersAsync(CancellationToken.None), "* * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             HabitReminderId, job => job.SendHabitRemindersAsync(CancellationToken.None), "* * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(

@@ -1,10 +1,10 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Inbox, LoaderCircle } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { notificationApi } from '../api/notification.api'
+import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
 
 type NotificationsMenuProps = {
   notificationsPath: string
@@ -13,8 +13,27 @@ type NotificationsMenuProps = {
 }
 
 export function NotificationsMenu({ notificationsPath, collapsed = false, active = false }: NotificationsMenuProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const query = useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list })
   const unreadCount = query.data?.filter((item) => !item.readAt).length ?? 0
+
+  async function activate(item: NotificationItem) {
+    try {
+      if (!item.readAt) {
+        await notificationApi.markRead(item.id)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+          queryClient.invalidateQueries({ queryKey: ['notifications-unread'] }),
+        ])
+      }
+
+      const actionPath = safeNotificationActionPath(item.actionPath)
+      if (actionPath) navigate(actionPath)
+    } catch {
+      return
+    }
+  }
 
   return (
     <DropdownMenu.Root>
@@ -56,7 +75,7 @@ export function NotificationsMenu({ notificationsPath, collapsed = false, active
             {!query.isLoading && !query.isError && query.data?.length === 0 ? <div className="grid place-items-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground"><Inbox className="size-5" /><p className="m-0">Your notification inbox is clear.</p></div> : null}
             {!query.isLoading && !query.isError && query.data?.length ? <ul className="m-0 divide-y divide-border p-0" aria-label="Recent notifications">{query.data.map((item) => {
               const unread = !item.readAt
-              return <li key={item.id} className={cn('flex gap-3 px-4 py-3', unread && 'bg-primary/[0.035]')}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span></span></li>
+              return <li key={item.id}><DropdownMenu.Item asChild><button type="button" className={cn('flex w-full gap-3 px-4 py-3 text-left outline-none hover:bg-accent focus:bg-accent', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span></span></button></DropdownMenu.Item></li>
             })}</ul> : null}
           </div>
           <DropdownMenu.Separator className="h-px bg-border" />

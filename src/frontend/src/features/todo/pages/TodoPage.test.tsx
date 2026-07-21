@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
 import { toDateInput } from '../todo-date'
@@ -9,6 +10,7 @@ import { TodoPage } from './TodoPage'
 const api = vi.hoisted(() => ({
   listByDate: vi.fn(),
   listByRange: vi.fn(),
+  getTodo: vi.fn(),
   createTodo: vi.fn(),
   updateTodo: vi.fn(),
   deleteTodo: vi.fn(),
@@ -17,6 +19,16 @@ const api = vi.hoisted(() => ({
 vi.mock('../api/todo.api', async (importOriginal) => ({
   ...await importOriginal<typeof import('../api/todo.api')>(),
   ...api,
+}))
+
+vi.mock('../todo-reminder', () => ({
+  createBrowserReminder: vi.fn((_date: string, time: string) => ({
+    reminder: {
+      time,
+      timeZoneId: 'UTC',
+      scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+    },
+  })),
 }))
 
 let items: TodoItem[]
@@ -31,6 +43,7 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     isCompleted: false,
     isImportant: false,
     repeatPattern: null,
+    reminder: null,
     completedAt: null,
     createdAt: '2026-07-22T01:00:00Z',
     updatedAt: '2026-07-22T01:00:00Z',
@@ -38,11 +51,15 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
   }
 }
 
-function renderPage() {
+function renderPage(initialEntry = '/todo') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
-  return render(<AppProviders queryClient={queryClient}><TodoPage /></AppProviders>)
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <AppProviders queryClient={queryClient}><TodoPage /></AppProviders>
+    </MemoryRouter>,
+  )
 }
 
 describe('TodoPage My Day workspace', () => {
@@ -52,6 +69,7 @@ describe('TodoPage My Day workspace', () => {
     items = [todo()]
     api.listByDate.mockImplementation(async () => [...items])
     api.listByRange.mockImplementation(async () => [...items])
+    api.getTodo.mockImplementation(async (id: string) => items.find((item) => item.id === id) ?? Promise.reject(new Error('not found')))
     api.createTodo.mockImplementation(async (input: CreateTodoInput) => {
       const created = todo({ id: 'todo-created', title: input.title, date: input.date, note: input.note ?? null })
       items = [...items, created]
@@ -152,6 +170,39 @@ describe('TodoPage My Day workspace', () => {
     fireEvent.pointerDown(await screen.findByRole('button', { name: 'Repeat: Monthly' }), { button: 0, ctrlKey: false })
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Does not repeat' }))
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
+  })
+
+  it('sets and clears one optional time-only reminder from details', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reminder: Not set' }))
+    fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '10:30' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', {
+      reminder: {
+        time: '10:30',
+        timeZoneId: 'UTC',
+        scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+      },
+    }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reminder: 10:30' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { reminder: null }))
+  })
+
+  it('opens an owned deep-linked task outside My Day and handles unavailable ids safely', async () => {
+    const outsideToday = todo({ id: 'outside-task', title: 'Next week task', date: '2035-07-29' })
+    api.getTodo.mockResolvedValueOnce(outsideToday)
+    const owned = renderPage('/todo?taskId=outside-task')
+
+    expect(await screen.findByLabelText('Details for Next week task')).toBeInTheDocument()
+    owned.unmount()
+
+    api.getTodo.mockRejectedValueOnce(new Error('not found'))
+    renderPage('/todo?taskId=foreign-or-missing')
+    expect(await screen.findByRole('alert')).toHaveTextContent('This task is unavailable or no longer exists.')
   })
 
   it('requires confirmation before deleting a task', async () => {
