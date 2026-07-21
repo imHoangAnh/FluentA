@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
-import { toDateInput } from '../todo-date'
+import { formatWeekRange, toDateInput, weekDates } from '../todo-date'
 import { TodoPage } from './TodoPage'
 
 const api = vi.hoisted(() => ({
@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getTodo: vi.fn(),
   createTodo: vi.fn(),
   updateTodo: vi.fn(),
+  duplicateTodo: vi.fn(),
   deleteTodo: vi.fn(),
 }))
 
@@ -80,6 +81,18 @@ describe('TodoPage My Day workspace', () => {
       updated = { ...updated, ...patch, updatedAt: '2026-07-22T02:00:00Z' }
       items = items.map((item) => item.id === id ? updated : item)
       return updated
+    })
+    api.duplicateTodo.mockImplementation(async (id: string) => {
+      const source = items.find((item) => item.id === id)!
+      const duplicate = todo({
+        ...source,
+        id: 'todo-duplicate',
+        isCompleted: false,
+        completedAt: null,
+        sortOrder: source.sortOrder + 1,
+      })
+      items = [...items, duplicate]
+      return duplicate
     })
     api.deleteTodo.mockImplementation(async (id: string) => {
       items = items.filter((item) => item.id !== id)
@@ -230,5 +243,51 @@ describe('TodoPage My Day workspace', () => {
     const activate = await screen.findByRole('menuitem', { name: 'Mark as active' })
     fireEvent.click(activate)
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { isCompleted: false }))
+  })
+
+  it('renders the compact Week workspace with per-day quick add, shared details, and duplicate', async () => {
+    items = [todo({
+      note: 'Only visible in details',
+      isImportant: true,
+      repeatPattern: 'Weekly',
+      reminder: {
+        time: '10:30',
+        timeZoneId: 'UTC',
+        scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+      },
+    })]
+    const dates = weekDates(toDateInput(new Date()))
+    renderPage()
+
+    fireEvent.pointerDown(await screen.findByRole('button', { name: 'My Day menu' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Week' }))
+
+    expect(await screen.findByRole('heading', { name: 'Week' })).toBeInTheDocument()
+    expect(screen.getByText(formatWeekRange(dates[0], dates[6]))).toBeInTheDocument()
+    expect(await screen.findAllByPlaceholderText('Add a task')).toHaveLength(7)
+    for (const weekday of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+      expect(screen.getByRole('heading', { name: weekday })).toBeInTheDocument()
+    }
+
+    const mondayInput = screen.getByLabelText('Add a task for Monday')
+    fireEvent.change(mondayInput, { target: { value: 'Plan the week' } })
+    fireEvent.submit(mondayInput.closest('form')!)
+    await waitFor(() => expect(api.createTodo).toHaveBeenCalledWith({ title: 'Plan the week', date: dates[0] }))
+    expect(screen.queryByLabelText('Details for Plan the week')).not.toBeInTheDocument()
+
+    const row = await screen.findByTestId('week-todo-todo-1')
+    expect(within(row).getByRole('button', { name: 'Review vocabulary' })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Remove importance from Review vocabulary' })).toBeInTheDocument()
+    expect(within(row).queryByText('Only visible in details')).not.toBeInTheDocument()
+    expect(within(row).queryByText('Weekly')).not.toBeInTheDocument()
+    expect(within(row).queryByText('10:30')).not.toBeInTheDocument()
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Review vocabulary' }))
+    expect(await screen.findByLabelText('Details for Review vocabulary')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
+
+    fireEvent.contextMenu(row)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Duplicate task' }))
+    await waitFor(() => expect(api.duplicateTodo).toHaveBeenCalledWith('todo-1'))
   })
 })

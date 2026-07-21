@@ -74,6 +74,11 @@ export async function updateTodo(id: string, input: UpdateTodoInput) {
   return response.data.data!
 }
 
+export async function duplicateTodo(id: string) {
+  const response = await apiClient.post<ApiEnvelope<TodoItem>>(`/todos/${id}/duplicate`)
+  return response.data.data!
+}
+
 export async function deleteTodo(id: string) {
   await apiClient.delete(`/todos/${id}`)
 }

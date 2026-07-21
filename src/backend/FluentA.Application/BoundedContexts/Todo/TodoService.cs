@@ -288,6 +288,33 @@ public sealed class TodoService : ITodoService
         return OperationResult<bool>.Success(true);
     }
 
+    public async Task<OperationResult<TodoItemDto>> DuplicateAsync(
+        Guid userId,
+        Guid todoId,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await _repository.GetAsync(userId, todoId, cancellationToken);
+        if (source is null)
+        {
+            return OperationResult<TodoItemDto>.Failure(TodoError.NotFound());
+        }
+
+        var sortOrder = await _repository.NextSortOrderAsync(userId, source.Date, cancellationToken);
+        var duplicate = TodoItem.Create(
+            userId,
+            source.Title,
+            source.Date,
+            source.Note,
+            source.IsImportant,
+            source.RepeatPattern,
+            source.ReminderTime,
+            source.ReminderTimeZoneId,
+            source.ReminderScheduledAtUtc,
+            sortOrder);
+        await _repository.AddAsync(duplicate, cancellationToken);
+        return OperationResult<TodoItemDto>.Success(ToDto(duplicate));
+    }
+
     private static (
         Dictionary<string, string[]> Errors,
         DateTime Date,

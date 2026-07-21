@@ -60,17 +60,21 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - `/todo` opens to My Day for the browser's current local date. Week is reached
   from the page-level `...` menu; there is no visible Day/Week switch or
   arbitrary My Day date selector.
-- A logged-in desktop user can open the Monday-Sunday Week view and navigate
-  between weeks.
+- A logged-in desktop user can open the Monday-Sunday Week view, see the
+  formatted visible range below `Week`, and navigate between weeks.
 - My Day creates a task from a required title-only quick input and immediately
   opens the new task's details. Note remains optional in details.
-- A logged-in user can create a task for any day in the visible week.
+- Every visible Week day owns a title-only quick input. Enter creates the task
+  on that day without opening details.
 - A logged-in user can toggle task completion without reloading the page.
 - A logged-in user can update task title, note, importance, Repeat, one optional
   time-only reminder, completion, assigned date, and sort order through
   field-scoped API behavior.
 - My Day rows contain only independent completion, title, and icon-only
   importance controls. Selecting the title opens a side-by-side detail panel.
+- Week rows use the same three visible controls and shared details panel; note,
+  Reminder, Repeat, date, and textual importance metadata remain hidden from
+  the compact row.
 - Title saves on Enter or blur, note saves on blur, and X or Escape closes the
   details panel without changing the task.
 - Delete from details or the restricted task context menu requires explicit
@@ -110,6 +114,9 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - Deleted tasks are hidden from normal list endpoints.
 - Task date remains owner-scoped and can change through the authenticated
   update route when the learner moves a task in Week view.
+- Duplicate is server-owned: the server reads the owned source and creates a
+  new incomplete task on the same date with copied title, note, importance,
+  Repeat, and Reminder under a new identity.
 - The server normalizes sort order for every affected owned task in the source
   and destination dates; clients do not write another user's ordering.
 
@@ -123,6 +130,7 @@ All responses use the FluentA envelope.
 | `GET` | `/api/v1/todos?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active tasks in an inclusive date range for week planning. |
 | `GET` | `/api/v1/todos/{id}` | Read one active owned task for notification deep-link selection; missing, deleted, and foreign tasks share `404`. |
 | `POST` | `/api/v1/todos` | Create a task. |
+| `POST` | `/api/v1/todos/{id}/duplicate` | Duplicate one active owned task with all approved fields, a new incomplete identity, the same date, and the next order. |
 | `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, Repeat, Reminder, completion, assigned date, or sort order. Completing or reopening applies recurrence and reminder lifecycle atomically. |
 | `DELETE` | `/api/v1/todos/{id}` | Soft-delete a task. |
 
@@ -160,11 +168,24 @@ All responses use the FluentA envelope.
 
 ## Todo Week Planning Rules
 
-- Week view always shows seven columns from Monday through Sunday.
-- Selecting a week column changes the date used by the create-task form.
+- Week view always shows seven equal columns from Monday through Sunday. The
+  header shows weekday names only; dates and task counts are not repeated in
+  column headers.
+- The page header shows a range such as `July 20–26, 2026` below `Week`.
+- Each day owns one title-only Add task input. Selecting a task title opens the
+  shared details panel at an approximate 4:1 board/panel desktop split; closing
+  details returns the board to full width.
+- Week task rows show only completion, a wrapping title, and icon-only
+  importance. Duplicate, explicit Move, and confirmed Delete are available
+  from the right-click/Shift+F10 menu without a visible overflow control.
+- Duplicate keeps the current selection unchanged and is performed only by the
+  authenticated server command so hidden note, Repeat, and Reminder state is
+  not lost.
 - Week view supports desktop pointer drag-and-drop to reorder tasks within a
   day and move tasks between visible days. The same behavior remains covered by
-  an explicit accessible Move action in the UI.
+  the explicit context-menu Move action.
+- Narrow layouts keep horizontal overflow inside the Week board; they do not
+  create page-level horizontal scrolling.
 - Mobile drag-and-drop is not part of the current contract.
 
 ## Todo Real-Time Rules

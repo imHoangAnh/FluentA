@@ -1,6 +1,5 @@
-import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 import * as todoApi from '../api/todo.api'
@@ -8,7 +7,7 @@ import { DeleteTodoConfirmationDialog } from '../components/DeleteTodoConfirmati
 import { MyDayView } from '../components/MyDayView'
 import { TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
-import { formatMyDayDate, shiftDate, toDateInput, weekDates } from '../todo-date'
+import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../todo-date'
 import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../todo-sort'
 import { TodoWeekView } from './TodoWeekView'
 import '../todo.css'
@@ -18,33 +17,6 @@ type TodoView = 'my-day' | 'week'
 type CreateVariables = {
   input: todoApi.CreateTodoInput
   selectAfterCreate: boolean
-}
-
-function WeekQuickAdd({ date, pending, onCreate }: { date: string; pending: boolean; onCreate: (title: string) => Promise<boolean> }) {
-  const [title, setTitle] = useState('')
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    const normalized = title.trim()
-    if (!normalized) return
-    if (await onCreate(normalized)) setTitle('')
-  }
-
-  return (
-    <form className="todo-quick-add" onSubmit={submit}>
-      <Plus aria-hidden="true" />
-      <label className="sr-only" htmlFor="todo-week-quick-title">Add a task for {date}</label>
-      <input
-        id="todo-week-quick-title"
-        value={title}
-        maxLength={240}
-        autoComplete="off"
-        placeholder={`Add a task for ${date}`}
-        onChange={(event) => setTitle(event.target.value)}
-      />
-      <button type="submit" disabled={pending || !title.trim()}>{pending ? 'Adding...' : 'Add'}</button>
-    </form>
-  )
 }
 
 export function TodoPage() {
@@ -138,6 +110,18 @@ export function TodoPage() {
     onSettled: refresh,
   })
 
+  const duplicateTodo = useMutation({
+    mutationFn: (item: todoApi.TodoItem) => todoApi.duplicateTodo(item.id),
+    onSuccess: async (created) => {
+      const appendCreated = (items: todoApi.TodoItem[] = []) =>
+        items.some((item) => item.id === created.id) ? items : [...items, created]
+      if (created.date === today) queryClient.setQueryData<todoApi.TodoItem[]>(dayKey, appendCreated)
+      if (dates.includes(created.date)) queryClient.setQueryData<todoApi.TodoItem[]>(weekKey, appendCreated)
+      await refresh()
+    },
+    onError: () => toast.error('Could not duplicate the task.'),
+  })
+
   const deleteTodo = useMutation({
     mutationFn: todoApi.deleteTodo,
     onSuccess: async (_result, deletedId) => {
@@ -220,11 +204,14 @@ export function TodoPage() {
     <div className="todo-workspace-page">
       <TodoPageHeader
         view={activeView}
-        subtitle={activeView === 'my-day' ? formatMyDayDate(today) : undefined}
+        subtitle={activeView === 'my-day' ? formatMyDayDate(today) : formatWeekRange(dates[0], dates[6])}
         sortMode={sortMode}
         onSortChange={changeSortMode}
         onViewChange={changeView}
-        onShiftWeek={(days) => setWeekAnchor((current) => shiftDate(current, days))}
+        onShiftWeek={(days) => {
+          setSelectedTaskId(null)
+          setWeekAnchor((current) => shiftDate(current, days))
+        }}
       />
 
       {activeView === 'my-day' ? (
@@ -263,26 +250,35 @@ export function TodoPage() {
           ) : null}
         </main>
       ) : (
-        <main className="todo-main-layout">
-          <WeekQuickAdd
-            date={weekAnchor}
-            pending={createTodo.isPending}
-            onCreate={(title) => createTask(title, weekAnchor, false)}
-          />
-          {weekQuery.isLoading ? <p className="todo-my-day__status" role="status">Loading week...</p> : null}
-          {weekQuery.isError ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load Todo week.</p> : null}
-          {!weekQuery.isLoading && !weekQuery.isError ? (
-            <div className="todo-week-surface">
+        <main className={`todo-main-layout todo-main-layout--week${selectedTask ? ' todo-main-layout--week-details' : ''}`}>
+          <div className="todo-week-surface">
+            {weekQuery.isLoading ? <p className="todo-my-day__status" role="status">Loading week...</p> : null}
+            {weekQuery.isError ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load Todo week.</p> : null}
+            {!weekQuery.isLoading && !weekQuery.isError ? (
               <TodoWeekView
                 dates={dates}
                 items={weekTodos}
-                selectedDate={weekAnchor}
-                onSelectDate={setWeekAnchor}
-                onToggle={(item, isCompleted) => safelyUpdateTask(item, { isCompleted })}
+                selectedId={effectiveSelectedTaskId}
+                creating={createTodo.isPending}
+                onCreate={(date, title) => createTask(title, date, false)}
+                onSelect={(item) => setSelectedTaskId(item.id)}
+                onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
+                onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
+                onDuplicate={(item) => duplicateTodo.mutate(item)}
                 onDelete={setDeleteTarget}
                 onMove={(item, date, sortOrder) => safelyUpdateTask(item, { date, sortOrder })}
               />
-            </div>
+            ) : null}
+          </div>
+          {selectedTask ? (
+            <TodoDetailsPanel
+              key={selectedTask.id}
+              item={selectedTask}
+              pending={updateTodo.isPending}
+              onClose={closeDetails}
+              onUpdate={updateTask}
+              onDelete={setDeleteTarget}
+            />
           ) : null}
         </main>
       )}

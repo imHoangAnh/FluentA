@@ -363,6 +363,59 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
+    public async Task Duplicate_CopiesAllApprovedFieldsOnTheSameDayUnderANewIncompleteIdentity()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var source = await service.CreateAsync(userId, new CreateTodoItemRequest(
+            "Duplicate source",
+            "2035-07-22",
+            "Hidden note",
+            IsImportant: true,
+            RepeatPattern: "Weekly",
+            Reminder: new TodoReminderRequest(
+                "09:30",
+                "America/New_York",
+                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc))));
+
+        var duplicate = await service.DuplicateAsync(userId, source.Value!.Id);
+        var day = await service.ListByDateAsync(userId, source.Value.Date);
+
+        Assert.True(duplicate.IsSuccess);
+        Assert.NotEqual(source.Value.Id, duplicate.Value!.Id);
+        Assert.Equal(source.Value.Date, duplicate.Value.Date);
+        Assert.Equal("Duplicate source", duplicate.Value.Title);
+        Assert.Equal("Hidden note", duplicate.Value.Note);
+        Assert.True(duplicate.Value.IsImportant);
+        Assert.Equal("Weekly", duplicate.Value.RepeatPattern);
+        Assert.Equal("09:30", duplicate.Value.Reminder!.Time);
+        Assert.Equal(source.Value.Reminder!.ScheduledAtUtc, duplicate.Value.Reminder.ScheduledAtUtc);
+        Assert.Null(duplicate.Value.Reminder.SentAtUtc);
+        Assert.False(duplicate.Value.IsCompleted);
+        Assert.Equal(1, duplicate.Value.SortOrder);
+        Assert.Equal(2, day.Value!.Count);
+        Assert.Equal(source.Value.Id, day.Value[0].Id);
+    }
+
+    [Fact]
+    public async Task Duplicate_ReturnsNotFoundForForeignOrDeletedSource()
+    {
+        var service = new TodoService(new FakeTodoRepository());
+        var ownerId = Guid.NewGuid();
+        var source = await service.CreateAsync(ownerId, new CreateTodoItemRequest("Owned source", "2035-07-22"));
+
+        var foreign = await service.DuplicateAsync(Guid.NewGuid(), source.Value!.Id);
+        await service.DeleteAsync(ownerId, source.Value.Id);
+        var deleted = await service.DuplicateAsync(ownerId, source.Value.Id);
+
+        Assert.False(foreign.IsSuccess);
+        Assert.False(deleted.IsSuccess);
+        Assert.Equal("TODO_NOT_FOUND", ((TodoError)foreign.Error!).Code);
+        Assert.Equal("TODO_NOT_FOUND", ((TodoError)deleted.Error!).Code);
+    }
+
+    [Fact]
     public async Task CompleteRecurringOccurrence_CreatesExactlyOneCopiedNextOccurrence()
     {
         var repository = new FakeTodoRepository();

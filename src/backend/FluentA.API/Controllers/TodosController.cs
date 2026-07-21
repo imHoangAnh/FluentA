@@ -73,6 +73,16 @@ public sealed class TodosController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Creates one incomplete same-day copy of an owned todo item.</summary>
+    [HttpPost("{todoId:guid}/duplicate")]
+    public async Task<IActionResult> Duplicate(Guid todoId, CancellationToken cancellationToken)
+    {
+        var result = await _todos.DuplicateAsync(CurrentUserId(), todoId, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Soft-deletes an owned todo item.</summary>
     [HttpDelete("{todoId:guid}")]
     public async Task<IActionResult> Delete(Guid todoId, CancellationToken cancellationToken)

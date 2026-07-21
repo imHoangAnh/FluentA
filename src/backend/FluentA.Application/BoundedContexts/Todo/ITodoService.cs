@@ -15,6 +15,8 @@ public interface ITodoService
     Task<OperationResult<TodoItemDto>> CreateAsync(Guid userId, CreateTodoItemRequest request, CancellationToken cancellationToken = default);
     /// <summary>Updates supplied fields on an owned todo item.</summary>
     Task<OperationResult<TodoItemDto>> UpdateAsync(Guid userId, Guid todoId, UpdateTodoItemRequest request, CancellationToken cancellationToken = default);
+    /// <summary>Creates one incomplete same-day copy from an owned todo item.</summary>
+    Task<OperationResult<TodoItemDto>> DuplicateAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
     /// <summary>Soft-deletes an owned todo item.</summary>
     Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
 }

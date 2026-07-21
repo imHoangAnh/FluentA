@@ -33,3 +33,28 @@ export function formatMyDayDate(dateValue: string) {
     month: 'long',
   }).format(new Date(year, month - 1, day))
 }
+
+function localDate(dateValue: string) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+export function formatWeekday(dateValue: string) {
+  return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(localDate(dateValue))
+}
+
+export function formatWeekRange(startDateValue: string, endDateValue: string) {
+  const start = localDate(startDateValue)
+  const end = localDate(endDateValue)
+  const month = new Intl.DateTimeFormat('en-US', { month: 'long' })
+
+  if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+    return `${month.format(start)} ${start.getDate()}\u2013${end.getDate()}, ${end.getFullYear()}`
+  }
+
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${month.format(start)} ${start.getDate()}\u2013${month.format(end)} ${end.getDate()}, ${end.getFullYear()}`
+  }
+
+  return `${month.format(start)} ${start.getDate()}, ${start.getFullYear()}\u2013${month.format(end)} ${end.getDate()}, ${end.getFullYear()}`
+}
