@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test';
 
+const apiUrl = process.env.E2E_API_URL ?? 'http://127.0.0.1:5000/api/v1';
+
 function todayInput(offsetDays = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function registerAndLogin(page, prefix) {
@@ -17,7 +22,7 @@ async function registerAndLogin(page, prefix) {
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+  await page.request.post(`${apiUrl}/auth/verify-email`, {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
@@ -30,36 +35,134 @@ async function registerAndLogin(page, prefix) {
   return { token: loginPayload.data.accessToken };
 }
 
-test('todo daily CRUD and foreign-owner protection smoke', async ({ page }) => {
+test('My Day core persists details and keeps task mutation owner-scoped', async ({ page }) => {
   const { token } = await registerAndLogin(page, 'todo');
   const headers = { Authorization: `Bearer ${token}` };
 
   await page.getByRole('link', { name: 'Todo' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/todo');
-  await expect(page.getByRole('heading', { name: 'TODO LIST' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Day' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'My Day menu' })).toBeVisible();
+  await expect(page.getByText('Grid')).toHaveCount(0);
+  await expect(page.getByText('Group')).toHaveCount(0);
+  await expect(page.getByText('Suggestions')).toHaveCount(0);
 
   await page.getByTestId('todo-title-input').fill('Review IELTS Unit 3');
-  await page.getByTestId('todo-note-input').fill('Focus on listening');
-  await page.getByTestId('create-todo-button').click();
-  await expect(page.getByLabel('Complete Review IELTS Unit 3')).toBeVisible();
-  await expect(page.getByText('Focus on listening')).toBeVisible();
+  await page.getByTestId('todo-title-input').press('Enter');
+  const details = page.getByLabel('Details for Review IELTS Unit 3');
+  await expect(details).toBeVisible();
+  await expect(details.getByLabel('Task title')).toBeFocused();
 
-  await page.getByLabel('Complete Review IELTS Unit 3').click();
+  const notePatch = page.waitForResponse((response) => response.url().includes('/api/v1/todos/') && response.request().method() === 'PATCH');
+  await details.getByLabel('Note').fill('Focus on listening');
+  await details.getByLabel('Note').blur();
+  await notePatch;
+  const importantPatch = page.waitForResponse((response) => response.url().includes('/api/v1/todos/') && response.request().method() === 'PATCH');
+  await details.getByRole('button', { name: 'Mark as important' }).click();
+  await importantPatch;
+  await expect(page.getByRole('button', { name: 'Remove importance from Review IELTS Unit 3' })).toBeVisible();
+
+  await page.reload();
+  const taskTitle = page.getByRole('button', { name: 'Review IELTS Unit 3', exact: true });
+  await taskTitle.click();
+  await expect(details.getByRole('textbox', { name: 'Note' })).toHaveValue('Focus on listening');
+  await expect(details.getByRole('button', { name: 'Remove importance' })).toBeVisible();
+
+  await taskTitle.press('Shift+F10');
+  const contextMenu = page.getByRole('menu', { name: 'Actions for Review IELTS Unit 3' });
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(3);
+  await expect(contextMenu.getByRole('menuitem', { name: 'Mark as completed' })).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem', { name: 'Remove importance' })).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem', { name: 'Delete task' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(details).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(details).toHaveCount(0);
+  await taskTitle.click();
+
+  await details.getByRole('button', { name: 'Mark Review IELTS Unit 3 as completed' }).click();
+  await expect(details).toBeVisible();
   await page.getByRole('button', { name: /Completed/ }).click();
-  await expect(page.locator('article.todo-card-v2').filter({ hasText: 'Review IELTS Unit 3' })).toHaveClass(/todo-card-v2--completed/);
+  await expect(page.getByTestId(/todo-row-/).filter({ hasText: 'Review IELTS Unit 3' })).toHaveClass(/todo-my-day-row--completed/);
 
-  await page.getByLabel('Delete Review IELTS Unit 3').click();
-  await expect(page.getByText('Review IELTS Unit 3')).toBeHidden();
+  await details.getByRole('button', { name: 'Delete task' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Delete task?' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog', { name: 'Delete task?' })).toHaveCount(0);
+  await expect(details).toBeVisible();
+  await details.getByRole('button', { name: 'Delete task' }).click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Delete task?' })).toHaveCount(0);
+  await details.getByRole('button', { name: 'Delete task' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete task?' }).getByRole('button', { name: 'Delete task' }).click();
+  await expect(page.getByRole('button', { name: 'Review IELTS Unit 3', exact: true })).toHaveCount(0);
 
-  const owned = (await (await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  const owned = (await (await page.request.post(`${apiUrl}/todos`, {
     headers,
     data: { title: 'Owned API task', date: todayInput() },
   })).json()).data;
 
   const second = await registerAndLogin(page, 'todo-foreign');
-  const foreign = await page.request.patch(`http://127.0.0.1:5000/api/v1/todos/${owned.id}`, {
+  const foreign = await page.request.patch(`${apiUrl}/todos/${owned.id}`, {
     headers: { Authorization: `Bearer ${second.token}` },
     data: { isCompleted: false },
   });
   expect(foreign.status()).toBe(404);
+});
+
+test('My Day keeps details side-by-side without page overflow at supported widths', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await registerAndLogin(page, 'todo-narrow');
+  await page.getByRole('link', { name: 'Todo' }).click();
+  await page.getByTestId('todo-title-input').fill('Narrow layout task');
+  await page.getByTestId('todo-title-input').press('Enter');
+  await expect(page.getByLabel('Details for Narrow layout task')).toBeVisible();
+
+  for (const width of [320, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+      list: document.querySelector('.todo-my-day')?.getBoundingClientRect().width ?? 0,
+      details: document.querySelector('.todo-details')?.getBoundingClientRect().width ?? 0,
+    }));
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+    expect(widths.list).toBeGreaterThan(0);
+    expect(widths.details).toBeGreaterThan(0);
+    if (width === 1440) {
+      const detailsShare = widths.details / (widths.list + widths.details);
+      expect(detailsShare).toBeGreaterThanOrEqual(0.19);
+      expect(detailsShare).toBeLessThanOrEqual(0.22);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`my-day-${width}.png`), fullPage: true });
+  }
+});
+
+test('automatic My Day sort becomes persisted manual order when keyboard drag starts', async ({ page }) => {
+  const { token } = await registerAndLogin(page, 'todo-sort');
+  const headers = { Authorization: `Bearer ${token}` };
+  await page.request.post(`${apiUrl}/todos`, { headers, data: { title: 'Zulu task', date: todayInput() } });
+  await page.request.post(`${apiUrl}/todos`, { headers, data: { title: 'Alpha task', date: todayInput() } });
+
+  await page.getByRole('link', { name: 'Todo' }).click();
+  await page.getByRole('button', { name: 'Sort My Day tasks' }).click();
+  await page.getByRole('menuitem', { name: 'Alphabetically' }).click();
+  await expect(page.getByRole('button', { name: 'Sort My Day tasks' })).toContainText('Alphabetically');
+  await expect(page.locator('.todo-my-day-row__title')).toHaveText(['Alpha task', 'Zulu task']);
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sort My Day tasks' })).toContainText('Alphabetically');
+  const zulu = page.getByRole('button', { name: 'Zulu task', exact: true });
+  await zulu.focus();
+  await zulu.press('Space');
+  await zulu.press('ArrowUp');
+  await zulu.press('Space');
+
+  await expect(page.getByRole('button', { name: 'Sort My Day tasks' })).toContainText('Sort');
+  await expect(page.locator('.todo-my-day-row__title')).toHaveText(['Zulu task', 'Alpha task']);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('fluenta.todo.my-day-sort.v1'))).toBeNull();
+
+  await page.reload();
+  await expect(page.locator('.todo-my-day-row__title')).toHaveText(['Zulu task', 'Alpha task']);
 });

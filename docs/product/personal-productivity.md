@@ -57,21 +57,31 @@ external notification delivery and mobile drag-and-drop remain deferred.
 
 - A logged-in user can open `/todo` from the protected app navigation.
 - A logged-in user can see only their own Todo tasks.
-- A logged-in user can view tasks for one selected day, defaulting to today.
-- A logged-in user can navigate between days.
-- A logged-in desktop user can switch to a Monday-Sunday Week view and navigate
+- `/todo` opens to My Day for the browser's current local date. Week is reached
+  from the page-level `...` menu; there is no visible Day/Week switch or
+  arbitrary My Day date selector.
+- A logged-in desktop user can open the Monday-Sunday Week view and navigate
   between weeks.
-- A logged-in user can create a task with a required title, optional note, and
-  assigned date.
+- My Day creates a task from a required title-only quick input and immediately
+  opens the new task's details. Note remains optional in details.
 - A logged-in user can create a task for any day in the visible week.
 - A logged-in user can toggle task completion without reloading the page.
-- A logged-in user can update task title, note, completion, assigned date, and
-  week sort order through field-scoped API behavior.
-- A logged-in user can delete their own task.
-- Todo compact rows show title only; note remains in form/detail.
+- A logged-in user can update task title, note, importance, completion,
+  assigned date, and sort order through field-scoped API behavior.
+- My Day rows contain only independent completion, title, and icon-only
+  importance controls. Selecting the title opens a side-by-side detail panel.
+- Title saves on Enter or blur, note saves on blur, and X or Escape closes the
+  details panel without changing the task.
+- Delete from details or the restricted task context menu requires explicit
+  confirmation. The context menu contains only completion, importance, and
+  delete actions.
+- My Day supports browser-local Importance, Alphabetically, and newest-Creation
+  sorting within each completion group. Incomplete tasks also support durable
+  manual drag order; starting a drag clears an active automatic sort and saves
+  the rendered order as manual.
 - Incomplete tasks stay above completed tasks.
-- Completed tasks stay visible below incomplete tasks and sort by most recent
-  `completed_at` first.
+- Completed tasks start collapsed with a count, are not draggable, and default
+  to most recent `completed_at` first.
 
 ## Todo Ownership And Authorization Rules
 
@@ -93,7 +103,7 @@ All responses use the FluentA envelope.
 | `GET` | `/api/v1/todos?date=YYYY-MM-DD` | List active tasks for the selected date. |
 | `GET` | `/api/v1/todos?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active tasks in an inclusive date range for week planning. |
 | `POST` | `/api/v1/todos` | Create a task. |
-| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, completion, assigned date, or week sort order. |
+| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, completion, assigned date, or sort order. |
 | `DELETE` | `/api/v1/todos/{id}` | Soft-delete a task. |
 
 ## Todo Validation And Error Rules

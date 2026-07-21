@@ -74,7 +74,7 @@ public sealed class TodoService : ITodoService
         }
 
         var sortOrder = await _repository.NextSortOrderAsync(userId, validation.Date, cancellationToken);
-        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note, sortOrder);
+        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note, request.IsImportant, sortOrder);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(ToDto(item));
     }
@@ -111,6 +111,11 @@ public sealed class TodoService : ITodoService
         if (request.IsCompleted is not null)
         {
             item.SetCompleted(request.IsCompleted.Value, DateTime.UtcNow);
+        }
+
+        if (request.IsImportant is not null)
+        {
+            item.SetImportant(request.IsImportant.Value);
         }
 
         if (request.Date is not null || request.SortOrder is not null)
@@ -240,6 +245,7 @@ public sealed class TodoService : ITodoService
             FormatDate(item.Date),
             item.SortOrder,
             item.IsCompleted,
+            item.IsImportant,
             item.CompletedAt,
             item.CreatedAt,
             item.UpdatedAt);

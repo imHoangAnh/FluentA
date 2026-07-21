@@ -15,7 +15,7 @@ public sealed class TodoServiceTests
         var userId = Guid.NewGuid();
         var date = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest(" Review IELTS ", date, " Unit 3 "));
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest(" Review IELTS ", date, " Unit 3 ", IsImportant: true));
         var listed = await service.ListByDateAsync(userId, date);
         var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
         var deleted = await service.DeleteAsync(userId, created.Value.Id);
@@ -24,6 +24,7 @@ public sealed class TodoServiceTests
         Assert.True(created.IsSuccess);
         Assert.Equal("Review IELTS", created.Value.Title);
         Assert.Equal("Unit 3", created.Value.Note);
+        Assert.True(created.Value.IsImportant);
         Assert.Single(listed.Value!);
         Assert.True(updated.Value!.IsCompleted);
         Assert.NotNull(updated.Value.CompletedAt);
@@ -60,7 +61,7 @@ public sealed class TodoServiceTests
         var service = new TodoService(repository);
         var userId = Guid.NewGuid();
         var date = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep"));
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep", IsImportant: true));
 
         var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(Title: "Renamed"));
 
@@ -68,6 +69,7 @@ public sealed class TodoServiceTests
         Assert.Equal("keep", updated.Value.Note);
         Assert.Equal(date, updated.Value.Date);
         Assert.False(updated.Value.IsCompleted);
+        Assert.True(updated.Value.IsImportant);
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public sealed class TodoServiceTests
         var service = new TodoService(repository);
         var userId = Guid.NewGuid();
         var date = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep"));
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep", IsImportant: true));
 
         var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
 
@@ -86,6 +88,26 @@ public sealed class TodoServiceTests
         Assert.Equal("keep", updated.Value.Note);
         Assert.Equal(date, updated.Value.Date);
         Assert.True(updated.Value.IsCompleted);
+        Assert.True(updated.Value.IsImportant);
+    }
+
+    [Fact]
+    public async Task Update_Importance_PersistsAndPreservesUnrelatedFields()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var date = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Task", date, "keep"));
+
+        var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsImportant: true));
+
+        Assert.True(updated.IsSuccess);
+        Assert.True(updated.Value!.IsImportant);
+        Assert.Equal("Task", updated.Value.Title);
+        Assert.Equal("keep", updated.Value.Note);
+        Assert.Equal(date, updated.Value.Date);
+        Assert.False(updated.Value.IsCompleted);
     }
 
     [Fact]
@@ -112,7 +134,7 @@ public sealed class TodoServiceTests
         var userId = Guid.NewGuid();
         var monday = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
         var tuesday = DateTime.UtcNow.Date.AddDays(2).ToString("yyyy-MM-dd");
-        var first = await service.CreateAsync(userId, new CreateTodoItemRequest("First", monday, "keep"));
+        var first = await service.CreateAsync(userId, new CreateTodoItemRequest("First", monday, "keep", IsImportant: true));
         var second = await service.CreateAsync(userId, new CreateTodoItemRequest("Second", monday));
 
         var reordered = await service.UpdateAsync(userId, second.Value!.Id, new UpdateTodoItemRequest(SortOrder: 0));
@@ -125,6 +147,7 @@ public sealed class TodoServiceTests
         Assert.Equal(["Second"], mondayItems.Value!.Select(item => item.Title));
         Assert.Equal(["First"], tuesdayItems.Value!.Select(item => item.Title));
         Assert.Equal("keep", moved.Value!.Note);
+        Assert.True(moved.Value.IsImportant);
         Assert.Equal(0, moved.Value.SortOrder);
     }
 

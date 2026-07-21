@@ -19,6 +19,7 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
         builder.Property(item => item.Date).HasColumnName("date").HasColumnType("date").IsRequired();
         builder.Property(item => item.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(item => item.IsCompleted).HasColumnName("is_completed").IsRequired();
+        builder.Property(item => item.IsImportant).HasColumnName("is_important").HasDefaultValue(false).IsRequired();
         builder.Property(item => item.CompletedAt).HasColumnName("completed_at");
         builder.Property(item => item.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(item => item.UpdatedAt).HasColumnName("updated_at").IsRequired();

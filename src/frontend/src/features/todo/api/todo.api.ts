@@ -8,6 +8,7 @@ export type TodoItem = {
   date: string
   sortOrder: number
   isCompleted: boolean
+  isImportant: boolean
   completedAt?: string | null
   createdAt: string
   updatedAt: string
@@ -17,12 +18,14 @@ export type CreateTodoInput = {
   title: string
   date: string
   note?: string | null
+  isImportant?: boolean
 }
 
 export type UpdateTodoInput = {
   title?: string
   note?: string
   isCompleted?: boolean
+  isImportant?: boolean
   date?: string
   sortOrder?: number
 }

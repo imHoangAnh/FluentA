@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const apiUrl = process.env.E2E_API_URL ?? 'http://127.0.0.1:5000/api/v1';
+
 function dateInput(date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -30,7 +32,7 @@ async function registerAndLogin(page, prefix) {
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
+  await page.request.post(`${apiUrl}/auth/verify-email`, {
     data: { email, otp: registerPayload.data.developmentOtp },
   });
 
@@ -60,22 +62,23 @@ test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
   const headers = { Authorization: `Bearer ${token}` };
   const dates = nextWeekDates();
 
-  const first = (await (await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  const first = (await (await page.request.post(`${apiUrl}/todos`, {
     headers,
     data: { title: 'First Monday', date: dates.monday, note: 'Preserve me' },
   })).json()).data;
-  const second = (await (await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  const second = (await (await page.request.post(`${apiUrl}/todos`, {
     headers,
     data: { title: 'Second Monday', date: dates.monday },
   })).json()).data;
-  const tuesday = (await (await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  const tuesday = (await (await page.request.post(`${apiUrl}/todos`, {
     headers,
     data: { title: 'Tuesday task', date: dates.tuesday },
   })).json()).data;
 
   await page.getByRole('link', { name: 'Todo' }).click();
-  await page.getByLabel('Selected todo date').fill(dates.monday);
-  await page.getByRole('button', { name: 'Week' }).click();
+  await page.getByRole('button', { name: 'My Day menu' }).click();
+  await page.getByRole('menuitem', { name: 'Week' }).click();
+  await page.getByRole('button', { name: 'Next week' }).click();
 
   await expect(page.getByRole('region', { name: 'Todo week' })).toBeVisible();
   await expect(page.locator('[data-testid^="week-day-"]')).toHaveCount(7);
@@ -85,7 +88,7 @@ test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
   await dragWithMouse(page, page.getByLabel('Drag Second Monday'), page.getByTestId(`week-todo-${first.id}`));
 
   await expect.poll(async () => {
-    const response = await page.request.get(`http://127.0.0.1:5000/api/v1/todos?startDate=${dates.monday}&endDate=${dates.sunday}`, { headers });
+    const response = await page.request.get(`${apiUrl}/todos?startDate=${dates.monday}&endDate=${dates.sunday}`, { headers });
     const items = (await response.json()).data.filter((item) => item.date === dates.monday);
     return items.map((item) => item.title);
   }).toEqual(['Second Monday', 'First Monday']);
@@ -93,7 +96,7 @@ test('todo week view reorders and moves tasks on desktop', async ({ page }) => {
   await dragWithMouse(page, page.getByLabel('Drag First Monday'), page.getByTestId(`week-todo-${tuesday.id}`));
 
   await expect.poll(async () => {
-    const response = await page.request.get(`http://127.0.0.1:5000/api/v1/todos?startDate=${dates.monday}&endDate=${dates.sunday}`, { headers });
+    const response = await page.request.get(`${apiUrl}/todos?startDate=${dates.monday}&endDate=${dates.sunday}`, { headers });
     const items = (await response.json()).data;
     const moved = items.find((item) => item.id === first.id);
     const tuesdayItems = items.filter((item) => item.date === dates.tuesday);
