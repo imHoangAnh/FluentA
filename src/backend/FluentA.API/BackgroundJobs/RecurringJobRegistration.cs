@@ -18,7 +18,7 @@ public static class RecurringJobRegistration
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             TodoCarryOverId, job => job.CarryOverTodosAsync(CancellationToken.None), "5 0 * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
-            HabitReminderId, job => job.SendHabitRemindersAsync(CancellationToken.None), "0 20 * * *");
+            HabitReminderId, job => job.SendHabitRemindersAsync(CancellationToken.None), "* * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             CountdownAlertId, job => job.ProcessCountdownAlertsAsync(CancellationToken.None), "*/5 * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(

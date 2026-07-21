@@ -2,7 +2,6 @@ using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Domain.BoundedContexts.Habit.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
 
 namespace FluentA.Infrastructure.Habit;
@@ -49,6 +48,13 @@ public sealed class EfHabitRepository : IHabitRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<int> CountEntriesAsync(Guid habitId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.HabitEntries.CountAsync(
+            entry => entry.HabitId == habitId && entry.DeletedAt == null,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
         IReadOnlyCollection<Guid> habitIds,
         DateTime startDate,
@@ -80,35 +86,67 @@ public sealed class EfHabitRepository : IHabitRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<bool> ToggleEntryAsync(Guid habitId, DateTime date, CancellationToken cancellationToken = default)
+    public async Task<HabitEntryMutationResult> ToggleEntryAsync(
+        Guid userId,
+        Guid habitId,
+        DateTime date,
+        CancellationToken cancellationToken = default)
     {
         var normalized = NormalizeDate(date);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var habit = await _dbContext.Habits
+            .FromSqlInterpolated($"SELECT * FROM habits WHERE id = {habitId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (habit is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new HabitEntryMutationResult(HabitEntryMutationStatus.NotFound, 0, null);
+        }
+
         var existing = await _dbContext.HabitEntries
-            .FirstOrDefaultAsync(entry => entry.HabitId == habitId && entry.Date == normalized, cancellationToken);
+            .FirstOrDefaultAsync(
+                entry => entry.HabitId == habitId
+                    && entry.Date == normalized
+                    && entry.DeletedAt == null,
+                cancellationToken);
+        var currentCount = await _dbContext.HabitEntries.CountAsync(
+            entry => entry.HabitId == habitId && entry.DeletedAt == null,
+            cancellationToken);
 
         if (existing is not null)
         {
             _dbContext.HabitEntries.Remove(existing);
             await _dbContext.SaveChangesAsync(cancellationToken);
-            return false;
+            await transaction.CommitAsync(cancellationToken);
+            return new HabitEntryMutationResult(
+                HabitEntryMutationStatus.Unchecked,
+                Math.Max(0, currentCount - 1),
+                habit.GoalDays);
+        }
+
+        if (!habit.IsStartedOn(normalized))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new HabitEntryMutationResult(HabitEntryMutationStatus.BeforeStart, currentCount, habit.GoalDays);
+        }
+
+        if (!habit.IsScheduledOn(normalized))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new HabitEntryMutationResult(HabitEntryMutationStatus.Unscheduled, currentCount, habit.GoalDays);
+        }
+
+        if (habit.GoalDays.HasValue && currentCount >= habit.GoalDays.Value)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new HabitEntryMutationResult(HabitEntryMutationStatus.GoalReached, currentCount, habit.GoalDays);
         }
 
         await _dbContext.HabitEntries.AddAsync(HabitEntry.Create(habitId, normalized), cancellationToken);
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
-        {
-            _dbContext.ChangeTracker.Clear();
-            return true;
-        }
-    }
-
-    private static bool IsUniqueViolation(DbUpdateException exception)
-    {
-        return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new HabitEntryMutationResult(HabitEntryMutationStatus.Checked, currentCount + 1, habit.GoalDays);
     }
 
     private static DateTime NormalizeDate(DateTime date)

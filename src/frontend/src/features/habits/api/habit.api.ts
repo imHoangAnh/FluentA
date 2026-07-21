@@ -12,10 +12,19 @@ export type Habit = {
   frequency: HabitFrequency
   customDays: string[]
   reminderEnabled: boolean
+  startDate: string
+  goalDays: number | null
+  reminderTime: string
   currentStreak: number
+  longestStreak: number
+  totalCheckIns: number
   isScheduledToday: boolean
   isCheckedToday: boolean
   monthlyCompletionRate: number
+  isGoalCompleted: boolean
+  goalCompletedOn: string | null
+  remainingGoalDays: number | null
+  canEditStartDate: boolean
   createdAt: string
   updatedAt: string
 }
@@ -26,24 +35,9 @@ export type HabitEntry = {
   isCompleted: boolean
 }
 
-export type HabitEntryToggle = HabitEntry
-
-export type HabitStats = {
-  habitId: string
-  name: string
-  description?: string | null
-  icon: HabitIcon
-  frequency: HabitFrequency
-  customDays: string[]
-  currentStreak: number
-  longestStreak: number
-  last7DaysCompletionRate: number
-  completedLast7Days: number
-  scheduledLast7Days: number
-  last30DaysCompletionRate: number
-  completedLast30Days: number
-  scheduledLast30Days: number
-  asOfDate: string
+export type HabitEntryToggle = HabitEntry & {
+  totalCheckIns: number
+  isGoalCompleted: boolean
 }
 
 export type CreateHabitInput = {
@@ -53,12 +47,16 @@ export type CreateHabitInput = {
   frequency: HabitFrequency
   customDays?: string[] | null
   reminderEnabled?: boolean
+  startDate: string
+  goalDays?: number | null
+  reminderTime?: string
+  timeZoneId: string
 }
 
 export type UpdateHabitInput = Partial<CreateHabitInput>
 
-export async function listHabits(timeZoneId: string) {
-  const response = await apiClient.get<ApiEnvelope<Habit[]>>('/habits', { params: { timeZoneId } })
+export async function listHabits(timeZoneId: string, month?: string) {
+  const response = await apiClient.get<ApiEnvelope<Habit[]>>('/habits', { params: { timeZoneId, month } })
   return response.data.data ?? []
 }
 
@@ -79,11 +77,6 @@ export async function deleteHabit(id: string) {
 export async function listHabitEntries(id: string, month: string, timeZoneId: string) {
   const response = await apiClient.get<ApiEnvelope<HabitEntry[]>>(`/habits/${id}/entries`, { params: { month, timeZoneId } })
   return response.data.data ?? []
-}
-
-export async function getHabitStats(id: string, timeZoneId: string) {
-  const response = await apiClient.get<ApiEnvelope<HabitStats>>(`/habits/${id}/stats`, { params: { timeZoneId } })
-  return response.data.data!
 }
 
 export async function toggleHabitEntry(id: string, date: string, timeZoneId: string) {

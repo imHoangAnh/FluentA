@@ -58,7 +58,16 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   const headers = { Authorization: `Bearer ${token}` };
   const habit = (await (await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
     headers,
-    data: { name: 'Cross-tab reading', description: 'SignalR proof', icon: 'Book', frequency: 'Daily' },
+    data: {
+      name: 'Cross-tab reading',
+      description: 'SignalR proof',
+      icon: 'Book',
+      frequency: 'Daily',
+      startDate: todayInput(),
+      goalDays: null,
+      reminderTime: '20:00',
+      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
   })).json()).data;
 
   await page.getByRole('link', { name: 'Habits' }).click();
@@ -68,7 +77,7 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   secondTab.on('console', collectConsoleError);
   await login(secondTab, email, password);
   await secondTab.getByRole('link', { name: 'Habits' }).click();
-  await expect(secondTab.getByLabel(`Check Cross-tab reading on ${todayInput()}`)).toBeVisible({ timeout: 15_000 });
+  await expect(secondTab.getByLabel(`Check Cross-tab reading for selected date ${todayInput()}`)).toBeVisible({ timeout: 15_000 });
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
   await secondTab.getByRole('link', { name: 'Countdowns' }).click();
   await expect(secondTab.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
@@ -80,8 +89,8 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
     && response.url().includes(`/api/v1/habits/${habit.id}/entries`)
     && response.url().includes(`month=${currentMonth()}`));
 
-  await page.getByLabel(`Check Cross-tab reading on ${todayInput()}`).click();
-  await expect(page.getByLabel(`Uncheck Cross-tab reading on ${todayInput()}`)).toBeVisible();
+  await page.getByLabel(`Check Cross-tab reading for selected date ${todayInput()}`).click();
+  await expect(page.getByLabel(`Uncheck Cross-tab reading for selected date ${todayInput()}`)).toBeVisible();
 
   const habitListPayload = await (await syncedHabitList).json();
   const entriesPayload = await (await syncedEntries).json();
@@ -90,6 +99,6 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
 
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
   await secondTab.getByRole('link', { name: 'Habits' }).click();
-  await expect(secondTab.getByLabel(`Uncheck Cross-tab reading on ${todayInput()}`)).toBeVisible();
+  await expect(secondTab.getByLabel(`Uncheck Cross-tab reading for selected date ${todayInput()}`)).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });

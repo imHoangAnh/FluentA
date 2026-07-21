@@ -10,6 +10,7 @@ public sealed partial class HabitService : IHabitService
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string MonthFormat = "yyyy-MM";
+    private const string TimeFormat = "HH:mm";
     private readonly IHabitRepository _repository;
     private readonly IHabitSyncNotifier _syncNotifier;
 
@@ -22,6 +23,7 @@ public sealed partial class HabitService : IHabitService
     public async Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(
         Guid userId,
         string? timeZoneId,
+        string? month = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryFindTimeZone(timeZoneId, out var timeZone))
@@ -32,18 +34,41 @@ public sealed partial class HabitService : IHabitService
             }));
         }
 
-        var habits = await _repository.ListAsync(userId, cancellationToken);
         var localToday = LocalToday(timeZone!);
-        var monthStart = new DateTime(localToday.Year, localToday.Month, 1);
+        if (!TryParseMonth(month, localToday, out var monthStart))
+        {
+            return OperationResult<IReadOnlyList<HabitDto>>.Failure(HabitError.Validation(new Dictionary<string, string[]>
+            {
+                ["month"] = ["month must be in YYYY-MM format."]
+            }));
+        }
+
+        var habits = await _repository.ListAsync(userId, cancellationToken);
+        if (habits.Count == 0)
+        {
+            return OperationResult<IReadOnlyList<HabitDto>>.Success([]);
+        }
+
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-        var streakStart = localToday.AddYears(-5);
-        var entries = habits.Count == 0
-            ? []
-            : await _repository.ListEntriesAsync(habits.Select(habit => habit.Id).ToList(), streakStart, monthEnd, cancellationToken);
-        var entriesByHabit = entries.GroupBy(entry => entry.HabitId).ToDictionary(group => group.Key, group => group.Select(entry => entry.Date.Date).ToHashSet());
+        var entryStart = habits.Min(habit => habit.StartDate);
+        var entryEnd = monthEnd > localToday ? monthEnd : localToday;
+        var entries = await _repository.ListEntriesAsync(
+            habits.Select(habit => habit.Id).ToList(),
+            entryStart,
+            entryEnd,
+            cancellationToken);
+        var entriesByHabit = entries
+            .Where(entry => entry.DeletedAt is null)
+            .GroupBy(entry => entry.HabitId)
+            .ToDictionary(group => group.Key, group => group.Select(entry => entry.Date.Date).ToHashSet());
 
         return OperationResult<IReadOnlyList<HabitDto>>.Success(habits
-            .Select(habit => ToDto(habit, localToday, entriesByHabit.GetValueOrDefault(habit.Id, []), monthStart, monthEnd))
+            .Select(habit => ToDto(
+                habit,
+                localToday,
+                entriesByHabit.GetValueOrDefault(habit.Id, []),
+                monthStart,
+                monthEnd))
             .ToList());
     }
 
@@ -58,10 +83,22 @@ public sealed partial class HabitService : IHabitService
             return OperationResult<HabitDto>.Failure(HabitError.Validation(validation.Errors));
         }
 
-        var habit = HabitEntity.Create(userId, request.Name, request.Description, validation.Icon, validation.Frequency, validation.CustomDays);
+        var habit = HabitEntity.Create(
+            userId,
+            request.Name,
+            request.Description,
+            validation.Icon,
+            validation.Frequency,
+            validation.CustomDays,
+            validation.StartDate,
+            request.GoalDays,
+            validation.ReminderTime);
         habit.SetReminderEnabled(request.ReminderEnabled);
         await _repository.AddAsync(habit, cancellationToken);
-        return OperationResult<HabitDto>.Success(ToDto(habit, DateTime.UtcNow.Date, [], DateTime.UtcNow.Date, DateTime.UtcNow.Date));
+
+        var localToday = LocalToday(validation.TimeZone!);
+        var monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return OperationResult<HabitDto>.Success(ToDto(habit, localToday, [], monthStart, monthStart.AddMonths(1).AddDays(-1)));
     }
 
     public async Task<OperationResult<HabitDto>> UpdateAsync(
@@ -76,7 +113,8 @@ public sealed partial class HabitService : IHabitService
             return OperationResult<HabitDto>.Failure(HabitError.NotFound());
         }
 
-        var validation = ValidateUpdate(habit, request);
+        var entryCount = await _repository.CountEntriesAsync(habit.Id, cancellationToken);
+        var validation = ValidateUpdate(habit, entryCount, request);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<HabitDto>.Failure(HabitError.Validation(validation.Errors));
@@ -87,14 +125,31 @@ public sealed partial class HabitService : IHabitService
             validation.Description,
             validation.Icon,
             validation.Frequency,
-            validation.CustomDays);
+            validation.CustomDays,
+            validation.StartDate,
+            validation.GoalDays,
+            validation.ReminderTime,
+            entryCount);
         if (request.ReminderEnabled is not null)
         {
             habit.SetReminderEnabled(request.ReminderEnabled.Value);
         }
 
         await _repository.UpdateAsync(habit, cancellationToken);
-        return OperationResult<HabitDto>.Success(ToDto(habit, DateTime.UtcNow.Date, [], DateTime.UtcNow.Date, DateTime.UtcNow.Date));
+
+        var timeZone = validation.TimeZone ?? TimeZoneInfo.Utc;
+        var localToday = LocalToday(timeZone);
+        var monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var entries = entryCount == 0
+            ? []
+            : await _repository.ListEntriesAsync(habit.Id, habit.StartDate, localToday, cancellationToken);
+        var completedDates = entries.Where(entry => entry.DeletedAt is null).Select(entry => entry.Date.Date).ToHashSet();
+        return OperationResult<HabitDto>.Success(ToDto(
+            habit,
+            localToday,
+            completedDates,
+            monthStart,
+            monthStart.AddMonths(1).AddDays(-1)));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default)
@@ -133,37 +188,10 @@ public sealed partial class HabitService : IHabitService
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
         var entries = await _repository.ListEntriesAsync(habit.Id, monthStart, monthEnd, cancellationToken);
         return OperationResult<IReadOnlyList<HabitEntryDto>>.Success(entries
+            .Where(entry => entry.DeletedAt is null)
             .OrderBy(entry => entry.Date)
             .Select(entry => new HabitEntryDto(habit.Id, FormatDate(entry.Date), true))
             .ToList());
-    }
-
-    public async Task<OperationResult<HabitStatsDto>> GetStatsAsync(
-        Guid userId,
-        Guid habitId,
-        string? timeZoneId,
-        CancellationToken cancellationToken = default)
-    {
-        if (!TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            return OperationResult<HabitStatsDto>.Failure(HabitError.Validation(new Dictionary<string, string[]>
-            {
-                ["timeZoneId"] = ["A valid browser timezone id is required."]
-            }));
-        }
-
-        var habit = await _repository.GetAsync(userId, habitId, cancellationToken);
-        if (habit is null)
-        {
-            return OperationResult<HabitStatsDto>.Failure(HabitError.NotFound());
-        }
-
-        var localToday = LocalToday(timeZone!);
-        var historyStart = localToday.AddYears(-10);
-        var entries = await _repository.ListEntriesAsync(habit.Id, historyStart, localToday, cancellationToken);
-        var completedDates = entries.Select(entry => entry.Date.Date).ToHashSet();
-
-        return OperationResult<HabitStatsDto>.Success(ToStatsDto(habit, localToday, completedDates));
     }
 
     public async Task<OperationResult<HabitEntryToggleDto>> ToggleEntryAsync(
@@ -178,12 +206,6 @@ public sealed partial class HabitService : IHabitService
             return OperationResult<HabitEntryToggleDto>.Failure(HabitError.Validation(validation.Errors));
         }
 
-        var habit = await _repository.GetAsync(userId, habitId, cancellationToken);
-        if (habit is null)
-        {
-            return OperationResult<HabitEntryToggleDto>.Failure(HabitError.NotFound());
-        }
-
         var localToday = LocalToday(validation.TimeZone!);
         if (validation.Date > localToday)
         {
@@ -193,30 +215,85 @@ public sealed partial class HabitService : IHabitService
             }));
         }
 
-        if (!habit.IsScheduledOn(validation.Date))
+        var mutation = await _repository.ToggleEntryAsync(userId, habitId, validation.Date, cancellationToken);
+        var mutationError = MutationError(mutation.Status);
+        if (mutationError is not null)
         {
-            return OperationResult<HabitEntryToggleDto>.Failure(HabitError.Validation(new Dictionary<string, string[]>
-            {
-                ["date"] = ["This habit is not scheduled for the supplied date."]
-            }));
+            return OperationResult<HabitEntryToggleDto>.Failure(mutationError);
         }
 
-        var isCompleted = await _repository.ToggleEntryAsync(habit.Id, validation.Date, cancellationToken);
         var date = FormatDate(validation.Date);
-        await _syncNotifier.HabitCheckedAsync(userId, habit.Id, date, isCompleted, cancellationToken);
-        return OperationResult<HabitEntryToggleDto>.Success(new HabitEntryToggleDto(habit.Id, date, isCompleted));
+        await _syncNotifier.HabitCheckedAsync(userId, habitId, date, mutation.IsCompleted, cancellationToken);
+        return OperationResult<HabitEntryToggleDto>.Success(new HabitEntryToggleDto(
+            habitId,
+            date,
+            mutation.IsCompleted,
+            mutation.TotalCheckIns,
+            mutation.IsGoalCompleted));
     }
 
-    private static (Dictionary<string, string[]> Errors, HabitIcon Icon, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateCreate(CreateHabitRequest request)
+    private static HabitError? MutationError(HabitEntryMutationStatus status)
+    {
+        return status switch
+        {
+            HabitEntryMutationStatus.NotFound => HabitError.NotFound(),
+            HabitEntryMutationStatus.BeforeStart => HabitError.Validation(new Dictionary<string, string[]>
+            {
+                ["date"] = ["Habit dates before the start date cannot be toggled."]
+            }),
+            HabitEntryMutationStatus.Unscheduled => HabitError.Validation(new Dictionary<string, string[]>
+            {
+                ["date"] = ["This habit is not scheduled for the supplied date."]
+            }),
+            HabitEntryMutationStatus.GoalReached => HabitError.Validation(new Dictionary<string, string[]>
+            {
+                ["date"] = ["This habit has already reached its goal."]
+            }),
+            _ => null
+        };
+    }
+
+    private static (
+        Dictionary<string, string[]> Errors,
+        HabitIcon Icon,
+        HabitFrequency Frequency,
+        IReadOnlyList<DayOfWeek> CustomDays,
+        DateTime StartDate,
+        TimeOnly ReminderTime,
+        TimeZoneInfo? TimeZone) ValidateCreate(CreateHabitRequest request)
     {
         var errors = ValidateNameAndDescription(request.Name, request.Description);
         var icon = ValidateIcon(request.Icon, errors, HabitIcon.Default);
         var schedule = ValidateSchedule(request.Frequency, request.CustomDays);
         Merge(errors, schedule.Errors);
-        return (errors, icon, schedule.Frequency, schedule.CustomDays);
+
+        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: true);
+        var startDate = ValidateDate(request.StartDate, "startDate", errors);
+        if (timeZone is not null && startDate < LocalToday(timeZone))
+        {
+            errors["startDate"] = ["Start date must be today or a future date."];
+        }
+
+        if (request.GoalDays is <= 0)
+        {
+            errors["goalDays"] = ["Goal days must be a positive whole number or null for Forever."];
+        }
+
+        var reminderTime = ValidateTime(request.ReminderTime, errors, required: true);
+        return (errors, icon, schedule.Frequency, schedule.CustomDays, startDate, reminderTime, timeZone);
     }
 
-    private static (Dictionary<string, string[]> Errors, string Name, string? Description, HabitIcon Icon, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateUpdate(HabitEntity habit, UpdateHabitRequest request)
+    private static (
+        Dictionary<string, string[]> Errors,
+        string Name,
+        string? Description,
+        HabitIcon Icon,
+        HabitFrequency Frequency,
+        IReadOnlyList<DayOfWeek> CustomDays,
+        DateTime StartDate,
+        int? GoalDays,
+        TimeOnly ReminderTime,
+        TimeZoneInfo? TimeZone) ValidateUpdate(HabitEntity habit, int entryCount, UpdateHabitRequest request)
     {
         var name = request.Name ?? habit.Name;
         var description = request.Description ?? habit.Description;
@@ -226,7 +303,49 @@ public sealed partial class HabitService : IHabitService
         var icon = request.Icon is null ? habit.Icon : ValidateIcon(request.Icon, errors, habit.Icon);
         var schedule = ValidateSchedule(frequency, customDays);
         Merge(errors, schedule.Errors);
-        return (errors, name, description, icon, schedule.Frequency, schedule.CustomDays);
+
+        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: request.StartDate is not null);
+        var startDate = request.StartDate is null
+            ? habit.StartDate
+            : ValidateDate(request.StartDate, "startDate", errors);
+        if (request.StartDate is not null
+            && startDate != habit.StartDate
+            && timeZone is not null
+            && startDate < LocalToday(timeZone))
+        {
+            errors["startDate"] = ["Start date must be today or a future date."];
+        }
+
+        if (entryCount > 0 && startDate != habit.StartDate)
+        {
+            errors["startDate"] = ["Start date cannot change after the first check-in."];
+        }
+
+        var goalDays = request.GoalDaysSpecified ? request.GoalDays : habit.GoalDays;
+        if (goalDays is <= 0)
+        {
+            errors["goalDays"] = ["Goal days must be a positive whole number or null for Forever."];
+        }
+        else if (goalDays != habit.GoalDays && goalDays.HasValue && goalDays.Value <= entryCount)
+        {
+            errors["goalDays"] = ["A changed finite goal must be greater than the current check-in count."];
+        }
+
+        var reminderTime = request.ReminderTime is null
+            ? habit.ReminderTime
+            : ValidateTime(request.ReminderTime, errors, required: true);
+
+        return (
+            errors,
+            name,
+            description,
+            icon,
+            schedule.Frequency,
+            schedule.CustomDays,
+            startDate,
+            goalDays,
+            reminderTime,
+            timeZone);
     }
 
     private static Dictionary<string, string[]> ValidateNameAndDescription(string name, string? description)
@@ -260,7 +379,9 @@ public sealed partial class HabitService : IHabitService
         return fallback;
     }
 
-    private static (Dictionary<string, string[]> Errors, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateSchedule(string? frequency, IReadOnlyList<string>? customDays)
+    private static (Dictionary<string, string[]> Errors, HabitFrequency Frequency, IReadOnlyList<DayOfWeek> CustomDays) ValidateSchedule(
+        string? frequency,
+        IReadOnlyList<string>? customDays)
     {
         var errors = new Dictionary<string, string[]>();
         if (!Enum.TryParse<HabitFrequency>(frequency, ignoreCase: true, out var parsedFrequency))
@@ -297,7 +418,9 @@ public sealed partial class HabitService : IHabitService
         return (errors, parsedFrequency, uniqueDays);
     }
 
-    private static (Dictionary<string, string[]> Errors, DateTime MonthStart, TimeZoneInfo? TimeZone) ValidateMonthAndTimeZone(string? month, string? timeZoneId)
+    private static (Dictionary<string, string[]> Errors, DateTime MonthStart, TimeZoneInfo? TimeZone) ValidateMonthAndTimeZone(
+        string? month,
+        string? timeZoneId)
     {
         var errors = new Dictionary<string, string[]>();
         if (!DateTime.TryParseExact(month, MonthFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedMonth))
@@ -305,28 +428,65 @@ public sealed partial class HabitService : IHabitService
             errors["month"] = ["month must be in YYYY-MM format."];
         }
 
-        if (!TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            errors["timeZoneId"] = ["A valid browser timezone id is required."];
-        }
-
-        return (errors, DateTime.SpecifyKind(new DateTime(parsedMonth.Year, parsedMonth.Month, 1), DateTimeKind.Utc), timeZone);
+        var timeZone = ValidateTimeZone(timeZoneId, errors, required: true);
+        return (
+            errors,
+            DateTime.SpecifyKind(new DateTime(parsedMonth.Year, parsedMonth.Month, 1), DateTimeKind.Utc),
+            timeZone);
     }
 
     private static (Dictionary<string, string[]> Errors, DateTime Date, TimeZoneInfo? TimeZone) ValidateToggle(ToggleHabitEntryRequest request)
     {
         var errors = new Dictionary<string, string[]>();
-        if (!DateTime.TryParseExact(request.Date, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+        var parsedDate = ValidateDate(request.Date, "date", errors);
+        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: true);
+        return (errors, parsedDate, timeZone);
+    }
+
+    private static TimeZoneInfo? ValidateTimeZone(
+        string? timeZoneId,
+        Dictionary<string, string[]> errors,
+        bool required)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId) && !required)
         {
-            errors["date"] = ["date must be a date in YYYY-MM-DD format."];
+            return null;
         }
 
-        if (!TryFindTimeZone(request.TimeZoneId, out var timeZone))
+        if (TryFindTimeZone(timeZoneId, out var timeZone))
         {
-            errors["timeZoneId"] = ["A valid browser timezone id is required."];
+            return timeZone;
         }
 
-        return (errors, DateTime.SpecifyKind(parsedDate.Date, DateTimeKind.Utc), timeZone);
+        errors["timeZoneId"] = ["A valid browser timezone id is required."];
+        return null;
+    }
+
+    private static DateTime ValidateDate(string? value, string field, Dictionary<string, string[]> errors)
+    {
+        if (DateTime.TryParseExact(value, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        }
+
+        errors[field] = [$"{field} must be a date in YYYY-MM-DD format."];
+        return DateTime.SpecifyKind(DateTime.MinValue.Date, DateTimeKind.Utc);
+    }
+
+    private static TimeOnly ValidateTime(string? value, Dictionary<string, string[]> errors, bool required)
+    {
+        if (!string.IsNullOrWhiteSpace(value)
+            && TimeOnly.TryParseExact(value, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        {
+            return time;
+        }
+
+        if (required)
+        {
+            errors["reminderTime"] = ["Reminder time must be in 24-hour HH:mm format."];
+        }
+
+        return new TimeOnly(20, 0);
     }
 
     private static bool TryFindTimeZone(string? timeZoneId, out TimeZoneInfo? timeZone)
@@ -352,12 +512,46 @@ public sealed partial class HabitService : IHabitService
         }
     }
 
-    private static HabitDto ToDto(HabitEntity habit, DateTime localToday, HashSet<DateTime> completedDates, DateTime monthStart, DateTime monthEnd)
+    private static bool TryParseMonth(string? month, DateTime localToday, out DateTime monthStart)
     {
-        var isScheduledToday = habit.IsScheduledOn(localToday);
-        var expectedDays = EachDate(monthStart, monthEnd).Count(habit.IsScheduledOn);
-        var completedExpectedDays = completedDates.Count(date => date >= monthStart && date <= monthEnd && habit.IsScheduledOn(date));
-        var completionRate = expectedDays == 0 ? 0 : Math.Round((double)completedExpectedDays / expectedDays * 100, 2);
+        if (string.IsNullOrWhiteSpace(month))
+        {
+            monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            return true;
+        }
+
+        if (DateTime.TryParseExact(month, MonthFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            monthStart = DateTime.SpecifyKind(new DateTime(parsed.Year, parsed.Month, 1), DateTimeKind.Utc);
+            return true;
+        }
+
+        monthStart = default;
+        return false;
+    }
+
+    private static HabitDto ToDto(
+        HabitEntity habit,
+        DateTime localToday,
+        HashSet<DateTime> completedDates,
+        DateTime monthStart,
+        DateTime monthEnd)
+    {
+        var totalCheckIns = completedDates.Count;
+        var goalCompletedOn = GoalCompletedOn(habit, completedDates);
+        var isGoalCompleted = goalCompletedOn.HasValue;
+        var streakAsOf = goalCompletedOn.HasValue && goalCompletedOn.Value < localToday
+            ? goalCompletedOn.Value
+            : localToday;
+        var expectedDays = EachDate(monthStart, monthEnd).Count(date => IsSummaryEligible(habit, date, goalCompletedOn));
+        var completedExpectedDays = completedDates.Count(date =>
+            date >= monthStart
+            && date <= monthEnd
+            && IsSummaryEligible(habit, date, goalCompletedOn));
+        var completionRate = expectedDays == 0
+            ? 0
+            : Math.Round((double)completedExpectedDays / expectedDays * 100, 2);
+
         return new HabitDto(
             habit.Id,
             habit.Name,
@@ -366,43 +560,50 @@ public sealed partial class HabitService : IHabitService
             habit.Frequency.ToString(),
             habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
             habit.ReminderEnabled,
-            CurrentStreak(habit, completedDates, localToday),
-            isScheduledToday,
+            FormatDate(habit.StartDate),
+            habit.GoalDays,
+            habit.ReminderTime.ToString(TimeFormat, CultureInfo.InvariantCulture),
+            CurrentStreak(habit, completedDates, streakAsOf),
+            LongestStreak(habit, completedDates, streakAsOf),
+            totalCheckIns,
+            IsSummaryEligible(habit, localToday, goalCompletedOn),
             completedDates.Contains(localToday),
             completionRate,
+            isGoalCompleted,
+            goalCompletedOn.HasValue ? FormatDate(goalCompletedOn.Value) : null,
+            habit.GoalDays.HasValue ? Math.Max(0, habit.GoalDays.Value - totalCheckIns) : null,
+            totalCheckIns == 0,
             habit.CreatedAt,
             habit.UpdatedAt);
     }
 
-    private static HabitStatsDto ToStatsDto(HabitEntity habit, DateTime localToday, HashSet<DateTime> completedDates)
+    private static DateTime? GoalCompletedOn(HabitEntity habit, HashSet<DateTime> completedDates)
     {
-        var sevenDayWindow = CompletionWindow(habit, completedDates, localToday.AddDays(-6), localToday);
-        var thirtyDayWindow = CompletionWindow(habit, completedDates, localToday.AddDays(-29), localToday);
-        return new HabitStatsDto(
-            habit.Id,
-            habit.Name,
-            habit.Description,
-            habit.Icon.ToString(),
-            habit.Frequency.ToString(),
-            habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
-            CurrentStreak(habit, completedDates, localToday),
-            LongestStreak(habit, completedDates, localToday),
-            sevenDayWindow.CompletionRate,
-            sevenDayWindow.Completed,
-            sevenDayWindow.Scheduled,
-            thirtyDayWindow.CompletionRate,
-            thirtyDayWindow.Completed,
-            thirtyDayWindow.Scheduled,
-            FormatDate(localToday));
+        if (!habit.GoalDays.HasValue || completedDates.Count < habit.GoalDays.Value)
+        {
+            return null;
+        }
+
+        return completedDates.OrderBy(date => date).ElementAt(habit.GoalDays.Value - 1);
     }
 
-    private static int CurrentStreak(HabitEntity habit, HashSet<DateTime> completedDates, DateTime localToday)
+    private static bool IsSummaryEligible(HabitEntity habit, DateTime date, DateTime? goalCompletedOn)
     {
-        var cursor = habit.IsScheduledOn(localToday) && completedDates.Contains(localToday)
-            ? localToday
-            : localToday.AddDays(-1);
+        return habit.IsEligibleOn(date) && (!goalCompletedOn.HasValue || date <= goalCompletedOn.Value);
+    }
+
+    private static int CurrentStreak(HabitEntity habit, HashSet<DateTime> completedDates, DateTime asOfDate)
+    {
+        if (asOfDate < habit.StartDate)
+        {
+            return 0;
+        }
+
+        var cursor = habit.IsScheduledOn(asOfDate) && completedDates.Contains(asOfDate)
+            ? asOfDate
+            : asOfDate.AddDays(-1);
         var streak = 0;
-        while (cursor >= localToday.AddYears(-5))
+        while (cursor >= habit.StartDate)
         {
             if (!habit.IsScheduledOn(cursor))
             {
@@ -422,18 +623,16 @@ public sealed partial class HabitService : IHabitService
         return streak;
     }
 
-    private static int LongestStreak(HabitEntity habit, HashSet<DateTime> completedDates, DateTime localToday)
+    private static int LongestStreak(HabitEntity habit, HashSet<DateTime> completedDates, DateTime asOfDate)
     {
-        if (completedDates.Count == 0)
+        if (completedDates.Count == 0 || asOfDate < habit.StartDate)
         {
             return 0;
         }
 
-        var start = completedDates.Min();
         var longest = 0;
         var current = 0;
-
-        foreach (var date in EachDate(start, localToday))
+        foreach (var date in EachDate(habit.StartDate, asOfDate))
         {
             if (!habit.IsScheduledOn(date))
             {
@@ -444,25 +643,14 @@ public sealed partial class HabitService : IHabitService
             {
                 current++;
                 longest = Math.Max(longest, current);
-                continue;
             }
-
-            current = 0;
+            else
+            {
+                current = 0;
+            }
         }
 
         return longest;
-    }
-
-    private static (int Completed, int Scheduled, double CompletionRate) CompletionWindow(
-        HabitEntity habit,
-        HashSet<DateTime> completedDates,
-        DateTime start,
-        DateTime end)
-    {
-        var scheduled = EachDate(start, end).Where(habit.IsScheduledOn).ToList();
-        var completed = scheduled.Count(completedDates.Contains);
-        var rate = scheduled.Count == 0 ? 0 : Math.Round((double)completed / scheduled.Count * 100, 2);
-        return (completed, scheduled.Count, rate);
     }
 
     private static IEnumerable<DateTime> EachDate(DateTime start, DateTime end)
@@ -490,5 +678,4 @@ public sealed partial class HabitService : IHabitService
             target[key] = value;
         }
     }
-
 }

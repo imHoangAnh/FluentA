@@ -59,4 +59,62 @@ public sealed class HabitTests
 
         Assert.Equal(HabitIcon.Default, habit.Icon);
     }
+
+    [Fact]
+    public void Create_WithStartGoalAndReminder_PersistsDateOnlyInvariants()
+    {
+        var habit = Habit.Create(
+            Guid.NewGuid(),
+            "Read",
+            null,
+            HabitIcon.Book,
+            HabitFrequency.Daily,
+            null,
+            new DateTime(2026, 7, 21, 18, 30, 0, DateTimeKind.Local),
+            21,
+            new TimeOnly(7, 45));
+
+        Assert.Equal(new DateTime(2026, 7, 21, 0, 0, 0, DateTimeKind.Utc), habit.StartDate);
+        Assert.Equal(21, habit.GoalDays);
+        Assert.Equal(new TimeOnly(7, 45), habit.ReminderTime);
+        Assert.False(habit.IsEligibleOn(new DateTime(2026, 7, 20)));
+        Assert.True(habit.IsEligibleOn(new DateTime(2026, 7, 21)));
+    }
+
+    [Fact]
+    public void Update_RejectsLockedStartDateAndNonIncreasingChangedGoal()
+    {
+        var habit = Habit.Create(
+            Guid.NewGuid(),
+            "Read",
+            null,
+            HabitIcon.Book,
+            HabitFrequency.Daily,
+            null,
+            new DateTime(2026, 7, 21),
+            21,
+            new TimeOnly(20, 0));
+
+        Assert.Throws<InvalidOperationException>(() => habit.Update(
+            habit.Name,
+            habit.Description,
+            habit.Icon,
+            habit.Frequency,
+            habit.ScheduledCustomDays,
+            new DateTime(2026, 7, 22),
+            habit.GoalDays,
+            habit.ReminderTime,
+            entryCount: 1));
+
+        Assert.Throws<ArgumentException>(() => habit.Update(
+            habit.Name,
+            habit.Description,
+            habit.Icon,
+            habit.Frequency,
+            habit.ScheduledCustomDays,
+            habit.StartDate,
+            goalDays: 1,
+            reminderTime: habit.ReminderTime,
+            entryCount: 1));
+    }
 }

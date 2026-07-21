@@ -16,7 +16,10 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         string? description,
         HabitIcon icon,
         HabitFrequency frequency,
-        IReadOnlyCollection<DayOfWeek>? customDays)
+        IReadOnlyCollection<DayOfWeek>? customDays,
+        DateTime startDate,
+        int? goalDays,
+        TimeOnly reminderTime)
     {
         if (userId == Guid.Empty)
         {
@@ -24,6 +27,9 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         }
 
         UserId = userId;
+        StartDate = NormalizeDate(startDate);
+        GoalDays = ValidateGoalDays(goalDays);
+        ReminderTime = reminderTime;
         ApplyDetails(name, description, icon, frequency, customDays);
     }
 
@@ -33,7 +39,10 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public HabitIcon Icon { get; private set; }
     public HabitFrequency Frequency { get; private set; }
     public string? CustomDays { get; private set; }
+    public DateTime StartDate { get; private set; }
+    public int? GoalDays { get; private set; }
     public bool ReminderEnabled { get; private set; } = true;
+    public TimeOnly ReminderTime { get; private set; } = new(20, 0);
     public DateTime? LastReminderSentOn { get; private set; }
 
     public IReadOnlyList<DayOfWeek> ScheduledCustomDays => ParseCustomDays(CustomDays);
@@ -44,9 +53,21 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         string? description,
         HabitIcon icon,
         HabitFrequency frequency,
-        IReadOnlyCollection<DayOfWeek>? customDays)
+        IReadOnlyCollection<DayOfWeek>? customDays,
+        DateTime? startDate = null,
+        int? goalDays = null,
+        TimeOnly? reminderTime = null)
     {
-        return new Habit(userId, name, description, icon, frequency, customDays);
+        return new Habit(
+            userId,
+            name,
+            description,
+            icon,
+            frequency,
+            customDays,
+            startDate ?? DateTime.UtcNow.Date,
+            goalDays,
+            reminderTime ?? new TimeOnly(20, 0));
     }
 
     public void Update(
@@ -54,15 +75,49 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         string? description,
         HabitIcon icon,
         HabitFrequency frequency,
-        IReadOnlyCollection<DayOfWeek>? customDays)
+        IReadOnlyCollection<DayOfWeek>? customDays,
+        DateTime startDate,
+        int? goalDays,
+        TimeOnly reminderTime,
+        int entryCount)
     {
+        if (entryCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(entryCount));
+        }
+
+        var normalizedStartDate = NormalizeDate(startDate);
+        if (entryCount > 0 && normalizedStartDate != StartDate)
+        {
+            throw new InvalidOperationException("Start date cannot change after the first check-in.");
+        }
+
+        var validatedGoalDays = ValidateGoalDays(goalDays);
+        if (validatedGoalDays != GoalDays && validatedGoalDays.HasValue && validatedGoalDays.Value <= entryCount)
+        {
+            throw new ArgumentException("A changed finite goal must be greater than the current check-in count.", nameof(goalDays));
+        }
+
         ApplyDetails(name, description, icon, frequency, customDays);
+        StartDate = normalizedStartDate;
+        GoalDays = validatedGoalDays;
+        ReminderTime = reminderTime;
         Touch();
     }
 
     public bool IsScheduledOn(DateTime localDate)
     {
         return Frequency == HabitFrequency.Daily || ScheduledCustomDays.Contains(localDate.Date.DayOfWeek);
+    }
+
+    public bool IsStartedOn(DateTime localDate)
+    {
+        return NormalizeDate(localDate) >= StartDate;
+    }
+
+    public bool IsEligibleOn(DateTime localDate)
+    {
+        return IsStartedOn(localDate) && IsScheduledOn(localDate);
     }
 
     public void MarkReminderSent(DateTime date)
@@ -160,5 +215,20 @@ public sealed class Habit : BaseEntity, IAggregateRoot
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(value => Enum.Parse<DayOfWeek>(value))
             .ToList();
+    }
+
+    private static int? ValidateGoalDays(int? goalDays)
+    {
+        if (goalDays is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(goalDays), "Goal days must be positive when supplied.");
+        }
+
+        return goalDays;
+    }
+
+    private static DateTime NormalizeDate(DateTime date)
+    {
+        return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
     }
 }

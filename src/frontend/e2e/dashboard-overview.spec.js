@@ -63,14 +63,24 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   });
   await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
     headers,
-    data: { name: 'Dashboard reading habit', description: 'Overview proof', icon: 'Book', frequency: 'Daily' },
+    data: {
+      name: 'Dashboard reading habit',
+      description: 'Overview proof',
+      icon: 'Book',
+      frequency: 'Daily',
+      startDate: today,
+      goalDays: null,
+      reminderTime: '20:00',
+      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
   });
   await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
     headers,
     data: { name: 'Dashboard IELTS date', targetDate: utcIso(14).slice(0, 10), alerts: [{ alertDay: '1DayBefore', alertTime: '09:00' }] },
   });
 
-  await page.reload();
+  await page.getByRole('link', { name: 'Habits', exact: true }).click();
+  await page.getByRole('link', { name: 'Overview', exact: true }).click();
 
   await expect(page.getByText('Dashboard planning task')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Dashboard reading habit')).toBeVisible();

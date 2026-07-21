@@ -2105,6 +2105,81 @@
   text-align: center;
 }
 
+.habit-week-day-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--ds-foreground);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 4px;
+}
+
+.habit-week-day-button:hover,
+.habit-week-day-button:focus-visible,
+.habit-week-day-button.selected {
+  background: var(--surface-soft);
+  border-color: var(--ds-border);
+}
+
+.habit-week-day-button > span:first-child {
+  color: var(--ds-muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.habit-week-day-button > span:first-child.active,
+.habit-week-day-button.selected > span:first-child {
+  color: var(--ds-primary);
+}
+
+.habit-week-day-button strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-day-progress {
+  display: grid;
+  height: 32px;
+  place-items: center;
+  position: relative;
+  width: 32px;
+}
+
+.habit-day-progress svg {
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+  width: 100%;
+}
+
+.habit-day-progress circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+.habit-day-progress .track {
+  stroke: var(--ds-muted);
+}
+
+.habit-day-progress .value {
+  stroke: var(--ds-primary);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s ease;
+}
+
+.habit-day-progress > svg + svg {
+  color: var(--ds-primary);
+  inset: 9px;
+  position: absolute;
+  transform: none;
+}
+
 .habit-tracker-week-day {
   display: flex;
   flex-direction: column;
@@ -2153,9 +2228,36 @@
   flex: 1;
   padding-bottom: 80px;
 }
+.habit-list-card {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 72px;
+  padding: 10px 12px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
 .habit-list-card.active {
   border-color: var(--ds-primary);
   background: rgba(15, 159, 143, 0.05);
+}
+
+.habit-list-card-select {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 4px;
+  text-align: left;
 }
 
 .habit-list-card-meta {
@@ -2177,9 +2279,10 @@
 }
 
 .habit-list-card-info {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -2203,6 +2306,36 @@
 }
 .habit-list-card-streak svg {
   color: #d97706;
+}
+
+.habit-list-card-status {
+  color: var(--ds-muted-foreground);
+  font-size: 11px;
+}
+
+.habit-list-card-toggle {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--ds-border);
+  border-radius: 50%;
+  color: var(--ds-muted-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  width: 42px;
+}
+
+.habit-list-card-toggle:hover:not(:disabled),
+.habit-list-card-toggle:focus-visible {
+  border-color: var(--ds-primary);
+  color: var(--ds-primary);
+}
+
+.habit-list-card-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .habit-list-card-week {
@@ -2239,7 +2372,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 20px;
   padding-bottom: 40px;
 }
 
@@ -2357,6 +2490,50 @@
   color: var(--ds-muted-foreground);
 }
 
+.habit-goal-card {
+  background: #fff;
+  border: 1px solid var(--ds-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.habit-goal-card > div:first-child {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.habit-goal-card strong {
+  color: var(--ds-foreground);
+  font-size: 24px;
+}
+
+.habit-goal-card span,
+.habit-goal-card p {
+  color: var(--ds-muted-foreground);
+  font-size: 12px;
+}
+
+.habit-goal-card p {
+  margin: 0;
+}
+
+.habit-goal-track {
+  background: var(--ds-muted);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.habit-goal-track > span {
+  background: var(--ds-primary);
+  display: block;
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
 .habit-calendar-card {
   padding: 32px;
   background: #ffffff;
@@ -2414,6 +2591,20 @@
   align-items: center;
   justify-content: center;
 }
+.habit-calendar-day-btn {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--ds-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  height: 38px;
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+}
 .habit-calendar-day-btn:hover:not(.disabled) {
   background: var(--ds-secondary);
 }
@@ -2452,6 +2643,8 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
+  max-height: min(880px, calc(100vh - 32px));
+  overflow: hidden;
 }
 
 .habit-modal-header {
@@ -2485,7 +2678,9 @@
 .habit-modal-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .habit-modal-form label {
@@ -2498,7 +2693,8 @@
 }
 
 .habit-modal-form input,
-.habit-modal-form select {
+.habit-modal-form select,
+.habit-modal-form textarea {
   border: 1px solid var(--ds-border);
   border-radius: 12px;
   padding: 12px;
@@ -2508,9 +2704,39 @@
   transition: all 0.2s;
 }
 .habit-modal-form input:focus,
-.habit-modal-form select:focus {
+.habit-modal-form select:focus,
+.habit-modal-form textarea:focus {
   border-color: var(--ds-primary);
   outline: none;
+}
+
+.habit-modal-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.habit-modal-form label small {
+  color: var(--ds-muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.habit-modal-form .habit-reminder-toggle {
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.habit-reminder-toggle input {
+  accent-color: var(--ds-primary);
+  height: 18px;
+  width: 18px;
+}
+
+.habit-form-error {
+  color: var(--ds-destructive);
+  font-size: 13px;
+  margin: 0;
 }
 
 .habit-icon-select {
@@ -3458,6 +3684,10 @@
   color: var(--ds-muted-foreground);
   line-height: 1.6;
   margin: 0;
+  max-height: 144px;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  padding-right: 8px;
   white-space: pre-wrap;
 }
 

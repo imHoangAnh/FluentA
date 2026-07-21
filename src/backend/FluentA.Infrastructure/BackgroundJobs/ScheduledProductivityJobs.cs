@@ -9,6 +9,7 @@ namespace FluentA.Infrastructure.BackgroundJobs;
 
 public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 {
+    private static readonly TimeZoneInfo VietnamTimeZone = ResolveVietnamTimeZone();
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
     private readonly IAssetService _assetService;
@@ -28,29 +29,42 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
     public async Task SendHabitRemindersAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone);
+        var today = DateTime.SpecifyKind(localNow.Date, DateTimeKind.Utc);
+        var localTime = TimeOnly.FromDateTime(localNow);
         var completedHabitIds = _dbContext.HabitEntries
             .Where(entry => entry.DeletedAt == null && entry.Date == today)
             .Select(entry => entry.HabitId);
         var habits = await _dbContext.Habits
             .Where(habit => habit.DeletedAt == null
                 && habit.ReminderEnabled
+                && habit.StartDate <= today
+                && habit.ReminderTime <= localTime
                 && habit.LastReminderSentOn != today
-                && !completedHabitIds.Contains(habit.Id))
+                && !completedHabitIds.Contains(habit.Id)
+                && (!habit.GoalDays.HasValue
+                    || _dbContext.HabitEntries.Count(entry =>
+                        entry.HabitId == habit.Id && entry.DeletedAt == null) < habit.GoalDays.Value))
             .ToListAsync(cancellationToken);
 
-        foreach (var habit in habits.Where(habit => habit.IsScheduledOn(today)))
+        var queued = 0;
+        foreach (var habit in habits.Where(habit => habit.IsEligibleOn(today)))
         {
             _dbContext.Notifications.Add(Notification.Create(habit.UserId, "HabitReminder", "Habit reminder",
                 $"You have not checked off {habit.Name} today.", $"habit:{habit.Id}:{today:yyyy-MM-dd}"));
             habit.MarkReminderSent(today);
+            queued++;
             _logger.LogInformation(
                 "HabitReminder notification queued for user {UserId}, habit {HabitId}, date {Date}.",
                 habit.UserId, habit.Id, today);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("HabitReminderJob queued {Count} reminders.", habits.Count(habit => habit.LastReminderSentOn == today));
+        _logger.LogInformation(
+            "HabitReminderJob evaluated {CandidateCount} due habits and queued {QueuedCount} reminders for Vietnam date {Date}.",
+            habits.Count,
+            queued,
+            today);
     }
 
     public async Task ProcessCountdownAlertsAsync(CancellationToken cancellationToken = default)
@@ -156,5 +170,24 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         deleted += await _dbContext.PomodoroConfigs.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
 
         _logger.LogInformation("DatabaseCleanupJob permanently deleted {Count} product records older than {Cutoff}.", deleted, cutoff);
+    }
+
+    private static TimeZoneInfo ResolveVietnamTimeZone()
+    {
+        foreach (var id in new[] { "Asia/Ho_Chi_Minh", "SE Asia Standard Time" })
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        throw new InvalidOperationException("The Vietnam timezone is not available on this host.");
     }
 }

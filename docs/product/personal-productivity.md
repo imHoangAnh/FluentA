@@ -4,10 +4,10 @@
 
 This contract covers the post-MVP personal productivity surface introduced by
 SPEC1 S1 and the current Habit Tracker work. It defines current Todo behavior,
-current Countdown behavior, the current Habit API plus monthly grid UI, and the
-Dashboard Overview authenticated home. Journal and Kanban have separate product
-contracts. Pomodoro, scheduled jobs, notifications, widget visibility settings,
-and mobile drag-and-drop are separate future stories.
+current Countdown behavior, the current selected-day Habit Tracker plus monthly
+detail calendar, and the Dashboard Overview authenticated home. Journal,
+Kanban, Pomodoro, and the Notification inbox have separate product contracts;
+external notification delivery and mobile drag-and-drop remain deferred.
 
 ## Dashboard Overview Outcomes
 
@@ -182,34 +182,42 @@ All responses use the FluentA envelope.
 ## Habit Foundation Outcomes
 
 - A logged-in user can open `/habits` from protected app navigation.
-- A logged-in user can create daily or custom-schedule habits through the Habit
-  API and Habit page form.
+- A logged-in user can create daily or custom-schedule habits with a Start
+  Date, Forever or finite successful-check-in Goal Days, and an optional single
+  reminder time through the Habit API and Habit page form.
 - A logged-in user can see only their own active habits.
 - A logged-in user can update habit name, description, semantic icon,
-  frequency, and custom weekdays from the Habit page.
+  frequency, custom weekdays, goal, and reminder preference from the Habit
+  page. Start Date remains editable only until the first check-in.
 - A logged-in user can soft-delete their own habits from the Habit page.
 - A logged-in user can query completed habit entries for an owned habit and
   month.
 - On desktop and tablet, the Habit page uses an approximately 50/50 list/detail
   layout. Each Habit card shows its semantic icon, compact current streak, and
-  the Monday-through-Sunday completion cells for the selected week.
+  one completion action for the date selected in the Monday-through-Sunday
+  strip.
 - A logged-in user can navigate past or future weeks. Eligible past and current
-  scheduled cells can be toggled directly; future and unscheduled cells are
-  visible but disabled.
-- The selected Habit detail shows four statistics, an optional description,
-  and then the navigable monthly calendar.
+  dates can be selected; future, pre-start, unscheduled, and completed-goal
+  check actions are visible but disabled.
+- Each date in the strip shows aggregate completed/eligible progress. Dates
+  before Start Date and dates after finite-goal completion do not contribute to
+  the denominator.
+- The selected Habit detail shows Total check-ins, Monthly check-in rate,
+  Current streak, Longest streak, optional finite-goal progress, an optional
+  bounded scrolling description, and then the navigable monthly calendar.
 - A logged-in user can toggle completion for today or past scheduled dates from
   the monthly grid.
-- Future dates and unscheduled custom-frequency dates are disabled in the grid.
-- The API rejects future dates and unscheduled custom-frequency dates.
-- Habit list responses include Dashboard-ready summary fields: current streak,
-  today's scheduled/completed state, and monthly completion rate.
-- Habit rows display current streak, today's state, and selected-month
-  completion rate.
-- Habit create/edit controls allow daily reminders to be enabled or disabled;
-  disabled habits are excluded from the scheduled reminder job.
-- A logged-in user can open `/habits/{id}/stats` from a Habit row to inspect
-  current streak, longest streak, and last 7-day and 30-day completion rates.
+- Future, pre-start, unscheduled custom-frequency, and completed-goal dates are
+  rejected by the API. An existing entry can always be unchecked so a finite
+  goal can reactivate.
+- Habit list responses include Dashboard/detail-ready summary fields: total
+  check-ins, current and longest streak, today's scheduled/completed state,
+  selected-month completion rate, finite-goal state, and Start Date editability.
+- Habit create/edit controls allow reminders to be enabled or disabled and set
+  one minute-precision time interpreted in fixed `Asia/Ho_Chi_Minh`. The
+  default is `20:00`.
+- The dedicated `/habits/{id}/stats` page and API route do not exist; the main
+  detail panel is the only Habit statistics surface.
 - The monthly grid remains horizontally scrollable on narrow screens instead of
   hiding days.
 - Habit entry toggles broadcast `HabitChecked` after durable persistence
@@ -226,6 +234,8 @@ All responses use the FluentA envelope.
   another user's data is not revealed.
 - Deleted habits are hidden from normal list and entry endpoints.
 - The database enforces one completion entry per habit/date.
+- The database enforces positive finite Goal Days. Entry mutation serializes
+  per Habit so concurrent different-date requests cannot exceed the goal.
 
 ## Habit API Contract
 
@@ -233,11 +243,10 @@ All responses use the FluentA envelope.
 
 | Method | Endpoint | Behavior |
 | --- | --- | --- |
-| `GET` | `/api/v1/habits?timeZoneId=...` | List active habits with learner-local summary data. |
+| `GET` | `/api/v1/habits?timeZoneId=...&month=YYYY-MM` | List active habits with learner-local and selected-month summary data. |
 | `POST` | `/api/v1/habits` | Create a daily or custom-schedule habit. |
-| `PATCH` | `/api/v1/habits/{id}` | Update habit details and schedule. |
+| `PATCH` | `/api/v1/habits/{id}` | Update habit details, schedule, goal, and reminder preference. |
 | `DELETE` | `/api/v1/habits/{id}` | Soft-delete a habit. |
-| `GET` | `/api/v1/habits/{id}/stats?timeZoneId=...` | Get learner-local statistics for one owned habit. |
 | `GET` | `/api/v1/habits/{id}/entries?month=YYYY-MM&timeZoneId=...` | List completed entries for one month. |
 | `POST` | `/api/v1/habits/{id}/entries` | Toggle one eligible date with `date` and `timeZoneId`. |
 
@@ -254,6 +263,13 @@ All responses use the FluentA envelope.
   Dashboard map the semantic icon to shared application presentation styling.
 - Frequency must be `Daily` or `Custom`.
 - Custom habits require at least one valid weekday name.
+- Start Date must use `YYYY-MM-DD` and new or changed values must be today or a
+  future learner-local date. It cannot change after the first check-in.
+- Goal Days is null for Forever or a positive integer. A changed finite value
+  must be greater than the current check-in count; switching to Forever is
+  always allowed.
+- Reminder Time must use 24-hour `HH:mm`; reminder delivery uses fixed Vietnam
+  time rather than the browser timezone.
 - Month values must be `YYYY-MM`.
 - Entry dates must be `YYYY-MM-DD`.
 - Future dates cannot be toggled.
@@ -271,8 +287,8 @@ All responses use the FluentA envelope.
 - Custom habits are scheduled only on their configured weekdays.
 - Unscheduled days do not break custom-habit streaks and do not count toward
   completion-rate denominators.
-- Longest streak and last 7/30-day rates are computed by the Habit API from
-  scheduled days and durable completion entries.
+- Total check-ins, current/longest streak, selected-month rate, and finite-goal
+  state are computed by the Habit API from scheduled days and durable entries.
 
 ## Deferred Integration
 
@@ -284,7 +300,7 @@ All responses use the FluentA envelope.
   countdown alert/cleanup work, and `DatabaseCleanupJob` schedules.
 - Reminder and countdown jobs persist delivery markers before retry completion,
   preventing duplicate daily/event notifications.
-- External notification delivery and per-habit reminder preferences remain
+- Habit reminders are in-app only. External email, push, or SMS delivery remains
   deferred to the notifications epic.
 - Mobile drag-and-drop remains deferred; mobile users receive explicit date and
   ordering controls.

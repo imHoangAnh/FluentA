@@ -6,7 +6,7 @@ namespace FluentA.Application.BoundedContexts.Habit;
 public interface IHabitService
 {
     /// <summary>Lists habits with learner-local summary fields for the authenticated user.</summary>
-    Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(Guid userId, string? timeZoneId, CancellationToken cancellationToken = default);
+    Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(Guid userId, string? timeZoneId, string? month = null, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a habit for the authenticated user.</summary>
     Task<OperationResult<HabitDto>> CreateAsync(Guid userId, CreateHabitRequest request, CancellationToken cancellationToken = default);
@@ -19,9 +19,6 @@ public interface IHabitService
 
     /// <summary>Lists completed entries for one owned habit and calendar month.</summary>
     Task<OperationResult<IReadOnlyList<HabitEntryDto>>> ListEntriesAsync(Guid userId, Guid habitId, string? month, string? timeZoneId, CancellationToken cancellationToken = default);
-
-    /// <summary>Gets learner-local statistics for one owned habit.</summary>
-    Task<OperationResult<HabitStatsDto>> GetStatsAsync(Guid userId, Guid habitId, string? timeZoneId, CancellationToken cancellationToken = default);
 
     /// <summary>Toggles completion for one eligible owned habit date.</summary>
     Task<OperationResult<HabitEntryToggleDto>> ToggleEntryAsync(Guid userId, Guid habitId, ToggleHabitEntryRequest request, CancellationToken cancellationToken = default);

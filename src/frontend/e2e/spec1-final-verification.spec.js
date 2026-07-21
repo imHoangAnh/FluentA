@@ -26,7 +26,7 @@ test('final SPEC1 preferences and notification ownership', async ({ page }) => {
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('No reminder habit');
-  await page.getByLabel('Daily reminder').uncheck();
+  await page.getByLabel('Reminder').uncheck();
   await page.getByTestId('save-habit-button').click();
   await expect(page.getByRole('heading', { name: 'No reminder habit' })).toBeVisible();
   const habits = await (await page.request.get(`http://127.0.0.1:5000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers })).json();

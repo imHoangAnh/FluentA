@@ -22,9 +22,12 @@ public sealed class HabitsController : ControllerBase
 
     /// <summary>Lists habits with learner-local summary data for the authenticated user.</summary>
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? timeZoneId, CancellationToken cancellationToken)
+    public async Task<IActionResult> List(
+        [FromQuery] string? timeZoneId,
+        [FromQuery] string? month,
+        CancellationToken cancellationToken)
     {
-        var result = await _habits.ListAsync(CurrentUserId(), timeZoneId, cancellationToken);
+        var result = await _habits.ListAsync(CurrentUserId(), timeZoneId, month, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiEnvelope<IReadOnlyList<HabitDto>>.Ok(result.Value!))
             : ToErrorResult(result);
@@ -57,19 +60,6 @@ public sealed class HabitsController : ControllerBase
         var result = await _habits.DeleteAsync(CurrentUserId(), habitId, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiEnvelope<object>.Ok(new { message = "Habit deleted." }))
-            : ToErrorResult(result);
-    }
-
-    /// <summary>Gets learner-local statistics for an owned habit.</summary>
-    [HttpGet("{habitId:guid}/stats")]
-    public async Task<IActionResult> GetStats(
-        Guid habitId,
-        [FromQuery] string? timeZoneId,
-        CancellationToken cancellationToken)
-    {
-        var result = await _habits.GetStatsAsync(CurrentUserId(), habitId, timeZoneId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<HabitStatsDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

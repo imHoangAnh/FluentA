@@ -24,7 +24,6 @@ const protectedRoutes = [
   ['/flashcards', 'Flashcards', 'Flashcard'],
   ['/practice', 'Practice', 'Practice'],
   ['/habits', 'Habits', 'Habits'],
-  ['/habits/route-proof/stats', 'Habit statistics', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
   ['/notes', 'Notes', 'Notes'],
   ['/kanban', 'Kanban', 'Kanban'],
