@@ -1,11 +1,15 @@
+using System.Text.Json;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
+using FluentA.Domain.BoundedContexts.Todo.Services;
 
 namespace FluentA.Application.UnitTests;
 
 public sealed class TodoServiceTests
 {
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
+
     [Fact]
     public async Task CreateListUpdateAndDelete_UseOwnedItems()
     {
@@ -164,6 +168,131 @@ public sealed class TodoServiceTests
         Assert.Empty(notifier.CheckedItems);
     }
 
+    [Fact]
+    public async Task RepeatPattern_CreateUpdateAndClear_UsesExactOptionalValues()
+    {
+        var service = new TodoService(new FakeTodoRepository());
+        var userId = Guid.NewGuid();
+        var date = "2026-07-22";
+
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Repeat me", date, RepeatPattern: "Daily"));
+        var updated = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest { RepeatPattern = "Weekdays" });
+        var cleared = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest { RepeatPattern = null });
+        var invalid = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest { RepeatPattern = "daily" });
+
+        Assert.Equal("Daily", created.Value.RepeatPattern);
+        Assert.Equal("Weekdays", updated.Value!.RepeatPattern);
+        Assert.Null(cleared.Value!.RepeatPattern);
+        Assert.False(invalid.IsSuccess);
+        var details = Assert.IsType<Dictionary<string, string[]>>(((TodoError)invalid.Error!).Details);
+        Assert.Contains("repeatPattern", details.Keys);
+    }
+
+    [Fact]
+    public void UpdateRequest_DistinguishesOmittedRepeatFromExplicitNull()
+    {
+        var omitted = JsonSerializer.Deserialize<UpdateTodoItemRequest>("{\"isCompleted\":true}", WebJson)!;
+        var cleared = JsonSerializer.Deserialize<UpdateTodoItemRequest>("{\"repeatPattern\":null}", WebJson)!;
+
+        Assert.False(omitted.IsRepeatPatternSpecified);
+        Assert.True(cleared.IsRepeatPatternSpecified);
+        Assert.Null(cleared.RepeatPattern);
+    }
+
+    [Fact]
+    public async Task CompleteRecurringOccurrence_CreatesExactlyOneCopiedNextOccurrence()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var created = await service.CreateAsync(
+            userId,
+            new CreateTodoItemRequest("Month end", "2026-01-31", "Keep note", IsImportant: true, RepeatPattern: "Monthly"));
+
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+        await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest(IsCompleted: true));
+        var nextDay = await service.ListByDateAsync(userId, "2026-02-28");
+
+        var next = Assert.Single(nextDay.Value!);
+        Assert.NotEqual(created.Value.Id, next.Id);
+        Assert.Equal("Month end", next.Title);
+        Assert.Equal("Keep note", next.Note);
+        Assert.True(next.IsImportant);
+        Assert.Equal("Monthly", next.RepeatPattern);
+        Assert.False(next.IsCompleted);
+    }
+
+    [Fact]
+    public async Task ReopenRecurringOccurrence_RemovesPristineGeneratedChild()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Daily", "2026-07-22", RepeatPattern: "Daily"));
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+
+        var reopened = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest(IsCompleted: false));
+        var nextDay = await service.ListByDateAsync(userId, "2026-07-23");
+
+        Assert.False(reopened.Value!.IsCompleted);
+        Assert.Null(reopened.Value.WarningCode);
+        Assert.Empty(nextDay.Value!);
+    }
+
+    [Fact]
+    public async Task ReopenRecurringOccurrence_RetainsEditedChildAndReturnsWarning()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Daily", "2026-07-22", RepeatPattern: "Daily"));
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+        var nextDay = await service.ListByDateAsync(userId, "2026-07-23");
+        var generated = Assert.Single(nextDay.Value!);
+        await service.UpdateAsync(userId, generated.Id, new UpdateTodoItemRequest(Title: "Edited next task"));
+
+        var reopened = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest(IsCompleted: false));
+        var retained = await service.ListByDateAsync(userId, "2026-07-23");
+
+        Assert.Equal("recurrence-next-retained", reopened.Value!.WarningCode);
+        Assert.Equal("Edited next task", Assert.Single(retained.Value!).Title);
+    }
+
+    [Fact]
+    public async Task DeleteGeneratedOccurrence_DoesNotDeleteSourceOrCreateAnotherOccurrence()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Daily", "2026-07-22", RepeatPattern: "Daily"));
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+        var generated = Assert.Single((await service.ListByDateAsync(userId, "2026-07-23")).Value!);
+
+        await service.DeleteAsync(userId, generated.Id);
+        var source = await service.ListByDateAsync(userId, "2026-07-22");
+        var nextDay = await service.ListByDateAsync(userId, "2026-07-23");
+
+        Assert.Single(source.Value!);
+        Assert.Empty(nextDay.Value!);
+    }
+
+    [Fact]
+    public async Task DeleteSourceOccurrence_DoesNotCascadeToGeneratedChild()
+    {
+        var repository = new FakeTodoRepository();
+        var service = new TodoService(repository);
+        var userId = Guid.NewGuid();
+        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Daily", "2026-07-22", RepeatPattern: "Daily"));
+        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
+
+        await service.DeleteAsync(userId, created.Value.Id);
+        var sourceDay = await service.ListByDateAsync(userId, "2026-07-22");
+        var generatedDay = await service.ListByDateAsync(userId, "2026-07-23");
+
+        Assert.Empty(sourceDay.Value!);
+        Assert.Single(generatedDay.Value!);
+    }
+
     private sealed class FakeTodoRepository : ITodoRepository
     {
         private readonly List<TodoItem> _items = [];
@@ -212,6 +341,62 @@ public sealed class TodoServiceTests
         }
 
         public Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<TodoCompletionMutationResult?> SetCompletionAsync(
+            Guid userId,
+            Guid todoId,
+            bool isCompleted,
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default)
+        {
+            var item = _items.FirstOrDefault(candidate => candidate.UserId == userId && candidate.Id == todoId && candidate.DeletedAt is null);
+            if (item is null)
+            {
+                return Task.FromResult<TodoCompletionMutationResult?>(null);
+            }
+
+            if (item.IsCompleted == isCompleted)
+            {
+                return Task.FromResult<TodoCompletionMutationResult?>(new TodoCompletionMutationResult(item, false));
+            }
+
+            var retained = false;
+            if (isCompleted)
+            {
+                item.MarkGeneratedOccurrenceEdited();
+                item.SetCompleted(true, nowUtc);
+                if (item.RepeatPattern is not null
+                    && !_items.Any(candidate => candidate.GeneratedFromTodoId == item.Id && candidate.DeletedAt is null))
+                {
+                    var nextDate = TodoRepeatSchedule.NextDate(item.Date, item.RepeatPattern.Value);
+                    var sortOrder = _items
+                        .Where(candidate => candidate.UserId == userId && candidate.Date == nextDate && candidate.DeletedAt is null)
+                        .Select(candidate => candidate.SortOrder)
+                        .DefaultIfEmpty(-1)
+                        .Max() + 1;
+                    _items.Add(TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder));
+                }
+            }
+            else
+            {
+                var child = _items.FirstOrDefault(candidate => candidate.UserId == userId
+                    && candidate.GeneratedFromTodoId == item.Id
+                    && candidate.DeletedAt is null);
+                if (child?.IsGeneratedOccurrencePristine == true)
+                {
+                    child.SoftDelete();
+                }
+                else if (child is not null)
+                {
+                    retained = true;
+                }
+
+                item.MarkGeneratedOccurrenceEdited();
+                item.SetCompleted(false, nowUtc);
+            }
+
+            return Task.FromResult<TodoCompletionMutationResult?>(new TodoCompletionMutationResult(item, retained));
+        }
     }
 
     private sealed class RecordingTodoSyncNotifier : ITodoSyncNotifier

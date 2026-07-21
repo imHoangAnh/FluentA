@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
 
+export type TodoRepeatPattern = 'Daily' | 'Weekdays' | 'Weekly' | 'Monthly' | 'Yearly'
+
 export type TodoItem = {
   id: string
   title: string
@@ -9,9 +11,11 @@ export type TodoItem = {
   sortOrder: number
   isCompleted: boolean
   isImportant: boolean
+  repeatPattern?: TodoRepeatPattern | null
   completedAt?: string | null
   createdAt: string
   updatedAt: string
+  warningCode?: 'recurrence-next-retained' | null
 }
 
 export type CreateTodoInput = {
@@ -19,6 +23,7 @@ export type CreateTodoInput = {
   date: string
   note?: string | null
   isImportant?: boolean
+  repeatPattern?: TodoRepeatPattern | null
 }
 
 export type UpdateTodoInput = {
@@ -26,6 +31,7 @@ export type UpdateTodoInput = {
   note?: string
   isCompleted?: boolean
   isImportant?: boolean
+  repeatPattern?: TodoRepeatPattern | null
   date?: string
   sortOrder?: number
 }

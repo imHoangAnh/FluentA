@@ -1,5 +1,6 @@
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
+using FluentA.Domain.BoundedContexts.Todo.Services;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,6 +74,84 @@ public sealed class EfTodoRepository : ITodoRepository
         _dbContext.TodoItems.UpdateRange(items);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<TodoCompletionMutationResult?> SetCompletionAsync(
+        Guid userId,
+        Guid todoId,
+        bool isCompleted,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var item = await _dbContext.TodoItems
+            .FromSqlInterpolated($"SELECT * FROM todo_items WHERE id = {todoId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (item is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        if (item.IsCompleted == isCompleted)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new TodoCompletionMutationResult(item, false);
+        }
+
+        var nextOccurrenceRetained = false;
+        if (isCompleted)
+        {
+            item.MarkGeneratedOccurrenceEdited();
+            item.SetCompleted(true, nowUtc);
+
+            if (item.RepeatPattern is not null)
+            {
+                var existingChild = await _dbContext.TodoItems.FirstOrDefaultAsync(
+                    candidate => candidate.UserId == userId
+                        && candidate.GeneratedFromTodoId == item.Id
+                        && candidate.DeletedAt == null,
+                    cancellationToken);
+
+                if (existingChild is null)
+                {
+                    var nextDate = TodoRepeatSchedule.NextDate(item.Date, item.RepeatPattern.Value);
+                    var sortOrder = await NextSortOrderAsync(userId, nextDate, cancellationToken);
+                    await _dbContext.TodoItems.AddAsync(
+                        TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder),
+                        cancellationToken);
+                }
+            }
+        }
+        else
+        {
+            var generatedChild = await _dbContext.TodoItems.FirstOrDefaultAsync(
+                candidate => candidate.UserId == userId
+                    && candidate.GeneratedFromTodoId == item.Id
+                    && candidate.DeletedAt == null,
+                cancellationToken);
+
+            if (generatedChild is not null)
+            {
+                if (generatedChild.IsGeneratedOccurrencePristine)
+                {
+                    generatedChild.SoftDelete();
+                }
+                else
+                {
+                    nextOccurrenceRetained = true;
+                }
+            }
+
+            item.MarkGeneratedOccurrenceEdited();
+            item.SetCompleted(false, nowUtc);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new TodoCompletionMutationResult(item, nextOccurrenceRetained);
+    }
+
     private static DateTime NormalizeDate(DateTime date)
     {
         return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);

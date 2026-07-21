@@ -452,6 +452,103 @@
   text-decoration: line-through;
 }
 
+.todo-details__fields {
+  border-top: 1px solid var(--ds-border);
+  padding: 0.5rem;
+}
+
+.todo-details__field {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.375rem;
+  color: var(--ds-foreground);
+  cursor: pointer;
+  display: grid;
+  gap: 0.625rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 3rem;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  width: 100%;
+}
+
+.todo-details__field:hover,
+.todo-details__field[data-state='open'] {
+  background: var(--ds-accent);
+}
+
+.todo-details__field:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.todo-details__field > svg {
+  color: var(--ds-muted-foreground);
+  height: 1rem;
+  width: 1rem;
+}
+
+.todo-details__field > span {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.todo-details__field small {
+  color: var(--ds-muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.todo-details__field strong {
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-details__repeat-menu {
+  background: var(--ds-card);
+  border: 1px solid var(--ds-border);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.75rem 2rem rgb(15 23 42 / 14%);
+  min-width: 12rem;
+  padding: 0.25rem;
+  z-index: 60;
+}
+
+.todo-details__repeat-option {
+  align-items: center;
+  border-radius: 0.25rem;
+  color: var(--ds-foreground);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.8125rem;
+  min-height: 2.25rem;
+  outline: none;
+  padding: 0 0.625rem 0 0.375rem;
+}
+
+.todo-details__repeat-option[data-highlighted] {
+  background: var(--ds-accent);
+}
+
+.todo-details__repeat-check {
+  align-items: center;
+  display: inline-flex;
+  height: 1rem;
+  justify-content: center;
+  margin-right: 0.5rem;
+  width: 1rem;
+}
+
+.todo-details__repeat-check svg {
+  height: 0.875rem;
+  width: 0.875rem;
+}
+
 .todo-details__note {
   border-top: 1px solid var(--ds-border);
   display: grid;

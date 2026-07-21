@@ -20,6 +20,12 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
         builder.Property(item => item.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(item => item.IsCompleted).HasColumnName("is_completed").IsRequired();
         builder.Property(item => item.IsImportant).HasColumnName("is_important").HasDefaultValue(false).IsRequired();
+        builder.Property(item => item.RepeatPattern).HasColumnName("repeat_pattern").HasConversion<string>().HasMaxLength(16);
+        builder.Property(item => item.GeneratedFromTodoId).HasColumnName("generated_from_todo_id");
+        builder.Property(item => item.IsGeneratedOccurrencePristine)
+            .HasColumnName("is_generated_occurrence_pristine")
+            .HasDefaultValue(false)
+            .IsRequired();
         builder.Property(item => item.CompletedAt).HasColumnName("completed_at");
         builder.Property(item => item.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(item => item.UpdatedAt).HasColumnName("updated_at").IsRequired();
@@ -27,5 +33,12 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
 
         builder.HasIndex(item => new { item.UserId, item.Date, item.SortOrder });
         builder.HasIndex(item => new { item.UserId, item.IsCompleted, item.Date });
+        builder.HasOne<TodoItem>()
+            .WithMany()
+            .HasForeignKey(item => item.GeneratedFromTodoId)
+            .OnDelete(DeleteBehavior.SetNull);
+        builder.HasIndex(item => item.GeneratedFromTodoId)
+            .IsUnique()
+            .HasFilter("generated_from_todo_id IS NOT NULL AND deleted_at IS NULL");
     }
 }

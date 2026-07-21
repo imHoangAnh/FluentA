@@ -11,4 +11,12 @@ public interface ITodoRepository
     Task AddAsync(TodoItem item, CancellationToken cancellationToken = default);
     Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default);
     Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default);
+    Task<TodoCompletionMutationResult?> SetCompletionAsync(
+        Guid userId,
+        Guid todoId,
+        bool isCompleted,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record TodoCompletionMutationResult(TodoItem Item, bool NextOccurrenceRetained);

@@ -2,12 +2,14 @@ using System.Globalization;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
+using FluentA.Domain.BoundedContexts.Todo.Enums;
 
 namespace FluentA.Application.BoundedContexts.Todo;
 
 public sealed class TodoService : ITodoService
 {
     private const string DateFormat = "yyyy-MM-dd";
+    private const string RecurrenceNextRetainedWarning = "recurrence-next-retained";
     private readonly ITodoRepository _repository;
     private readonly ITodoSyncNotifier _syncNotifier;
 
@@ -28,7 +30,7 @@ public sealed class TodoService : ITodoService
         }
 
         var items = await _repository.ListByDateAsync(userId, parsedDate, cancellationToken);
-        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(ToDto).ToList());
+        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => ToDto(item)).ToList());
     }
 
     public async Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByRangeAsync(
@@ -59,7 +61,7 @@ public sealed class TodoService : ITodoService
         }
 
         var items = await _repository.ListByRangeAsync(userId, parsedStart, parsedEnd, cancellationToken);
-        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(ToDto).ToList());
+        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => ToDto(item)).ToList());
     }
 
     public async Task<OperationResult<TodoItemDto>> CreateAsync(
@@ -74,7 +76,14 @@ public sealed class TodoService : ITodoService
         }
 
         var sortOrder = await _repository.NextSortOrderAsync(userId, validation.Date, cancellationToken);
-        var item = TodoItem.Create(userId, request.Title, validation.Date, request.Note, request.IsImportant, sortOrder);
+        var item = TodoItem.Create(
+            userId,
+            request.Title,
+            validation.Date,
+            request.Note,
+            request.IsImportant,
+            validation.RepeatPattern,
+            sortOrder);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(ToDto(item));
     }
@@ -92,12 +101,18 @@ public sealed class TodoService : ITodoService
         }
 
         var validation = ValidateUpdate(request);
-        if (validation.Count > 0)
+        if (validation.Errors.Count > 0)
         {
-            return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation));
+            return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
         }
 
         var completionBefore = item.IsCompleted;
+        var originalTitle = item.Title;
+        var originalNote = item.Note;
+        var originalImportant = item.IsImportant;
+        var originalRepeat = item.RepeatPattern;
+        var originalDate = item.Date;
+        var originalSortOrder = item.SortOrder;
         if (request.Title is not null)
         {
             item.Rename(request.Title);
@@ -108,14 +123,14 @@ public sealed class TodoService : ITodoService
             item.UpdateNote(request.Note);
         }
 
-        if (request.IsCompleted is not null)
-        {
-            item.SetCompleted(request.IsCompleted.Value, DateTime.UtcNow);
-        }
-
         if (request.IsImportant is not null)
         {
             item.SetImportant(request.IsImportant.Value);
+        }
+
+        if (request.IsRepeatPatternSpecified)
+        {
+            item.SetRepeatPattern(validation.RepeatPattern);
         }
 
         if (request.Date is not null || request.SortOrder is not null)
@@ -134,18 +149,57 @@ public sealed class TodoService : ITodoService
                 candidate.MoveTo(destinationDate, index);
             }
 
+            MarkGeneratedOccurrenceEditedWhenChanged(
+                item,
+                originalTitle,
+                originalNote,
+                originalImportant,
+                originalRepeat,
+                originalDate,
+                originalSortOrder);
             await _repository.UpdateRangeAsync(destination, cancellationToken);
         }
-        else
+        else if (request.Title is not null
+            || request.Note is not null
+            || request.IsImportant is not null
+            || request.IsRepeatPatternSpecified)
         {
+            MarkGeneratedOccurrenceEditedWhenChanged(
+                item,
+                originalTitle,
+                originalNote,
+                originalImportant,
+                originalRepeat,
+                originalDate,
+                originalSortOrder);
             await _repository.UpdateAsync(item, cancellationToken);
         }
+
+        TodoCompletionMutationResult? completionResult = null;
+        if (request.IsCompleted is not null && completionBefore != request.IsCompleted.Value)
+        {
+            completionResult = await _repository.SetCompletionAsync(
+                userId,
+                todoId,
+                request.IsCompleted.Value,
+                DateTime.UtcNow,
+                cancellationToken);
+            if (completionResult is null)
+            {
+                return OperationResult<TodoItemDto>.Failure(TodoError.NotFound());
+            }
+
+            item = completionResult.Item;
+        }
+
         if (completionBefore != item.IsCompleted)
         {
             await _syncNotifier.TodoItemCheckedAsync(userId, item.Id, item.IsCompleted, cancellationToken);
         }
 
-        return OperationResult<TodoItemDto>.Success(ToDto(item));
+        return OperationResult<TodoItemDto>.Success(ToDto(
+            item,
+            completionResult?.NextOccurrenceRetained == true ? RecurrenceNextRetainedWarning : null));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
@@ -161,7 +215,7 @@ public sealed class TodoService : ITodoService
         return OperationResult<bool>.Success(true);
     }
 
-    private static (Dictionary<string, string[]> Errors, DateTime Date) ValidateCreate(CreateTodoItemRequest request)
+    private static (Dictionary<string, string[]> Errors, DateTime Date, TodoRepeatPattern? RepeatPattern) ValidateCreate(CreateTodoItemRequest request)
     {
         var errors = ValidateTitleAndNote(request.Title, request.Note);
         if (!TryParseDate(request.Date, "date", out var date, out var dateErrors))
@@ -169,10 +223,12 @@ public sealed class TodoService : ITodoService
             errors["date"] = dateErrors["date"];
         }
 
-        return (errors, date);
+        var repeatPattern = ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors);
+
+        return (errors, date, repeatPattern);
     }
 
-    private static Dictionary<string, string[]> ValidateUpdate(UpdateTodoItemRequest request)
+    private static (Dictionary<string, string[]> Errors, TodoRepeatPattern? RepeatPattern) ValidateUpdate(UpdateTodoItemRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
@@ -199,7 +255,11 @@ public sealed class TodoService : ITodoService
             errors["sortOrder"] = ["sortOrder cannot be negative."];
         }
 
-        return errors;
+        var repeatPattern = request.IsRepeatPatternSpecified
+            ? ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors)
+            : null;
+
+        return (errors, repeatPattern);
     }
 
     private static Dictionary<string, string[]> ValidateTitleAndNote(string title, string? note)
@@ -236,7 +296,48 @@ public sealed class TodoService : ITodoService
         return true;
     }
 
-    private static TodoItemDto ToDto(TodoItem item)
+    private static TodoRepeatPattern? ParseRepeatPattern(
+        string? value,
+        string field,
+        Dictionary<string, string[]> errors)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (!Enum.TryParse<TodoRepeatPattern>(value, ignoreCase: false, out var parsed)
+            || !Enum.IsDefined(parsed)
+            || !string.Equals(value, parsed.ToString(), StringComparison.Ordinal))
+        {
+            errors[field] = ["repeatPattern must be Daily, Weekdays, Weekly, Monthly, Yearly, or null."];
+            return null;
+        }
+
+        return parsed;
+    }
+
+    private static void MarkGeneratedOccurrenceEditedWhenChanged(
+        TodoItem item,
+        string originalTitle,
+        string? originalNote,
+        bool originalImportant,
+        TodoRepeatPattern? originalRepeat,
+        DateTime originalDate,
+        int originalSortOrder)
+    {
+        if (item.Title != originalTitle
+            || item.Note != originalNote
+            || item.IsImportant != originalImportant
+            || item.RepeatPattern != originalRepeat
+            || item.Date != originalDate
+            || item.SortOrder != originalSortOrder)
+        {
+            item.MarkGeneratedOccurrenceEdited();
+        }
+    }
+
+    private static TodoItemDto ToDto(TodoItem item, string? warningCode = null)
     {
         return new TodoItemDto(
             item.Id,
@@ -246,9 +347,11 @@ public sealed class TodoService : ITodoService
             item.SortOrder,
             item.IsCompleted,
             item.IsImportant,
+            item.RepeatPattern?.ToString(),
             item.CompletedAt,
             item.CreatedAt,
-            item.UpdatedAt);
+            item.UpdatedAt,
+            warningCode);
     }
 
     private static string FormatDate(DateTime date)

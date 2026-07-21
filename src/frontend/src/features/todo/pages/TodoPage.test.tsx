@@ -30,6 +30,7 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     sortOrder: 0,
     isCompleted: false,
     isImportant: false,
+    repeatPattern: null,
     completedAt: null,
     createdAt: '2026-07-22T01:00:00Z',
     updatedAt: '2026-07-22T01:00:00Z',
@@ -138,6 +139,19 @@ describe('TodoPage My Day workspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
     expect(screen.queryByLabelText('Details for Review lesson 12')).not.toBeInTheDocument()
+  })
+
+  it('sets and clears one optional repeat pattern from the details menu', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Repeat: Does not repeat' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Monthly' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: 'Monthly' }))
+
+    fireEvent.pointerDown(await screen.findByRole('button', { name: 'Repeat: Monthly' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Does not repeat' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
   })
 
   it('requires confirmation before deleting a task', async () => {

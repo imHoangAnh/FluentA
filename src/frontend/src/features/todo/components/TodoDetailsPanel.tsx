@@ -1,6 +1,19 @@
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useEffect, useRef, useState } from 'react'
-import { Check, Circle, Star, Trash2, X } from 'lucide-react'
-import type { TodoItem, UpdateTodoInput } from '../api/todo.api'
+import { Check, ChevronRight, Circle, Repeat2, Star, Trash2, X } from 'lucide-react'
+import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
+
+const repeatOptions: Array<{ value: TodoRepeatPattern | null; label: string }> = [
+  { value: null, label: 'Does not repeat' },
+  { value: 'Daily', label: 'Daily' },
+  { value: 'Weekdays', label: 'Weekdays' },
+  { value: 'Weekly', label: 'Weekly' },
+  { value: 'Monthly', label: 'Monthly' },
+  { value: 'Yearly', label: 'Yearly' },
+]
+
+const repeatMenuClass = 'todo-details__repeat-menu'
+const repeatMenuItemClass = 'todo-details__repeat-option'
 
 type TodoDetailsPanelProps = {
   item: TodoItem
@@ -104,6 +117,41 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
         >
           <Star aria-hidden="true" fill={item.isImportant ? 'currentColor' : 'none'} />
         </button>
+      </div>
+      <div className="todo-details__fields">
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              className="todo-details__field"
+              type="button"
+              aria-label={`Repeat: ${item.repeatPattern ?? 'Does not repeat'}`}
+              disabled={pending}
+            >
+              <Repeat2 aria-hidden="true" />
+              <span>
+                <small>Repeat</small>
+                <strong>{item.repeatPattern ?? 'Does not repeat'}</strong>
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={repeatMenuClass} sideOffset={6} align="start">
+              {repeatOptions.map((option) => (
+                <DropdownMenu.Item
+                  className={repeatMenuItemClass}
+                  key={option.value ?? 'none'}
+                  onSelect={() => void onUpdate(item.id, { repeatPattern: option.value }).catch(() => undefined)}
+                >
+                  <span className="todo-details__repeat-check">
+                    {item.repeatPattern === option.value ? <Check aria-hidden="true" /> : null}
+                  </span>
+                  {option.label}
+                </DropdownMenu.Item>
+              ))}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
       <div className="todo-details__note">
         <label htmlFor={`todo-note-${item.id}`}>Note</label>

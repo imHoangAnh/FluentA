@@ -166,3 +166,76 @@ test('automatic My Day sort becomes persisted manual order when keyboard drag st
   await page.reload();
   await expect(page.locator('.todo-my-day-row__title')).toHaveText(['Zulu task', 'Alpha task']);
 });
+
+test('repeat lifecycle creates one occurrence and safely handles both reopen branches', async ({ page }) => {
+  const { token } = await registerAndLogin(page, 'todo-repeat');
+  const headers = { Authorization: `Bearer ${token}` };
+  const tomorrow = todayInput(1);
+  const concurrentDate = todayInput(2);
+  const concurrentNextDate = todayInput(3);
+
+  const concurrentSource = (await (await page.request.post(`${apiUrl}/todos`, {
+    headers,
+    data: { title: 'Concurrent recurrence proof', date: concurrentDate, repeatPattern: 'Daily' },
+  })).json()).data;
+  const concurrentResponses = await Promise.all(Array.from({ length: 6 }, () => page.request.patch(
+    `${apiUrl}/todos/${concurrentSource.id}`,
+    { headers, data: { isCompleted: true } },
+  )));
+  expect(concurrentResponses.map((response) => response.status())).toEqual([200, 200, 200, 200, 200, 200]);
+  const concurrentChildren = (await (await page.request.get(
+    `${apiUrl}/todos?date=${concurrentNextDate}`,
+    { headers },
+  )).json()).data;
+  expect(concurrentChildren.filter((item) => item.title === 'Concurrent recurrence proof')).toHaveLength(1);
+
+  await page.getByRole('link', { name: 'Todo' }).click();
+  await page.getByTestId('todo-title-input').fill('Recurrence proof');
+  await page.getByTestId('todo-title-input').press('Enter');
+  const details = page.getByLabel('Details for Recurrence proof');
+
+  await details.getByRole('button', { name: 'Repeat: Does not repeat' }).click();
+  const repeatMenu = page.getByRole('menu');
+  await expect(repeatMenu.getByRole('menuitem')).toHaveText([
+    'Does not repeat',
+    'Daily',
+    'Weekdays',
+    'Weekly',
+    'Monthly',
+    'Yearly',
+  ]);
+  await repeatMenu.getByRole('menuitem', { name: 'Daily' }).click();
+  await expect(details.getByRole('button', { name: 'Repeat: Daily' })).toBeVisible();
+  await expect(page.getByTestId(/todo-row-/).filter({ hasText: 'Recurrence proof' })).not.toContainText('Daily');
+
+  await details.getByRole('button', { name: 'Mark Recurrence proof as completed' }).click();
+  await expect.poll(async () => {
+    const response = await page.request.get(`${apiUrl}/todos?date=${tomorrow}`, { headers });
+    return (await response.json()).data;
+  }).toHaveLength(1);
+
+  await details.getByRole('button', { name: 'Mark Recurrence proof as active' }).click();
+  await expect.poll(async () => {
+    const response = await page.request.get(`${apiUrl}/todos?date=${tomorrow}`, { headers });
+    return (await response.json()).data;
+  }).toHaveLength(0);
+
+  await details.getByRole('button', { name: 'Mark Recurrence proof as completed' }).click();
+  await expect.poll(async () => {
+    const response = await page.request.get(`${apiUrl}/todos?date=${tomorrow}`, { headers });
+    return (await response.json()).data;
+  }).toHaveLength(1);
+  const generatedResponse = await page.request.get(`${apiUrl}/todos?date=${tomorrow}`, { headers });
+  const generatedItem = (await generatedResponse.json()).data[0];
+  await page.request.patch(`${apiUrl}/todos/${generatedItem.id}`, {
+    headers,
+    data: { title: 'Edited generated occurrence' },
+  });
+
+  await details.getByRole('button', { name: 'Mark Recurrence proof as active' }).click();
+  await expect(page.getByText('The edited next occurrence was kept. Both tasks now exist.')).toBeVisible();
+  await expect.poll(async () => {
+    const response = await page.request.get(`${apiUrl}/todos?date=${tomorrow}`, { headers });
+    return (await response.json()).data.map((item) => item.title);
+  }).toEqual(['Edited generated occurrence']);
+});

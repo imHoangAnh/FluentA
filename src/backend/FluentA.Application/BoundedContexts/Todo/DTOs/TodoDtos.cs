@@ -1,18 +1,58 @@
+using System.Text.Json.Serialization;
+
 namespace FluentA.Application.BoundedContexts.Todo.DTOs;
 
 public sealed record CreateTodoItemRequest(
     string Title,
     string Date,
     string? Note = null,
-    bool IsImportant = false);
+    bool IsImportant = false,
+    string? RepeatPattern = null);
 
-public sealed record UpdateTodoItemRequest(
-    string? Title = null,
-    string? Note = null,
-    bool? IsCompleted = null,
-    bool? IsImportant = null,
-    string? Date = null,
-    int? SortOrder = null);
+public sealed class UpdateTodoItemRequest
+{
+    private string? _repeatPattern;
+
+    public UpdateTodoItemRequest()
+    {
+    }
+
+    public UpdateTodoItemRequest(
+        string? Title = null,
+        string? Note = null,
+        bool? IsCompleted = null,
+        bool? IsImportant = null,
+        string? Date = null,
+        int? SortOrder = null)
+    {
+        this.Title = Title;
+        this.Note = Note;
+        this.IsCompleted = IsCompleted;
+        this.IsImportant = IsImportant;
+        this.Date = Date;
+        this.SortOrder = SortOrder;
+    }
+
+    public string? Title { get; init; }
+    public string? Note { get; init; }
+    public bool? IsCompleted { get; init; }
+    public bool? IsImportant { get; init; }
+    public string? Date { get; init; }
+    public int? SortOrder { get; init; }
+
+    public string? RepeatPattern
+    {
+        get => _repeatPattern;
+        init
+        {
+            _repeatPattern = value;
+            IsRepeatPatternSpecified = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool IsRepeatPatternSpecified { get; private set; }
+}
 
 public sealed record TodoItemDto(
     Guid Id,
@@ -22,6 +62,8 @@ public sealed record TodoItemDto(
     int SortOrder,
     bool IsCompleted,
     bool IsImportant,
+    string? RepeatPattern,
     DateTime? CompletedAt,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    string? WarningCode = null);

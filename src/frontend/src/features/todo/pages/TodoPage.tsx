@@ -107,6 +107,9 @@ export function TodoPage() {
       queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
         items.map((item) => item.id === updated.id ? updated : item),
       )
+      if (updated.warningCode === 'recurrence-next-retained') {
+        toast.warning('The edited next occurrence was kept. Both tasks now exist.')
+      }
     },
     onError: (_error, _variables, context) => {
       for (const [key, value] of context?.previous ?? []) queryClient.setQueryData(key, value)

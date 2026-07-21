@@ -66,7 +66,7 @@ external notification delivery and mobile drag-and-drop remain deferred.
   opens the new task's details. Note remains optional in details.
 - A logged-in user can create a task for any day in the visible week.
 - A logged-in user can toggle task completion without reloading the page.
-- A logged-in user can update task title, note, importance, completion,
+- A logged-in user can update task title, note, importance, Repeat, completion,
   assigned date, and sort order through field-scoped API behavior.
 - My Day rows contain only independent completion, title, and icon-only
   importance controls. Selecting the title opens a side-by-side detail panel.
@@ -82,6 +82,14 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - Incomplete tasks stay above completed tasks.
 - Completed tasks start collapsed with a count, are not draggable, and default
   to most recent `completed_at` first.
+- Repeat is optional and offers exactly Daily, Weekdays, Weekly, Monthly, and
+  Yearly. Completing a recurring occurrence preserves it and creates one new
+  incomplete occurrence with copied title, note, importance, and Repeat.
+- Weekdays skips Saturday and Sunday. Monthly and Yearly clamp unavailable days
+  to the last valid day of the target month.
+- Reopening removes an unchanged generated next occurrence. If that occurrence
+  has been edited, it remains and the user is warned that both tasks exist.
+- Deleting one occurrence never cascades to another occurrence.
 
 ## Todo Ownership And Authorization Rules
 
@@ -103,7 +111,7 @@ All responses use the FluentA envelope.
 | `GET` | `/api/v1/todos?date=YYYY-MM-DD` | List active tasks for the selected date. |
 | `GET` | `/api/v1/todos?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | List active tasks in an inclusive date range for week planning. |
 | `POST` | `/api/v1/todos` | Create a task. |
-| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, completion, assigned date, or sort order. |
+| `PATCH` | `/api/v1/todos/{id}` | Field-scoped update for title, note, importance, Repeat, completion, assigned date, or sort order. Completing or reopening applies the recurrence lifecycle atomically. |
 | `DELETE` | `/api/v1/todos/{id}` | Soft-delete a task. |
 
 ## Todo Validation And Error Rules
@@ -113,6 +121,8 @@ All responses use the FluentA envelope.
 - Date values must parse as calendar dates.
 - Sort order must be a non-negative integer; an omitted sort order preserves
   the task's current position unless a date move requires normalization.
+- `repeatPattern` is optional and accepts only `Daily`, `Weekdays`, `Weekly`,
+  `Monthly`, `Yearly`, or explicit `null` to clear it.
 - Date ranges must include both `startDate` and `endDate`, and `startDate` must
   be on or before `endDate`.
 - Validation failures return `422 VALIDATION_ERROR`.

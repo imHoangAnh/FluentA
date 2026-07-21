@@ -269,6 +269,8 @@ public sealed class PomodoroServiceTests
         public Task AddAsync(TodoItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateRangeAsync(IReadOnlyList<TodoItem> values, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<TodoCompletionMutationResult?> SetCompletionAsync(Guid userId, Guid todoId, bool isCompleted, DateTime nowUtc, CancellationToken cancellationToken = default) =>
+            Task.FromResult<TodoCompletionMutationResult?>(null);
     }
 
     private sealed class FakePomodoroRepository : IPomodoroRepository

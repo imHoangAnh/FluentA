@@ -1,4 +1,5 @@
 using FluentA.Domain.SeedWork;
+using FluentA.Domain.BoundedContexts.Todo.Enums;
 
 namespace FluentA.Domain.BoundedContexts.Todo.Entities;
 
@@ -9,7 +10,16 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Title = string.Empty;
     }
 
-    private TodoItem(Guid userId, string title, DateTime date, string? note, bool isImportant, int sortOrder)
+    private TodoItem(
+        Guid userId,
+        string title,
+        DateTime date,
+        string? note,
+        bool isImportant,
+        TodoRepeatPattern? repeatPattern,
+        int sortOrder,
+        Guid? generatedFromTodoId,
+        bool isGeneratedOccurrencePristine)
     {
         if (userId == Guid.Empty)
         {
@@ -21,7 +31,10 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Date = NormalizeDate(date);
         Note = CleanNote(note);
         IsImportant = isImportant;
+        RepeatPattern = repeatPattern;
         SortOrder = ValidateSortOrder(sortOrder);
+        GeneratedFromTodoId = generatedFromTodoId;
+        IsGeneratedOccurrencePristine = isGeneratedOccurrencePristine;
     }
 
     public Guid UserId { get; private set; }
@@ -31,10 +44,40 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
     public int SortOrder { get; private set; }
     public bool IsCompleted { get; private set; }
     public bool IsImportant { get; private set; }
+    public TodoRepeatPattern? RepeatPattern { get; private set; }
+    public Guid? GeneratedFromTodoId { get; private set; }
+    public bool IsGeneratedOccurrencePristine { get; private set; }
     public DateTime? CompletedAt { get; private set; }
-    public static TodoItem Create(Guid userId, string title, DateTime date, string? note, bool isImportant = false, int sortOrder = 0)
+    public static TodoItem Create(
+        Guid userId,
+        string title,
+        DateTime date,
+        string? note,
+        bool isImportant = false,
+        TodoRepeatPattern? repeatPattern = null,
+        int sortOrder = 0)
     {
-        return new TodoItem(userId, title, date, note, isImportant, sortOrder);
+        return new TodoItem(userId, title, date, note, isImportant, repeatPattern, sortOrder, null, false);
+    }
+
+    public static TodoItem CreateGeneratedOccurrence(TodoItem source, DateTime date, int sortOrder)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.RepeatPattern is null)
+        {
+            throw new InvalidOperationException("A Todo without a repeat pattern cannot generate an occurrence.");
+        }
+
+        return new TodoItem(
+            source.UserId,
+            source.Title,
+            date,
+            source.Note,
+            source.IsImportant,
+            source.RepeatPattern,
+            sortOrder,
+            source.Id,
+            true);
     }
 
     public void Rename(string title)
@@ -69,6 +112,28 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         }
 
         IsImportant = isImportant;
+        Touch();
+    }
+
+    public void SetRepeatPattern(TodoRepeatPattern? repeatPattern)
+    {
+        if (RepeatPattern == repeatPattern)
+        {
+            return;
+        }
+
+        RepeatPattern = repeatPattern;
+        Touch();
+    }
+
+    public void MarkGeneratedOccurrenceEdited()
+    {
+        if (GeneratedFromTodoId is null || !IsGeneratedOccurrencePristine)
+        {
+            return;
+        }
+
+        IsGeneratedOccurrencePristine = false;
         Touch();
     }
 
