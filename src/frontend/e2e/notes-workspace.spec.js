@@ -63,7 +63,7 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   await page.getByRole('button', { name: 'Create your first board' }).click();
   await page.getByLabel('Board name').fill('Release Proof Board');
   const createBoardPromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/notes/boards') && response.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await page.getByRole('button', { name: 'Create board', exact: true }).click();
   const boardPayload = await (await createBoardPromise).json();
   const boardId = boardPayload.data.id;
 

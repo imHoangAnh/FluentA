@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { RefObject } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import {
   Dialog,
@@ -14,19 +15,30 @@ type RenameEntityDialogProps = {
   entity: 'Board' | 'Page'
   initialName: string
   maxLength: number
+  fallbackRef?: RefObject<HTMLElement | null>
   pending?: boolean
+  returnFocusRef?: RefObject<HTMLElement | null>
   error?: string | null
   onOpenChange: (open: boolean) => void
   onConfirm: (name: string) => void
 }
 
-export function RenameEntityDialog({ entity, initialName, maxLength, pending = false, error, onOpenChange, onConfirm }: RenameEntityDialogProps) {
+export function RenameEntityDialog({ entity, initialName, maxLength, fallbackRef, pending = false, returnFocusRef, error, onOpenChange, onConfirm }: RenameEntityDialogProps) {
   const [name, setName] = useState(initialName)
   const trimmedName = name.trim()
 
   return (
     <Dialog open onOpenChange={(open) => { if (!pending) onOpenChange(open) }}>
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={returnFocusRef || fallbackRef ? (event) => {
+          event.preventDefault()
+          requestAnimationFrame(() => {
+            const returnTarget = returnFocusRef?.current
+            if (returnTarget?.isConnected) returnTarget.focus()
+            else fallbackRef?.current?.focus()
+          })
+        } : undefined}
+      >
         <form
           className="grid gap-5"
           onSubmit={(event) => {

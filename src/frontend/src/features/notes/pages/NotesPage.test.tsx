@@ -54,6 +54,7 @@ function renderPage() {
 describe('NotesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Reflect.deleteProperty(document, 'execCommand')
     useAuthStore.setState({
       accessToken: 'notes-token',
       status: 'authenticated',
@@ -138,14 +139,31 @@ describe('NotesPage', () => {
       createdAt: '2026-07-09T09:05:00Z',
       updatedAt: '2026-07-09T09:05:00Z',
     })
+    vi.mocked(noteApi.getPage).mockResolvedValue({
+      id: 'page-1',
+      boardId: 'board-1',
+      name: 'Week 1 reflections',
+      content: '',
+      date: '2026-07-09',
+      createdAt: '2026-07-09T09:05:00Z',
+      updatedAt: '2026-07-09T09:05:00Z',
+    })
 
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Create your first board' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Create board')
     await user.type(screen.getByLabelText('Board name'), 'Learning Notes')
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await user.click(screen.getByRole('button', { name: 'Create board' }))
 
     await waitFor(() => expect(noteApi.createBoard).toHaveBeenCalled())
+    await user.click(await screen.findByRole('button', { name: 'Add page' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Add a note page to “Learning Notes”.')
+    await user.type(screen.getByLabelText('Page name'), 'Week 1 reflections')
+    await user.click(screen.getByRole('button', { name: 'Create page' }))
+
+    await waitFor(() => expect(noteApi.createPage).toHaveBeenCalledWith('board-1', { name: 'Week 1 reflections' }))
+    expect(await screen.findByDisplayValue('Week 1 reflections')).toBeInTheDocument()
   })
 
   it('loads the default page detail', async () => {
@@ -185,8 +203,57 @@ describe('NotesPage', () => {
 
     renderPage()
 
-    await waitFor(() => expect(noteApi.getPage).toHaveBeenCalledWith('page-1'))
-    expect(await screen.findByDisplayValue('Week 1 reflections')).toBeInTheDocument()
+    await waitFor(() => expect(noteApi.getPage).toHaveBeenCalledWith('page-2'))
+    expect(await screen.findByDisplayValue('Practice recap')).toBeInTheDocument()
+  })
+
+  it('keeps the formatting toolbar in the editor header and the note canvas borderless', async () => {
+    const user = userEvent.setup()
+    const execCommand = vi.fn(() => true)
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+
+    vi.mocked(noteApi.listBoards).mockResolvedValue([{
+      id: 'board-1',
+      name: 'Learning Notes',
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T09:00:00Z',
+      pages: [{
+        id: 'page-1',
+        boardId: 'board-1',
+        name: 'Week 1 reflections',
+        date: '2026-07-09',
+        createdAt: '2026-07-09T09:00:00Z',
+        updatedAt: '2026-07-09T09:00:00Z',
+      }],
+    }])
+    vi.mocked(noteApi.getPage).mockResolvedValue({
+      id: 'page-1',
+      boardId: 'board-1',
+      name: 'Week 1 reflections',
+      content: '<p>Saved content</p>',
+      date: '2026-07-09',
+      createdAt: '2026-07-09T09:00:00Z',
+      updatedAt: '2026-07-09T09:00:00Z',
+    })
+
+    renderPage()
+
+    const header = await screen.findByTestId('note-editor-header')
+    const toolbar = await screen.findByRole('toolbar', { name: 'Note formatting tools' })
+    const toolbarHost = screen.getByTestId('note-toolbar-host')
+    const editor = screen.getByLabelText('Journal rich text editor')
+    const editorShell = editor.parentElement
+
+    expect(header).toContainElement(toolbarHost)
+    expect(toolbarHost).toContainElement(toolbar)
+    expect(editorShell).not.toContainElement(toolbar)
+    expect(editor).toHaveClass('border-0', 'outline-none', 'focus-visible:ring-0')
+    expect(editorShell).toHaveClass('border-0', 'focus-within:ring-0')
+
+    await user.click(screen.getByRole('button', { name: 'Bold' }))
+    expect(execCommand).toHaveBeenCalledWith('bold', false, undefined)
+    expect(screen.getByTestId('note-save-status')).toHaveTextContent('Unsaved changes')
+    Reflect.deleteProperty(document, 'execCommand')
   })
 
   it('saves the current draft on blur', async () => {
@@ -437,6 +504,7 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.updateBoard).toHaveBeenCalledWith('board-1', { name: 'Study Notes' }))
     const renamedBoard = await screen.findByRole('button', { name: /Study Notes/ })
+    await waitFor(() => expect(renamedBoard).toHaveFocus())
     fireEvent.contextMenu(renamedBoard)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Study Notes”?')
@@ -444,6 +512,7 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.deleteBoard).toHaveBeenCalledWith('board-1'))
     expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 
   it('renames and deletes a Page from its right-click menu', async () => {
@@ -490,6 +559,7 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledWith('page-1', { name: 'Weekly review' }))
     const renamedPage = await screen.findByRole('button', { name: 'Weekly review' })
+    await waitFor(() => expect(renamedPage).toHaveFocus())
     fireEvent.contextMenu(renamedPage)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Weekly review”?')
@@ -497,5 +567,6 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.deletePage).toHaveBeenCalledWith('page-1'))
     expect(await screen.findByText('This board has no pages')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 })

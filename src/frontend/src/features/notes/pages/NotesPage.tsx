@@ -5,10 +5,10 @@ import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
-import { Input } from '@/shared/components/ui/input'
 import { cn } from '@/shared/lib/utils'
 import * as assetsApi from '@/lib/api/assets.api'
 import { toast } from '@/lib/toast'
+import { CreateNoteDialog } from '../components/CreateNoteDialog'
 import { DeleteNoteConfirmationDialog } from '../components/DeleteNoteConfirmationDialog'
 import * as noteApi from '../api/note.api'
 
@@ -48,10 +48,8 @@ export function NotesPage() {
 
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
-  const [isBoardFormOpen, setIsBoardFormOpen] = useState(false)
-  const [isPageFormOpen, setIsPageFormOpen] = useState(false)
-  const [newBoardName, setNewBoardName] = useState('')
-  const [newPageName, setNewPageName] = useState('')
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false)
+  const [isCreatingPage, setIsCreatingPage] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [draftPageId, setDraftPageId] = useState<string | null>(null)
@@ -60,7 +58,12 @@ export function NotesPage() {
   const [editorError, setEditorError] = useState<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<NoteEntityTarget | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NoteEntityTarget | null>(null)
+  const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
+  const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null)
   const savePromiseRef = useRef<Promise<boolean> | null>(null)
+  const railFocusRef = useRef<HTMLDivElement>(null)
+  const createReturnFocusRef = useRef<HTMLElement | null>(null)
+  const entityActionReturnFocusRef = useRef<HTMLElement | null>(null)
 
   const boardsQuery = useQuery({
     queryKey: ['note', 'boards'],
@@ -95,8 +98,8 @@ export function NotesPage() {
       })
       setSelectedBoardId(board.id)
       setSelectedPageId(null)
-      setNewBoardName('')
-      setIsBoardFormOpen(false)
+      setIsCreatingBoard(false)
+      toast.success('Board created successfully')
       await queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
     },
   })
@@ -117,8 +120,8 @@ export function NotesPage() {
       setContent(page.content)
       setIsDirty(false)
       setSaveStatus('saved')
-      setNewPageName('')
-      setIsPageFormOpen(false)
+      setIsCreatingPage(false)
+      toast.success('Page created successfully')
       await queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
     },
   })
@@ -170,7 +173,9 @@ export function NotesPage() {
       setTitle('')
       setContent('')
       setIsDirty(false)
+      setRestoreDeleteFocus(true)
       setDeleteTarget(null)
+      requestAnimationFrame(() => railFocusRef.current?.focus())
       toast.success('Board deleted successfully')
       void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
     },
@@ -191,14 +196,16 @@ export function NotesPage() {
       setTitle('')
       setContent('')
       setIsDirty(false)
+      setRestoreDeleteFocus(true)
       setDeleteTarget(null)
+      requestAnimationFrame(() => railFocusRef.current?.focus())
       toast.success('Page deleted successfully')
       void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
     },
   })
 
   const boardError = createBoard.isError ? 'Could not create board right now.' : null
-  const pageError = editorError ?? (createPage.isError || updatePage.isError ? 'Could not save note page right now.' : null)
+  const pageError = editorError ?? (updatePage.isError ? 'Could not save note page right now.' : null)
   const isOpeningPage = pageQuery.isLoading
   const isSaving = saveStatus === 'saving'
   // Server data is the clean draft. Local state becomes authoritative only after an edit,
@@ -280,6 +287,7 @@ export function NotesPage() {
     if (!saved) return
     setSelectedBoardId(boardId)
     setSelectedPageId(null)
+    setIsCreatingPage(false)
   }
 
   async function handleSelectPage(pageId: string) {
@@ -301,13 +309,24 @@ export function NotesPage() {
     else deletePage.mutate(deleteTarget)
   }
 
+  function openCreateBoardDialog(returnFocusTo: HTMLElement) {
+    createReturnFocusRef.current = returnFocusTo
+    createBoard.reset()
+    setIsCreatingBoard(true)
+  }
+
+  function openCreatePageDialog(returnFocusTo: HTMLElement) {
+    createReturnFocusRef.current = returnFocusTo
+    createPage.reset()
+    setIsCreatingPage(true)
+  }
+
   return (
     <>
-      <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[220px_minmax(0,1fr)] min-[900px]:grid-rows-1 min-[1200px]:grid-cols-[248px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={() => setIsBoardFormOpen((value) => !value)}><FolderPlus /></Button></div>
-          {isBoardFormOpen ? <form className="grid gap-3 border-b border-border bg-secondary/30 p-3" onSubmit={(event) => { event.preventDefault(); const name = newBoardName.trim(); if (name) createBoard.mutate({ name }) }}><div className="grid gap-1.5"><label className="text-xs font-medium" htmlFor="note-board-name">Board name</label><Input id="note-board-name" value={newBoardName} onChange={(event) => setNewBoardName(event.target.value)} placeholder="Learning notes" maxLength={120} autoFocus required /></div><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" onClick={() => setIsBoardFormOpen(false)}>Cancel</Button><Button type="submit" size="sm" disabled={createBoard.isPending || !newBoardName.trim()}>Create</Button></div>{boardError ? <p className="m-0 text-sm text-destructive">{boardError}</p> : null}</form> : null}
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={(event) => openCreateBoardDialog(event.currentTarget)}><FolderPlus /></Button></div>
+          <div ref={railFocusRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2 outline-none" data-testid="notes-rail-scroll">
             {boards.map((board) => {
               const isActiveBoard = activeBoard?.id === board.id
               const sortedBoardPages = newestFirst(board.pages)
@@ -319,7 +338,7 @@ export function NotesPage() {
                         type="button"
                         className={cn('flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActiveBoard && 'bg-secondary text-secondary-foreground')}
                         onClick={() => { void handleSelectBoard(board.id) }}
-                        onContextMenu={() => { void handleSelectBoard(board.id) }}
+                        onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectBoard(board.id) }}
                       >
                         <ChevronRight className={cn('size-4 shrink-0 transition-transform', isActiveBoard && 'rotate-90')} />
                         <span className="min-w-0 flex-1 truncate">{board.name}</span>
@@ -328,11 +347,12 @@ export function NotesPage() {
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'board', boardId: board.id, name: board.name })}>Rename Board</ContextMenuItem>
-                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name })}>Delete Board</ContextMenuItem>
+                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }) }}>Delete Board</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                   {isActiveBoard ? (
                     <div className="ml-4 mt-1 grid gap-1 border-l border-border pl-2">
+                      <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={(event) => openCreatePageDialog(event.currentTarget)}><Plus /> Add page</Button>
                       {sortedBoardPages.map((page) => (
                         <ContextMenu key={page.id}>
                           <ContextMenuTrigger asChild>
@@ -340,18 +360,17 @@ export function NotesPage() {
                               type="button"
                               className={cn('flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePageSummary?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
                               onClick={() => { void handleSelectPage(page.id) }}
-                              onContextMenu={() => { void handleSelectPage(page.id) }}
+                              onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectPage(page.id) }}
                             >
                               <FileText className="size-3.5 shrink-0" /><span className="truncate">{page.name}</span>
                             </button>
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Rename Page</ContextMenuItem>
-                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Delete Page</ContextMenuItem>
+                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setRestoreDeleteFocus(false); setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name }) }}>Delete Page</ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
                       ))}
-                      <Button type="button" variant="ghost" size="sm" className="justify-start px-2 text-primary" onClick={() => setIsPageFormOpen(true)}><Plus /> Add page</Button>
                     </div>
                   ) : null}
                 </div>
@@ -359,30 +378,124 @@ export function NotesPage() {
             })}
             {boardsQuery.isLoading ? <p className="px-2 text-sm text-muted-foreground">Loading note boards...</p> : null}
             {boardsQuery.isError ? <p className="px-2 text-sm text-destructive">Could not load note boards.</p> : null}
-            {!boardsQuery.isLoading && !boardsQuery.isError && boards.length === 0 ? <div className="px-3 py-10 text-center"><BookOpenText className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="m-0 text-sm font-medium">No note boards yet</p><p className="m-0 mt-1 text-xs leading-5 text-muted-foreground">Create a board to start organizing notes.</p><Button className="mt-4" size="sm" onClick={() => setIsBoardFormOpen(true)}>Create board</Button></div> : null}
+            {!boardsQuery.isLoading && !boardsQuery.isError && boards.length === 0 ? <div className="px-3 py-10 text-center"><BookOpenText className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="m-0 text-sm font-medium">No note boards yet</p><p className="m-0 mt-1 text-xs leading-5 text-muted-foreground">Create a board to start organizing notes.</p><Button className="mt-4" size="sm" onClick={(event) => openCreateBoardDialog(event.currentTarget)}>Create board</Button></div> : null}
           </div>
         </Card>
 
         <section className="flex min-h-0 min-w-0 flex-col">
-          {activeBoard ? <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <Card className="flex min-h-[64px] shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><h2 className="m-0 truncate text-xl font-semibold tracking-[-0.02em]">{activePageSummary?.name ?? 'Create your first page'}</h2></div><Button type="button" size="sm" onClick={() => setIsPageFormOpen((value) => !value)}><Plus /> Add page</Button></Card>
-            {isPageFormOpen ? <Card className="shrink-0"><form className="flex items-end gap-3 p-4" onSubmit={(event) => { event.preventDefault(); const name = newPageName.trim(); if (name) createPage.mutate({ boardId: activeBoard.id, name }) }}><div className="grid flex-1 gap-1.5"><label className="text-xs font-medium" htmlFor="note-page-name">Page name</label><Input id="note-page-name" value={newPageName} onChange={(event) => setNewPageName(event.target.value)} placeholder="Week 1 reflections" maxLength={240} autoFocus required /></div><Button type="button" variant="ghost" onClick={() => setIsPageFormOpen(false)}>Cancel</Button><Button type="submit" disabled={createPage.isPending || !newPageName.trim()}>Create page</Button></form>{pageError ? <p className="m-0 px-4 pb-4 text-sm text-destructive">{pageError}</p> : null}</Card> : null}
-            {pages.length === 0 ? <Card className="grid min-h-0 flex-1 place-content-center text-center"><FileText className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-lg font-semibold">This board has no pages</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then start writing your first note.</p><Button className="mx-auto mt-5" onClick={() => setIsPageFormOpen(true)}><Plus /> Create page</Button></Card> : null}
-            {pages.length > 0 && activePageSummary ? <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              {pageQuery.isLoading || isOpeningPage ? <p className="m-0 px-5 pt-4 text-sm text-muted-foreground">Loading note page...</p> : null}
-              {pageQuery.isError ? <p className="m-0 px-5 pt-4 text-sm text-destructive">Could not load note page.</p> : null}
-              {activePage ? <><div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"><div className="min-w-0 flex-1"><input aria-label="Note title" className="w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-[-0.02em] text-foreground outline-none placeholder:text-muted-foreground" data-testid="note-title-input" disabled={isOpeningPage} maxLength={240} value={draftTitle} onBlur={() => { void persistDraft() }} onChange={(event) => { setContent(draftContent); setTitle(event.target.value); markChanged() }} /><p className="m-0 mt-1 text-sm text-muted-foreground">{formatDate(activePage.date)}</p></div><div className="flex shrink-0 items-center gap-3"><small data-testid="note-save-status" className="text-xs text-muted-foreground">{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : isDirty ? 'Unsaved changes' : 'Saved'}</small><Button type="button" size="sm" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>{isSaving ? <Loader2 className="animate-spin" /> : <Save />}{saveStatus === 'error' ? 'Retry save' : 'Save'}</Button></div></div>{pageError ? <p className="m-0 border-b border-border px-5 py-3 text-sm text-destructive">{pageError}</p> : null}<Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}><div className="min-h-0 flex-1 overflow-y-auto p-5 [&_.journal-rich-text-content]:min-h-[32rem]"><JournalRichTextEditor disabled={isOpeningPage} content={draftContent} onBlur={() => { void persistDraft() }} onChange={(html) => { setTitle(draftTitle); setContent(html); markChanged() }} onImageFiles={uploadNoteImages} onImageUploadError={(message) => { setEditorError(message); setSaveStatus('error') }} /></div></Suspense></> : null}
-            </Card> : null}
-          </div> : <Card className="grid min-h-0 flex-1 place-content-center text-center"><Layers3 className="mx-auto mb-3 size-10 text-muted-foreground" /><h2 className="m-0 text-xl font-semibold">Select or create a note board</h2><p className="m-0 mt-2 text-sm text-muted-foreground">Boards keep related note pages together.</p><Button className="mx-auto mt-5" onClick={() => setIsBoardFormOpen(true)}><FolderPlus /> Create your first board</Button></Card>}
+          {activeBoard ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              {pages.length === 0 ? (
+                <Card className="grid min-h-0 flex-1 place-content-center text-center">
+                  <FileText className="mx-auto mb-3 size-10 text-muted-foreground" />
+                  <h2 className="m-0 text-lg font-semibold">This board has no pages</h2>
+                  <p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then start writing your first note.</p>
+                  <Button className="mx-auto mt-5" onClick={(event) => openCreatePageDialog(event.currentTarget)}><Plus /> Create page</Button>
+                </Card>
+              ) : null}
+              {pages.length > 0 && activePageSummary ? (
+                <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {pageQuery.isLoading || isOpeningPage ? <p className="m-0 px-5 pt-4 text-sm text-muted-foreground">Loading note page...</p> : null}
+                  {pageQuery.isError ? <p className="m-0 px-5 pt-4 text-sm text-destructive">Could not load note page.</p> : null}
+                  {activePage ? (
+                    <>
+                      <div
+                        className="grid shrink-0 gap-3 border-b border-border px-4 py-3 xl:grid-cols-[minmax(12rem,1fr)_minmax(0,2fr)_auto] xl:items-center xl:px-5"
+                        data-testid="note-editor-header"
+                      >
+                        <div className="min-w-0">
+                          <input
+                            aria-label="Note title"
+                            className="w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-[-0.02em] text-foreground outline-none placeholder:text-muted-foreground"
+                            data-testid="note-title-input"
+                            disabled={isOpeningPage}
+                            maxLength={240}
+                            value={draftTitle}
+                            onBlur={() => { void persistDraft() }}
+                            onChange={(event) => { setContent(draftContent); setTitle(event.target.value); markChanged() }}
+                          />
+                          <p className="m-0 mt-1 text-sm text-muted-foreground">{formatDate(activePage.date)}</p>
+                        </div>
+                        <div
+                          ref={setToolbarHost}
+                          className="min-h-8 min-w-0 [&_.journal-toolbar]:flex-wrap [&_.journal-toolbar]:justify-start xl:[&_.journal-toolbar]:justify-center"
+                          data-testid="note-toolbar-host"
+                        />
+                        <div className="flex shrink-0 items-center justify-end gap-3">
+                          <small data-testid="note-save-status" className="text-xs text-muted-foreground">
+                            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : isDirty ? 'Unsaved changes' : 'Saved'}
+                          </small>
+                          <Button type="button" size="sm" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>
+                            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                            {saveStatus === 'error' ? 'Retry save' : 'Save'}
+                          </Button>
+                        </div>
+                      </div>
+                      {pageError ? <p className="m-0 border-b border-border px-5 py-3 text-sm text-destructive">{pageError}</p> : null}
+                      <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                          <JournalRichTextEditor
+                            disabled={isOpeningPage}
+                            content={draftContent}
+                            toolbarAriaLabel="Note formatting tools"
+                            toolbarClassName="flex-wrap justify-start xl:justify-center"
+                            toolbarHost={toolbarHost}
+                            shellClassName="border-0 bg-transparent outline-none shadow-none focus-within:border-0 focus-within:outline-none focus-within:ring-0"
+                            contentClassName="min-h-[32rem] border-0 outline-none shadow-none focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none! focus-visible:ring-0"
+                            onBlur={() => { void persistDraft() }}
+                            onChange={(html) => { setTitle(draftTitle); setContent(html); markChanged() }}
+                            onImageFiles={uploadNoteImages}
+                            onImageUploadError={(message) => { setEditorError(message); setSaveStatus('error') }}
+                          />
+                        </div>
+                      </Suspense>
+                    </>
+                  ) : null}
+                </Card>
+              ) : null}
+            </div>
+          ) : (
+            <Card className="grid min-h-0 flex-1 place-content-center text-center">
+              <Layers3 className="mx-auto mb-3 size-10 text-muted-foreground" />
+              <h2 className="m-0 text-xl font-semibold">Select or create a note board</h2>
+              <p className="m-0 mt-2 text-sm text-muted-foreground">Boards keep related note pages together.</p>
+              <Button className="mx-auto mt-5" onClick={(event) => openCreateBoardDialog(event.currentTarget)}><FolderPlus /> Create your first board</Button>
+            </Card>
+          )}
         </section>
       </div>
+      {isCreatingBoard ? (
+        <CreateNoteDialog
+          entity="Board"
+          fallbackRef={railFocusRef}
+          pending={createBoard.isPending}
+          returnFocusRef={createReturnFocusRef}
+          error={boardError}
+          onOpenChange={(open) => { if (!open) { setIsCreatingBoard(false); createBoard.reset() } }}
+          onConfirm={(name) => createBoard.mutate({ name })}
+        />
+      ) : null}
+      {isCreatingPage && activeBoard ? (
+        <CreateNoteDialog
+          entity="Page"
+          boardName={activeBoard.name}
+          fallbackRef={railFocusRef}
+          pending={createPage.isPending}
+          returnFocusRef={createReturnFocusRef}
+          error={createPage.isError ? 'Could not create page right now.' : null}
+          onOpenChange={(open) => { if (!open) { setIsCreatingPage(false); createPage.reset() } }}
+          onConfirm={(name) => createPage.mutate({ boardId: activeBoard.id, name })}
+        />
+      ) : null}
       {renameTarget ? (
         <RenameEntityDialog
           key={`${renameTarget.kind}:${renameTarget.kind === 'board' ? renameTarget.boardId : renameTarget.pageId}`}
           entity={renameTarget.kind === 'board' ? 'Board' : 'Page'}
+          fallbackRef={railFocusRef}
           initialName={renameTarget.name}
           maxLength={renameTarget.kind === 'board' ? 120 : 240}
           pending={renameBoard.isPending || renamePage.isPending}
+          returnFocusRef={entityActionReturnFocusRef}
           error={renameBoard.isError || renamePage.isError ? `Could not rename ${renameTarget.kind} right now.` : null}
           onOpenChange={(open) => { if (!open) setRenameTarget(null) }}
           onConfirm={confirmRename}
@@ -391,9 +504,12 @@ export function NotesPage() {
       {deleteTarget ? (
         <DeleteNoteConfirmationDialog
           entity={deleteTarget.kind === 'board' ? 'Board' : 'Page'}
+          fallbackRef={railFocusRef}
           name={deleteTarget.name}
           pending={deleteBoard.isPending || deletePage.isPending}
-          onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+          restoreFallback={restoreDeleteFocus}
+          returnFocusRef={entityActionReturnFocusRef}
+          onOpenChange={(open) => { if (!open) { setRestoreDeleteFocus(false); setDeleteTarget(null) } }}
           onConfirm={confirmDelete}
         />
       ) : null}

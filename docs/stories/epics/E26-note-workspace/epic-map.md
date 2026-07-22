@@ -42,6 +42,7 @@ images for cleanup without storing base64 HTML payloads.
 | E26-C | Rich-text editor reuse and autosave safety | Reuse Journal editor behavior while honoring blur save, page-switch save, save-state feedback, and blank new-page behavior | US-NOTE-003 | frontend interaction tests, reload proof, race-condition checks, sanitized content proof |
 | E26-D | Embedded image upload and cleanup lifecycle | Extend shared assets to Note images, persist reload-safe references, and mark removed images for cleanup per `D3` | US-NOTE-004 | asset upload/finalize/delete proof, base64 rejection, cleanup reconciliation evidence |
 | E26-E | Release reconciliation | Close doc, matrix, regression, and lifecycle gaps across navigation, CRUD, editor persistence, sanitization, and asset cleanup | US-NOTE-005 | focused E2E, static contract audit, matrix evidence, release smoke |
+| E26-F | Workspace presentation parity | Align the shipped Note rail, creation dialogs, context actions, and editor header with Vocabulary without changing Note data behavior | US-NOTE-006, US-NOTE-007 | focused UI behavior, shared-editor regression, responsive browser proof |
 
 ## Story Queue
 
@@ -52,18 +53,20 @@ images for cleanup without storing base64 HTML payloads.
 | US-NOTE-003 | E26-C | Note pages reuse the Journal editor boundary with blur save, page-switch autosave, save-state feedback, and blank new-page opening | US-NOTE-001, US-NOTE-002 | Ready after shell and page detail loading exist |
 | US-NOTE-004 | E26-D | Pasted or dropped Note images upload through shared assets, survive reload, reject base64 persistence, and mark removed images for cleanup | US-NOTE-001, US-NOTE-003 | Needs feasibility validation for link-reconciliation and cleanup boundary |
 | US-NOTE-005 | E26-E | Release proof confirms navigation, CRUD, sanitization, autosave, image upload, and cleanup expectations across docs and matrix rows | US-NOTE-001, US-NOTE-002, US-NOTE-003, US-NOTE-004 | Ready after all delivery stories land |
+| US-NOTE-006 | E26-F | Notes uses the Vocabulary-aligned rail and selected-page title/date composition without counters | US-NOTE-005 | Implemented |
+| US-NOTE-007 | E26-F | Notes uses Vocabulary-style creation dialogs and context-action focus while the complete borderless editor toolbar moves into the selected-page header | US-NOTE-006 | Implemented; focused tests, isolated build, and four-width browser proof passed |
 
-## Current Story To Prepare
+## Current Story Delivered
 
-`US-NOTE-004` - Add paste/drop image upload through the shared asset runtime,
-persist reload-safe references, and mark removed Note images for cleanup.
+`US-NOTE-007` - Aligns Notes creation and context-action presentation with
+Vocabulary, then move the existing formatting toolbar into the selected-page
+header and remove the editable canvas border.
 
 Why now:
 
-- `US-NOTE-003` already shipped writable Note pages with blur save and
-  page-switch save safety, so the next user-visible gap is embedded images.
-- `SPEC.md` requires first-release Note image upload through the existing asset
-  boundary and explicitly forbids persisted base64 image payloads.
-- Locked decision `D3` introduces the next unresolved data-lifecycle risk:
-  removed Note images must be reconciled into cleanup instead of leaking
-  unbounded storage.
+- The user approved exact Vocabulary parity for creation, rename, and deletion
+  presentation without changing the existing Note CRUD contracts.
+- The selected editor header currently leaves the full toolbar below it and the
+  focused canvas shows an unwanted border.
+- The requested change can stay frontend-only if the shared editor keeps its
+  existing inline default for Journal and Notes uses an optional placement seam.

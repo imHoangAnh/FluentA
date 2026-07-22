@@ -34,6 +34,10 @@ story order, and proof boundaries are approved.
    required by `D3`.
 6. Refresh product docs, story evidence, matrix rows, and focused regression
    proof for navigation, ownership, sanitization, autosave, and asset cleanup.
+7. Treat later layout parity as frontend-only follow-up stories: first align
+   the rail and editor metadata (`US-NOTE-006`), then align creation dialogs,
+   destructive-action focus, and the editor-header toolbar (`US-NOTE-007`)
+   without reopening Note persistence or asset contracts.
 
 ## Rejected Alternatives
 

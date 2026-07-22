@@ -19,14 +19,21 @@ import {
   Undo2,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { cn } from '@/shared/lib/utils'
 
 type JournalRichTextEditorProps = {
+  contentClassName?: string
   disabled?: boolean
   content: string
   onChange: (html: string) => void
   onBlur?: () => void
   onImageFiles?: (files: File[]) => Promise<Array<{ id: string; displayUrl: string; alt?: string }>>
   onImageUploadError?: (message: string) => void
+  shellClassName?: string
+  toolbarAriaLabel?: string
+  toolbarClassName?: string
+  toolbarHost?: HTMLElement | null
 }
 
 function runCommand(command: string, value?: string) {
@@ -38,12 +45,17 @@ function runCommand(command: string, value?: string) {
 }
 
 export function JournalRichTextEditor({
+  contentClassName,
   disabled = false,
   content,
   onChange,
   onBlur,
   onImageFiles,
   onImageUploadError,
+  shellClassName,
+  toolbarAriaLabel = 'Journal formatting tools',
+  toolbarClassName,
+  toolbarHost,
 }: JournalRichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(100)
@@ -100,9 +112,8 @@ export function JournalRichTextEditor({
     }
   }
 
-  return (
-    <div className="journal-rich-text-shell" style={{ ['--journal-editor-zoom' as string]: `${zoom / 100}` }}>
-      <div className="journal-toolbar" role="toolbar" aria-label="Journal formatting tools">
+  const toolbar = (
+    <div className={cn('journal-toolbar', toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel}>
         <button className="journal-toolbar-button" type="button" aria-label="Heading 1" disabled={disabled} onClick={() => apply('formatBlock', 'h1')}>
           <Heading1 size={16} />
         </button>
@@ -186,12 +197,17 @@ export function JournalRichTextEditor({
             onChange={(event) => setZoom(Number(event.target.value))}
           />
         </label>
-      </div>
+    </div>
+  )
+
+  return (
+    <div className={cn('journal-rich-text-shell', shellClassName)} style={{ ['--journal-editor-zoom' as string]: `${zoom / 100}` }}>
+      {toolbarHost === undefined ? toolbar : toolbarHost ? createPortal(toolbar, toolbarHost) : null}
 
       <div
         ref={editorRef}
         aria-label="Journal rich text editor"
-        className="journal-rich-text-content"
+        className={cn('journal-rich-text-content', contentClassName)}
         contentEditable={!disabled}
         suppressContentEditableWarning
         onBlur={onBlur}
