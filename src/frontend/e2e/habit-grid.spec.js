@@ -40,6 +40,10 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
   const createHabitButton = page.getByRole('button', { name: 'Create habit' });
   await createHabitButton.click();
   await expect(page.getByRole('dialog', { name: 'Create Habit' })).toBeVisible();
+  const compactModal = await page.locator('.habit-modal').boundingBox();
+  expect(compactModal?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(440);
+  expect(await page.locator('.habit-modal-header h3').evaluate((element) => getComputedStyle(element).fontSize)).toBe('18px');
+  expect((await page.getByTestId('habit-name-input').boundingBox())?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(40);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Create Habit' })).toBeHidden();
   await expect(createHabitButton).toBeFocused();
@@ -62,8 +66,21 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
 
   const today = todayInput();
   await page.getByLabel(`Check Read English for selected date ${today}`).click();
-  await expect(page.getByLabel(`Uncheck Read English for selected date ${today}`)).toBeVisible();
+  const checkedRowButton = page.getByLabel(`Uncheck Read English for selected date ${today}`);
+  await expect(checkedRowButton).toBeVisible();
   await expect(page.getByLabel(/Goal progress 1 of 21/)).toBeVisible();
+
+  const selectedDayProgress = page.locator(`.habit-week-day-button[aria-label*="${today}"] .habit-day-progress`);
+  const progressBox = await selectedDayProgress.boundingBox();
+  const progressCheckBox = await selectedDayProgress.locator('.lucide-check').boundingBox();
+  expect(Math.abs(((progressBox?.x ?? 0) + (progressBox?.width ?? 0) / 2) - ((progressCheckBox?.x ?? 0) + (progressCheckBox?.width ?? 0) / 2))).toBeLessThan(1);
+  expect(Math.abs(((progressBox?.y ?? 0) + (progressBox?.height ?? 0) / 2) - ((progressCheckBox?.y ?? 0) + (progressCheckBox?.height ?? 0) / 2))).toBeLessThan(1);
+
+  const rowButtonBox = await checkedRowButton.boundingBox();
+  const rowCheckBox = await checkedRowButton.locator('svg').boundingBox();
+  expect(await checkedRowButton.locator('svg').evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 255, 255)');
+  expect(Math.abs(((rowButtonBox?.x ?? 0) + (rowButtonBox?.width ?? 0) / 2) - ((rowCheckBox?.x ?? 0) + (rowCheckBox?.width ?? 0) / 2))).toBeLessThan(1);
+  expect(Math.abs(((rowButtonBox?.y ?? 0) + (rowButtonBox?.height ?? 0) / 2) - ((rowCheckBox?.y ?? 0) + (rowCheckBox?.height ?? 0) / 2))).toBeLessThan(1);
 
   const initialRange = await page.locator('.habit-week-navigation strong').textContent();
   await page.getByRole('button', { name: 'Next week' }).click();
@@ -75,10 +92,14 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
   const desktopSidebar = await page.locator('.habit-tracker-sidebar').boundingBox();
   const desktopDetails = await page.locator('.habit-tracker-details').boundingBox();
   expect(Math.abs((desktopSidebar?.width ?? 0) - (desktopDetails?.width ?? 0))).toBeLessThan(4);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight > document.documentElement.clientHeight)).toBe(false);
 
   await page.setViewportSize({ width: 1024, height: 768 });
   await expect(page.locator('.habit-tracker-sidebar')).toBeVisible();
   await expect(page.locator('.habit-tracker-details')).toBeVisible();
-  const hasPageOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-  expect(hasPageOverflow).toBe(false);
+  const pageOverflow = await page.evaluate(() => ({
+    horizontal: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    vertical: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+  }));
+  expect(pageOverflow).toEqual({ horizontal: false, vertical: false });
 });

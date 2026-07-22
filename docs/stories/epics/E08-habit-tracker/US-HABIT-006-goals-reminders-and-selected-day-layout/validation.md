@@ -97,6 +97,81 @@ git diff --check -- <story source and documentation paths>
 - Preserved the user's unrelated dirty Flashcard and Todo files without editing
   or reverting them.
 
+## Follow-up Visual Polish — 2026-07-21
+
+- Centered the completed-day check glyph independently from the circular SVG
+  progress ring. Browser geometry assertions keep both the week-strip glyph and
+  Habit-row glyph within one pixel of their container center.
+- Kept the completed-row glyph white during hover/focus so it remains visible
+  against the primary background.
+- Reduced the Create/Edit Habit modal to a 440px maximum width with an 18px
+  title, 13px labels, 14px fields, 12px form rhythm, smaller controls, and a
+  760px bounded scroll area. All existing fields and keyboard behavior remain.
+- Reduced the detail hierarchy to a 22px title/value scale, tighter statistic
+  and goal cards, 13px description text, and a denser 16px calendar heading
+  without changing colors, content order, or interaction targets.
+- Focused Habit ESLint passed; Habit Vitest passed 4/4; authenticated Chromium
+  `habit-grid.spec.js` and `habit-details.spec.js` passed 2/2 at desktop/tablet
+  widths. Rendered modal and detail screenshots were visually inspected.
+- Seven Habit fixtures and seven HabitEntry fixtures created by this follow-up's
+  browser proof were deleted by their dedicated test-account prefixes. Existing
+  non-fixture Habit rows and their entry were preserved.
+- No P1 or P2 finding remains from this follow-up.
+
+## Delete Confirmation Follow-up — 2026-07-21
+
+- Replaced the Habit page's native `window.confirm` call with the shared Radix
+  Alert Dialog used by the existing application design system.
+- The modal names the selected Habit, explains that its check-in history is
+  removed, and requires an explicit `Delete Habit` action. `Cancel`, Escape,
+  focus trapping/restoration, destructive styling, pending-state locking, and
+  an inline API error message are provided by the accessible dialog flow.
+- Habit Vitest passed 5/5, focused Habit ESLint passed, and authenticated
+  Chromium `habit-grid.spec.js` plus `habit-details.spec.js` passed 2/2. The E2E
+  flow proves Cancel preserves the Habit and confirmation removes it.
+- The rendered confirmation modal was visually inspected at 1440x900. Three
+  browser fixtures and two fixture entries were removed by their test-account
+  prefixes; existing non-fixture Habit rows were preserved.
+- Active Habit source no longer contains `window.confirm`. No P1 or P2 finding
+  remains from this follow-up.
+
+## Split-Panel Border Follow-up — 2026-07-21
+
+- Added 16px outer padding and spacing so the list and detail columns read as
+  two separate panels without changing their approximately 50/50 ownership.
+- The left Habit list now has a full design-token border, 12px rounded corners,
+  and clipped header/list content so the corner treatment remains clean.
+- The right selected-Habit detail now has the same 1px design-token outline and
+  12px corner radius. Existing statistic, goal, description, and calendar card
+  borders remain unchanged.
+- Habit Vitest passed 4/4 and direct Vite production bundling passed. Live
+  browser inspection at 1280px and 768px confirmed both outlines and radii,
+  zero horizontal overflow, and no console warning/error.
+- No API, component behavior, product contract, or data changed. No P1 or P2
+  finding remains from this follow-up.
+
+## Single-Row Statistics And Larger Description Follow-up — 2026-07-21
+
+- Reduced the four detail statistic cards to a compact 48px row and kept all
+  four cards on one line. Each card now places its short visible label on the
+  left and its value on the right instead of stacking the value below.
+- Preserved the full statistic meaning for assistive technology through the
+  article accessible names: Total check-ins, Monthly check-in rate, Current
+  streak, and Longest streak.
+- Increased the Description card to a 120px minimum height with 15px body text
+  and 1.6 line height. Existing newline preservation, long-token wrapping, and
+  vertical scrolling for long descriptions remain intact.
+- Habit Vitest passed 4/4, focused Habit ESLint passed, direct Vite production
+  bundling passed, and authenticated Chromium `habit-grid.spec.js` plus
+  `habit-details.spec.js` passed 2/2. The detail E2E explicitly verifies four
+  statistic columns, horizontal card layout, the compact 17px values, larger
+  15px description text, and overflow scrolling.
+- Live browser inspection at 1516px confirmed the one-row layout, right-aligned
+  values, readable non-truncated short labels, no horizontal document overflow,
+  and no console warning/error. The temporary visual fixture was deleted.
+- No API, database schema, stored data, or Habit behavior changed. No P1 or P2
+  finding remains from this follow-up.
+
 ## Known Warnings Outside This Story
 
 - Full frontend lint and build still stop only on the two pre-existing unused

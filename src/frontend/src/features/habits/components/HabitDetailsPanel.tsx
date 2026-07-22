@@ -52,10 +52,10 @@ export function HabitDetailsPanel({
       </header>
 
       <section className="habit-stats-grid" aria-label="Habit statistics">
-        <StatCard icon={<CheckCircle2 size={18} className="icon-primary" />} label="Total check-ins" value={habit.totalCheckIns} suffix="Days" />
-        <StatCard icon={<Percent size={18} className="icon-primary" />} label="Monthly check-in rate" value={Math.round(habit.monthlyCompletionRate)} suffix="%" />
-        <StatCard icon={<Flame size={18} className="icon-orange" />} label="Current streak" value={habit.currentStreak} suffix="Days" />
-        <StatCard icon={<Trophy size={18} className="icon-purple" />} label="Longest streak" value={habit.longestStreak} suffix="Days" />
+        <StatCard icon={<CheckCircle2 size={18} className="icon-primary" />} label="Check-ins" accessibleLabel="Total check-ins" value={habit.totalCheckIns} suffix="Days" />
+        <StatCard icon={<Percent size={18} className="icon-primary" />} label="Monthly rate" accessibleLabel="Monthly check-in rate" value={Math.round(habit.monthlyCompletionRate)} suffix="%" />
+        <StatCard icon={<Flame size={18} className="icon-orange" />} label="Streak" accessibleLabel="Current streak" value={habit.currentStreak} suffix="Days" />
+        <StatCard icon={<Trophy size={18} className="icon-purple" />} label="Best streak" accessibleLabel="Longest streak" value={habit.longestStreak} suffix="Days" />
       </section>
 
       {habit.goalDays ? (
@@ -114,9 +114,9 @@ export function HabitDetailsPanel({
   )
 }
 
-function StatCard({ icon, label, value, suffix }: { icon: ReactNode; label: string; value: number; suffix: string }) {
+function StatCard({ icon, label, accessibleLabel = label, value, suffix }: { icon: ReactNode; label: string; accessibleLabel?: string; value: number; suffix: string }) {
   return (
-    <article className="habit-stat-card">
+    <article className="habit-stat-card" aria-label={`${accessibleLabel}: ${value} ${suffix}`}>
       <div className="habit-stat-label">{icon}<span>{label}</span></div>
       <p className="habit-stat-value">{value} <span>{suffix}</span></p>
     </article>
