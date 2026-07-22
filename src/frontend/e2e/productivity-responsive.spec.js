@@ -33,7 +33,8 @@ const productivityRoutes = [
 test('productivity routes avoid page overflow at desktop and tablet widths', async ({ page }, testInfo) => {
   await registerAndLogin(page);
 
-  await page.goto('http://127.0.0.1:5173/kanban');
+  await page.getByRole('link', { name: 'Kanban', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:5173/kanban');
   await page.getByTestId('kanban-board-name-input').fill('Responsive board');
   await page.getByTestId('kanban-board-name-input').press('Enter');
   await expect(page.getByTestId('kanban-column-Done')).toBeVisible();
@@ -45,14 +46,22 @@ test('productivity routes avoid page overflow at desktop and tablet widths', asy
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     for (const route of productivityRoutes) {
-      await page.goto(`http://127.0.0.1:5173${route.path}`);
+      await page.getByRole('link', { name: route.title, exact: true }).click();
+      await expect(page).toHaveURL(`http://127.0.0.1:5173${route.path}`);
       await expect(page.getByRole('heading', { level: 1, name: route.title })).toBeVisible();
+      if (route.path === '/kanban') {
+        await page.getByTestId('kanban-column-To Do').getByRole('button', { name: 'Add Card' }).click();
+        await expect(page.getByRole('complementary', { name: 'Create card' })).toBeVisible();
+      }
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       }));
       expect(dimensions.scrollWidth, `${route.path} should not overflow at ${viewport.width}px`).toBeLessThanOrEqual(dimensions.clientWidth);
       await page.screenshot({ path: testInfo.outputPath(`${route.title.toLowerCase()}-${viewport.name}.png`) });
+      if (route.path === '/kanban') {
+        await page.getByRole('button', { name: 'Close card details' }).click();
+      }
     }
   }
 });

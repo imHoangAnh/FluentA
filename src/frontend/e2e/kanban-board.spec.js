@@ -36,13 +36,40 @@ test('Kanban board foundation manages boards columns cards moves and filters', a
 
   await page.getByRole('link', { name: 'Kanban' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/kanban');
-  await expect(page.getByRole('heading', { name: 'Kanban Board' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Kanban' })).toBeVisible();
 
   await page.getByTestId('kanban-board-name-input').fill('Launch roadmap');
   await page.getByTestId('kanban-board-name-input').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Launch roadmap' })).toBeVisible();
   await expect(page.getByTestId('kanban-column-To Do')).toBeVisible();
   await expect(page.getByTestId('kanban-column-In Progress')).toBeVisible();
   await expect(page.getByTestId('kanban-column-Done')).toBeVisible();
+
+  await page.getByTestId('kanban-board-name-input').fill('Archive candidate');
+  await page.getByTestId('kanban-board-name-input').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Archive candidate' })).toBeVisible();
+  await page.getByRole('button', { name: 'Launch roadmap' }).click();
+  await expect(page.getByRole('heading', { name: 'Launch roadmap' })).toBeVisible();
+
+  const archiveTab = page.getByRole('button', { name: 'Archive candidate' });
+  await archiveTab.click({ button: 'right' });
+  const deleteProjectDialog = page.getByRole('alertdialog', { name: 'Delete project?' });
+  await expect(deleteProjectDialog).toContainText('Archive candidate');
+  await deleteProjectDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(archiveTab).toBeVisible();
+  await archiveTab.click({ button: 'right' });
+  await deleteProjectDialog.getByRole('button', { name: 'Delete project' }).click();
+  await expect(archiveTab).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Launch roadmap' })).toBeVisible();
+
+  await page.getByTestId('kanban-board-name-input').fill('Temporary project');
+  await page.getByTestId('kanban-board-name-input').press('Enter');
+  const temporaryTab = page.getByRole('button', { name: 'Temporary project' });
+  await expect(page.getByRole('heading', { name: 'Temporary project' })).toBeVisible();
+  await temporaryTab.click({ button: 'right' });
+  await deleteProjectDialog.getByRole('button', { name: 'Delete project' }).click();
+  await expect(temporaryTab).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Launch roadmap' })).toBeVisible();
 
   const listResponse = await page.request.get('http://127.0.0.1:5000/api/v1/kanban/boards', { headers });
   expect(listResponse.status()).toBe(200);
@@ -55,17 +82,18 @@ test('Kanban board foundation manages boards columns cards moves and filters', a
   const detail = (await detailResponse.json()).data;
   expect(detail.columns.map((column) => column.name)).toEqual(['To Do', 'In Progress', 'Done']);
 
+  await page.getByRole('button', { name: 'Add column' }).click();
   await page.getByTestId('kanban-column-name-input').fill('Blocked');
   await page.getByTestId('kanban-column-name-input').press('Enter');
   await expect(page.getByTestId('kanban-column-Blocked')).toBeVisible();
 
   await page.getByTestId('kanban-column-To Do').getByRole('button', { name: 'Add Card' }).click();
-  await expect(page.getByRole('dialog', { name: 'Create card' })).toBeVisible();
+  const createPanel = page.getByRole('complementary', { name: 'Create card' });
+  await expect(createPanel).toBeVisible();
   await page.getByTestId('kanban-edit-title-input').fill('Outline speaking project');
-  const createDialog = page.getByRole('dialog', { name: 'Create card' });
-  await createDialog.getByRole('combobox', { name: 'Priority' }).selectOption('High');
-  await createDialog.getByRole('textbox', { name: 'Deadline' }).fill(todayInput());
-  await page.getByRole('button', { name: 'Save card' }).click();
+  await createPanel.getByRole('combobox', { name: 'Priority' }).selectOption('High');
+  await createPanel.getByLabel('Deadline').fill(todayInput());
+  await createPanel.getByRole('button', { name: 'Save card' }).click();
   const createdCard = page.getByTestId('kanban-card-Outline speaking project');
   await expect(createdCard).toBeVisible();
 
@@ -84,9 +112,11 @@ test('Kanban board foundation manages boards columns cards moves and filters', a
 
   const editCardButton = page.getByRole('button', { name: 'Edit Outline speaking project' });
   await editCardButton.click();
-  await expect(page.getByRole('dialog', { name: 'Edit card' })).toBeVisible();
+  const editPanel = page.getByRole('complementary', { name: 'Edit card' });
+  await expect(editPanel).toBeVisible();
+  await expect(editPanel.getByText(/Move to/i)).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Edit card' })).toBeHidden();
+  await expect(editPanel).toBeHidden();
   await expect(editCardButton).toBeFocused();
   await editCardButton.click();
   await page.getByTestId('kanban-edit-title-input').fill('Edited speaking project');
@@ -113,7 +143,7 @@ test('Kanban board foundation manages boards columns cards moves and filters', a
   await foreignPage.close();
 
   await page.getByRole('button', { name: 'Edit Edited speaking project' }).click();
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('complementary', { name: 'Edit card' }).getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByTestId('kanban-card-Edited speaking project')).toBeHidden();
   await page.getByLabel('Delete column Blocked').click();
   await expect(page.getByTestId('kanban-column-Blocked')).toBeHidden();

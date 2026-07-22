@@ -70,8 +70,21 @@ All responses use the FluentA envelope.
 ## UI Rules
 
 - The board list and active board detail are visible on `/kanban`.
+- The visible workspace heading is the selected project name. Project tabs are
+  the selection surface, and the existing new-project input remains beside the
+  tabs.
+- Project deletion is not an always-visible toolbar action. Right-clicking a
+  project tab, or using its keyboard context-menu command, opens a confirmation
+  for that exact project before the existing delete operation runs.
+- Priority, Deadline, and Add column share the top toolbar. Add column reveals a
+  lightweight required-name input in that row and continues to use the existing
+  create-column operation.
 - The active board renders columns horizontally on desktop and remains
-  horizontally scrollable on narrow screens.
+  horizontally scrollable within the board on narrow screens. The document
+  itself must not gain horizontal overflow from Kanban columns.
+- Selecting an existing card or Add Card opens the same non-modal right-side
+  detail panel. The panel owns title, description, priority, deadline, save,
+  cancel/close, and existing-card deletion; it does not own card movement.
 - Card movement can be completed with explicit Move controls in addition to
   pointer drag behavior, so keyboard and narrow-screen users have a reliable
   path.
