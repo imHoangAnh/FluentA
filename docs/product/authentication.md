@@ -21,7 +21,11 @@ Vocabulary Board, Flashcards, and production deployment wiring outside auth are 
   `/settings/practice`, and `/settings/review`.
 - A logged-in user can move between `/settings/profile`, `/settings/practice`,
   `/settings/review`, and `/settings/level5` inside one protected shared
-  Settings shell.
+  Settings shell. The shell presents one visible Settings heading, icon-led
+  secondary navigation, a wide-screen navigation column, and a wrapped
+  narrow-screen navigation grid without changing route ownership.
+- Profile keeps avatar actions, full name, read-only email, bio, validation,
+  and explicit save inside the compact Settings content panel.
 - A logged-in user can refresh access without re-entering credentials while the refresh cookie is valid.
 - A logged-in user can log out and lose access to protected routes.
 - A user can continue with Google when local Google credentials are configured.

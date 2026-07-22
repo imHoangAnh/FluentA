@@ -127,8 +127,11 @@ target behavior for that split and the data ownership rules that support it.
   authenticated Settings routes `/settings/practice` and `/settings/review`,
   and both routes save only when the learner clicks their explicit save action.
 - Level 5 management lives alongside them at `/settings/level5` inside the
-  shared Settings shell and keeps its existing global filter/search/remove
-  behavior.
+  shared Settings shell. Search is the first control and one Filter dropdown
+  exposes All, Active, and Inactive views. Active rows use a final-column
+  checkbox, the header checkbox selects or clears all visible active rows, and
+  `Remove selected` requires confirmation before the existing transition marks
+  those words inactive while preserving review history.
 
 ## FluentA SRS
 

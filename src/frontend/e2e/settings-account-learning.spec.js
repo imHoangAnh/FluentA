@@ -55,7 +55,7 @@ test('Settings profile, Practice, Review, Level 5, and responsive routes persist
   await registerAndLogin(page)
   await page.goto('/settings/profile')
 
-  await expect(page.getByRole('heading', { name: 'Your settings' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
   await page.getByLabel('Full name').fill('Settings Learner Updated')
   await page.getByLabel('Bio').fill('API-backed settings proof')
   const profilePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/profile') && response.request().method() === 'PUT')
@@ -72,7 +72,7 @@ test('Settings profile, Practice, Review, Level 5, and responsive routes persist
   await expect(page.getByText('Practice settings saved.')).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name: 'Review' }).click()
-  const dailyLimit = page.getByLabel('Daily limit')
+  const dailyLimit = page.getByLabel('Daily review limit')
   await dailyLimit.fill('275')
   const reviewPromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/review/settings') && response.request().method() === 'PUT')
   await page.getByRole('button', { name: 'Save review settings' }).click()
@@ -80,8 +80,8 @@ test('Settings profile, Practice, Review, Level 5, and responsive routes persist
   await expect(page.getByText('Review settings saved.')).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name: 'Level 5' }).click()
-  await expect(page.getByRole('heading', { name: 'Manage Level 5 words' })).toBeVisible()
-  await expect(page.getByText('No Level 5 words match this filter yet.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Level 5 words', exact: true })).toBeVisible()
+  await expect(page.getByText('No Level 5 words match this view.')).toBeVisible()
 
   await page.screenshot({ path: testInfo.outputPath('settings-desktop.png'), fullPage: true })
   await page.setViewportSize({ width: 1024, height: 900 })

@@ -1,23 +1,47 @@
+import { Brain, Headphones, Trophy, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { Badge } from '@/shared/components/ui/badge'
 import { Card } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 
 const settingsLinks = [
-  { to: '/settings/profile', label: 'Profile' },
-  { to: '/settings/review', label: 'Review' },
-  { to: '/settings/practice', label: 'Practice' },
-  { to: '/settings/level5', label: 'Level 5' },
+  { to: '/settings/profile', label: 'Profile', icon: UserRound },
+  { to: '/settings/practice', label: 'Practice', icon: Headphones },
+  { to: '/settings/review', label: 'Review', icon: Brain },
+  { to: '/settings/level5', label: 'Level 5', icon: Trophy },
 ]
 
 export function SettingsLayout() {
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-      <Card className="p-3">
-        <nav className="grid gap-1" aria-label="Settings navigation">
-          {settingsLinks.map((link) => <NavLink key={link.to} to={link.to} className={({ isActive }) => cn('rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActive && 'bg-secondary text-secondary-foreground')}>{link.label}</NavLink>)}
-        </nav>
-      </Card>
-      <section className="min-w-0"><Outlet /></section>
+    <div className="grid min-w-0 gap-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Settings</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your profile and learning preferences.</p>
+        </div>
+        <Badge variant="outline">4 sections</Badge>
+      </header>
+
+      <div className="grid min-w-0 items-start gap-4 min-[900px]:grid-cols-[200px_minmax(0,1fr)]">
+        <Card className="p-2 min-[900px]:sticky min-[900px]:top-6">
+          <nav className="grid grid-cols-1 gap-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-1" aria-label="Settings navigation">
+            {settingsLinks.map(({ icon: Icon, label, to }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => cn(
+                  'flex min-w-0 items-center gap-2 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:px-3 sm:text-sm',
+                  isActive && 'bg-secondary text-secondary-foreground',
+                )}
+              >
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </Card>
+        <section className="min-w-0"><Outlet /></section>
+      </div>
     </div>
   )
 }

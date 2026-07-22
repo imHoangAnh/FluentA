@@ -28,6 +28,7 @@ existing global-management behavior inside the same shell.
 | E25-A | Shared shell and route ownership | Establish the new second-level route structure and `/settings` redirect before moving behavior between screens | US-SETTINGS-002 | protected routing, active-nav, redirect, shell rendering proof |
 | E25-B | Manual-save settings cutover | Move Profile, Practice, and Review into route-local drafts with explicit save behavior only | US-SETTINGS-003 | profile/avatar save, practice save, review save, reload/error proof |
 | E25-C | Release reconciliation | Prove Level 5 behavior survives in-shell and refresh docs/tests/matrix to the split-route contract | US-SETTINGS-004 | Level 5 regression, docs refresh, focused browser proof, matrix evidence |
+| E25-D | Settings workspace redesign | Apply the approved four-surface visual system without changing the existing route, save, or API contracts | US-SETTINGS-005 | focused component behavior, Level 5 selection/confirmation, responsive browser proof, build evidence |
 
 ## Story Queue
 
@@ -36,16 +37,23 @@ existing global-management behavior inside the same shell.
 | US-SETTINGS-002 | E25-A | `/settings` redirects to `/settings/profile` and all four second-level Settings routes render inside one shared shell | none | Ready to implement |
 | US-SETTINGS-003 | E25-B | Profile, Practice, and Review each use route-local drafts plus explicit save actions without autosave | US-SETTINGS-002 | Ready after the shell and route split land |
 | US-SETTINGS-004 | E25-C | Level 5 remains functional inside the shared shell and docs/proof reflect the split-route contract | US-SETTINGS-002, US-SETTINGS-003 | Ready after route and save-flow cutover |
+| US-SETTINGS-005 | E25-D | Profile, Practice, Review, and Level 5 use the approved compact Settings workspace; Level 5 uses search, one filter dropdown, right-aligned selection, select-all, and confirmation before removal | US-SETTINGS-004 | Implemented; focused tests, isolated production build, and four-width browser proof passed |
 
-## Current Story To Prepare
+## Current Story
 
-`US-SETTINGS-002` - Introduce the shared Settings shell, sidebar, route split,
-and `/settings` redirect.
+`US-SETTINGS-005` - Redesign the four existing Settings surfaces while
+preserving their shipped routes, API contracts, and explicit-save behavior.
+
+Result: implemented with no backend, route, schema, cache-key, or dependency
+change. See `US-SETTINGS-005/validation.md` for the acceptance matrix and
+external dirty-worktree build blocker.
 
 Why now:
 
-- It creates the route/layout foundation every later settings slice depends on.
-- It isolates navigation and shell risk before manual-save refactors change the
-  form behavior of three separate settings surfaces.
-- It gives validation a stable place to prove active sidebar state, protected
-  routing, and Level 5 shell integration.
+- The user approved one concrete interactive design for all four surfaces.
+- The approved Level 5 refinement replaces the three visible filter buttons
+  with one filter dropdown, places search first, moves selection to the final
+  column, adds visible-list select-all, and requires confirmation before remove.
+- The change is UI-only and can reuse the current feature routes, React Query
+  mutations, Radix dropdown menu, shared Alert Dialog, and design-system
+  primitives.

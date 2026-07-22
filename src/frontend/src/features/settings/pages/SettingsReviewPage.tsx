@@ -1,20 +1,20 @@
-import { Check, LoaderCircle, Save, XCircle } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
+import { SettingsSaveStatus, type SettingsSaveState } from '../components/SettingsSaveStatus'
 import * as reviewApi from '@/features/review'
+import { Button } from '@/shared/components/ui/button'
+import { Input } from '@/shared/components/ui/input'
 
 export function SettingsReviewPage() {
   const queryClient = useQueryClient()
   const [reviewDraft, setReviewDraft] = useState<reviewApi.ReviewSettings | null>(null)
   const [reviewLimitInput, setReviewLimitInput] = useState<string | null>(null)
-  const [reviewState, setReviewState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [reviewState, setReviewState] = useState<SettingsSaveState>('idle')
   const [reviewError, setReviewError] = useState<string | null>(null)
 
-  const reviewSettingsQuery = useQuery({
-    queryKey: ['review', 'settings'],
-    queryFn: reviewApi.getReviewSettings,
-  })
-
+  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: reviewApi.getReviewSettings })
   const updateReviewSettings = useMutation({
     mutationFn: reviewApi.updateReviewSettings,
     onMutate: () => {
@@ -38,9 +38,10 @@ export function SettingsReviewPage() {
 
   const savedReview = reviewSettingsQuery.data ?? null
   const review = reviewDraft ?? savedReview
-  const hasUnsavedChanges = reviewDraft !== null
-    && savedReview !== null
-    && (reviewDraft.dailyLimit !== savedReview.dailyLimit || reviewDraft.recapAfterAnswer !== savedReview.recapAfterAnswer)
+  const hasUnsavedChanges = reviewDraft !== null && savedReview !== null && (
+    reviewDraft.dailyLimit !== savedReview.dailyLimit
+    || reviewDraft.recapAfterAnswer !== savedReview.recapAfterAnswer
+  )
 
   function updateReviewDraft(next: reviewApi.ReviewSettings, inputValue = String(next.dailyLimit)) {
     setReviewDraft(next)
@@ -49,49 +50,46 @@ export function SettingsReviewPage() {
     setReviewState('idle')
   }
 
-  function saveReviewSettings() {
-    if (!review || !hasUnsavedChanges) return
-    updateReviewSettings.mutate(review)
-  }
-
-  if (reviewSettingsQuery.isLoading && !review) {
-    return (
-      <section className="settings-panel settings-panel--loading">
-        <LoaderCircle className="settings-spinner" />
-        <p>Loading review settings...</p>
-      </section>
-    )
-  }
-
-  if (reviewSettingsQuery.isError || !review) {
-    return (
-      <section className="settings-panel settings-panel--loading">
-        <p className="flashcard-status flashcard-status--error">Unable to load review settings.</p>
-      </section>
-    )
-  }
+  if (reviewSettingsQuery.isLoading && !review) return <SettingsLoadingPanel label="Loading review settings" />
+  if (reviewSettingsQuery.isError || !review) return <SettingsErrorPanel message="Unable to load review settings." />
 
   const reviewInput = reviewLimitInput ?? String(review.dailyLimit)
 
   return (
-    <section className="settings-panel">
-      <div className="settings-section-header">
-        <div>
-          <span className="preview-label">Review settings</span>
-          <h2>Board review defaults</h2>
-        </div>
-        <SettingsStatus
+    <SettingsPanel
+      eyebrow="Learning"
+      title="Review"
+      description="Set the default daily workload and answer recap behavior."
+      status={(
+        <SettingsSaveStatus
+          errorLabel={reviewError ?? 'Unable to save review settings. Your draft is still here.'}
           hasUnsavedChanges={hasUnsavedChanges}
-          errorLabel={reviewError}
           state={reviewState}
           successLabel="Review settings saved."
         />
-      </div>
-      <p>Control the global daily review limit and whether each correct answer shows a recap.</p>
-      <div className="settings-form">
-        <label>
-          Daily limit
-          <input
+      )}
+      footer={(
+        <>
+          <span className="text-xs text-muted-foreground">These defaults apply to new Review sessions.</span>
+          <Button
+            type="button"
+            disabled={!hasUnsavedChanges || updateReviewSettings.isPending}
+            onClick={() => updateReviewSettings.mutate(review)}
+          >
+            <Save aria-hidden="true" />
+            {updateReviewSettings.isPending ? 'Saving review settings...' : 'Save review settings'}
+          </Button>
+        </>
+      )}
+    >
+      <div className="divide-y divide-border border-y border-border">
+        <div className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_140px] sm:items-center">
+          <div>
+            <label className="text-sm font-semibold text-foreground" htmlFor="review-daily-limit">Daily review limit</label>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Maximum number of due words added to a Review session.</p>
+          </div>
+          <Input
+            id="review-daily-limit"
             min="1"
             max="1000"
             type="number"
@@ -101,67 +99,34 @@ export function SettingsReviewPage() {
               updateReviewDraft({ ...review, dailyLimit: raw === '' ? 0 : Number(raw) }, raw)
             }}
           />
+        </div>
+
+        <label className="flex cursor-pointer flex-wrap items-center justify-between gap-4 py-4" htmlFor="review-recap-after-answer">
+          <span>
+            <strong className="block text-sm font-semibold text-foreground">Recap after each correct answer</strong>
+            <span className="mt-1 block text-xs leading-5 text-muted-foreground">Show the word summary before moving to the next card.</span>
+          </span>
+          <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              id="review-recap-after-answer"
+              className="size-4 accent-primary"
+              checked={review.recapAfterAnswer}
+              type="checkbox"
+              onChange={(event) => updateReviewDraft({ ...review, recapAfterAnswer: event.target.checked })}
+            />
+            {review.recapAfterAnswer ? 'On' : 'Off'}
+          </span>
         </label>
-        <label className="settings-checkbox">
-          <input
-            checked={review.recapAfterAnswer}
-            type="checkbox"
-            onChange={(event) => updateReviewDraft({ ...review, recapAfterAnswer: event.target.checked })}
-          />
-          <span>Recap after each correct answer</span>
-        </label>
-        <button
-          className="primary-button settings-save-button"
-          type="button"
-          disabled={!hasUnsavedChanges || updateReviewSettings.isPending}
-          onClick={saveReviewSettings}
-        >
-          <Save size={17} /> {updateReviewSettings.isPending ? 'Saving review settings...' : 'Save review settings'}
-        </button>
       </div>
-    </section>
+    </SettingsPanel>
   )
 }
 
-function SettingsStatus({
-  hasUnsavedChanges,
-  errorLabel,
-  state,
-  successLabel,
-}: {
-  hasUnsavedChanges: boolean
-  errorLabel: string | null
-  state: 'idle' | 'saving' | 'saved' | 'error'
-  successLabel: string
-}) {
-  if (state === 'saving') {
-    return <p className="settings-muted"><LoaderCircle size={14} className="settings-spin-inline" /> Saving...</p>
-  }
-
-  if (state === 'saved') {
-    return <p className="settings-success"><Check size={14} /> {successLabel}</p>
-  }
-
-  if (state === 'error' && errorLabel) {
-    return <p className="flashcard-status flashcard-status--error"><XCircle size={14} /> {errorLabel}</p>
-  }
-
-  if (hasUnsavedChanges) {
-    return <p className="settings-muted">Unsaved changes.</p>
-  }
-
-  return null
-}
-
 function readApiError(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
+  if (error instanceof Error && error.message) return error.message
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
     return response?.data?.error?.message ?? fallback
   }
-
   return fallback
 }

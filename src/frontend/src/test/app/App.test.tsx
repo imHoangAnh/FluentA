@@ -358,9 +358,9 @@ describe('FluentA app routes', async () => {
     expect(settingsNavigation.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
     expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
     expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
     await waitFor(() => expect(settingsNavigation.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page'))
-    expect(screen.queryByRole('heading', { name: 'Practice mode sequence' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Practice' })).not.toBeInTheDocument()
   })
 
   it('renders split settings routes inside the shared shell', async () => {
@@ -371,17 +371,17 @@ describe('FluentA app routes', async () => {
     })
 
     let view = await renderApp('/settings/practice')
-    expect(screen.getByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Practice' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     view = await renderApp('/settings/review')
-    expect(screen.getByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     await renderApp('/settings/level5')
-    expect(screen.getByRole('heading', { name: 'Manage Level 5 words' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Level 5 words' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Level 5' })).toHaveAttribute('aria-current', 'page')
   })
 })

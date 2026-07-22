@@ -27,10 +27,13 @@ test('review settings save and dashboard counts aggregate page decks', async ({ 
   const token = (await (await loginResponsePromise).json()).data.accessToken;
   const headers = { Authorization: `Bearer ${token}` };
 
-  await page.goto('/settings');
-  await expect(page.getByRole('heading', { name: 'Your settings' })).toBeVisible();
-  await page.getByLabel('Daily limit').fill('1');
-  await expect(page.getByText('Saved automatically.')).toBeVisible();
+  await page.goto('/settings/review');
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible();
+  await page.getByLabel('Daily review limit').fill('1');
+  const reviewSettingsResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/review/settings') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Save review settings' }).click();
+  expect((await reviewSettingsResponse).status()).toBe(200);
+  await expect(page.getByText('Review settings saved.')).toBeVisible();
 
   const board = (await (await page.request.post('http://127.0.0.1:5000/api/v1/boards', {
     headers,

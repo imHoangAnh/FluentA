@@ -51,15 +51,15 @@ describe('SettingsReviewPage manual save', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
 
-    const dailyLimitInput = screen.getByLabelText('Daily limit')
+    const dailyLimitInput = screen.getByLabelText('Daily review limit')
     await user.clear(dailyLimitInput)
     await user.type(dailyLimitInput, '250')
-    await user.click(screen.getByRole('checkbox', { name: 'Recap after each correct answer' }))
+    await user.click(screen.getByRole('checkbox', { name: /Recap after each correct answer/ }))
 
     expect(reviewApi.updateReviewSettings).not.toHaveBeenCalled()
-    expect(screen.getByText('Unsaved changes.')).toBeInTheDocument()
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save review settings' }))
 
@@ -78,9 +78,9 @@ describe('SettingsReviewPage manual save', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Board review defaults' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
 
-    const dailyLimitInput = screen.getByLabelText('Daily limit')
+    const dailyLimitInput = screen.getByLabelText('Daily review limit')
     await user.clear(dailyLimitInput)
     await user.type(dailyLimitInput, '250')
     await user.click(screen.getByRole('button', { name: 'Save review settings' }))

@@ -33,6 +33,9 @@ and doc/test boundaries are approved.
    remove, and bulk remove behavior.
 7. Refresh product docs and focused frontend/browser proof to the split-route
    contract.
+8. Apply the approved Settings workspace redesign as `US-SETTINGS-005`, using
+   existing shared primitives and preserving the route/API/manual-save
+   contracts completed by the earlier stories.
 
 ## Rejected Alternatives
 
@@ -55,6 +58,7 @@ and doc/test boundaries are approved.
 | Review draft/save cutover | HIGH | Current number/toggle edits autosave immediately; draft conversion can regress validation, empty input handling, or cache refresh. | Vitest interaction coverage and save/reload proof. |
 | Level 5 shell migration | MEDIUM | Layout refactor must not change list filters, search, single remove, or bulk remove semantics. | Focused UI regression and manual browser proof. |
 | Product-doc drift | MEDIUM | Existing docs still advertise one unified `/settings` page. | Product-doc update aligned to Feature 24 before closeout. |
+| Four-surface visual cutover | MEDIUM | A shared redesign can regress save states, active navigation, Level 5 filtering, or narrow-width layout even without API changes. | focused Vitest for all four pages, build/lint, and browser proof at 320/768/1024/1440 widths |
 
 ## Likely File Boundaries
 

@@ -49,11 +49,11 @@ describe('SettingsPracticePage manual save', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Practice' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /pronunciation/i }))
 
     expect(practiceApi.updatePracticeSettings).not.toHaveBeenCalled()
-    expect(screen.getByText('Unsaved changes.')).toBeInTheDocument()
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save practice settings' }))
 
@@ -71,12 +71,12 @@ describe('SettingsPracticePage manual save', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Practice mode sequence' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Practice' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /pronunciation/i }))
     await user.click(screen.getByRole('button', { name: 'Save practice settings' }))
 
     expect(await screen.findByText('Unable to save practice settings. Your draft is still here.')).toBeInTheDocument()
-    expect(screen.getByText('Click to include this mode.')).toBeInTheDocument()
+    expect(screen.getByText(/Not included.*Say the word and check your speech/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save practice settings' })).toBeEnabled()
   })
 })

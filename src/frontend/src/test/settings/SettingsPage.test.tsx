@@ -105,7 +105,7 @@ describe('SettingsPage profile save', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Your settings' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument()
     await user.upload(screen.getByLabelText(/choose avatar/i), avatarFile)
     await user.click(screen.getByRole('button', { name: 'Save profile' }))
 
