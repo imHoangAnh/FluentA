@@ -46,7 +46,7 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
 
   await page.getByRole('link', { name: 'Countdowns' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:5173/countdowns');
-  await expect(page.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Countdown', exact: true })).toBeVisible();
 
   const newCountdownButton = page.getByRole('button', { name: 'New Countdown' });
   await newCountdownButton.click();
@@ -69,8 +69,14 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
   await expect(cover).toBeVisible();
   await expect(cover).toHaveAttribute('src', /X-Amz-Algorithm=/);
 
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByLabel('Delete IELTS Exam').click();
+  await page.getByRole('button', { name: 'Open actions for IELTS Exam' }).click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Delete countdown?' })).toContainText('IELTS Exam');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'Delete countdown' }).click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeHidden();
 
   const past = await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {

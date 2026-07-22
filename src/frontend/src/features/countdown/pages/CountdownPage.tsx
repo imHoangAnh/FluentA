@@ -1,7 +1,9 @@
-import { CalendarClock, ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { CalendarClock, ImagePlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import * as assetsApi from '@/lib/api/assets.api'
+import { DeleteCountdownConfirmationDialog } from '../components/DeleteCountdownConfirmationDialog'
 import * as countdownApi from '../api/countdown.api'
 
 const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
@@ -42,6 +44,8 @@ export function CountdownPage() {
   const [alerts, setAlerts] = useState<Array<{ alertDay: string; alertTime: string }>>([defaultAlert()])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const dialogTitleId = useId()
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -100,6 +104,7 @@ export function CountdownPage() {
   const deleteCountdown = useMutation({
     mutationFn: countdownApi.deleteCountdown,
     onSuccess: async () => {
+      setDeleteTarget(null)
       await refresh()
     },
   })
@@ -115,41 +120,77 @@ export function CountdownPage() {
       <main className="countdown-main">
         <header className="countdown-header">
           <div className="countdown-header-title">
-            <h2>Countdowns</h2>
-            <p>Date-based milestones with fixed Vietnam-local alerts.</p>
+            <h1>Countdown</h1>
           </div>
-          <button ref={createTriggerRef} className="add-event-btn" type="button" onClick={() => setShowFormModal(true)}>
-            <Plus size={20} />
-            <span>New Countdown</span>
+          <button
+            ref={createTriggerRef}
+            className="countdown-create-button"
+            type="button"
+            aria-label="New Countdown"
+            title="New Countdown"
+            onClick={() => setShowFormModal(true)}
+          >
+            <Plus size={19} />
           </button>
         </header>
 
         <div className="countdown-canvas">
           <section className="countdown-list-area">
             <div className="countdown-list-container">
-              <div className="countdown-events-wrapper">
+              <div className="countdown-card-grid">
                 {countdowns.map((item) => (
-                  <article key={item.id} className="event-list-item active">
-                    <div className="event-icon-box">
-                      {item.coverDownloadUrl ? <img className="countdown-cover-image" src={item.coverDownloadUrl} alt={item.name} /> : <CalendarClock size={28} />}
+                  <article key={item.id} className={`countdown-card${item.coverDownloadUrl ? ' countdown-card--covered' : ''}`}>
+                    <div className="countdown-card-visual" aria-hidden={!item.coverDownloadUrl}>
+                      {item.coverDownloadUrl ? (
+                        <img className="countdown-cover-image" src={item.coverDownloadUrl} alt={item.name} />
+                      ) : (
+                        <div className="countdown-card-fallback" aria-hidden="true">
+                          <CalendarClock size={34} />
+                        </div>
+                      )}
+                      {item.coverDownloadUrl ? <div className="countdown-card-scrim" aria-hidden="true" /> : null}
                     </div>
-                    <div className="event-info">
-                      <h4 className="event-title">{item.name}</h4>
-                      <p className="event-subtitle">{item.alerts.length} alert{item.alerts.length === 1 ? '' : 's'} · {formatTargetDate(item.targetDate)}</p>
-                      <p className="event-subtitle">{item.alerts.map((alert) => `${alert.alertDay} ${alert.alertTime}`).join(' • ')}</p>
-                    </div>
-                    <div className="event-meta">
-                      <p className={`event-days ${item.isCompleted ? 'event-days-completed' : ''}`}>{statusText(item)}</p>
-                      <button
-                        className="kanban-danger-btn"
-                        type="button"
-                        aria-label={`Delete ${item.name}`}
-                        onClick={() => {
-                          if (window.confirm(`Delete "${item.name}"?`)) deleteCountdown.mutate(item.id)
-                        }}
-                      >
-                        <Trash2 size={16} /> Delete
-                      </button>
+                    <div className="countdown-card-content">
+                      <div className="countdown-card-topline">
+                        <h2>{item.name}</h2>
+                        <DropdownMenu.Root
+                          modal={false}
+                          open={openMenuId === item.id}
+                          onOpenChange={(open) => setOpenMenuId(open ? item.id : null)}
+                        >
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              className="countdown-card-menu-trigger"
+                              type="button"
+                              aria-label={`Open actions for ${item.name}`}
+                              title="Countdown actions"
+                            >
+                              <MoreHorizontal size={18} />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content className="countdown-card-menu" align="end" sideOffset={6}>
+                              <DropdownMenu.Item
+                                className="countdown-card-menu-item countdown-card-menu-item--danger"
+                                onSelect={() => {
+                                  setOpenMenuId(null)
+                                  window.setTimeout(() => setDeleteTarget({ id: item.id, name: item.name }), 0)
+                                }}
+                              >
+                                <Trash2 size={15} />
+                                Delete
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </div>
+                      <div className="countdown-card-count">
+                        <strong className={item.isCompleted ? 'countdown-card-count--completed' : undefined}>{statusText(item)}</strong>
+                      </div>
+                      <div className="countdown-card-footer">
+                        <span>{item.isCompleted ? 'Target' : 'Until'} {formatTargetDate(item.targetDate)}</span>
+                        <span>{item.alerts.length} alert{item.alerts.length === 1 ? '' : 's'}</span>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -220,6 +261,16 @@ export function CountdownPage() {
               </form>
             </div>
           </div>
+        ) : null}
+
+        {deleteTarget ? (
+          <DeleteCountdownConfirmationDialog
+            countdownName={deleteTarget.name}
+            pending={deleteCountdown.isPending}
+            onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+            onRestoreFocus={() => createTriggerRef.current?.focus()}
+            onConfirm={() => deleteCountdown.mutate(deleteTarget.id)}
+          />
         ) : null}
       </main>
     </>

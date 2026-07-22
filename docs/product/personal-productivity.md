@@ -211,10 +211,15 @@ All responses use the FluentA envelope.
   One active cover asset can attach to only one active Countdown.
 - Countdown cards are ordered with active/upcoming items first by nearest
   `target_date`, then completed items.
+- The `/countdowns` workspace uses the title `Countdown`, an icon-only create
+  action, and a compact responsive card grid; it does not add an `All` tab.
 - Countdown cards use the cover image as the primary visual when present, or a
   light preset fallback when absent.
 - Countdown cards show live client-side remaining time before the target date
   and a completed state for seven days after the target date.
+- Each card exposes Delete through its overflow menu. Delete requires explicit
+  confirmation in an accessible modal before the existing delete request runs.
+- Countdown cards stack without horizontal overflow on narrow viewports.
 
 ## Countdown API Contract
 

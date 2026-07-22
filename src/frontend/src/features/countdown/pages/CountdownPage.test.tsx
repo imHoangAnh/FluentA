@@ -1,0 +1,68 @@
+import { QueryClient } from '@tanstack/react-query'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppProviders } from '@/app/providers'
+import { CountdownPage } from './CountdownPage'
+
+const countdownApi = vi.hoisted(() => ({
+  createCountdown: vi.fn(),
+  deleteCountdown: vi.fn(),
+  listCountdowns: vi.fn(),
+}))
+
+vi.mock('../api/countdown.api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../api/countdown.api')>(),
+  ...countdownApi,
+}))
+
+vi.mock('@/lib/api/assets.api', () => ({
+  uploadCountdownCoverAsset: vi.fn(),
+}))
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  return render(<AppProviders queryClient={queryClient}><CountdownPage /></AppProviders>)
+}
+
+describe('CountdownPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    countdownApi.listCountdowns.mockResolvedValue([{
+      id: 'countdown-1',
+      name: 'IELTS Exam',
+      targetDate: '2026-08-21',
+      coverAssetId: null,
+      coverDownloadUrl: null,
+      coverDownloadUrlExpiresAt: null,
+      isCompleted: false,
+      alerts: [{ id: 'alert-1', alertDay: '1DayBefore', alertTime: '09:00', scheduledAtUtc: '2026-08-20T02:00:00Z', firedAtUtc: null }],
+      createdAt: '2026-07-21T00:00:00Z',
+      updatedAt: '2026-07-21T00:00:00Z',
+    }])
+    countdownApi.deleteCountdown.mockResolvedValue(undefined)
+  })
+
+  it('renders the compact create action and confirms the exact card before delete', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Countdown' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New Countdown' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'IELTS Exam' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Open actions for IELTS Exam' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    expect(screen.getByRole('alertdialog', { name: 'Delete countdown?' })).toHaveTextContent('IELTS Exam')
+    expect(countdownApi.deleteCountdown).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(countdownApi.deleteCountdown).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Open actions for IELTS Exam' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete countdown' }))
+
+    await waitFor(() => expect(countdownApi.deleteCountdown.mock.calls[0]?.[0]).toBe('countdown-1'))
+  })
+})
