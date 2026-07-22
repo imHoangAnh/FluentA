@@ -62,7 +62,7 @@ test('Pomodoro timer controls sync across same-user tabs', async ({ context, pag
   await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Running');
 
   await secondTab.getByRole('button', { name: 'Complete phase', exact: true }).click();
-  await expect(page.getByText(/ShortBreak Session/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Short Break' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
   await expect(secondTab.getByTestId('pomodoro-state')).toHaveText('Idle');

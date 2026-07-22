@@ -1,9 +1,10 @@
-import { Bell, CheckCircle2, CheckSquare, Clock3, Pause, Play, RotateCcw, Settings, TimerReset } from 'lucide-react'
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { CheckCircle2, Clock3, Pause, Play, RotateCcw, Settings, TimerReset } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../api/pomodoro.api'
 import * as todoApi from '@/features/todo'
 import * as kanbanApi from '@/features/kanban'
+import { PomodoroConfigurationDialog, type PomodoroConfigFormValues } from '../components/PomodoroConfigurationDialog'
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)
@@ -11,14 +12,7 @@ function formatDuration(seconds: number) {
   return `${minutes}:${`${remainingSeconds}`.padStart(2, '0')}`
 }
 
-type ConfigForm = {
-  workMinutes: number
-  shortBreakMinutes: number
-  longBreakMinutes: number
-  longBreakAfter: number
-}
-
-const defaultForm: ConfigForm = {
+const defaultForm: PomodoroConfigFormValues = {
   workMinutes: 25,
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
@@ -27,8 +21,9 @@ const defaultForm: ConfigForm = {
 
 export function PomodoroPage() {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState<ConfigForm | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [mode, setMode] = useState<'pomo' | 'stopwatch'>('pomo')
+  const [configOpen, setConfigOpen] = useState(false)
   const [displaySeconds, setDisplaySeconds] = useState<number | null>(null)
   const [linkedTask, setLinkedTask] = useState('')
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0)
@@ -64,13 +59,9 @@ export function PomodoroPage() {
   const updateConfig = useMutation({
     mutationFn: pomodoroApi.updatePomodoroConfig,
     onSuccess: async (saved) => {
-      setForm({
-        workMinutes: saved.workMinutes,
-        shortBreakMinutes: saved.shortBreakMinutes,
-        longBreakMinutes: saved.longBreakMinutes,
-        longBreakAfter: saved.longBreakAfter,
-      })
-      setMessage('Settings saved.')
+      queryClient.setQueryData(['pomodoro', 'config'], saved)
+      setMessage(null)
+      setConfigOpen(false)
       await queryClient.invalidateQueries({ queryKey: ['pomodoro'] })
     },
     onError: () => setMessage('Could not save settings.'),
@@ -92,15 +83,9 @@ export function PomodoroPage() {
     onError: () => setMessage('Error updating timer.'),
   })
 
-  function submitConfig(event: FormEvent) {
-    event.preventDefault()
-    setMessage(null)
-    updateConfig.mutate(currentForm)
-  }
-
   const current = currentQuery.data
-  const currentForm = form ?? configQuery.data ?? defaultForm
-  const shownSeconds = displaySeconds ?? current?.remainingSeconds ?? 0
+  const currentForm = configQuery.data ?? defaultForm
+  const shownSeconds = current ? (displaySeconds ?? current.remainingSeconds) : currentForm.workMinutes * 60
   const timerCommandPending = timerCommand.isPending
   const completeTimer = timerCommand.mutate
 
@@ -145,207 +130,151 @@ export function PomodoroPage() {
     board.columns.flatMap((column) => column.cards.map((card) => ({ ...card, boardName: board.name }))),
   )
 
-  const progressTotal = current?.durationSeconds ?? (currentForm.workMinutes * 60);
-  const progressRatio = shownSeconds / progressTotal;
-  const strokeDashoffset = 753.98 - (progressRatio * 753.98);
+  const progressTotal = current?.durationSeconds ?? (currentForm.workMinutes * 60)
+  const progressRatio = Math.min(1, Math.max(0, shownSeconds / progressTotal))
+  const strokeDashoffset = 753.98 - (progressRatio * 753.98)
+  const timerState = current?.state ?? 'Idle'
+  const phaseLabel = current?.phase === 'ShortBreak' ? 'Short Break' : current?.phase === 'LongBreak' ? 'Long Break' : 'Focus'
 
   return (
-    <>
-      <main className="pomodoro-main">
-        <header className="pomodoro-header">
-          <div className="pomodoro-header-title">
-            <h2>Focus Timer</h2>
-          </div>
-          <div className="pomodoro-header-actions">
-            <div className="notification-icon">
-              <Bell size={24} />
-              <span className="notification-dot"></span>
+    <main className="pomodoro-main">
+      <div className="pomodoro-workspace-canvas">
+        <div className="pomodoro-grid-container">
+          <section className="pomodoro-left-column" aria-label="Focus timer workspace">
+            <div className="pomodoro-workspace-toolbar">
+              <div className="pomodoro-mode-switch" role="group" aria-label="Timer mode">
+                <button type="button" className={mode === 'pomo' ? 'active' : undefined} aria-pressed={mode === 'pomo'} onClick={() => setMode('pomo')}>Pomo</button>
+                <button type="button" className={mode === 'stopwatch' ? 'active' : undefined} aria-pressed={mode === 'stopwatch'} onClick={() => setMode('stopwatch')}>Stopwatch</button>
+              </div>
+              <button
+                className="pomodoro-settings-trigger"
+                type="button"
+                aria-label="Open configuration"
+                title="Configuration"
+                onClick={() => { setMessage(null); setConfigOpen(true) }}
+              >
+                <Settings size={19} />
+              </button>
             </div>
-          </div>
-        </header>
 
-        <div className="pomodoro-workspace-canvas">
-          <div className="pomodoro-grid-container">
-            {/* Center Focus Area */}
-            <section className="pomodoro-left-column">
-              {/* Active Timer Card */}
-              <div className="pomodoro-glass-card pomodoro-timer-card">
-                <div className="pomodoro-timer-badge">
-                  <span className="pulse-dot"></span>
-                  <span className="badge-text">{current?.phase || 'Focus'} Session</span>
-                  <strong data-testid="pomodoro-state">{current?.state ?? 'Idle'}</strong>
+            {mode === 'pomo' ? (
+              <section className="pomodoro-mode-panel pomodoro-timer-panel" aria-label="Pomodoro timer">
+                <div className="pomodoro-session-heading">
+                  <h2>{phaseLabel}</h2>
+                  <span data-testid="pomodoro-state">{timerState}</span>
                 </div>
-                
-                {/* Progress Ring */}
+
                 <div className="pomodoro-ring-container">
-                  <svg className="pomodoro-ring-svg">
+                  <svg className="pomodoro-ring-svg" viewBox="0 0 256 256" aria-hidden="true">
                     <circle className="ring-bg" cx="128" cy="128" r="120" />
-                    <circle 
-                      className="ring-progress" 
-                      cx="128" cy="128" r="120" 
-                      style={{ strokeDashoffset }}
-                    />
+                    <circle className="ring-progress" cx="128" cy="128" r="120" style={{ strokeDashoffset }} />
                   </svg>
                   <div className="pomodoro-ring-text">
-                    <span className="timer-display" data-testid="pomodoro-current-time">{current ? formatDuration(shownSeconds) : '--:--'}</span>
+                    <span className="timer-display" data-testid="pomodoro-current-time">{formatDuration(shownSeconds)}</span>
                     <span className="timer-label">remaining</span>
                   </div>
                 </div>
 
-                {/* Controls */}
                 <div className="pomodoro-controls">
-                  <button className="control-btn secondary" type="button" aria-label="Reset" onClick={() => timerCommand.mutate({ command: 'reset' })} disabled={timerCommand.isPending}>
-                    <RotateCcw size={24} />
+                  <button className="pomodoro-secondary-action" type="button" aria-label="Reset" title="Reset timer" onClick={() => timerCommand.mutate({ command: 'reset' })} disabled={timerCommandPending}>
+                    <RotateCcw size={19} />
                   </button>
-                  
-                  {current?.state === 'Idle' ? (
-                    <button className="control-btn primary" type="button" aria-label="Start" onClick={() => {
+
+                  {timerState === 'Idle' ? (
+                    <button className="pomodoro-primary-action" type="button" aria-label="Start" onClick={() => {
                       const [source, id] = linkedTask.split(':')
                       timerCommand.mutate({ command: 'start', startInput: id ? { linkedTaskId: id, linkedTaskSource: source as 'todo' | 'kanban' } : {} })
-                    }} disabled={timerCommand.isPending}>
-                      <Play size={40} fill="currentColor" />
+                    }} disabled={timerCommandPending || currentQuery.isLoading}>
+                      <Play size={18} fill="currentColor" /> Start
                     </button>
-                  ) : current?.state === 'Running' ? (
-                    <button className="control-btn primary" type="button" aria-label="Pause" onClick={() => timerCommand.mutate({ command: 'pause' })} disabled={timerCommand.isPending}>
-                      <Pause size={40} fill="currentColor" />
+                  ) : timerState === 'Running' ? (
+                    <button className="pomodoro-primary-action" type="button" aria-label="Pause" onClick={() => timerCommand.mutate({ command: 'pause' })} disabled={timerCommandPending}>
+                      <Pause size={18} fill="currentColor" /> Pause
                     </button>
-                  ) : current?.state === 'Paused' ? (
-                    <button className="control-btn primary" type="button" aria-label="Resume" onClick={() => timerCommand.mutate({ command: 'resume' })} disabled={timerCommand.isPending}>
-                      <Play size={40} fill="currentColor" />
+                  ) : timerState === 'Paused' ? (
+                    <button className="pomodoro-primary-action" type="button" aria-label="Resume" onClick={() => timerCommand.mutate({ command: 'resume' })} disabled={timerCommandPending}>
+                      <Play size={18} fill="currentColor" /> Resume
                     </button>
                   ) : (
-                    <button className="control-btn primary" type="button" aria-label="Reset" onClick={() => timerCommand.mutate({ command: 'reset' })} disabled={timerCommand.isPending}>
-                      <RotateCcw size={40} />
+                    <button className="pomodoro-primary-action" type="button" aria-label="Reset" onClick={() => timerCommand.mutate({ command: 'reset' })} disabled={timerCommandPending}>
+                      <RotateCcw size={18} /> Reset
                     </button>
                   )}
 
-                  <button className="control-btn secondary" type="button" aria-label="Complete phase" onClick={() => timerCommand.mutate({ command: 'complete' })} disabled={timerCommand.isPending}>
-                    <CheckCircle2 size={24} />
+                  <button className="pomodoro-secondary-action" type="button" aria-label="Complete phase" title="Complete phase" onClick={() => timerCommand.mutate({ command: 'complete' })} disabled={timerCommandPending}>
+                    <CheckCircle2 size={19} />
                   </button>
                 </div>
-              </div>
-
-              {/* Lower Grid: Task & Stopwatch */}
-              <div className="pomodoro-lower-grid">
-                {/* Task Integration */}
-                <div className="pomodoro-glass-card pomodoro-task-card">
-                  <div className="card-header">
-                    <h3>Target Task</h3>
-                    <CheckSquare size={24} className="icon-primary" />
-                  </div>
-                  <p>Select a task to link this session's effort.</p>
-                  <div className="select-wrapper">
-                    <select data-testid="pomodoro-task-select" aria-label="Linked task" value={linkedTask} onChange={(event) => setLinkedTask(event.target.value)} disabled={current?.state !== 'Idle'}>
-                      <option value="">No linked task</option>
-                      {(todosQuery.data ?? []).map((todo) => <option key={todo.id} value={`todo:${todo.id}`}>Todo: {todo.title}</option>)}
-                      {kanbanCards.map((card) => <option key={card.id} value={`kanban:${card.id}`}>Kanban: {card.boardName} / {card.title}</option>)}
-                    </select>
-                  </div>
-                  {current?.linkedTaskId && current?.state !== 'Idle' && <p className="linked-status" data-testid="pomodoro-linked-task">Linked {current.linkedTaskSource} task</p>}
+              </section>
+            ) : (
+              <section className="pomodoro-mode-panel pomodoro-stopwatch-panel" aria-label="Stopwatch">
+                <TimerReset className="pomodoro-stopwatch-icon" size={24} aria-hidden="true" />
+                <div className="pomodoro-stopwatch-time" data-testid="stopwatch-time">{formatDuration(stopwatchSeconds)}</div>
+                <div className="pomodoro-stopwatch-actions">
+                  <button className="pomodoro-primary-action" type="button" aria-label={stopwatchRunning ? 'Pause stopwatch' : 'Start stopwatch'} onClick={() => setStopwatchRunning((running) => !running)}>
+                    {stopwatchRunning ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                    {stopwatchRunning ? 'Pause' : 'Start'}
+                  </button>
+                  <button type="button" onClick={() => setLaps((currentLaps) => [...currentLaps, stopwatchSeconds])} disabled={stopwatchSeconds === 0}>Lap</button>
+                  <button type="button" aria-label="Reset stopwatch" onClick={() => { setStopwatchRunning(false); setStopwatchSeconds(0); setLaps([]) }} disabled={stopwatchSeconds === 0}>Reset</button>
                 </div>
+                {laps.length > 0 ? (
+                  <ol className="pomodoro-lap-list" aria-label="Stopwatch laps">
+                    {laps.map((lap, index) => <li key={`${index}-${lap}`}><span>Lap {index + 1}</span><strong>{formatDuration(lap)}</strong></li>)}
+                  </ol>
+                ) : <p className="pomodoro-stopwatch-empty">Your laps will appear here.</p>}
+              </section>
+            )}
+            {message && !configOpen ? <p className="pomodoro-inline-message" role="alert">{message}</p> : null}
+          </section>
 
-                {/* Stopwatch Section */}
-                <div className="pomodoro-glass-card pomodoro-stopwatch-card">
-                  <div className="card-header">
-                    <h3>Stopwatch</h3>
-                    <TimerReset size={24} className="icon-primary" />
+          <aside className="pomodoro-right-column">
+            <section className="pomodoro-side-card pomodoro-stats-card">
+              <h2>Daily Statistics</h2>
+              <div className="pomodoro-stats-list">
+                <div className="pomodoro-stat-item" data-testid="pomodoro-today-count">
+                  <div className="pomodoro-stat-icon"><CheckCircle2 size={18} /></div>
+                  <div>
+                    <p>Completed today</p>
+                    <strong data-testid="pomodoro-today-count-value">{todayQuery.data?.completedWorkSessions ?? 0}</strong>
                   </div>
-                  <div className="stopwatch-row">
-                    <div className="stopwatch-time" data-testid="stopwatch-time">{formatDuration(stopwatchSeconds)}</div>
-                    <button className="btn-stopwatch" type="button" aria-label={stopwatchRunning ? 'Pause stopwatch' : 'Start stopwatch'} onClick={() => setStopwatchRunning((r) => !r)}>
-                      {stopwatchRunning ? 'Pause' : 'Start Freeform'}
-                    </button>
+                </div>
+                <div className="pomodoro-stat-item">
+                  <div className="pomodoro-stat-icon"><Clock3 size={18} /></div>
+                  <div>
+                    <p>Focus time</p>
+                    <strong>{(todayQuery.data?.completedWorkSessions ?? 0) * currentForm.workMinutes} min</strong>
                   </div>
-                  {stopwatchSeconds > 0 && (
-                     <div className="stopwatch-actions">
-                        <button className="btn-lap" type="button" onClick={() => setLaps((v) => [...v, stopwatchSeconds])}>Lap</button>
-                        <button className="btn-reset" type="button" aria-label="Reset stopwatch" onClick={() => { setStopwatchRunning(false); setStopwatchSeconds(0); setLaps([]) }}>Reset</button>
-                     </div>
-                  )}
-                  {laps.length > 0 && (
-                     <ul className="lap-list">
-                        {laps.map((lap, idx) => <li key={`${idx}-${lap}`}>Lap {idx+1}: {formatDuration(lap)}</li>)}
-                     </ul>
-                  )}
                 </div>
               </div>
             </section>
 
-            {/* Sidebar Stats & Settings */}
-            <aside className="pomodoro-right-column">
-              {/* Daily Statistics */}
-              <div className="pomodoro-glass-card pomodoro-stats-card">
-                <h3>Daily Statistics</h3>
-                <div className="stats-list">
-                  <div className="stat-item" data-testid="pomodoro-today-count">
-                    <div className="stat-icon-wrapper">
-                      <CheckCircle2 size={24} />
-                    </div>
-                    <div className="stat-info">
-                      <p className="stat-label">Completed today</p>
-                      <p className="stat-value" data-testid="pomodoro-today-count-value">{todayQuery.data?.completedWorkSessions ?? 0}</p>
-                    </div>
-                  </div>
-                  <div className="stat-item">
-                    <div className="stat-icon-wrapper">
-                      <Clock3 size={24} />
-                    </div>
-                    <div className="stat-info">
-                      <p className="stat-label">Total Focus Time</p>
-                      <p className="stat-value">{formatDuration((todayQuery.data?.completedWorkSessions ?? 0) * currentForm.workMinutes * 60)}</p>
-                    </div>
-                  </div>
-                </div>
+            <section className="pomodoro-side-card pomodoro-task-card">
+              <h2>Target Task</h2>
+              <p>Select a task to link this session's effort.</p>
+              <div className="pomodoro-select-wrapper">
+                <select data-testid="pomodoro-task-select" aria-label="Linked task" value={linkedTask} onChange={(event) => setLinkedTask(event.target.value)} disabled={timerState !== 'Idle'}>
+                  <option value="">No linked task</option>
+                  {(todosQuery.data ?? []).map((todo) => <option key={todo.id} value={`todo:${todo.id}`}>Todo: {todo.title}</option>)}
+                  {kanbanCards.map((card) => <option key={card.id} value={`kanban:${card.id}`}>Kanban: {card.boardName} / {card.title}</option>)}
+                </select>
               </div>
-
-              {/* Settings */}
-              <div className="pomodoro-glass-card pomodoro-settings-card">
-                <div className="card-header">
-                  <h3>Configuration</h3>
-                  <Settings size={24} className="icon-secondary" />
-                </div>
-                <form onSubmit={submitConfig} className="settings-form">
-                  <div className="setting-row">
-                    <div className="setting-label">
-                      <label htmlFor="pomodoro-work-input">Work Session</label>
-                      <span>{currentForm.workMinutes} min</span>
-                    </div>
-                    <input id="pomodoro-work-input" data-testid="pomodoro-work-input" type="range" min={5} max={60} value={currentForm.workMinutes} onChange={(e) => setForm({...currentForm, workMinutes: Number(e.target.value)})} />
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">
-                      <label htmlFor="pomodoro-short-break-input">Short Break</label>
-                      <span>{currentForm.shortBreakMinutes} min</span>
-                    </div>
-                    <input id="pomodoro-short-break-input" data-testid="pomodoro-short-break-input" type="range" min={1} max={15} value={currentForm.shortBreakMinutes} onChange={(e) => setForm({...currentForm, shortBreakMinutes: Number(e.target.value)})} />
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">
-                      <label htmlFor="pomodoro-long-break-input">Long Break</label>
-                      <span>{currentForm.longBreakMinutes} min</span>
-                    </div>
-                    <input id="pomodoro-long-break-input" data-testid="pomodoro-long-break-input" type="range" min={10} max={45} value={currentForm.longBreakMinutes} onChange={(e) => setForm({...currentForm, longBreakMinutes: Number(e.target.value)})} />
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">
-                      <label htmlFor="pomodoro-long-after-input">Long Break After</label>
-                      <span>{currentForm.longBreakAfter} sessions</span>
-                    </div>
-                    <input id="pomodoro-long-after-input" data-testid="pomodoro-long-after-input" type="range" min={1} max={12} value={currentForm.longBreakAfter} onChange={(e) => setForm({...currentForm, longBreakAfter: Number(e.target.value)})} />
-                  </div>
-                  
-                  <div className="settings-footer">
-                    <button type="submit" className="save-btn" disabled={updateConfig.isPending || configQuery.isLoading}>
-                      {updateConfig.isPending ? 'Saving...' : 'Save Settings'}
-                    </button>
-                    {message && <p className="save-message">{message}</p>}
-                  </div>
-                </form>
-              </div>
-            </aside>
-          </div>
+              {current?.linkedTaskId && timerState !== 'Idle' ? <p className="pomodoro-linked-status" data-testid="pomodoro-linked-task">Linked {current.linkedTaskSource} task</p> : null}
+            </section>
+          </aside>
         </div>
-      </main>
-    </>
+      </div>
+
+      {configOpen ? (
+        <PomodoroConfigurationDialog
+          initialValues={currentForm}
+          message={message}
+          onOpenChange={setConfigOpen}
+          onSubmit={(values) => { setMessage(null); updateConfig.mutate(values) }}
+          open
+          pending={updateConfig.isPending || configQuery.isLoading}
+        />
+      ) : null}
+    </main>
   )
 }

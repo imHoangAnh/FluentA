@@ -33,24 +33,27 @@ test('Pomodoro config persists and current state uses configured work duration',
   await registerAndLogin(page);
   await page.getByRole('link', { name: 'Pomodoro' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Focus timer' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pomo' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('pomodoro-state')).toHaveText('Idle');
   await expect(page.getByTestId('pomodoro-current-time')).toHaveText('25:00');
 
+  await page.getByRole('button', { name: 'Open configuration' }).click();
   await page.getByTestId('pomodoro-work-input').fill('30');
   await page.getByTestId('pomodoro-short-break-input').fill('7');
   await page.getByTestId('pomodoro-long-break-input').fill('20');
   await page.getByTestId('pomodoro-long-after-input').fill('3');
-  await page.getByRole('button', { name: 'Save settings' }).click();
-  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByRole('dialog', { name: 'Configuration' })).toBeHidden();
   await expect(page.getByTestId('pomodoro-current-time')).toHaveText('30:00');
 
   await page.getByRole('link', { name: 'Overview' }).click();
   await page.getByRole('link', { name: 'Pomodoro' }).click();
+  await page.getByRole('button', { name: 'Open configuration' }).click();
   await expect(page.getByTestId('pomodoro-work-input')).toHaveValue('30');
   await expect(page.getByTestId('pomodoro-short-break-input')).toHaveValue('7');
   await expect(page.getByTestId('pomodoro-long-break-input')).toHaveValue('20');
   await expect(page.getByTestId('pomodoro-long-after-input')).toHaveValue('3');
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByTestId('pomodoro-current-time')).toHaveText('30:00');
   expect(consoleErrors).toEqual([]);
 });

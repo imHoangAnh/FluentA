@@ -36,6 +36,13 @@ Pomodoro stories.
 - The visible active browser automatically completes a phase at zero and
   provides a browser sound/notification alert.
 - A client-only stopwatch supports start, pause, reset, and transient laps.
+- The `/pomodoro` page presents `Pomo | Stopwatch` as one left-side timer
+  workspace. Switching modes preserves the page-owned stopwatch state and lap
+  history.
+- An icon-only Settings action beside the mode switch opens a centered
+  Configuration modal containing the same four persisted configuration values.
+- Daily Statistics appears above Target Task in the desktop right column. The
+  supporting column stacks below the timer workspace on narrow viewports.
 
 ## API Contract
 
