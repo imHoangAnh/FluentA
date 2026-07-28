@@ -15,8 +15,10 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - The previous vocabulary workspace remains available at `/vocabulary`.
 - The Dashboard greets the learner based on local time and displays the current
   local date.
-- The Dashboard shows Flashcard due/new card totals, a review action, and the
-  current Flashcard streak from the existing Flashcard dashboard contract.
+- The Dashboard Review Queue shows scheduled Review and new Learning totals as
+  separate values, a review action, and the current Flashcard streak from the
+  existing Flashcard dashboard contract. Its Due Today circle and badge count
+  only overdue plus due-today words; new Learning words never inflate them.
 - The Dashboard shows today's Todo tasks, limited to a small visible set, with
   inline completion toggles.
 - The Dashboard shows today's scheduled Habits, current streak summaries, and
@@ -24,18 +26,24 @@ external notification delivery and mobile drag-and-drop remain deferred.
 - The Dashboard shows the nearest Countdown events with live client-side
   remaining time.
 - Dashboard navigation links remain available for Vocabulary, Flashcards, Todo,
-  Habits, Countdown, and logout.
+  Habits, Countdown, and logout. Overview is intentionally absent from the
+  sidebar menu; the FluentA logo returns the user to `/` from every protected
+  route.
 
 ## Dashboard Presentation Contract
 
 - `/` renders inside the shared FluentA desktop/tablet AppShell with a full
-  sidebar on desktop and an icon-only collapsed sidebar at tablet widths.
+  sidebar on desktop and an automatic icon-only sidebar at tablet widths. The
+  shell does not expose a manual shrink or expand control.
 - Dashboard uses the shared light-theme teal tokens, self-hosted Geist Sans
   Variable typography, accessible focus states, and subtle reduced-motion-safe
   transitions.
 - The review queue, daily Todo, next Countdown, and Habit tracker use shared
   card/button/badge primitives while preserving their existing data and
   mutation contracts.
+- Review Queue visually prioritizes scheduled Review work. Learning remains a
+  labeled secondary count, and the responsive layout keeps both values readable
+  without horizontal overflow.
 - Loading uses structured skeletons; empty states retain explanatory text and
   the relevant navigation action.
 - Chrome and Edge are the blocking browsers for this presentation contract.
@@ -44,6 +52,8 @@ external notification delivery and mobile drag-and-drop remain deferred.
 
 - Dashboard data is derived from existing user-owned Todo, Habit, Countdown,
   and Flashcard endpoints; there is no dedicated Dashboard API endpoint yet.
+- Dashboard Due Today is derived as `overdue + dueToday`. `newCards` is shown
+  only as Learning and is not part of the due count or due empty state.
 - Todo rows use the browser's current local date.
 - Habit rows use the browser timezone for schedule-sensitive summary fields and
   toggles.

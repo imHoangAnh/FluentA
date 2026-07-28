@@ -55,7 +55,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
 
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review');
-  await expect(page.getByText('No cards due today')).toBeVisible();
+  await expect(page.getByText('No reviews due today.')).toBeVisible();
 
   await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
     headers,
@@ -80,7 +80,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   });
 
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
-  await page.getByRole('link', { name: 'Overview', exact: true }).click();
+  await page.getByRole('link', { name: 'Go to overview' }).click();
 
   await expect(page.getByText('Dashboard planning task')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Dashboard reading habit')).toBeVisible();
