@@ -101,6 +101,9 @@ docker compose -f docker-compose.dev.yml up -d
 ```
 
 This starts PostgreSQL, Redis, MinIO, and the local MinIO bucket bootstrap.
+The FluentA development database is `fluenta_dev`, exposed on
+`localhost:5432`, and persisted in the Docker volume
+`fluenta-postgres-dev-data`.
 
 ### 3. Apply database migrations
 
