@@ -3,16 +3,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Inbox, LoaderCircle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/ui/button'
+import { menuContentClassName, menuItemClassName, menuSeparatorClassName } from '@/shared/components/ui/menu-styles'
 import { cn } from '@/shared/lib/utils'
 import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
 
 type NotificationsMenuProps = {
   notificationsPath: string
-  collapsed?: boolean
   active?: boolean
 }
 
-export function NotificationsMenu({ notificationsPath, collapsed = false, active = false }: NotificationsMenuProps) {
+export function NotificationsMenu({ notificationsPath, active = false }: NotificationsMenuProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const query = useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list })
@@ -46,7 +46,6 @@ export function NotificationsMenu({ notificationsPath, collapsed = false, active
           className={cn(
             'h-10 w-full justify-start gap-3 px-3 text-sm font-medium text-muted-foreground hover:text-accent-foreground',
             active && 'bg-secondary text-secondary-foreground',
-            collapsed && 'justify-center px-0',
             'max-[1100px]:justify-center max-[1100px]:px-0',
           )}
         >
@@ -54,7 +53,7 @@ export function NotificationsMenu({ notificationsPath, collapsed = false, active
             <Bell />
             {unreadCount > 0 ? <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
           </span>
-          <span className={cn('truncate', collapsed && 'sr-only', 'max-[1100px]:sr-only')}>Notifications</span>
+          <span className="truncate max-[1100px]:sr-only">Notifications</span>
           {unreadCount > 0 ? <span id="notification-unread-count" className="sr-only">{unreadCount} unread notifications</span> : null}
         </Button>
       </DropdownMenu.Trigger>
@@ -63,7 +62,7 @@ export function NotificationsMenu({ notificationsPath, collapsed = false, active
           side="right"
           align="end"
           sideOffset={8}
-          className="z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-[0_12px_36px_rgba(16,32,29,0.14)]"
+          className={cn(menuContentClassName, 'flex w-[min(24rem,calc(100vw-2rem))] min-w-0 flex-col p-0')}
         >
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <DropdownMenu.Label className="p-0 text-sm font-semibold">Notifications</DropdownMenu.Label>
@@ -75,12 +74,12 @@ export function NotificationsMenu({ notificationsPath, collapsed = false, active
             {!query.isLoading && !query.isError && query.data?.length === 0 ? <div className="grid place-items-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground"><Inbox className="size-5" /><p className="m-0">Your notification inbox is clear.</p></div> : null}
             {!query.isLoading && !query.isError && query.data?.length ? <ul className="m-0 divide-y divide-border p-0" aria-label="Recent notifications">{query.data.map((item) => {
               const unread = !item.readAt
-              return <li key={item.id}><DropdownMenu.Item asChild><button type="button" className={cn('flex w-full gap-3 px-4 py-3 text-left outline-none hover:bg-accent focus:bg-accent', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span></span></button></DropdownMenu.Item></li>
+              return <li key={item.id}><DropdownMenu.Item asChild><button type="button" className={cn(menuItemClassName, 'h-auto w-full items-start rounded-none px-4 py-3 text-left font-normal', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span></span></button></DropdownMenu.Item></li>
             })}</ul> : null}
           </div>
-          <DropdownMenu.Separator className="h-px bg-border" />
+          <DropdownMenu.Separator className={cn(menuSeparatorClassName, 'm-0')} />
           <DropdownMenu.Item asChild>
-            <Link to={notificationsPath} className="flex min-h-11 items-center justify-center px-4 text-sm font-medium text-primary outline-none transition-colors hover:bg-accent focus:bg-accent focus:text-accent-foreground">
+            <Link to={notificationsPath} className={cn(menuItemClassName, 'min-h-11 justify-center rounded-none px-4 text-primary data-[highlighted]:text-primary focus:text-primary')}>
               Show all notifications
             </Link>
           </DropdownMenu.Item>

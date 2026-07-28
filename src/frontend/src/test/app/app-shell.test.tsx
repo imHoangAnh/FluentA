@@ -31,7 +31,7 @@ function routesWithoutShellMetadata(routes: RouteObject[], inherited = false, pa
 }
 
 describe('AppShell environment', () => {
-  it('uses injected navigation, collapse state, account, and logout behavior', () => {
+  it('uses injected navigation, home and profile links, account, and logout behavior', () => {
     const logout = vi.fn(async () => undefined)
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -48,6 +48,8 @@ describe('AppShell environment', () => {
     )
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Go to overview' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
     expect(screen.getByText('Test Learner')).toBeInTheDocument()
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Test page' })).toHaveClass('sr-only')
@@ -56,16 +58,14 @@ describe('AppShell environment', () => {
     expect(applicationLinks.indexOf(screen.getByRole('link', { name: 'Notifications' })))
       .toBeLessThan(applicationLinks.indexOf(screen.getByRole('link', { name: 'Settings' })))
 
-    const collapse = screen.getByRole('button', { name: 'Collapse sidebar' })
-    expect(collapse).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(collapse)
-    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Log out')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
     expect(logout).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps shell state mounted while route metadata and content change', async () => {
+  it('keeps the shell mounted while route metadata and content change', async () => {
     const router = createMemoryRouter([{
       element: <AppShellRouteLayout />,
       children: [
@@ -88,11 +88,11 @@ describe('AppShell environment', () => {
       </ShellEnvironmentProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
     fireEvent.click(screen.getByRole('link', { name: 'Go to second' }))
 
     expect(await screen.findByText('Second route content')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('link', { name: 'Go to overview' })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Second page' })).toHaveClass('sr-only')
     expect(screen.getByRole('main')).toHaveClass('max-w-none')
   })

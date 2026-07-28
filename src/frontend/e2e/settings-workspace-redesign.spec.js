@@ -80,7 +80,7 @@ for (const viewport of [
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await mockSettingsApis(page)
 
-    await page.goto('http://localhost:5173/settings/profile')
+    await page.goto('http://localhost:5173/profile')
     await expect(page.getByRole('navigation', { name: 'Settings navigation' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
 

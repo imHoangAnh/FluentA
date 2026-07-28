@@ -21,7 +21,7 @@ export function AppProviders({ children, queryClient = productionQueryClient }: 
     navigationSections: shellNavigationSections,
     settingsNavigation: shellSettingsNavigation,
     notificationsPath: shellNotificationsPath,
-    notificationsMenu: (collapsed: boolean, active: boolean) => <NotificationsMenu notificationsPath={shellNotificationsPath} collapsed={collapsed} active={active} />,
+    notificationsMenu: (active: boolean) => <NotificationsMenu notificationsPath={shellNotificationsPath} active={active} />,
   }), [account, logout])
 
   return (

@@ -1,11 +1,10 @@
-import { Brain, Headphones, Trophy, UserRound } from 'lucide-react'
+import { Brain, Headphones, Trophy } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Badge } from '@/shared/components/ui/badge'
 import { Card } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 
 const settingsLinks = [
-  { to: '/settings/profile', label: 'Profile', icon: UserRound },
   { to: '/settings/practice', label: 'Practice', icon: Headphones },
   { to: '/settings/review', label: 'Review', icon: Brain },
   { to: '/settings/level5', label: 'Level 5', icon: Trophy },
@@ -17,9 +16,9 @@ export function SettingsLayout() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Settings</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your profile and learning preferences.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your learning preferences.</p>
         </div>
-        <Badge variant="outline">4 sections</Badge>
+        <Badge variant="outline">3 sections</Badge>
       </header>
 
       <div className="grid min-w-0 items-start gap-4 min-[900px]:grid-cols-[200px_minmax(0,1fr)]">

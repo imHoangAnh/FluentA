@@ -46,7 +46,7 @@ test('Pomodoro config persists and current state uses configured work duration',
   await expect(page.getByRole('dialog', { name: 'Configuration' })).toBeHidden();
   await expect(page.getByTestId('pomodoro-current-time')).toHaveText('30:00');
 
-  await page.getByRole('link', { name: 'Overview' }).click();
+  await page.getByRole('link', { name: 'Go to overview' }).click();
   await page.getByRole('link', { name: 'Pomodoro' }).click();
   await page.getByRole('button', { name: 'Open configuration' }).click();
   await expect(page.getByTestId('pomodoro-work-input')).toHaveValue('30');

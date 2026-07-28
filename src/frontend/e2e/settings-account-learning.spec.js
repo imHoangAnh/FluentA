@@ -23,7 +23,7 @@ async function registerAndLogin(page) {
 
 test('Settings avatar uploads and renders through signed delivery without a durable profile URL', async ({ page }) => {
   const token = await registerAndLogin(page)
-  await page.goto('/settings/profile')
+  await page.goto('/profile')
 
   await page.locator('input[type="file"]').setInputFiles({
     name: 'e31-avatar.png',
@@ -53,7 +53,7 @@ test('Settings avatar uploads and renders through signed delivery without a dura
 test('Settings profile, Practice, Review, Level 5, and responsive routes persist through the API', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await registerAndLogin(page)
-  await page.goto('/settings/profile')
+  await page.goto('/profile')
 
   await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
   await page.getByLabel('Full name').fill('Settings Learner Updated')

@@ -7,18 +7,27 @@ function lazySettingsPage<T extends Record<string, unknown>>(load: () => Promise
   return async () => ({ Component: (await load())[name] as ComponentType })
 }
 
-export const settingsRoutes: RouteObject[] = [{
-  path: 'settings',
-  handle: appShellRoute({
-    title: 'Settings',
-    description: 'Manage your profile and learning preferences.',
-  }),
-  Component: SettingsLayout,
-  children: [
-    { index: true, element: <Navigate to="profile" replace /> },
-    { path: 'profile', lazy: lazySettingsPage(() => import('./pages/SettingsPage'), 'SettingsPage') },
-    { path: 'practice', lazy: lazySettingsPage(() => import('./pages/SettingsPracticePage'), 'SettingsPracticePage') },
-    { path: 'review', lazy: lazySettingsPage(() => import('./pages/SettingsReviewPage'), 'SettingsReviewPage') },
-    { path: 'level5', lazy: lazySettingsPage(() => import('./pages/LevelFiveSettingsPage'), 'LevelFiveSettingsPage') },
-  ],
-}]
+export const settingsRoutes: RouteObject[] = [
+  {
+    path: 'profile',
+    handle: appShellRoute({
+      title: 'Profile',
+      description: 'Manage your account profile.',
+    }),
+    lazy: lazySettingsPage(() => import('./pages/SettingsPage'), 'SettingsPage'),
+  },
+  {
+    path: 'settings',
+    handle: appShellRoute({
+      title: 'Settings',
+      description: 'Manage your learning preferences.',
+    }),
+    Component: SettingsLayout,
+    children: [
+      { index: true, element: <Navigate to="practice" replace /> },
+      { path: 'practice', lazy: lazySettingsPage(() => import('./pages/SettingsPracticePage'), 'SettingsPracticePage') },
+      { path: 'review', lazy: lazySettingsPage(() => import('./pages/SettingsReviewPage'), 'SettingsReviewPage') },
+      { path: 'level5', lazy: lazySettingsPage(() => import('./pages/LevelFiveSettingsPage'), 'LevelFiveSettingsPage') },
+    ],
+  },
+]

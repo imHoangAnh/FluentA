@@ -32,8 +32,8 @@ test('final SPEC1 preferences and notification ownership', async ({ page }) => {
   const habits = await (await page.request.get(`http://127.0.0.1:5000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers })).json();
   expect(habits.data.find((habit) => habit.name === 'No reminder habit').reminderEnabled).toBe(false);
 
-  await page.getByRole('link', { name: 'Overview' }).click();
-  await expect(page.getByText('Dashboard Overview')).toBeVisible();
+  await page.getByRole('link', { name: 'Go to overview' }).click();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await page.getByLabel('Dashboard widget settings').click();
   await page.getByLabel('todo').uncheck();
   await expect(page.getByText('Daily todo')).toBeHidden();
