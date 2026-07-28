@@ -2,12 +2,14 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { ArchiveX, Check, ChevronDown, Filter, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { RemoveLevelFiveWordsDialog } from '../components/RemoveLevelFiveWordsDialog'
 import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
 import * as reviewApi from '@/features/review'
+import { restoreTrashEntry } from '@/features/trash'
+import { toast } from '@/lib/toast'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
+import { menuContentClassName, menuItemClassName } from '@/shared/components/ui/menu-styles'
 import { cn } from '@/shared/lib/utils'
 
 type FilterMode = 'all' | 'active' | 'inactive'
@@ -30,19 +32,28 @@ export function LevelFiveSettingsPage() {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string[]>([])
-  const [pendingRemoval, setPendingRemoval] = useState<string[] | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
 
   const levelFiveQuery = useQuery({ queryKey: ['review', 'level-five'], queryFn: reviewApi.listLevelFiveWords })
   const removeMutation = useMutation({
     mutationFn: reviewApi.removeLevelFiveWords,
     onMutate: () => setRemoveError(null),
-    onSuccess: (_, wordIds) => {
+    onSuccess: (entries, wordIds) => {
       queryClient.setQueryData(['review', 'level-five'], (current: reviewApi.LevelFiveReviewItem[] | undefined) =>
-        current?.map((item) => wordIds.includes(item.wordId) ? { ...item, status: 'inactive' as const } : item) ?? current)
+        current?.filter((item) => !wordIds.includes(item.wordId)) ?? current)
       setSelected([])
-      setPendingRemoval(null)
       setRemoveError(null)
+      toast.success(entries.length === 1 ? 'Word moved to Trash.' : `${entries.length} words moved to Trash.`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void Promise.all(entries.map((entry) => restoreTrashEntry(entry.id)))
+              .then(() => queryClient.invalidateQueries({ queryKey: ['review', 'level-five'] }))
+              .then(() => toast.success('Words restored at Level 0 for the next local day.'))
+              .catch(() => toast.error('Could not restore all selected words.'))
+          },
+        },
+      })
     },
     onError: (error: unknown) => {
       setRemoveError(readApiError(error, 'Unable to remove the selected words.'))
@@ -105,12 +116,13 @@ export function LevelFiveSettingsPage() {
               disabled={selected.length === 0 || removeMutation.isPending}
               onClick={() => {
                 setRemoveError(null)
-                setPendingRemoval([...selected])
+                removeMutation.mutate([...selected])
               }}
             >
               <ArchiveX aria-hidden="true" />
               Remove selected
             </Button>
+            {removeError ? <span className="text-xs text-destructive" role="alert">{removeError}</span> : null}
           </>
         )}
       >
@@ -143,7 +155,7 @@ export function LevelFiveSettingsPage() {
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                className="z-50 min-w-40 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+                className={cn(menuContentClassName, 'min-w-40')}
                 align="end"
                 sideOffset={6}
               >
@@ -152,7 +164,7 @@ export function LevelFiveSettingsPage() {
                     <DropdownMenu.RadioItem
                       key={value}
                       value={value}
-                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent focus:bg-accent"
+                      className={menuItemClassName}
                     >
                       <span className="grid size-4 place-items-center">
                         <DropdownMenu.ItemIndicator><Check className="size-3.5" aria-hidden="true" /></DropdownMenu.ItemIndicator>
@@ -223,22 +235,6 @@ export function LevelFiveSettingsPage() {
         </div>
       </SettingsPanel>
 
-      <RemoveLevelFiveWordsDialog
-        count={pendingRemoval?.length ?? 0}
-        error={removeError}
-        open={pendingRemoval !== null}
-        pending={removeMutation.isPending}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingRemoval(null)
-            setRemoveError(null)
-          }
-        }}
-        onRestoreFocus={() => document.getElementById('level-five-remove-selected')?.focus()}
-        onConfirm={() => {
-          if (pendingRemoval?.length) removeMutation.mutate(pendingRemoval)
-        }}
-      />
     </>
   )
 }

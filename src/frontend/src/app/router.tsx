@@ -14,6 +14,7 @@ import { notesRoutes } from '@/features/notes'
 import { pomodoroRoutes } from '@/features/pomodoro'
 import { countdownRoutes } from '@/features/countdown'
 import { habitsRoutes } from '@/features/habits'
+import { trashRoutes } from '@/features/trash'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { AppShellRouteLayout } from './layouts/AppShellRouteLayout'
 import { ProtectedRoute } from './route-guards/ProtectedRoute'
@@ -40,6 +41,7 @@ export const protectedAppRoutes: RouteObject[] = [
   ...pomodoroRoutes,
   ...countdownRoutes,
   ...habitsRoutes,
+  ...trashRoutes,
 ]
 
 export const appRoutes: RouteObject[] = [

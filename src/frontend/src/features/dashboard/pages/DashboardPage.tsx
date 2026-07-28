@@ -1,4 +1,4 @@
-import { CalendarClock, Check, CheckCircle2, Circle, Timer, TrendingUp } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, CalendarClock, Check, CheckCircle2, Circle, GraduationCap, Timer, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -84,9 +84,9 @@ export function DashboardPage() {
   const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 3), [habitsQuery.data])
   const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
   const flashcardDashboard = flashcardDashboardQuery.data
-  const dueCards = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0) + (flashcardDashboard?.newCards ?? 0)
   const dueReview = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)
-  const ringProgress = Math.min(100, dueCards * 5)
+  const learningCards = flashcardDashboard?.newCards ?? 0
+  const hasDueReview = dueReview > 0
   const isLoading = todosQuery.isLoading || habitsQuery.isLoading || countdownsQuery.isLoading || flashcardDashboardQuery.isLoading
 
   return (
@@ -109,28 +109,64 @@ export function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-3">
-          <Card className="col-span-6 max-xl:col-span-12">
-            <CardHeader className="flex-row items-start justify-between">
-              <div>
-                <CardTitle>Review queue</CardTitle>
-              </div>
-              <Badge variant={dueCards > 0 ? 'default' : 'outline'}>{dueCards} due</Badge>
-            </CardHeader>
-            <CardContent className="grid grid-cols-[180px_1fr] items-center gap-8 max-md:grid-cols-1">
-              <div className="relative mx-auto size-40" aria-label={`${dueCards} cards due today`}>
-                <svg className="size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--ds-muted)" strokeWidth="9" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--ds-primary)" strokeWidth="9" strokeLinecap="round" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - ringProgress} />
-                </svg>
-                <div className="absolute inset-0 grid place-content-center text-center"><strong className="text-3xl">{dueCards}</strong><span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Due today</span></div>
-              </div>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-border bg-background p-4"><p className="m-0 text-xs text-muted-foreground">Review</p><p className="m-0 mt-1 text-2xl font-semibold">{dueReview}</p></div>
-                  <div className="rounded-lg border border-border bg-background p-4"><p className="m-0 text-xs text-muted-foreground">Learning</p><p className="m-0 mt-1 text-2xl font-semibold">{flashcardDashboard?.newCards ?? 0}</p></div>
+          <Card className="col-span-6 overflow-hidden max-xl:col-span-12">
+            <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground" aria-hidden="true">
+                  <BookOpenCheck className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <CardTitle>Review queue</CardTitle>
+                  <CardDescription className="mt-1">Scheduled reviews stay separate from new words.</CardDescription>
                 </div>
-                {dueCards === 0 ? <p className="m-0 text-sm text-muted-foreground">No cards due today</p> : null}
-                <Button asChild><Link to="/review">Open Review</Link></Button>
+              </div>
+              <Badge data-testid="dashboard-review-due-badge" variant={hasDueReview ? 'default' : 'outline'} className="shrink-0">{dueReview} due</Badge>
+            </CardHeader>
+            <CardContent className="grid grid-cols-[152px_minmax(0,1fr)] items-stretch gap-6 max-sm:grid-cols-1">
+              <div
+                data-testid="dashboard-review-due-ring"
+                className="relative mx-auto grid size-36 place-items-center rounded-full bg-[radial-gradient(circle_at_center,var(--ds-card)_58%,var(--ds-secondary)_100%)]"
+                aria-label={`${dueReview} ${dueReview === 1 ? 'word' : 'words'} due for review today. ${learningCards} new ${learningCards === 1 ? 'word' : 'words'} available to learn.`}
+              >
+                <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="var(--ds-muted)" strokeWidth="7" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    fill="none"
+                    stroke="var(--ds-primary)"
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    pathLength="100"
+                    strokeDasharray={hasDueReview ? '74 26' : '0 100'}
+                  />
+                </svg>
+                <div className="relative grid place-items-center gap-1 text-center">
+                  <BookOpenCheck className="size-5 text-primary" aria-hidden="true" />
+                  <strong className="text-4xl leading-none tracking-[-0.04em] text-foreground">{dueReview}</strong>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Due today</span>
+                </div>
+              </div>
+              <div className="flex min-w-0 flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3 max-[420px]:grid-cols-1">
+                  <div data-testid="dashboard-review-count" className="rounded-lg border border-primary/15 bg-secondary/65 p-3.5">
+                    <div className="flex items-center gap-2 text-xs font-medium text-secondary-foreground"><BookOpenCheck className="size-4" aria-hidden="true" />Review</div>
+                    <p className="m-0 mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{dueReview}</p>
+                    <p className="m-0 mt-0.5 text-xs text-muted-foreground">Scheduled words</p>
+                  </div>
+                  <div data-testid="dashboard-learning-count" className="rounded-lg border border-border bg-muted/45 p-3.5">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><GraduationCap className="size-4" aria-hidden="true" />Learning</div>
+                    <p className="m-0 mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{learningCards}</p>
+                    <p className="m-0 mt-0.5 text-xs text-muted-foreground">New words</p>
+                  </div>
+                </div>
+                <p className="m-0 text-sm text-muted-foreground">
+                  {hasDueReview
+                    ? `${dueReview} ${dueReview === 1 ? 'word is' : 'words are'} ready for spaced review.`
+                    : 'No reviews due today.'}
+                </p>
+                <Button asChild className="mt-auto w-full justify-between"><Link to="/review">Open Review<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
               </div>
             </CardContent>
           </Card>

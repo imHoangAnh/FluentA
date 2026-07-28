@@ -257,6 +257,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
 
+                    b.Property<DateTime?>("RestoredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("restored_at_utc");
+
                     b.Property<DateTime>("TargetDate")
                         .HasColumnType("date")
                         .HasColumnName("target_date");
@@ -1350,6 +1354,77 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("todo_items", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Trash.Entities.TrashEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("display_name");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entity_kind");
+
+                    b.Property<string>("OriginalLocation")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("original_location");
+
+                    b.Property<DateTime>("PurgeAfterAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purge_after_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime>("TrashedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trashed_at");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntityKind", "EntityId")
+                        .IsUnique();
+
+                    b.HasIndex("State", "PurgeAfterAt");
+
+                    b.HasIndex("UserId", "State", "TrashedAt");
+
+                    b.ToTable("trash_entries", (string)null);
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1741,6 +1816,15 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("GeneratedFromTodoId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Trash.Entities.TrashEntry", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", b =>

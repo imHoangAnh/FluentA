@@ -262,6 +262,10 @@ public sealed class PomodoroServiceTests
     {
         public Task<TodoItem?> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default) =>
             Task.FromResult(items.FirstOrDefault(item => item.Id == todoId && item.UserId == userId && item.DeletedAt is null));
+        public Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default) =>
+            GetAsync(userId, todoId, cancellationToken);
+        public Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TodoItem>>(items.Where(item => item.UserId == userId).ToList());
         public Task<IReadOnlyList<TodoItem>> ListByDateAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TodoItem>>([]);
         public Task<IReadOnlyList<TodoItem>> ListByRangeAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TodoItem>>([]);
         public Task<IReadOnlyList<TodoItem>> ListCarryOverCandidatesAsync(Guid userId, DateTime today, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TodoItem>>([]);
@@ -269,6 +273,7 @@ public sealed class PomodoroServiceTests
         public Task AddAsync(TodoItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateRangeAsync(IReadOnlyList<TodoItem> values, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RemoveRangeAsync(IReadOnlyList<TodoItem> values, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<TodoCompletionMutationResult?> SetCompletionAsync(Guid userId, Guid todoId, bool isCompleted, DateTime nowUtc, CancellationToken cancellationToken = default) =>
             Task.FromResult<TodoCompletionMutationResult?>(null);
     }

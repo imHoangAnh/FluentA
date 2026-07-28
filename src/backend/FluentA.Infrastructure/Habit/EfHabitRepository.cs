@@ -34,6 +34,15 @@ public sealed class EfHabitRepository : IHabitRepository
                 cancellationToken);
     }
 
+    public Task<HabitEntity?> GetTrashedAsync(Guid userId, Guid habitId, DateTime trashedAt, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Habits.FirstOrDefaultAsync(
+            habit => habit.Id == habitId
+                && habit.UserId == userId
+                && habit.DeletedAt == trashedAt,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
         Guid habitId,
         DateTime startDate,
@@ -83,6 +92,12 @@ public sealed class EfHabitRepository : IHabitRepository
     public async Task UpdateAsync(HabitEntity habit, CancellationToken cancellationToken = default)
     {
         _dbContext.Habits.Update(habit);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveAsync(HabitEntity habit, CancellationToken cancellationToken = default)
+    {
+        _dbContext.Habits.Remove(habit);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

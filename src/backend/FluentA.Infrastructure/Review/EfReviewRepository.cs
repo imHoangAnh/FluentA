@@ -520,6 +520,7 @@ public sealed class EfReviewRepository : IReviewRepository
             where state.UserId == userId
                 && state.DeletedAt == null
                 && state.Level == 5
+                && state.Status == WordReviewStatus.Active
                 && word.DeletedAt == null
                 && page.DeletedAt == null
                 && board.DeletedAt == null

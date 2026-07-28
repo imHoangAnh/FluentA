@@ -5,11 +5,11 @@ services:
     environment:
       POSTGRES_DB: fluenta_dev
       POSTGRES_USER: fluenta
-      POSTGRES_PASSWORD: fluenta_local_pass
+      POSTGRES_PASSWORD: fluenta_dev
     ports:
       - "5432:5432"
     volumes:
-      - fluenta_postgres_data:/var/lib/postgresql/data
+      - fluenta_postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fluenta -d fluenta_dev"]
       interval: 5s
@@ -62,5 +62,6 @@ services:
         mc anonymous set none "local/$$MINIO_BUCKET"
 
 volumes:
-  fluenta_postgres_data:
+  fluenta_postgres_dev_data:
+    name: fluenta-postgres-dev-data
   fluenta_minio_data:

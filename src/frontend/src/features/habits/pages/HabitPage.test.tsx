@@ -65,7 +65,9 @@ describe('HabitPage', () => {
     api.listHabits.mockResolvedValue([habit()])
     api.listHabitEntries.mockResolvedValue([])
     api.toggleHabitEntry.mockResolvedValue({ habitId: 'habit-1', date: todayInput(), isCompleted: true, totalCheckIns: 5, isGoalCompleted: false })
-    api.deleteHabit.mockResolvedValue(undefined)
+    api.deleteHabit.mockResolvedValue({
+      id: 'trash-1', entityKind: 'Habit', entityId: 'habit-1', displayName: 'Read English', originalLocation: 'Habit tracker', trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
+    })
   })
 
   it('renders selected-day rows and the four main detail statistics', async () => {
@@ -96,20 +98,10 @@ describe('HabitPage', () => {
     expect(habitsRoutes.map((route) => route.path)).toEqual(['habits'])
   })
 
-  it('requires confirmation before deleting a Habit', async () => {
+  it('moves the selected Habit to Trash without confirmation', async () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Delete Read English' }))
-    expect(await screen.findByRole('alertdialog', { name: 'Delete Habit?' })).toBeInTheDocument()
-    expect(screen.getByText(/This action cannot be undone/)).toHaveTextContent('Read English')
-    expect(api.deleteHabit).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
-    expect(api.deleteHabit).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Read English' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete Habit' }))
     await waitFor(() => expect(api.deleteHabit).toHaveBeenCalled())
     expect(api.deleteHabit.mock.calls[0]?.[0]).toBe('habit-1')
   })

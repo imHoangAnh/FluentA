@@ -96,6 +96,15 @@ describe('TodoPage My Day workspace', () => {
     })
     api.deleteTodo.mockImplementation(async (id: string) => {
       items = items.filter((item) => item.id !== id)
+      return {
+        id: 'trash-todo-1',
+        entityKind: 'Todo',
+        entityId: id,
+        displayName: 'Review vocabulary',
+        originalLocation: toDateInput(new Date()),
+        trashedAt: '2026-07-28T00:00:00Z',
+        purgeAfterAt: '2026-08-27T00:00:00Z',
+      }
     })
   })
 
@@ -218,16 +227,14 @@ describe('TodoPage My Day workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This task is unavailable or no longer exists.')
   })
 
-  it('requires confirmation before deleting a task', async () => {
+  it('moves a task to Trash without a confirmation modal', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete task' }))
 
-    expect(await screen.findByRole('alertdialog', { name: 'Delete task?' })).toHaveTextContent('Review vocabulary')
-    expect(api.deleteTodo).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete task' }))
     await waitFor(() => expect(api.deleteTodo).toHaveBeenCalled())
     expect(api.deleteTodo.mock.calls[0]?.[0]).toBe('todo-1')
+    expect(screen.queryByRole('alertdialog', { name: 'Delete task?' })).not.toBeInTheDocument()
   })
 
   it('keeps completed tasks collapsed and restores them to active from the context menu', async () => {

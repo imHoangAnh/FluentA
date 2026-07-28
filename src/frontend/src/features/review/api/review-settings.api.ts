@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type ReviewSettings = {
   dailyLimit: number
@@ -33,6 +34,6 @@ export async function listLevelFiveWords() {
 }
 
 export async function removeLevelFiveWords(wordIds: string[]) {
-  const response = await apiClient.post<ApiEnvelope<number>>('/review/level-five/remove', { wordIds })
-  return response.data.data ?? 0
+  const response = await apiClient.post<ApiEnvelope<TrashEntry[]>>('/review/level-five/remove', { wordIds })
+  return response.data.data ?? []
 }

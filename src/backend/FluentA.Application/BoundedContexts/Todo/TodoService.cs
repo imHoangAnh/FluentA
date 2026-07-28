@@ -1,5 +1,6 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Enums;
@@ -15,11 +16,13 @@ public sealed class TodoService : ITodoService
     private const string TimeFormat = "HH:mm";
     private readonly ITodoRepository _repository;
     private readonly ITodoSyncNotifier _syncNotifier;
+    private readonly ITrashService? _trashService;
 
-    public TodoService(ITodoRepository repository, ITodoSyncNotifier? syncNotifier = null)
+    public TodoService(ITodoRepository repository, ITodoSyncNotifier? syncNotifier = null, ITrashService? trashService = null)
     {
         _repository = repository;
         _syncNotifier = syncNotifier ?? NullTodoSyncNotifier.Instance;
+        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByDateAsync(
@@ -275,17 +278,29 @@ public sealed class TodoService : ITodoService
         return OperationResult<TodoItemDto>.Success(ToDto(item, warningCode));
     }
 
-    public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
     {
+        if (_trashService is not null)
+        {
+            return await _trashService.TrashTodoAsync(userId, todoId, cancellationToken);
+        }
+
         var item = await _repository.GetAsync(userId, todoId, cancellationToken);
         if (item is null)
         {
-            return OperationResult<bool>.Failure(TodoError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(TodoError.NotFound());
         }
 
         item.SoftDelete();
         await _repository.UpdateAsync(item, cancellationToken);
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(
+            Guid.Empty,
+            "Todo",
+            item.Id,
+            item.Title,
+            FormatDate(item.Date),
+            item.DeletedAt!.Value,
+            item.DeletedAt!.Value.AddDays(30)));
     }
 
     public async Task<OperationResult<TodoItemDto>> DuplicateAsync(

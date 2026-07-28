@@ -1,4 +1,5 @@
 using FluentA.Application.BoundedContexts.Habit.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 
 namespace FluentA.Application.BoundedContexts.Habit;
@@ -15,7 +16,7 @@ public interface IHabitService
     Task<OperationResult<HabitDto>> UpdateAsync(Guid userId, Guid habitId, UpdateHabitRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Soft-deletes an owned habit.</summary>
-    Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default);
+    Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default);
 
     /// <summary>Lists completed entries for one owned habit and calendar month.</summary>
     Task<OperationResult<IReadOnlyList<HabitEntryDto>>> ListEntriesAsync(Guid userId, Guid habitId, string? month, string? timeZoneId, CancellationToken cancellationToken = default);

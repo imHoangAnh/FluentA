@@ -1,6 +1,7 @@
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 
@@ -9,10 +10,12 @@ namespace FluentA.Application.BoundedContexts.Review;
 public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 {
     private readonly IReviewRepository _repository;
+    private readonly ITrashService? _trash;
 
-    public ReviewService(IReviewRepository repository)
+    public ReviewService(IReviewRepository repository, ITrashService? trash = null)
     {
         _repository = repository;
+        _trash = trash;
     }
 
     public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(
@@ -191,21 +194,41 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
         CancellationToken cancellationToken = default) =>
         _repository.ListLevelFiveWordsAsync(userId, cancellationToken);
 
-    public async Task<OperationResult<int>> RemoveLevelFiveWordsAsync(
+    public async Task<OperationResult<IReadOnlyList<TrashEntryDto>>> RemoveLevelFiveWordsAsync(
         Guid userId,
         RemoveLevelFiveWordsRequest request,
         CancellationToken cancellationToken = default)
     {
         if (request.WordIds is null || request.WordIds.Count == 0)
         {
-            return OperationResult<int>.Failure(ReviewError.Validation(new Dictionary<string, string[]>
+            return OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(ReviewError.Validation(new Dictionary<string, string[]>
             {
                 ["wordIds"] = ["At least one Level 5 word is required."]
             }));
         }
 
-        var removed = await _repository.RemoveLevelFiveWordsAsync(userId, request.WordIds, cancellationToken);
-        return OperationResult<int>.Success(removed);
+        var ids = request.WordIds.Distinct().ToArray();
+        if (ids.Length > 100 || ids.Any(id => id == Guid.Empty))
+        {
+            return OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(ReviewError.Validation(new Dictionary<string, string[]>
+            {
+                ["wordIds"] = ["Between 1 and 100 valid Level 5 words are required."]
+            }));
+        }
+
+        if (_trash is not null)
+        {
+            var moved = await _trash.TrashLevelFiveBatchAsync(userId, ids, cancellationToken);
+            return moved.IsSuccess
+                ? OperationResult<IReadOnlyList<TrashEntryDto>>.Success(moved.Value!)
+                : OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(moved.Error!);
+        }
+
+        // Isolated legacy service tests do not compose the Trash coordinator.
+        // Production DI always follows the branch above.
+        var removed = await _repository.RemoveLevelFiveWordsAsync(userId, ids, cancellationToken);
+        return OperationResult<IReadOnlyList<TrashEntryDto>>.Success(
+            Enumerable.Range(0, removed).Select(_ => new TrashEntryDto(Guid.Empty, "LevelFive", Guid.Empty, string.Empty, "Review", DateTime.UtcNow, DateTime.UtcNow)).ToArray());
     }
 
     private static Dictionary<string, string[]> ValidateSettings(UpdateReviewSettingsRequest request)

@@ -232,10 +232,21 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void SoftDelete()
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        DeletedAt = DateTime.UtcNow;
+        DeletedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
         UpdatedAt = DeletedAt.Value;
+    }
+
+    public void RestoreFromTrash(DateTime? nowUtc = null)
+    {
+        if (DeletedAt is null)
+        {
+            return;
+        }
+
+        DeletedAt = null;
+        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
     }
 
     private void Touch(DateTime? nowUtc = null)

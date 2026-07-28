@@ -1,6 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useEffect, useRef, useState } from 'react'
 import { Bell, Check, ChevronRight, Circle, Repeat2, Star, Trash2, X } from 'lucide-react'
+import { menuContentClassName, menuItemClassName } from '@/shared/components/ui/menu-styles'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
 import { createBrowserReminder } from '../todo-reminder'
 
@@ -12,9 +13,6 @@ const repeatOptions: Array<{ value: TodoRepeatPattern | null; label: string }> =
   { value: 'Monthly', label: 'Monthly' },
   { value: 'Yearly', label: 'Yearly' },
 ]
-
-const repeatMenuClass = 'todo-details__repeat-menu'
-const repeatMenuItemClass = 'todo-details__repeat-option'
 
 type TodoDetailsPanelProps = {
   item: TodoItem
@@ -211,10 +209,10 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content className={repeatMenuClass} sideOffset={6} align="start">
+            <DropdownMenu.Content className={menuContentClassName} sideOffset={6} align="start">
               {repeatOptions.map((option) => (
                 <DropdownMenu.Item
-                  className={repeatMenuItemClass}
+                  className={menuItemClassName}
                   key={option.value ?? 'none'}
                   onSelect={() => void onUpdate(item.id, { repeatPattern: option.value }).catch(() => undefined)}
                 >

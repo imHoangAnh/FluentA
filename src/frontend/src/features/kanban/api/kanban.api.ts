@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type KanbanBoardSummary = {
   id: string
@@ -70,7 +71,8 @@ export async function getBoard(boardId: string) {
 }
 
 export async function deleteBoard(boardId: string) {
-  await apiClient.delete(`/kanban/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/kanban/boards/${boardId}`)
+  return response.data.data!
 }
 
 export async function createColumn(boardId: string, name: string) {
@@ -84,7 +86,8 @@ export async function updateColumn(boardId: string, columnId: string, input: { n
 }
 
 export async function deleteColumn(boardId: string, columnId: string) {
-  await apiClient.delete(`/kanban/boards/${boardId}/columns/${columnId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/kanban/boards/${boardId}/columns/${columnId}`)
+  return response.data.data!
 }
 
 export async function createCard(boardId: string, input: CreateKanbanCardInput) {
@@ -103,5 +106,6 @@ export async function moveCard(cardId: string, columnId: string, sortOrder: numb
 }
 
 export async function deleteCard(cardId: string) {
-  await apiClient.delete(`/kanban/cards/${cardId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/kanban/cards/${cardId}`)
+  return response.data.data!
 }

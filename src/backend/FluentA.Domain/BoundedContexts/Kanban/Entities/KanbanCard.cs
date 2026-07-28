@@ -101,6 +101,12 @@ public sealed class KanbanCard : BaseEntity
         UpdatedAt = now;
     }
 
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        DeletedAt = null;
+        UpdatedAt = nowUtc;
+    }
+
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;

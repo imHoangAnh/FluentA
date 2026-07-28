@@ -6,7 +6,6 @@ import {
   FileText,
   Flame,
   GraduationCap,
-  LayoutDashboard,
   NotebookPen,
   Settings,
   Timer,
@@ -20,7 +19,6 @@ export const shellNavigationSections: ShellNavigationSection[] = [
   {
     label: 'Studying',
     items: [
-      { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
       { to: '/vocabulary', label: 'Vocabulary', icon: BookOpenText },
       {
         to: '/flashcards',

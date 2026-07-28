@@ -4,6 +4,7 @@ using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Countdown.Entities;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
 
 namespace FluentA.Application.BoundedContexts.Countdown;
@@ -14,15 +15,18 @@ public sealed class CountdownService : ICountdownService
     private readonly ICountdownRepository _repository;
     private readonly IAssetRepository? _assets;
     private readonly IAssetObjectStorage? _assetStorage;
+    private readonly ITrashService? _trash;
 
     public CountdownService(
         ICountdownRepository repository,
         IAssetRepository? assets = null,
-        IAssetObjectStorage? assetStorage = null)
+        IAssetObjectStorage? assetStorage = null,
+        ITrashService? trash = null)
     {
         _repository = repository;
         _assets = assets;
         _assetStorage = assetStorage;
+        _trash = trash;
     }
 
     public async Task<OperationResult<IReadOnlyList<CountdownEventDto>>> ListAsync(
@@ -68,12 +72,17 @@ public sealed class CountdownService : ICountdownService
         return OperationResult<CountdownEventDto>.Success(await ToDtoAsync(userId, countdown, cancellationToken));
     }
 
-    public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
     {
+        if (_trash is not null)
+        {
+            return await _trash.TrashCountdownAsync(userId, countdownId, cancellationToken);
+        }
+
         var countdown = await _repository.GetAsync(userId, countdownId, cancellationToken);
         if (countdown is null)
         {
-            return OperationResult<bool>.Failure(CountdownError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(CountdownError.NotFound());
         }
 
         if (countdown.CoverAssetId.HasValue && _assets is not null)
@@ -89,7 +98,7 @@ public sealed class CountdownService : ICountdownService
         countdown.SoftDelete();
         await _repository.UpdateAsync(countdown, cancellationToken);
 
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Countdown", countdown.Id, countdown.Name, "Countdown", DateTime.UtcNow, DateTime.UtcNow));
     }
 
     private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts)> ValidateCreateAsync(

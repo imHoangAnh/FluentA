@@ -2,7 +2,8 @@ import { CalendarClock, Plus } from 'lucide-react'
 import { type MouseEvent, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as habitApi from '../api/habit.api'
-import { DeleteHabitConfirmationDialog } from '../components/DeleteHabitConfirmationDialog'
+import { restoreTrashEntry } from '@/features/trash'
+import { toast } from '@/lib/toast'
 import { HabitDetailsPanel } from '../components/HabitDetailsPanel'
 import { HabitFormDialog } from '../components/HabitFormDialog'
 import { HabitList } from '../components/HabitList'
@@ -29,7 +30,6 @@ export function HabitPage() {
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(new Date())))
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [formHabitId, setFormHabitId] = useState<'new' | string | null>(null)
-  const [deleteHabitId, setDeleteHabitId] = useState<string | null>(null)
   const formTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const weekDates = useMemo<HabitWeekDay[]>(() => {
@@ -59,7 +59,6 @@ export function HabitPage() {
   const formHabit = formHabitId && formHabitId !== 'new'
     ? habits.find((habit) => habit.id === formHabitId)
     : undefined
-  const habitPendingDelete = habits.find((habit) => habit.id === deleteHabitId)
 
   const entryQueryKeys = useMemo(() => {
     const weekMonths = [...new Set(weekDates.map((day) => day.dateStr.slice(0, 7)))]
@@ -118,11 +117,22 @@ export function HabitPage() {
   })
   const deleteHabit = useMutation({
     mutationFn: habitApi.deleteHabit,
-    onSuccess: async () => {
-      setDeleteHabitId(null)
+    onSuccess: async (entry) => {
       setSelectedHabitId(null)
       await refresh()
+      toast.success('Habit moved to Trash. Its reminder was removed.', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreTrashEntry(entry.id)
+              .then(refresh)
+              .then(() => toast.success('Habit restored without a reminder.'))
+              .catch(() => toast.error('Could not restore the habit.'))
+          },
+        },
+      })
     },
+    onError: () => toast.error('Could not move the habit to Trash.'),
   })
   const toggleEntry = useMutation({
     mutationFn: ({ habitId, date }: { habitId: string; date: string }) => habitApi.toggleHabitEntry(habitId, date, timeZoneId),
@@ -131,7 +141,6 @@ export function HabitPage() {
 
   const mutationError = createHabit.error ?? updateHabit.error
   const formError = mutationError instanceof Error ? mutationError.message : undefined
-  const deleteError = deleteHabit.error instanceof Error ? deleteHabit.error.message : undefined
   const selectedDates = useMemo(() => monthDates(selectedMonth), [selectedMonth])
 
   function openCreate(event: MouseEvent<HTMLButtonElement>) {
@@ -192,7 +201,7 @@ export function HabitPage() {
             onNextMonth={() => setSelectedMonth((month) => shiftMonth(month, 1))}
             onToggle={(date) => toggleEntry.mutate({ habitId: selectedHabit.id, date })}
             onEdit={() => openEdit(selectedHabit.id)}
-            onDelete={() => setDeleteHabitId(selectedHabit.id)}
+            onDelete={() => deleteHabit.mutate(selectedHabit.id)}
           />
         ) : (
           <div className="habit-tracker-empty-state"><CalendarClock size={80} /><p>Select a habit to view your progress</p></div>
@@ -211,20 +220,6 @@ export function HabitPage() {
           onSubmit={(payload) => formHabit
             ? updateHabit.mutate({ id: formHabit.id, patch: payload })
             : createHabit.mutate(payload)}
-        />
-      ) : null}
-
-      {habitPendingDelete ? (
-        <DeleteHabitConfirmationDialog
-          name={habitPendingDelete.name}
-          pending={deleteHabit.isPending}
-          error={deleteError}
-          onOpenChange={(open) => {
-            if (open) return
-            deleteHabit.reset()
-            setDeleteHabitId(null)
-          }}
-          onConfirm={() => deleteHabit.mutate(habitPendingDelete.id)}
         />
       ) : null}
     </div>

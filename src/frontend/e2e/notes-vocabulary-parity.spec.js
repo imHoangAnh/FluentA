@@ -12,19 +12,30 @@ function json(data) {
 }
 
 async function mockNoteApis(page) {
+  const longPageName = 'A very long Notes page title that must stay inside the page rail and end with an ellipsis'
   const board = {
     id: 'board-1',
     name: 'Learning Notes',
     createdAt: '2026-07-20T09:00:00Z',
     updatedAt: '2026-07-21T09:00:00Z',
-    pages: [{
-      id: 'page-1',
-      boardId: 'board-1',
-      name: 'Vocabulary recap',
-      date: '2026-07-21',
-      createdAt: '2026-07-21T09:00:00Z',
-      updatedAt: '2026-07-21T09:00:00Z',
-    }],
+    pages: [
+      {
+        id: 'page-1',
+        boardId: 'board-1',
+        name: 'Vocabulary recap',
+        date: '2026-07-21',
+        createdAt: '2026-07-21T09:00:00Z',
+        updatedAt: '2026-07-21T09:00:00Z',
+      },
+      {
+        id: 'page-long',
+        boardId: 'board-1',
+        name: longPageName,
+        date: '2026-07-20',
+        createdAt: '2026-07-20T09:00:00Z',
+        updatedAt: '2026-07-20T09:00:00Z',
+      },
+    ],
   }
   const pageDetails = new Map([[
     'page-1',
@@ -91,6 +102,29 @@ async function mockNoteApis(page) {
     })
   })
 }
+
+test('Notes page titles use an ellipsis instead of overflowing the rail', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await mockNoteApis(page)
+  await page.goto('http://localhost:5173/notes')
+
+  const longPageName = 'A very long Notes page title that must stay inside the page rail and end with an ellipsis'
+  const pageButton = page.getByRole('button', { name: longPageName })
+  const label = pageButton.getByText(longPageName)
+  const metrics = await label.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflow: style.overflow,
+      textOverflow: style.textOverflow,
+      whiteSpace: style.whiteSpace,
+    }
+  })
+
+  expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth)
+  expect(metrics).toMatchObject({ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })
+})
 
 for (const viewport of [
   { name: 'mobile', width: 320, height: 780 },

@@ -75,10 +75,17 @@ public sealed class VocabWord : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void SoftDelete()
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        DeletedAt = DateTime.UtcNow;
-        UpdatedAt = DeletedAt.Value;
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
+        DeletedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void RestoreFromTrash(DateTime? nowUtc = null)
+    {
+        DeletedAt = null;
+        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
     }
 
     private void Apply(

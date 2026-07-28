@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -59,7 +60,7 @@ public sealed class HabitsController : ControllerBase
     {
         var result = await _habits.DeleteAsync(CurrentUserId(), habitId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Habit deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -100,11 +101,22 @@ public sealed class HabitsController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
-        if (result.Error is not HabitError error)
+        var error = result.Error switch
+        {
+            HabitError habitError => new ApiErrorEnvelope(habitError.Code, habitError.Message, habitError.Details),
+            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
+            _ => null,
+        };
+        var statusCode = result.Error switch
+        {
+            HabitError habitError => habitError.StatusCode,
+            TrashError trashError => trashError.StatusCode,
+            _ => 500,
+        };
+        if (error is null)
         {
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
     }
 }

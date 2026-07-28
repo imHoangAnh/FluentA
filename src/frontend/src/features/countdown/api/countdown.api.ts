@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type CountdownEvent = {
   id: string
@@ -43,5 +44,6 @@ export async function createCountdown(input: CreateCountdownInput) {
 }
 
 export async function deleteCountdown(id: string) {
-  await apiClient.delete(`/countdowns/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/countdowns/${id}`)
+  return response.data.data!
 }

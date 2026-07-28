@@ -84,6 +84,9 @@ public sealed class EfJournalRepository : IJournalRepository
             .FirstOrDefaultAsync(entry => entry.Id == journalId && entry.UserId == userId && entry.DeletedAt == null, cancellationToken);
     }
 
+    public Task<JournalEntry?> GetTrashedAsync(Guid userId, Guid journalId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+        _dbContext.JournalEntries.FirstOrDefaultAsync(entry => entry.Id == journalId && entry.UserId == userId && entry.DeletedAt == trashedAt, cancellationToken);
+
     public async Task AddAsync(JournalEntry entry, CancellationToken cancellationToken = default)
     {
         await _dbContext.JournalEntries.AddAsync(entry, cancellationToken);
@@ -93,6 +96,12 @@ public sealed class EfJournalRepository : IJournalRepository
     public async Task UpdateAsync(JournalEntry entry, CancellationToken cancellationToken = default)
     {
         _dbContext.JournalEntries.Update(entry);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveAsync(JournalEntry entry, CancellationToken cancellationToken = default)
+    {
+        _dbContext.JournalEntries.Remove(entry);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

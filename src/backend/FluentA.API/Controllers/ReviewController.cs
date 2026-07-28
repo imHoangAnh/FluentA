@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -92,7 +93,7 @@ public sealed class ReviewController : ControllerBase
     {
         var result = await _review.RemoveLevelFiveWordsAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<int>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<IReadOnlyList<TrashEntryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -112,12 +113,14 @@ public sealed class ReviewController : ControllerBase
         var error = result.Error switch
         {
             ReviewError reviewError => new ApiErrorEnvelope(reviewError.Code, reviewError.Message, reviewError.Details),
+            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
             _ => null,
         };
 
         var statusCode = result.Error switch
         {
             ReviewError reviewError => reviewError.StatusCode,
+            TrashError trashError => trashError.StatusCode,
             _ => 500,
         };
 

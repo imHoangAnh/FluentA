@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
@@ -86,7 +86,7 @@ describe('DashboardPage', () => {
   it('renders current empty states, links, and local date/timezone queries', async () => {
     renderDashboard()
 
-    expect(await screen.findByText('No cards due today')).toBeInTheDocument()
+    expect(await screen.findByText('No reviews due today.')).toBeInTheDocument()
     expect(screen.getByText('No tasks for today.')).toBeInTheDocument()
     expect(screen.getByText('No habits scheduled today.')).toBeInTheDocument()
     expect(screen.getByText('No upcoming events')).toBeInTheDocument()
@@ -119,7 +119,24 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Plan speaking practice')).toBeInTheDocument()
     expect(screen.getByText('Read English')).toBeInTheDocument()
     expect(screen.getByText('IELTS Exam')).toBeInTheDocument()
-    expect(screen.getByText('9 due')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-review-due-badge')).toHaveTextContent('5 due')
+    expect(within(screen.getByTestId('dashboard-review-due-ring')).getByText('5')).toBeInTheDocument()
+    expect(within(screen.getByTestId('dashboard-review-count')).getByText('5')).toBeInTheDocument()
+    expect(within(screen.getByTestId('dashboard-learning-count')).getByText('4')).toBeInTheDocument()
+  })
+
+  it('keeps new learning words out of the Due Today count', async () => {
+    adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 7 })
+
+    renderDashboard()
+
+    const ring = await screen.findByTestId('dashboard-review-due-ring')
+    expect(ring).toHaveAttribute('aria-label', '0 words due for review today. 7 new words available to learn.')
+    expect(within(ring).getByText('0')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-review-due-badge')).toHaveTextContent('0 due')
+    expect(within(screen.getByTestId('dashboard-review-count')).getByText('0')).toBeInTheDocument()
+    expect(within(screen.getByTestId('dashboard-learning-count')).getByText('7')).toBeInTheDocument()
+    expect(screen.getByText('No reviews due today.')).toBeInTheDocument()
   })
 
   it('keeps Todo and Habit quick-toggle mutation contracts', async () => {

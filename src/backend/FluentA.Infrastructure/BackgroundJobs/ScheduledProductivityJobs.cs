@@ -1,5 +1,6 @@
 using FluentA.Application.BackgroundJobs;
 using FluentA.Application.BoundedContexts.Assets;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -13,12 +14,14 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
     private readonly IAssetService _assetService;
+    private readonly ITrashService _trashService;
 
-    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService)
+    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService, ITrashService trashService)
     {
         _dbContext = dbContext;
         _logger = logger;
         _assetService = assetService;
+        _trashService = trashService;
     }
 
     public async Task CarryOverTodosAsync(CancellationToken cancellationToken = default)
@@ -156,37 +159,18 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     {
         var now = DateTime.UtcNow;
         var countdowns = await _dbContext.CountdownEvents
-            .Include(countdown => countdown.Alerts)
             .Where(countdown => countdown.DeletedAt == null)
             .ToListAsync(cancellationToken);
 
         var retired = 0;
         foreach (var countdown in countdowns.Where(countdown => countdown.ShouldRetireAt(now)))
         {
-            if (countdown.CoverAssetId.HasValue)
+            var result = await _trashService.TrashCountdownAsync(countdown.UserId, countdown.Id, cancellationToken);
+            if (result.IsSuccess)
             {
-                var asset = await _dbContext.Assets.FirstOrDefaultAsync(
-                    entity => entity.Id == countdown.CoverAssetId.Value
-                        && entity.UploadedByUserId == countdown.UserId
-                        && entity.DeletedAt == null,
-                    cancellationToken);
-
-                if (asset is not null)
-                {
-                    asset.Archive(now, TimeSpan.FromDays(30));
-                }
+                retired++;
+                _logger.LogInformation("Countdown retirement moved to Trash for user {UserId}, countdown {CountdownId}.", countdown.UserId, countdown.Id);
             }
-
-            countdown.DetachCover();
-            countdown.SoftDelete(now);
-
-            retired++;
-            _logger.LogInformation("Countdown retirement queued for user {UserId}, countdown {CountdownId}.", countdown.UserId, countdown.Id);
-        }
-
-        if (retired > 0)
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         _logger.LogInformation("CountdownRetirementJob retired {Count} countdowns.", retired);
@@ -204,20 +188,18 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         _logger.LogInformation("ArchivedAssetPurgeJob claimed {Claimed} assets, deleted {Deleted}, failed {Failed}.", result.Claimed, result.Deleted, result.Failed);
     }
 
+    public async Task PurgeExpiredTrashAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await _trashService.PurgeDueAsync(cancellationToken);
+        _logger.LogInformation("TrashPurgeJob claimed {Claimed}, deleted {Deleted}, skipped {Skipped}, failed {Failed}.", result.Claimed, result.Deleted, result.Skipped, result.Failed);
+    }
+
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)
     {
         var cutoff = DateTime.UtcNow.AddDays(-30);
         var deleted = 0;
 
-        deleted += await _dbContext.HabitEntries.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.Habits.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.TodoItems.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.CountdownAlerts.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.CountdownEvents.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.JournalEntries.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.KanbanCards.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.KanbanColumns.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-        deleted += await _dbContext.KanbanBoards.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
+        // E35-owned records are permanently deleted exclusively by TrashService.
         deleted += await _dbContext.PomodoroSessions.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         deleted += await _dbContext.PomodoroConfigs.Where(entity => entity.DeletedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
 

@@ -5,8 +5,8 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities'
 import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../api/vocabulary.api'
-import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { toast } from '@/lib/toast'
+import { restoreTrashEntry } from '@/features/trash'
 
 const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
 const textCellClassName = `${cellClassName} block h-auto resize-none overflow-hidden whitespace-pre-wrap break-words leading-5`
@@ -159,7 +159,7 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
     <div>
       {type === 'select' ? (
         <div className="relative">
-          <select className={`${cellClassName} appearance-none pr-7`} ref={register} {...shared}>
+          <select className={`${cellClassName} ds-select-inline appearance-none pr-7`} ref={register} {...shared}>
             {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -235,8 +235,6 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   const cellRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({})
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
   const tableFocusRef = useRef<HTMLDivElement>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
-  const [restoreDeleteFocus, setRestoreDeleteFocus] = useState(false)
 
   const wordsKey = ['vocab', 'words', page.id]
   const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
@@ -282,12 +280,20 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
   const deleteWord = useMutation({
     mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(boardId, target.id),
-    onSuccess: (_, target) => {
+    onSuccess: (entry, target) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== target.id))
-      setRestoreDeleteFocus(true)
-      setDeleteTarget(null)
       requestAnimationFrame(() => tableFocusRef.current?.focus())
-      toast.success('Word deleted successfully')
+      toast.success('Word moved to Trash.', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreTrashEntry(entry.id)
+              .then(() => queryClient.invalidateQueries({ queryKey: wordsKey }))
+              .then(() => toast.success('Word restored.'))
+              .catch(() => toast.error('Could not restore the word.'))
+          },
+        },
+      })
     },
   })
 
@@ -382,7 +388,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
     if (column.type === 'select') {
       return (
         <div className="relative">
-          <select className={`${cellClassName} appearance-none pr-7`} {...shared}>
+          <select className={`${cellClassName} ds-select-inline appearance-none pr-7`} {...shared}>
             {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -421,7 +427,10 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
                   onResizeStart={handleResizeStart}
                 />
               ))}
-              <div />
+              <div
+                className="sticky right-0 z-20 min-h-10 border-l border-foreground/70 bg-muted"
+                data-testid="sticky-actions-header"
+              />
             </div>
           </SortableContext>
         </DndContext>
@@ -441,13 +450,13 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
                 />
               </div>
             ))}
-            <div className="grid h-10 place-items-center">
+            <div className="sticky right-0 z-[5] grid h-10 place-items-center border-l border-foreground/70 bg-card" data-testid="sticky-word-actions">
               <button
                 className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 type="button"
                 tabIndex={-1}
                 aria-label={`Delete ${word.word}`}
-                onClick={() => { setRestoreDeleteFocus(false); setDeleteTarget({ id: word.id, name: word.word }) }}
+                onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
               </button>
@@ -457,7 +466,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
         <form className="grid min-h-12 items-start bg-secondary/35 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
           {columns.map((column) => <div className="min-w-0 self-start border-r border-foreground/70 px-1" key={column.key}>{renderBlankCell(column)}</div>)}
-          <div className="grid h-10 place-items-center">
+          <div className="sticky right-0 z-[5] grid h-10 place-items-center border-l border-foreground/70 bg-secondary" data-testid="sticky-create-actions">
             <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add" aria-label="Create word">
               <CheckCircle2 className="size-4" aria-hidden="true" />
             </button>
@@ -466,18 +475,6 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         {wordsQuery.isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading words...</div> : null}
         {createWord.isError ? <div className="p-4 text-sm text-destructive" role="alert">Could not create word. Fix the row and try again.</div> : null}
       </div>
-      {deleteTarget ? (
-        <DeleteConfirmationDialog
-          entity="Word"
-          name={deleteTarget.name}
-          open
-          pending={deleteWord.isPending}
-          restoreFallback={restoreDeleteFocus}
-          fallbackRef={tableFocusRef}
-          onOpenChange={(open) => { if (!open && !deleteWord.isPending) { setRestoreDeleteFocus(false); setDeleteTarget(null) } }}
-          onConfirm={() => deleteWord.mutate(deleteTarget)}
-        />
-      ) : null}
     </div>
   )
 }

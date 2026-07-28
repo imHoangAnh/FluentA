@@ -45,9 +45,9 @@ public sealed class NoteBoard : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void SoftDelete()
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
         DeletedAt = now;
         UpdatedAt = now;
 
@@ -55,6 +55,13 @@ public sealed class NoteBoard : BaseEntity, IAggregateRoot
         {
             page.SoftDelete(now);
         }
+    }
+
+    public void RestoreFromTrash(DateTime? nowUtc = null)
+    {
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
+        DeletedAt = null;
+        UpdatedAt = now;
     }
 
     private static string CleanName(string name)

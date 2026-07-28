@@ -49,15 +49,28 @@ public sealed class KanbanBoard : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void SoftDelete()
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        var now = DateTime.UtcNow;
+        var now = nowUtc ?? DateTime.UtcNow;
         DeletedAt = now;
         UpdatedAt = now;
 
         foreach (var column in _columns.Where(column => column.DeletedAt is null))
         {
             column.SoftDelete(now, deleteCards: true);
+        }
+    }
+
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        var trashedAt = DeletedAt;
+        DeletedAt = null;
+        UpdatedAt = nowUtc;
+
+        if (trashedAt is null) return;
+        foreach (var column in _columns.Where(column => column.DeletedAt == trashedAt))
+        {
+            column.RestoreFromTrash(nowUtc, trashedAt.Value);
         }
     }
 

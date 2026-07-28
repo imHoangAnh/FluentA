@@ -2,9 +2,12 @@ using System.Reflection;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Note.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
+using FluentA.Domain.BoundedContexts.Trash.Entities;
+using FluentA.Domain.BoundedContexts.Trash.Enums;
 using FluentA.Infrastructure.Note;
 
 namespace FluentA.Application.UnitTests;
@@ -29,7 +32,8 @@ public sealed class NoteServiceTests
         Assert.True(first.IsSuccess);
         Assert.Equal(["Second", "First"], listed.Value!.Select(board => board.Name));
         Assert.Equal("Updated", updated.Value!.Name);
-        Assert.True(deleted.Value);
+        Assert.True(deleted.IsSuccess);
+        Assert.Equal(second.Value.Id, deleted.Value!.EntityId);
         Assert.Single(afterDelete.Value!);
     }
 
@@ -52,7 +56,8 @@ public sealed class NoteServiceTests
         Assert.Equal(created.Value.Id, fetched.Value!.Id);
         Assert.Equal("Renamed", updated.Value!.Name);
         Assert.Equal("<p>Saved</p>", updated.Value.Content);
-        Assert.True(deleted.Value);
+        Assert.True(deleted.IsSuccess);
+        Assert.Equal(created.Value.Id, deleted.Value!.EntityId);
         Assert.Equal("NOTE_PAGE_NOT_FOUND", ((NoteError)missing.Error!).Code);
     }
 
@@ -73,6 +78,60 @@ public sealed class NoteServiceTests
         Assert.Equal("NOTE_BOARD_NOT_FOUND", ((NoteError)foreignBoard.Error!).Code);
         Assert.Equal("NOTE_PAGE_NOT_FOUND", ((NoteError)foreignPage.Error!).Code);
         Assert.Equal("NOTE_PAGE_NOT_FOUND", ((NoteError)deletedPage.Error!).Code);
+    }
+
+    [Fact]
+    public async Task NoteTrash_BoardRestoreAndPermanentDelete_PreservesThenArchivesAttachedImages()
+    {
+        var repository = new FakeNoteRepository();
+        var assets = new FakeAssetRepository();
+        var ownerId = Guid.NewGuid();
+        var notes = new NoteService(repository, new FakeNoteContentProcessor(), assets, new FakeAssetObjectStorage());
+        var board = await notes.CreateBoardAsync(ownerId, new CreateNoteBoardRequest("Study"));
+        var page = await notes.CreatePageAsync(ownerId, board.Value!.Id, new CreateNotePageRequest("Week 1"));
+        var asset = Asset.CreatePending(Guid.NewGuid(), ownerId, AssetType.NoteImage, "note-images/users/demo/image.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload("image/png", 128);
+        assets.Assets.Add(asset);
+        await notes.UpdatePageAsync(ownerId, page.Value!.Id, new UpdateNotePageRequest(Content: $"<img data-note-asset-id=\"{asset.Id}\">"));
+
+        var trashRepository = new FakeTrashRepository();
+        var trash = new TrashService([new NoteTrashParticipant(repository, assets)], trashRepository, new InlineTrashTransaction());
+        var moved = await trash.TrashNoteBoardAsync(ownerId, board.Value.Id);
+
+        Assert.True(moved.IsSuccess);
+        Assert.Empty((await notes.ListBoardsAsync(ownerId)).Value!);
+        Assert.Contains(asset.Id, await repository.GetPageAssetIdsAsync(page.Value.Id));
+        Assert.Equal(AssetStatus.Ready, asset.Status);
+
+        Assert.True((await trash.RestoreAsync(ownerId, moved.Value!.Id)).IsSuccess);
+        Assert.Single((await notes.ListBoardsAsync(ownerId)).Value!);
+        Assert.NotNull((await notes.GetPageAsync(ownerId, page.Value.Id)).Value);
+
+        var movedAgain = await trash.TrashNoteBoardAsync(ownerId, board.Value.Id);
+        Assert.True((await trash.PermanentlyDeleteAsync(ownerId, movedAgain.Value!.Id)).IsSuccess);
+        Assert.Empty((await notes.ListBoardsAsync(ownerId)).Value!);
+        Assert.Equal(AssetStatus.Archived, asset.Status);
+    }
+
+    [Fact]
+    public async Task NoteTrash_PermanentBoardDelete_RemovesRegistryEntriesForPreviouslyTrashedPages()
+    {
+        var repository = new FakeNoteRepository();
+        var assets = new FakeAssetRepository();
+        var ownerId = Guid.NewGuid();
+        var notes = new NoteService(repository, new FakeNoteContentProcessor(), assets, new FakeAssetObjectStorage());
+        var board = await notes.CreateBoardAsync(ownerId, new CreateNoteBoardRequest("Board"));
+        var page = await notes.CreatePageAsync(ownerId, board.Value!.Id, new CreateNotePageRequest("Page"));
+        var entries = new FakeTrashRepository();
+        var trash = new TrashService([new NoteTrashParticipant(repository, assets, entries)], entries, new InlineTrashTransaction());
+
+        var pageEntry = await trash.TrashNotePageAsync(ownerId, page.Value!.Id);
+        var boardEntry = await trash.TrashNoteBoardAsync(ownerId, board.Value.Id);
+        var deleted = await trash.PermanentlyDeleteAsync(ownerId, boardEntry.Value!.Id);
+
+        Assert.True(pageEntry.IsSuccess);
+        Assert.True(deleted.IsSuccess);
+        Assert.DoesNotContain((await entries.ListActiveAsync(ownerId, TrashEntityKind.Note, null, 100)), entry => entry.Id == pageEntry.Value!.Id);
     }
 
     [Fact]
@@ -209,11 +268,30 @@ public sealed class NoteServiceTests
             return Task.FromResult(_pages.FirstOrDefault(page => page.Id == pageId && page.DeletedAt is null && ownedBoardIds.Contains(page.BoardId)));
         }
 
+        public Task<NoteBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt == trashedAt));
+        }
+
+        public Task<NotePage?> GetTrashedPageAsync(Guid userId, Guid pageId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            var ownedBoardIds = _boards.Where(board => board.UserId == userId && board.DeletedAt is null).Select(board => board.Id).ToHashSet();
+            return Task.FromResult(_pages.FirstOrDefault(page => page.Id == pageId && page.DeletedAt == trashedAt && ownedBoardIds.Contains(page.BoardId)));
+        }
+
         public NotePage GetStoredPage(Guid pageId) => _pages.Single(page => page.Id == pageId);
 
         public Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(Guid pageId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlySet<Guid>>(_assetIdsByPage.GetValueOrDefault(pageId, []).ToHashSet());
+        }
+
+        public Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlySet<Guid>>(_assetIdsByPage
+                .Where(entry => pageIds.Contains(entry.Key))
+                .SelectMany(entry => entry.Value)
+                .ToHashSet());
         }
 
         public Task<IReadOnlyDictionary<Guid, Guid>> GetAttachedAssetPageIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
@@ -250,21 +328,32 @@ public sealed class NoteServiceTests
         public Task UpdateBoardAsync(NoteBoard board, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdatePageAsync(NotePage page, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task SoftDeleteBoardAsync(NoteBoard board, CancellationToken cancellationToken = default)
+        public Task SoftDeleteBoardAsync(NoteBoard board, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
-            board.SoftDelete();
+            board.SoftDelete(trashedAt);
             foreach (var page in _pages.Where(page => page.BoardId == board.Id && page.DeletedAt is null))
             {
-                page.SoftDelete(board.UpdatedAt);
-                _assetIdsByPage.Remove(page.Id);
+                page.SoftDelete(trashedAt);
             }
             return Task.CompletedTask;
         }
 
-        public Task SoftDeletePageAsync(NotePage page, CancellationToken cancellationToken = default)
+        public Task SoftDeletePageAsync(NotePage page, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
-            page.SoftDelete();
-            _assetIdsByPage.Remove(page.Id);
+            page.SoftDelete(trashedAt);
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveBoardAsync(NoteBoard board, CancellationToken cancellationToken = default)
+        {
+            _boards.Remove(board);
+            _pages.RemoveAll(page => page.BoardId == board.Id);
+            return Task.CompletedTask;
+        }
+
+        public Task RemovePageAsync(NotePage page, CancellationToken cancellationToken = default)
+        {
+            _pages.Remove(page);
             return Task.CompletedTask;
         }
 
@@ -342,5 +431,33 @@ public sealed class NoteServiceTests
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class InlineTrashTransaction : ITrashTransaction
+    {
+        public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default) => action(cancellationToken);
+    }
+
+    private sealed class FakeTrashRepository : ITrashRepository
+    {
+        private readonly List<TrashEntry> _entries = [];
+
+        public Task AddAsync(TrashEntry entry, CancellationToken cancellationToken = default) { _entries.Add(entry); return Task.CompletedTask; }
+        public Task<IReadOnlyList<TrashEntry>> ListActiveAsync(Guid userId, TrashEntityKind? kind, string? search, int limit, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TrashEntry>>(_entries.Where(entry => entry.UserId == userId && entry.State == TrashEntryState.Active).ToList());
+        public Task<TrashEntry?> ClaimOwnedAsync(Guid userId, Guid entryId, TrashEntryState claimState, DateTime nowUtc, CancellationToken cancellationToken = default)
+        {
+            var entry = _entries.SingleOrDefault(item => item.Id == entryId && item.UserId == userId && item.State == TrashEntryState.Active);
+            if (entry is not null) entry.MarkClaimed(claimState, nowUtc);
+            return Task.FromResult(entry);
+        }
+        public Task<TrashEntry?> ClaimDueAsync(Guid entryId, DateTime nowUtc, CancellationToken cancellationToken = default) => Task.FromResult<TrashEntry?>(null);
+        public Task<IReadOnlyList<Guid>> ListDueEntryIdsAsync(DateTime nowUtc, int limit, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Guid>>([]);
+        public Task UpdateAsync(TrashEntry entry, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RemoveAsync(TrashEntry entry, CancellationToken cancellationToken = default) { _entries.Remove(entry); return Task.CompletedTask; }
+        public Task RemoveActiveByEntityIdsAsync(Guid userId, TrashEntityKind kind, IReadOnlyCollection<Guid> entityIds, CancellationToken cancellationToken = default)
+        {
+            _entries.RemoveAll(entry => entry.UserId == userId && entry.EntityKind == kind && entry.State == TrashEntryState.Active && entityIds.Contains(entry.EntityId));
+            return Task.CompletedTask;
+        }
     }
 }

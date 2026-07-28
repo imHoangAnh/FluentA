@@ -2,6 +2,8 @@ import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Sear
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
+import { restoreTrashEntry } from '@/features/trash'
+import { toast } from '@/lib/toast'
 
 const JournalRichTextEditor = lazy(() =>
   import('../components/JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
@@ -84,7 +86,6 @@ export function JournalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => toMonthInput(new Date()))
-  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const openRequestRef = useRef(0)
   const draftVersionRef = useRef(0)
 
@@ -221,10 +222,21 @@ export function JournalPage() {
 
   const deleteEntry = useMutation({
     mutationFn: journalApi.deleteJournalEntry,
-    onSuccess: async (_result, id) => {
+    onSuccess: async (entry, id) => {
       queryClient.removeQueries({ queryKey: ['journal', 'entry', id] })
       clearEditor()
       await refresh()
+      toast.success('Journal entry moved to Trash.', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreTrashEntry(entry.id)
+              .then(refresh)
+              .then(() => toast.success('Journal entry restored.'))
+              .catch(() => toast.error('Could not restore the journal entry.'))
+          },
+        },
+      })
     },
   })
 
@@ -385,7 +397,7 @@ export function JournalPage() {
                   type="button"
                   aria-label={`Delete journal ${title}`}
                   disabled={deleteEntry.isPending}
-                  onClick={() => setDeleteConfirmationOpen(true)}
+                  onClick={() => selectedId && deleteEntry.mutate(selectedId)}
                   title="Delete entry"
                 >
                   <Trash2 size={18} />
@@ -488,18 +500,6 @@ export function JournalPage() {
               The journal entry could not be saved.
             </div>
           )}
-          {deleteConfirmationOpen && selectedId ? (
-            <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4" role="presentation">
-              <section className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg" role="alertdialog" aria-modal="true" aria-labelledby="journal-delete-title" aria-describedby="journal-delete-description">
-                <h3 id="journal-delete-title" className="m-0 text-lg font-semibold">Delete journal entry?</h3>
-                <p id="journal-delete-description" className="mt-2 text-sm text-muted-foreground">“{title}” will be removed from your journal. This action cannot be undone.</p>
-                <div className="mt-5 flex justify-end gap-3">
-                  <button className="secondary-button" type="button" disabled={deleteEntry.isPending} onClick={() => setDeleteConfirmationOpen(false)}>Cancel</button>
-                  <button className="primary-button bg-destructive hover:bg-destructive/90" type="button" disabled={deleteEntry.isPending} onClick={() => deleteEntry.mutate(selectedId)}>Delete entry</button>
-                </div>
-              </section>
-            </div>
-          ) : null}
         </form>
       </div>
         </div>

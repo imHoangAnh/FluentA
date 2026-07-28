@@ -38,13 +38,22 @@ test('keeps one AppShell mounted across protected client-side navigation', async
 
   await expect(page).toHaveURL('http://127.0.0.1:5173/')
   await expect(page.getByLabel('Primary navigation')).toBeVisible()
+  await expect(page.getByLabel('Primary navigation').getByRole('link', { name: 'Overview', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Log out' }).hover()
+  await expect(page.getByRole('tooltip', { name: 'Log out' })).toBeVisible()
   const initialShell = await page.locator('.ds-root').elementHandle()
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click()
+  await expect(page.getByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).toHaveCount(0)
   await page.getByRole('link', { name: 'Todo', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:5173/todo')
-  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Go to overview' })).toHaveAttribute('href', '/')
+  const todoTitleInput = page.getByTestId('todo-title-input')
+  await todoTitleInput.focus()
+  await expect.poll(() => todoTitleInput.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return { outline: style.outlineStyle, boxShadow: style.boxShadow }
+  })).toEqual({ outline: 'none', boxShadow: 'none' })
   await expect(page.locator('#main-content > h1')).toHaveText('Todo')
   await expect(page.getByLabel('Primary navigation')).toHaveCount(1)
 
@@ -52,4 +61,9 @@ test('keeps one AppShell mounted across protected client-side navigation', async
   expect(initialShell).not.toBeNull()
   expect(currentShell).not.toBeNull()
   expect(await initialShell.evaluate((node, nextNode) => node === nextNode, currentShell)).toBe(true)
+
+  await page.getByRole('link', { name: 'Open profile' }).click()
+  await expect(page).toHaveURL('http://127.0.0.1:5173/profile')
+  await page.getByRole('link', { name: 'Go to overview' }).click()
+  await expect(page).toHaveURL('http://127.0.0.1:5173/')
 })

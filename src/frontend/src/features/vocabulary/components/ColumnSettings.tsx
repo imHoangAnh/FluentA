@@ -1,6 +1,8 @@
 import { Check, ChevronDown, Columns3 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/shared/components/ui/button'
+import { menuContentClassName, menuItemClassName, menuLabelClassName, menuSeparatorClassName } from '@/shared/components/ui/menu-styles'
+import { cn } from '@/shared/lib/utils'
 import type { BoardPreferences } from '../api/vocabulary.api'
 
 const optionalColumns = [
@@ -35,17 +37,17 @@ export function ColumnSettings({ preferences, onSave }: ColumnSettingsProps) {
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 min-w-52 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_12px_36px_rgba(16,32,29,0.14)] data-[state=open]:animate-in data-[state=closed]:animate-out"
+          className={cn(menuContentClassName, 'min-w-52')}
         >
-          <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Board columns</DropdownMenu.Label>
-          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Label className={menuLabelClassName}>Board columns</DropdownMenu.Label>
+          <DropdownMenu.Separator className={menuSeparatorClassName} />
           {optionalColumns.map((column) => (
             <DropdownMenu.CheckboxItem
               key={column.key}
               checked={!preferences.hiddenColumns.includes(column.key)}
               onCheckedChange={() => toggle(column.key)}
               onSelect={(event) => event.preventDefault()}
-              className="relative flex min-h-9 cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground"
+              className={cn(menuItemClassName, 'relative pl-8')}
             >
               <span className="absolute left-2 grid size-4 place-items-center">
                 <DropdownMenu.ItemIndicator><Check className="size-3.5" /></DropdownMenu.ItemIndicator>

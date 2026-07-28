@@ -40,10 +40,12 @@ describe('CountdownPage', () => {
       createdAt: '2026-07-21T00:00:00Z',
       updatedAt: '2026-07-21T00:00:00Z',
     }])
-    countdownApi.deleteCountdown.mockResolvedValue(undefined)
+    countdownApi.deleteCountdown.mockResolvedValue({
+      id: 'trash-1', entityKind: 'Countdown', entityId: 'countdown-1', displayName: 'IELTS Exam', originalLocation: 'Countdown', trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
+    })
   })
 
-  it('renders the compact create action and confirms the exact card before delete', async () => {
+  it('renders the compact create action and moves the exact card to Trash without confirmation', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -53,16 +55,6 @@ describe('CountdownPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open actions for IELTS Exam' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
-    expect(screen.getByRole('alertdialog', { name: 'Delete countdown?' })).toHaveTextContent('IELTS Exam')
-    expect(countdownApi.deleteCountdown).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(countdownApi.deleteCountdown).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Open actions for IELTS Exam' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
-    await user.click(screen.getByRole('button', { name: 'Delete countdown' }))
-
     await waitFor(() => expect(countdownApi.deleteCountdown.mock.calls[0]?.[0]).toBe('countdown-1'))
   })
 })

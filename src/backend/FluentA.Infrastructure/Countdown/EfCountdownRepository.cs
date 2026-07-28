@@ -35,6 +35,17 @@ public sealed class EfCountdownRepository : ICountdownRepository
                 cancellationToken);
     }
 
+    public Task<CountdownEventEntity?> GetTrashedAsync(Guid userId, Guid countdownId, DateTime trashedAt, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.CountdownEvents
+            .Include(countdownEvent => countdownEvent.Alerts)
+            .FirstOrDefaultAsync(
+                countdownEvent => countdownEvent.Id == countdownId
+                    && countdownEvent.UserId == userId
+                    && countdownEvent.DeletedAt == trashedAt,
+                cancellationToken);
+    }
+
     public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
     {
         return _dbContext.CountdownEvents.AnyAsync(
@@ -51,6 +62,13 @@ public sealed class EfCountdownRepository : ICountdownRepository
     public async Task UpdateAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
     {
         _dbContext.CountdownEvents.Update(countdownEvent);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
+    {
+        _dbContext.CountdownAlerts.RemoveRange(countdownEvent.Alerts);
+        _dbContext.CountdownEvents.Remove(countdownEvent);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

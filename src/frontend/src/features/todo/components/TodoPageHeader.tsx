@@ -1,5 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { ArrowUpDown, CalendarDays, Check, ChevronLeft, ChevronRight, MoreHorizontal, Sun } from 'lucide-react'
+import { menuContentClassName, menuItemClassName, menuLabelClassName } from '@/shared/components/ui/menu-styles'
 import { TODO_SORT_OPTIONS, type TodoSortMode } from '../todo-sort'
 
 type TodoPageHeaderProps = {
@@ -10,9 +11,6 @@ type TodoPageHeaderProps = {
   onViewChange: (view: 'my-day' | 'week') => void
   onShiftWeek: (days: number) => void
 }
-
-const menuContentClass = 'z-50 min-w-44 rounded-md border border-border bg-card p-1 shadow-lg outline-none'
-const menuItemClass = 'flex h-8 cursor-pointer select-none items-center rounded-sm px-2 text-sm font-medium outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground'
 
 export function TodoPageHeader({
   view,
@@ -37,9 +35,9 @@ export function TodoPageHeader({
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content className={menuContentClass} sideOffset={6} align="start">
+              <DropdownMenu.Content className={menuContentClassName} sideOffset={6} align="start">
                 <DropdownMenu.Item
-                  className={menuItemClass}
+                  className={menuItemClassName}
                   onSelect={() => onViewChange(view === 'my-day' ? 'week' : 'my-day')}
                 >
                   {view === 'my-day' ? <CalendarDays className="mr-2 size-4" aria-hidden="true" /> : <Sun className="mr-2 size-4" aria-hidden="true" />}
@@ -61,11 +59,11 @@ export function TodoPageHeader({
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content className={menuContentClass} sideOffset={6} align="end">
-                <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Sort by</DropdownMenu.Label>
+              <DropdownMenu.Content className={menuContentClassName} sideOffset={6} align="end">
+                <DropdownMenu.Label className={menuLabelClassName}>Sort by</DropdownMenu.Label>
                 {TODO_SORT_OPTIONS.map((option) => (
                   <DropdownMenu.Item
-                    className={menuItemClass}
+                    className={menuItemClassName}
                     key={option.value}
                     onSelect={() => onSortChange(sortMode === option.value ? null : option.value)}
                   >

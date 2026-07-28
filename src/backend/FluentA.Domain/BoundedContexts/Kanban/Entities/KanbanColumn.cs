@@ -81,6 +81,19 @@ public sealed class KanbanColumn : BaseEntity
         }
     }
 
+    public void RestoreFromTrash(DateTime nowUtc, DateTime? cardTrashedAt = null)
+    {
+        var trashedAt = cardTrashedAt ?? DeletedAt;
+        DeletedAt = null;
+        UpdatedAt = nowUtc;
+
+        if (trashedAt is null) return;
+        foreach (var card in _cards.Where(card => card.DeletedAt == trashedAt))
+        {
+            card.RestoreFromTrash(nowUtc);
+        }
+    }
+
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;

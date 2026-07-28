@@ -8,6 +8,7 @@ using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
+using FluentA.Domain.BoundedContexts.Trash.Entities;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
@@ -39,6 +40,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
+    public DbSet<TrashEntry> TrashEntries => Set<TrashEntry>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
     public DbSet<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert> CountdownAlerts => Set<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();

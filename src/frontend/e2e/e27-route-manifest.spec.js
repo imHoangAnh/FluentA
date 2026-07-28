@@ -17,7 +17,7 @@ const publicRoutes = [
 ]
 
 const protectedRoutes = [
-  ['/', 'Overview', 'Overview'],
+  ['/', 'Overview', null],
   ['/vocabulary', 'Vocabulary', 'Vocabulary'],
   ['/todo', 'Todo', 'Todo'],
   ['/countdowns', 'Countdowns', 'Countdowns'],
@@ -30,7 +30,7 @@ const protectedRoutes = [
   ['/pomodoro', 'Pomodoro', 'Pomodoro'],
   ['/notifications', 'Notifications', null],
   ['/settings', 'Settings', 'Settings'],
-  ['/settings/profile', 'Settings', 'Settings'],
+  ['/profile', 'Profile', null],
   ['/settings/practice', 'Settings', 'Settings'],
   ['/settings/review', 'Settings', 'Settings'],
   ['/settings/level5', 'Settings', 'Settings'],
@@ -52,6 +52,20 @@ async function mockReleaseApis(page, authState) {
     }
     if (path.endsWith('/auth/me')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
+      return
+    }
+    if (path === '/api/v1/settings') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            profile: { ...user, bio: '' },
+            practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
+            reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
+          },
+        }),
+      })
       return
     }
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Deterministic route-manifest fixture' }) })
@@ -105,6 +119,9 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 
+    await page.goto('/settings/profile')
+    await expect(page).toHaveURL(/\/$/)
+
     await page.goto('/pomodoro')
     await expect(page.getByRole('heading', { name: 'Pomodoro', exact: true })).toBeVisible()
     await page.locator('body').click({ position: { x: 2, y: 2 } })
@@ -117,7 +134,7 @@ for (const viewport of [
     expect(reducedDuration).toMatch(/1e-05s|0\.00001s|0\.01ms|0s/)
     await page.screenshot({ path: `test-results/e27-pomodoro-${viewport.name}.png`, fullPage: true })
 
-    await page.goto('/settings/profile')
-    await page.screenshot({ path: `test-results/e27-settings-${viewport.name}.png`, fullPage: true })
+    await page.goto('/profile')
+    await page.screenshot({ path: `test-results/e27-profile-${viewport.name}.png`, fullPage: true })
   })
 }

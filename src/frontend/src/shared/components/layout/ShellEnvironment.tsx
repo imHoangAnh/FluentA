@@ -28,7 +28,7 @@ export type ShellEnvironmentValue = {
   navigationSections: ShellNavigationSection[]
   settingsNavigation: ShellNavigationItem
   notificationsPath: string
-  notificationsMenu?: (collapsed: boolean, active: boolean) => ReactNode
+  notificationsMenu?: (active: boolean) => ReactNode
 }
 
 const ShellEnvironmentContext = createContext<ShellEnvironmentValue | null>(null)

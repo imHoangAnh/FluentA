@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,7 +47,7 @@ public sealed class CountdownsController : ControllerBase
     {
         var result = await _countdowns.DeleteAsync(CurrentUserId(), countdownId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Countdown deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -63,11 +64,22 @@ public sealed class CountdownsController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
-        if (result.Error is not CountdownError error)
+        var error = result.Error switch
+        {
+            CountdownError countdownError => new ApiErrorEnvelope(countdownError.Code, countdownError.Message, countdownError.Details),
+            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
+            _ => null,
+        };
+        var statusCode = result.Error switch
+        {
+            CountdownError countdownError => countdownError.StatusCode,
+            TrashError trashError => trashError.StatusCode,
+            _ => 500,
+        };
+        if (error is null)
         {
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
     }
 }

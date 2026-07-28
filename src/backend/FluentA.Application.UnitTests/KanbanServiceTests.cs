@@ -193,6 +193,15 @@ public sealed class KanbanServiceTests
             return Task.FromResult(column);
         }
 
+        public Task<KanbanBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt == trashedAt));
+
+        public Task<KanbanColumn?> GetTrashedColumnAsync(Guid userId, Guid columnId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).FirstOrDefault(column => column.Id == columnId && column.DeletedAt == trashedAt));
+
+        public Task<KanbanCard?> GetTrashedCardAsync(Guid userId, Guid cardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).Where(column => column.DeletedAt is null).SelectMany(column => column.Cards).FirstOrDefault(card => card.Id == cardId && card.DeletedAt == trashedAt));
+
         public Task<int> NextColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
         {
             var sortOrder = Boards.SelectMany(board => board.Columns)
@@ -237,6 +246,16 @@ public sealed class KanbanServiceTests
         public Task UpdateColumnAsync(KanbanColumn column, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task UpdateCardAsync(KanbanCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task RemoveBoardAsync(KanbanBoard board, CancellationToken cancellationToken = default)
+        {
+            Boards.Remove(board);
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveColumnAsync(KanbanColumn column, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task RemoveCardAsync(KanbanCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class RecordingKanbanSyncNotifier : IKanbanSyncNotifier

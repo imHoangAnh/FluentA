@@ -42,6 +42,9 @@ dotnet restore src/backend/FluentA.slnx
 docker compose -f docker-compose.dev.yml up -d
 ```
 
+PostgreSQL sử dụng database `fluenta_dev` tại `localhost:5432`. Dữ liệu local
+được giữ trong Docker volume `fluenta-postgres-dev-data` giữa các lần khởi động.
+
 ### 4.3. Cập nhật database
 
 ```powershell

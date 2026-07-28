@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type JournalEntry = {
   id: string
@@ -79,5 +80,6 @@ export async function updateJournalEntry(id: string, input: UpdateJournalEntryIn
 }
 
 export async function deleteJournalEntry(id: string) {
-  await apiClient.delete(`/journal/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/journal/${id}`)
+  return response.data.data!
 }

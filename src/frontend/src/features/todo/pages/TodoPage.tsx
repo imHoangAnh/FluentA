@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from '@/lib/toast'
 import * as todoApi from '../api/todo.api'
-import { DeleteTodoConfirmationDialog } from '../components/DeleteTodoConfirmationDialog'
+import { restoreTrashEntry } from '@/features/trash'
 import { MyDayView } from '../components/MyDayView'
 import { TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
@@ -28,7 +28,6 @@ export function TodoPage() {
   const activeView: TodoView = requestedTaskId ? 'my-day' : view
   const [weekAnchor, setWeekAnchor] = useState(today)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<todoApi.TodoItem | null>(null)
   const [sortMode, setSortMode] = useState<TodoSortMode | null>(() => readTodoSortMode())
   const orderQueue = useRef<Promise<void>>(Promise.resolve())
 
@@ -124,14 +123,24 @@ export function TodoPage() {
 
   const deleteTodo = useMutation({
     mutationFn: todoApi.deleteTodo,
-    onSuccess: async (_result, deletedId) => {
+    onSuccess: async (entry, deletedId) => {
       queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
         items.filter((item) => item.id !== deletedId),
       )
       if (selectedTaskId === deletedId) setSelectedTaskId(null)
       queryClient.removeQueries({ queryKey: ['todo-item', deletedId] })
-      setDeleteTarget(null)
       await refresh()
+      toast.success('Moved to Trash.', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreTrashEntry(entry.id)
+              .then(refresh)
+              .then(() => toast.success('Task restored. Its reminder was not restored.'))
+              .catch(() => toast.error('Could not restore the task.'))
+          },
+        },
+      })
     },
     onError: () => toast.error('Could not delete the task.'),
   })
@@ -227,7 +236,7 @@ export function TodoPage() {
             onSelect={(item) => setSelectedTaskId(item.id)}
             onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
             onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
-            onDelete={setDeleteTarget}
+            onDelete={(item) => deleteTodo.mutate(item.id)}
             onPersistOrder={persistManualOrder}
           />
           {requestedTaskId && requestedTaskQuery.isLoading ? (
@@ -245,7 +254,7 @@ export function TodoPage() {
               pending={updateTodo.isPending}
               onClose={closeDetails}
               onUpdate={updateTask}
-              onDelete={setDeleteTarget}
+              onDelete={(item) => deleteTodo.mutate(item.id)}
             />
           ) : null}
         </main>
@@ -265,7 +274,7 @@ export function TodoPage() {
                 onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
                 onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
                 onDuplicate={(item) => duplicateTodo.mutate(item)}
-                onDelete={setDeleteTarget}
+                onDelete={(item) => deleteTodo.mutate(item.id)}
                 onMove={(item, date, sortOrder) => safelyUpdateTask(item, { date, sortOrder })}
               />
             ) : null}
@@ -277,20 +286,11 @@ export function TodoPage() {
               pending={updateTodo.isPending}
               onClose={closeDetails}
               onUpdate={updateTask}
-              onDelete={setDeleteTarget}
+              onDelete={(item) => deleteTodo.mutate(item.id)}
             />
           ) : null}
         </main>
       )}
-
-      {deleteTarget ? (
-        <DeleteTodoConfirmationDialog
-          title={deleteTarget.title}
-          pending={deleteTodo.isPending}
-          onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-          onConfirm={() => deleteTodo.mutate(deleteTarget.id)}
-        />
-      ) : null}
     </div>
   )
 }

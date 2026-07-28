@@ -1,5 +1,6 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Kanban.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Kanban.Entities;
 using FluentA.Domain.BoundedContexts.Kanban.Enums;
@@ -11,11 +12,13 @@ public sealed class KanbanService : IKanbanService
     private const string DateFormat = "yyyy-MM-dd";
     private readonly IKanbanRepository _repository;
     private readonly IKanbanSyncNotifier _syncNotifier;
+    private readonly ITrashService? _trashService;
 
-    public KanbanService(IKanbanRepository repository, IKanbanSyncNotifier? syncNotifier = null)
+    public KanbanService(IKanbanRepository repository, IKanbanSyncNotifier? syncNotifier = null, ITrashService? trashService = null)
     {
         _repository = repository;
         _syncNotifier = syncNotifier ?? NullKanbanSyncNotifier.Instance;
+        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<KanbanBoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -45,17 +48,19 @@ public sealed class KanbanService : IKanbanService
             : OperationResult<KanbanBoardDetailDto>.Success(ToDetail(board));
     }
 
-    public async Task<OperationResult<bool>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
+        if (_trashService is not null) return await _trashService.TrashKanbanAsync(userId, boardId, cancellationToken);
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
         {
-            return OperationResult<bool>.Failure(KanbanError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(KanbanError.NotFound());
         }
 
-        board.SoftDelete();
+        var nowUtc = DateTime.UtcNow;
+        board.SoftDelete(nowUtc);
         await _repository.UpdateBoardAsync(board, cancellationToken);
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Kanban", board.Id, board.Name, "Kanban board", nowUtc, nowUtc.AddDays(30)));
     }
 
     public async Task<OperationResult<KanbanColumnDto>> CreateColumnAsync(
@@ -128,22 +133,24 @@ public sealed class KanbanService : IKanbanService
         return OperationResult<KanbanColumnDto>.Success(ToColumnDto(column));
     }
 
-    public async Task<OperationResult<bool>> DeleteColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
     {
         var column = await _repository.GetColumnAsync(userId, boardId, columnId, cancellationToken);
         if (column is null)
         {
-            return OperationResult<bool>.Failure(KanbanError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(KanbanError.NotFound());
         }
 
         if (column.HasActiveCards())
         {
-            return OperationResult<bool>.Failure(KanbanError.ColumnNotEmpty());
+            return OperationResult<TrashEntryDto>.Failure(KanbanError.ColumnNotEmpty());
         }
 
-        column.SoftDelete();
+        if (_trashService is not null) return await _trashService.TrashKanbanAsync(userId, columnId, cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        column.SoftDelete(nowUtc);
         await _repository.UpdateColumnAsync(column, cancellationToken);
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Kanban", column.Id, column.Name, "Kanban column", nowUtc, nowUtc.AddDays(30)));
     }
 
     public async Task<OperationResult<KanbanCardDto>> CreateCardAsync(
@@ -221,17 +228,19 @@ public sealed class KanbanService : IKanbanService
         return OperationResult<KanbanCardDto>.Success(ToCardDto(card));
     }
 
-    public async Task<OperationResult<bool>> DeleteCardAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteCardAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
     {
+        if (_trashService is not null) return await _trashService.TrashKanbanAsync(userId, cardId, cancellationToken);
         var card = await _repository.GetCardAsync(userId, cardId, cancellationToken);
         if (card is null)
         {
-            return OperationResult<bool>.Failure(KanbanError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(KanbanError.NotFound());
         }
 
-        card.SoftDelete();
+        var nowUtc = DateTime.UtcNow;
+        card.SoftDelete(nowUtc);
         await _repository.UpdateCardAsync(card, cancellationToken);
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Kanban", card.Id, card.Title, "Kanban card", nowUtc, nowUtc.AddDays(30)));
     }
 
     private static (Dictionary<string, string[]> Errors, CardPriority Priority, DateTime? Deadline) ValidateCardCreate(CreateKanbanCardRequest request)

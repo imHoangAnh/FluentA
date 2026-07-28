@@ -47,6 +47,22 @@ public sealed class EfTodoRepository : ITodoRepository
             .FirstOrDefaultAsync(item => item.Id == todoId && item.UserId == userId && item.DeletedAt == null, cancellationToken);
     }
 
+    public Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.TodoItems
+            .FromSqlInterpolated($"SELECT * FROM todo_items WHERE id = {todoId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.TodoItems
+            .Where(item => item.UserId == userId)
+            .OrderBy(item => item.Date)
+            .ThenBy(item => item.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(TodoItem item, CancellationToken cancellationToken = default)
     {
         await _dbContext.TodoItems.AddAsync(item, cancellationToken);
@@ -72,6 +88,12 @@ public sealed class EfTodoRepository : ITodoRepository
     public async Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
     {
         _dbContext.TodoItems.UpdateRange(items);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
+    {
+        _dbContext.TodoItems.RemoveRange(items);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

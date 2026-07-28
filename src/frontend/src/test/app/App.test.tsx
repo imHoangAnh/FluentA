@@ -344,7 +344,21 @@ describe('FluentA app routes', async () => {
     expect(screen.queryByText('Load failed this page.')).not.toBeInTheDocument()
   })
 
-  it('renders protected settings from cached data', async () => {
+  it('renders the protected profile at its dedicated route', async () => {
+    useAuthStore.setState({
+      accessToken: 'memory-token',
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderApp('/profile')
+
+    expect(screen.getByRole('heading', { name: 'Profile', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
+    expect(screen.queryByRole('navigation', { name: 'Settings navigation' })).not.toBeInTheDocument()
+  })
+
+  it('opens learning settings at Practice and excludes Profile from settings navigation', async () => {
     useAuthStore.setState({
       accessToken: 'memory-token',
       status: 'authenticated',
@@ -354,13 +368,12 @@ describe('FluentA app routes', async () => {
     await renderApp('/settings')
 
     const settingsNavigation = within(screen.getByRole('navigation', { name: 'Settings navigation' }))
-    expect(settingsNavigation.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/settings/profile')
+    expect(settingsNavigation.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
     expect(settingsNavigation.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
     expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
     expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
     expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
-    await waitFor(() => expect(settingsNavigation.getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page'))
-    expect(screen.queryByRole('heading', { name: 'Practice' })).not.toBeInTheDocument()
+    await waitFor(() => expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page'))
   })
 
   it('renders split settings routes inside the shared shell', async () => {

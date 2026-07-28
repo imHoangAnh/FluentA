@@ -3,6 +3,7 @@ using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
 using FluentA.Application.Common;
+using FluentA.Application.BoundedContexts.Trash;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -86,7 +87,7 @@ public sealed class JournalsController : ControllerBase
     {
         var result = await _journals.DeleteAsync(CurrentUserId(), journalId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Journal entry deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -103,11 +104,22 @@ public sealed class JournalsController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
-        if (result.Error is not JournalError error)
+        var error = result.Error switch
+        {
+            JournalError journalError => new ApiErrorEnvelope(journalError.Code, journalError.Message, journalError.Details),
+            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
+            _ => null,
+        };
+        var statusCode = result.Error switch
+        {
+            JournalError journalError => journalError.StatusCode,
+            TrashError trashError => trashError.StatusCode,
+            _ => 500,
+        };
+        if (error is null)
         {
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
     }
 }

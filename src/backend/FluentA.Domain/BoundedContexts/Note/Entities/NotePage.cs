@@ -52,6 +52,17 @@ public sealed class NotePage : BaseEntity
         UpdatedAt = now;
     }
 
+    public void RestoreFromTrash(DateTime? nowUtc = null)
+    {
+        if (DeletedAt is null)
+        {
+            return;
+        }
+
+        DeletedAt = null;
+        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
+    }
+
     private static string CleanName(string name)
     {
         var cleaned = name.Trim();
