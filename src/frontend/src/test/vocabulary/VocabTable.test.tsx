@@ -57,7 +57,7 @@ describe('VocabTable', () => {
     vi.clearAllMocks()
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([word])
     vi.mocked(vocabularyApi.createWord).mockResolvedValue(word)
-    vi.mocked(vocabularyApi.deleteWord).mockResolvedValue(undefined)
+    vi.mocked(vocabularyApi.deleteWord).mockResolvedValue({ id: 'trash-word' } as never)
   })
 
   it('hides nullable fixed columns from board preferences', async () => {
@@ -141,6 +141,16 @@ describe('VocabTable', () => {
     expect(screen.getByLabelText('Resize Example')).toBeInTheDocument()
   })
 
+  it('keeps the Add and Delete action column pinned to the right while data columns scroll', async () => {
+    renderTable()
+
+    await screen.findByLabelText('Delete mitigate')
+
+    expect(screen.getByTestId('sticky-actions-header')).toHaveClass('sticky', 'right-0', 'bg-muted')
+    expect(screen.getByTestId('sticky-word-actions')).toHaveClass('sticky', 'right-0', 'bg-card')
+    expect(screen.getByTestId('sticky-create-actions')).toHaveClass('sticky', 'right-0', 'bg-secondary')
+  })
+
   it('uses independently sized wrapped editors with visible column dividers', async () => {
     renderTable()
 
@@ -154,17 +164,12 @@ describe('VocabTable', () => {
     expect(screen.getByLabelText('Resize Word').parentElement).toHaveClass('border-foreground/70')
   })
 
-  it('uses an accessible confirmation dialog for Word deletion instead of browser confirm', async () => {
+  it('moves a Word to Trash immediately without a confirmation dialog', async () => {
     const user = userEvent.setup()
     renderTable()
 
     await user.click(await screen.findByRole('button', { name: 'Delete mitigate' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “mitigate”?')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(vocabularyApi.deleteWord).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Delete mitigate' }))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(vocabularyApi.deleteWord).toHaveBeenCalledWith('board-1', 'word-1'))
   })
 })

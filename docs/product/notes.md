@@ -26,6 +26,8 @@ and cross-feature linking remain out of scope.
 - New Note pages open immediately with blank content.
 - A logged-in user can get and update one owned active Note page.
 - Note Workspace uses the same board-and-page rail pattern as Vocabulary. A
+  page name stays on one line in the rail and uses an ellipsis when it exceeds
+  the available width. A
   selected page header shows its editable title and date on the left, the
   complete existing formatting toolbar in the middle, and save state/actions
   on the right. The zones wrap when space is constrained, while every toolbar

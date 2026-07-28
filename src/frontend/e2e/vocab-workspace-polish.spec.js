@@ -87,8 +87,8 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
   await mockWorkspaceApis(browserPage)
 
   for (const viewport of [
-    { name: 'desktop', width: 1440, height: 1000, sidebarWidth: 184, controlVisible: true },
-    { name: 'tablet', width: 1024, height: 900, sidebarWidth: 84, controlVisible: false },
+    { name: 'desktop', width: 1440, height: 1000, sidebarWidth: 184 },
+    { name: 'tablet', width: 1024, height: 900, sidebarWidth: 84 },
   ]) {
     await browserPage.setViewportSize({ width: viewport.width, height: viewport.height })
     await browserPage.goto('/vocabulary')
@@ -130,6 +130,16 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
     const after = await stickyHeader.boundingBox()
     expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1)
 
+    const deleteActions = browserPage.getByTestId('sticky-word-actions').first()
+    const createActions = browserPage.getByTestId('sticky-create-actions')
+    const deleteBefore = await deleteActions.boundingBox()
+    const createBefore = await createActions.boundingBox()
+    await table.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+    const deleteAfter = await deleteActions.boundingBox()
+    const createAfter = await createActions.boundingBox()
+    expect(Math.abs(deleteBefore.x - deleteAfter.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(createBefore.x - createAfter.x)).toBeLessThanOrEqual(1)
+
     const longCell = browserPage.getByRole('textbox', { name: 'Definition for vocabulary-1', exact: true })
     const cellMetrics = await longCell.evaluate((element) => ({
       clientHeight: element.clientHeight,
@@ -139,15 +149,7 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
     expect(cellMetrics.clientHeight).toBe(cellMetrics.scrollHeight)
     expect(cellMetrics.overflowY).toBe('hidden')
 
-    const collapseControl = browserPage.getByRole('button', { name: /sidebar/i })
-    if (viewport.controlVisible) {
-      await expect(collapseControl).toBeVisible()
-      await expect(collapseControl).not.toContainText('Collapse')
-      await collapseControl.click()
-      await expect.poll(() => browserPage.locator('aside[aria-label="Primary navigation"]').evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(84)
-    } else {
-      await expect(collapseControl).toBeHidden()
-    }
+    await expect(browserPage.getByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).toHaveCount(0)
 
   }
 })

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
@@ -66,8 +66,14 @@ describe('NotesPage', () => {
       },
     })
     vi.mocked(noteApi.listBoards).mockResolvedValue([])
-    vi.mocked(noteApi.deleteBoard).mockResolvedValue(undefined)
-    vi.mocked(noteApi.deletePage).mockResolvedValue(undefined)
+    vi.mocked(noteApi.deleteBoard).mockResolvedValue({
+      id: 'trash-board-1', entityKind: 'Note', entityId: 'board-1', displayName: 'Learning Notes', originalLocation: 'Notes',
+      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
+    })
+    vi.mocked(noteApi.deletePage).mockResolvedValue({
+      id: 'trash-page-1', entityKind: 'Note', entityId: 'page-1', displayName: 'Week 1 reflections', originalLocation: 'Notes',
+      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
+    })
     vi.mocked(noteApi.updatePage).mockResolvedValue({
       id: 'page-1',
       boardId: 'board-1',
@@ -205,6 +211,9 @@ describe('NotesPage', () => {
 
     await waitFor(() => expect(noteApi.getPage).toHaveBeenCalledWith('page-2'))
     expect(await screen.findByDisplayValue('Practice recap')).toBeInTheDocument()
+    const pageButton = screen.getByRole('button', { name: 'Practice recap' })
+    expect(pageButton).toHaveClass('min-w-0', 'overflow-hidden')
+    expect(within(pageButton).getByText('Practice recap')).toHaveClass('min-w-0', 'flex-1', 'truncate')
   })
 
   it('keeps the formatting toolbar in the editor header and the note canvas borderless', async () => {
@@ -507,11 +516,10 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedBoard).toHaveFocus())
     fireEvent.contextMenu(renamedBoard)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Study Notes”?')
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deleteBoard).toHaveBeenCalledWith('board-1'))
     expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 
@@ -562,11 +570,10 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedPage).toHaveFocus())
     fireEvent.contextMenu(renamedPage)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Weekly review”?')
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deletePage).toHaveBeenCalledWith('page-1'))
     expect(await screen.findByText('This board has no pages')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 })

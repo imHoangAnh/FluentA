@@ -336,6 +336,18 @@ Habit Stats, Settings, and page-specific learning routes. The shell remains
 mounted during protected client-side navigation while its active route
 metadata and feature content change.
 
+Text-entry controls use their focused border or an inset container treatment
+as the focus indicator. They do not draw a second outline or ring outside the
+control. Native single-select controls use the same no-outer-ring contract with
+an inset focus indicator, a shared chevron, and semantic surface/border tokens;
+inline Vocabulary table selects keep their cell-owned border and Lucide
+chevron. Non-text interactive controls retain the shared outer focus outline.
+
+Radix dropdown and context menus share their surface and item states through
+`src/frontend/src/shared/components/ui/menu-styles.ts`. Feature menus may add
+layout constraints such as the Notifications width, but must preserve the
+shared radius, elevation, highlighted, disabled, and destructive treatments.
+
 Superseded global and route stylesheets are not runtime dependencies. Stable
 presentation uses utilities and shared primitives. Inline values are limited
 to computed feature behavior: Vocabulary drag/resize and grid tracks, Journal

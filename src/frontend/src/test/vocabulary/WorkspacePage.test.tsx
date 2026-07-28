@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,8 +53,8 @@ function renderWorkspace() {
 describe('WorkspacePage board and page context actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue(undefined)
-    vi.mocked(vocabularyApi.deletePage).mockResolvedValue(undefined)
+    vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue({ id: 'trash-board' } as never)
+    vi.mocked(vocabularyApi.deletePage).mockResolvedValue({ id: 'trash-page' } as never)
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([])
     vi.mocked(vocabularyApi.listBoards).mockResolvedValue([newestBoard, olderBoard])
     vi.mocked(vocabularyApi.getBoard).mockImplementation(async (boardId) => {
@@ -75,6 +75,18 @@ describe('WorkspacePage board and page context actions', () => {
 
     expect(addPage.compareDocumentPosition(newestPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(addPage.compareDocumentPosition(earlierPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('ellipsizes long Board and Page labels without changing their accessible names', async () => {
+    renderWorkspace()
+
+    const boardButton = await screen.findByRole('button', { name: /Newest board/ })
+    const pageButton = screen.getByRole('button', { name: 'Newest page' })
+
+    expect(boardButton).toHaveClass('min-w-0', 'overflow-hidden')
+    expect(within(boardButton).getByText('Newest board')).toHaveClass('min-w-0', 'flex-1', 'truncate')
+    expect(pageButton).toHaveClass('min-w-0', 'overflow-hidden')
+    expect(within(pageButton).getByText('Newest page')).toHaveClass('min-w-0', 'flex-1', 'truncate')
   })
 
   it('creates a Board from a modal and Escape cancels without a request', async () => {
@@ -122,7 +134,7 @@ describe('WorkspacePage board and page context actions', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('confirms the exact right-clicked Board, preserves it on Cancel, then selects the newest replacement after Delete', async () => {
+  it('moves the exact right-clicked Board to Trash and selects the newest replacement', async () => {
     const user = userEvent.setup()
     renderWorkspace()
 
@@ -130,15 +142,7 @@ describe('WorkspacePage board and page context actions', () => {
     fireEvent.contextMenu(boardButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
 
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Newest board”?')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(vocabularyApi.deleteBoard).not.toHaveBeenCalled()
-    expect(boardButton).toBeInTheDocument()
-
-    fireEvent.contextMenu(boardButton)
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
-
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(vocabularyApi.deleteBoard).toHaveBeenCalledWith('board-new'))
     expect(await screen.findByRole('heading', { name: 'Older page' })).toBeInTheDocument()
   })
@@ -150,8 +154,7 @@ describe('WorkspacePage board and page context actions', () => {
     const pageButton = await screen.findByRole('button', { name: 'Newest page' })
     fireEvent.contextMenu(pageButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('Delete “Newest page”?')
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
     await waitFor(() => expect(vocabularyApi.deletePage).toHaveBeenCalledWith('board-new', 'page-new'))
     expect(await screen.findByRole('heading', { name: 'Earlier page' })).toBeInTheDocument()
