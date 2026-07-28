@@ -132,10 +132,21 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void SoftDelete()
+    public void MoveToTrash(DateTime nowUtc)
     {
-        DeletedAt = DateTime.UtcNow;
-        UpdatedAt = DeletedAt.Value;
+        DeletedAt = nowUtc;
+        ReminderEnabled = false;
+        LastReminderSentOn = null;
+        UpdatedAt = nowUtc;
+    }
+
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        DeletedAt = null;
+        // Reminder settings deliberately stay disabled after Restore.
+        ReminderEnabled = false;
+        LastReminderSentOn = null;
+        UpdatedAt = nowUtc;
     }
 
     private void ApplyDetails(

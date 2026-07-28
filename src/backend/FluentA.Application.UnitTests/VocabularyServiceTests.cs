@@ -265,11 +265,32 @@ public sealed class VocabularyServiceTests
             return Task.FromResult(Words.FirstOrDefault(word => word.Id == wordId && ownedPageIds.Contains(word.PageId) && word.DeletedAt is null));
         }
 
+        public Task<VocabBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt == trashedAt));
+
+        public Task<VocabPage?> GetTrashedPageAsync(Guid userId, Guid pageId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            var activeBoards = _boards.Where(board => board.UserId == userId && board.DeletedAt is null).Select(board => board.Id).ToHashSet();
+            return Task.FromResult(_pages.FirstOrDefault(page => page.Id == pageId && page.DeletedAt == trashedAt && activeBoards.Contains(page.BoardId)));
+        }
+
+        public Task<VocabWord?> GetTrashedWordAsync(Guid userId, Guid wordId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            var activePageIds = _pages.Where(page => page.DeletedAt is null).Select(page => page.Id).ToHashSet();
+            return Task.FromResult(Words.FirstOrDefault(word => word.Id == wordId && word.DeletedAt == trashedAt && activePageIds.Contains(word.PageId)));
+        }
+
         public Task<VocabBoardPreference?> GetBoardPreferenceAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
             => Task.FromResult(Preferences.FirstOrDefault(preference => preference.UserId == userId && preference.BoardId == boardId && preference.DeletedAt is null));
 
         public Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => word.PageId == pageId && word.DeletedAt is null).ToList());
+
+        public Task<IReadOnlyList<VocabWord>> ListTrashedWordsAsync(IReadOnlyCollection<Guid> pageIds, DateTime trashedAt, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => pageIds.Contains(word.PageId) && word.DeletedAt == trashedAt).ToList());
+
+        public Task<IReadOnlyList<VocabWord>> ListWordsForPagesAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => pageIds.Contains(word.PageId)).ToList());
 
         public Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
         {
@@ -301,23 +322,31 @@ public sealed class VocabularyServiceTests
         public Task UpdateBoardPreferenceAsync(VocabBoardPreference preference, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateFixedCellAsync(VocabWord word, string columnKey, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task SoftDeleteBoardAsync(VocabBoard board, CancellationToken cancellationToken = default)
+        public Task SoftDeleteBoardAsync(VocabBoard board, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
-            board.SoftDelete();
+            board.SoftDelete(trashedAt);
+            var pageIds = _pages.Where(page => page.BoardId == board.Id && page.DeletedAt is null).Select(page => page.Id).ToHashSet();
+            foreach (var page in _pages.Where(page => pageIds.Contains(page.Id))) page.SoftDelete(trashedAt);
+            foreach (var word in Words.Where(word => pageIds.Contains(word.PageId) && word.DeletedAt is null)) word.SoftDelete(trashedAt);
             return Task.CompletedTask;
         }
 
-        public Task SoftDeletePageAsync(VocabPage page, CancellationToken cancellationToken = default)
+        public Task SoftDeletePageAsync(VocabPage page, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
-            page.SoftDelete();
+            page.SoftDelete(trashedAt);
+            foreach (var word in Words.Where(word => word.PageId == page.Id && word.DeletedAt is null)) word.SoftDelete(trashedAt);
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteWordAsync(VocabWord word, CancellationToken cancellationToken = default)
+        public Task SoftDeleteWordAsync(VocabWord word, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
-            word.SoftDelete();
+            word.SoftDelete(trashedAt);
             return Task.CompletedTask;
         }
+
+        public Task RemoveBoardAsync(VocabBoard board, CancellationToken cancellationToken = default) { _boards.Remove(board); _pages.RemoveAll(page => page.BoardId == board.Id); return Task.CompletedTask; }
+        public Task RemovePageAsync(VocabPage page, CancellationToken cancellationToken = default) { _pages.Remove(page); Words.RemoveAll(word => word.PageId == page.Id); return Task.CompletedTask; }
+        public Task RemoveWordAsync(VocabWord word, CancellationToken cancellationToken = default) { Words.Remove(word); return Task.CompletedTask; }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {

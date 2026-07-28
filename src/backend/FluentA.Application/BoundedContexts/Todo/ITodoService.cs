@@ -1,4 +1,5 @@
 using FluentA.Application.BoundedContexts.Todo.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 
 namespace FluentA.Application.BoundedContexts.Todo;
@@ -17,6 +18,6 @@ public interface ITodoService
     Task<OperationResult<TodoItemDto>> UpdateAsync(Guid userId, Guid todoId, UpdateTodoItemRequest request, CancellationToken cancellationToken = default);
     /// <summary>Creates one incomplete same-day copy from an owned todo item.</summary>
     Task<OperationResult<TodoItemDto>> DuplicateAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
-    /// <summary>Soft-deletes an owned todo item.</summary>
-    Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
+    /// <summary>Moves an owned todo item and its already-created future occurrences to Trash.</summary>
+    Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
 }

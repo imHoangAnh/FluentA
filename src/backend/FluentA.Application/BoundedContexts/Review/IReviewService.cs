@@ -1,4 +1,5 @@
 using FluentA.Application.BoundedContexts.Review.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 
 namespace FluentA.Application.BoundedContexts.Review;
@@ -37,7 +38,7 @@ public interface IReviewService
         Guid userId,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<int>> RemoveLevelFiveWordsAsync(
+    Task<OperationResult<IReadOnlyList<TrashEntryDto>>> RemoveLevelFiveWordsAsync(
         Guid userId,
         RemoveLevelFiveWordsRequest request,
         CancellationToken cancellationToken = default);

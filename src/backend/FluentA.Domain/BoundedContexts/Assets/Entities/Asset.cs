@@ -140,6 +140,19 @@ public sealed class Asset : BaseEntity, IAggregateRoot
         UpdatedAt = nowUtc;
     }
 
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        if (Status != AssetStatus.Archived)
+        {
+            return;
+        }
+
+        Status = AssetStatus.Ready;
+        ArchivedAt = null;
+        PurgeAfterAt = null;
+        UpdatedAt = nowUtc;
+    }
+
     public void ClaimPurge(DateTime nowUtc)
     {
         if (Status != AssetStatus.Archived || !PurgeAfterAt.HasValue || PurgeAfterAt.Value > nowUtc)

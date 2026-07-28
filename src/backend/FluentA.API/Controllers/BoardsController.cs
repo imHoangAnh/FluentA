@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,7 +56,7 @@ public sealed class BoardsController : ControllerBase
     {
         var result = await _vocabulary.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Board deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -87,7 +88,7 @@ public sealed class BoardsController : ControllerBase
     {
         var result = await _vocabulary.DeletePageAsync(CurrentUserId(), boardId, pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Page deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -126,7 +127,7 @@ public sealed class BoardsController : ControllerBase
     {
         var result = await _vocabulary.DeleteWordAsync(CurrentUserId(), boardId, wordId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Word deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -150,12 +151,17 @@ public sealed class BoardsController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
-        if (result.Error is not VocabularyError error)
+        if (result.Error is VocabularyError vocabularyError)
         {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
+            var vocabularyEnvelope = ApiEnvelope<object>.Fail(new ApiErrorEnvelope(vocabularyError.Code, vocabularyError.Message, vocabularyError.Details));
+            return StatusCode(vocabularyError.StatusCode, vocabularyEnvelope);
         }
 
-        var envelope = ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details));
-        return StatusCode(error.StatusCode, envelope);
+        if (result.Error is TrashError trashError)
+        {
+            return StatusCode(trashError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(trashError.Code, trashError.Message)));
+        }
+
+        return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
     }
 }

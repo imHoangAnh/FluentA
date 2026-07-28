@@ -13,6 +13,7 @@ using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Todo;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.Common.Interfaces;
 using FluentA.Infrastructure.Assets;
@@ -33,6 +34,7 @@ using FluentA.Infrastructure.Practice;
 using FluentA.Infrastructure.Pronunciation;
 using FluentA.Infrastructure.Review;
 using FluentA.Infrastructure.Todo;
+using FluentA.Infrastructure.Trash;
 using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -46,7 +48,7 @@ namespace FluentA.Infrastructure;
 public static class DependencyInjection
 {
     private const string DefaultPostgresConnection =
-        "Host=localhost;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_local_pass";
+        "Host=localhost;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_dev";
     private const string DefaultRedisConnection = "localhost:6379";
     private const int DefaultPostgresMinPoolSize = 0;
     private const int DefaultPostgresMaxPoolSize = 30;
@@ -110,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IPracticeRepository, EfPracticeRepository>();
         services.AddScoped<IPronunciationWordRepository, EfPronunciationWordRepository>();
         services.AddScoped<IReviewRepository, EfReviewRepository>();
+        services.AddScoped<ILevelFiveTrashRepository, EfLevelFiveTrashRepository>();
         services.AddScoped<IFlashcardService, FlashcardService>();
         services.AddScoped<IPracticeService, PracticeService>();
         services.AddScoped<IPronunciationService, PronunciationService>();
@@ -122,6 +125,17 @@ public static class DependencyInjection
         services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();
+        services.AddScoped<ITrashRepository, EfTrashRepository>();
+        services.AddScoped<ITrashTransaction, EfTrashTransaction>();
+        services.AddScoped<ITrashParticipant, TodoTrashParticipant>();
+        services.AddScoped<ITrashParticipant, NoteTrashParticipant>();
+        services.AddScoped<ITrashParticipant, VocabularyTrashParticipant>();
+        services.AddScoped<ITrashParticipant, LevelFiveTrashParticipant>();
+        services.AddScoped<ITrashParticipant, CountdownTrashParticipant>();
+        services.AddScoped<ITrashParticipant, HabitTrashParticipant>();
+        services.AddScoped<ITrashParticipant, JournalTrashParticipant>();
+        services.AddScoped<ITrashParticipant, KanbanTrashParticipant>();
+        services.AddScoped<ITrashService, TrashService>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<ICountdownRepository, EfCountdownRepository>();
         services.AddScoped<ICountdownService, CountdownService>();

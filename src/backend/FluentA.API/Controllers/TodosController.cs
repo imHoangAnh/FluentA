@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -83,13 +84,13 @@ public sealed class TodosController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Soft-deletes an owned todo item.</summary>
+    /// <summary>Moves an owned todo item and its already-created future occurrences to Trash.</summary>
     [HttpDelete("{todoId:guid}")]
     public async Task<IActionResult> Delete(Guid todoId, CancellationToken cancellationToken)
     {
         var result = await _todos.DeleteAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Todo item deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -106,6 +107,11 @@ public sealed class TodosController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
+        if (result.Error is TrashError trashError)
+        {
+            return StatusCode(trashError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(trashError.Code, trashError.Message)));
+        }
+
         if (result.Error is not TodoError error)
         {
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));

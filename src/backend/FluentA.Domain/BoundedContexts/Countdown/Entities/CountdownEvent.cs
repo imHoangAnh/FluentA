@@ -28,6 +28,7 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     public string Name { get; private set; }
     public DateTime TargetDate { get; private set; }
     public Guid? CoverAssetId { get; private set; }
+    public DateTime? RestoredAtUtc { get; private set; }
     public IReadOnlyList<CountdownAlert> Alerts => _alerts.AsReadOnly();
 
     public static CountdownEvent Create(Guid userId, string name, DateTime targetDate, Guid? coverAssetId = null)
@@ -55,12 +56,22 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
         }
 
         var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam()).Date;
+        if (RestoredAtUtc.HasValue && vietnamNow > TargetDate.Date.AddDays(7))
+        {
+            var restoredOn = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(RestoredAtUtc.Value), CountdownTimeZone.Vietnam()).Date;
+            return vietnamNow <= restoredOn.AddDays(7);
+        }
         return vietnamNow <= TargetDate.Date.AddDays(7);
     }
 
     public bool ShouldRetireAt(DateTime utcNow)
     {
         var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam()).Date;
+        if (RestoredAtUtc.HasValue && vietnamNow > TargetDate.Date.AddDays(7))
+        {
+            var restoredOn = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(RestoredAtUtc.Value), CountdownTimeZone.Vietnam()).Date;
+            return vietnamNow > restoredOn.AddDays(7);
+        }
         return vietnamNow > TargetDate.Date.AddDays(7);
     }
 
@@ -85,6 +96,15 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     {
         CoverAssetId = null;
         Touch();
+    }
+
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        var now = NormalizeUtc(nowUtc);
+        DeletedAt = null;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(now, CountdownTimeZone.Vietnam()).Date;
+        RestoredAtUtc = vietnamNow > TargetDate.Date.AddDays(7) ? now : null;
+        UpdatedAt = now;
     }
 
     private void Touch()

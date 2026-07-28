@@ -72,6 +72,32 @@ public sealed class EfKanbanRepository : IKanbanRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<KanbanBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KanbanBoards
+            .Include(board => board.Columns)
+            .ThenInclude(column => column.Cards)
+            .FirstOrDefaultAsync(board => board.Id == boardId && board.UserId == userId && board.DeletedAt == trashedAt, cancellationToken);
+    }
+
+    public Task<KanbanColumn?> GetTrashedColumnAsync(Guid userId, Guid columnId, DateTime trashedAt, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KanbanColumns
+            .Include(column => column.Cards)
+            .Where(column => column.Id == columnId && column.DeletedAt == trashedAt)
+            .Join(_dbContext.KanbanBoards.Where(board => board.UserId == userId && board.DeletedAt == null), column => column.BoardId, board => board.Id, (column, _) => column)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<KanbanCard?> GetTrashedCardAsync(Guid userId, Guid cardId, DateTime trashedAt, CancellationToken cancellationToken = default)
+    {
+        return (from card in _dbContext.KanbanCards
+                join column in _dbContext.KanbanColumns on card.ColumnId equals column.Id
+                join board in _dbContext.KanbanBoards on column.BoardId equals board.Id
+                where card.Id == cardId && card.DeletedAt == trashedAt && column.DeletedAt == null && board.DeletedAt == null && board.UserId == userId
+                select card).FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> NextColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
     {
         var maxSortOrder = await _dbContext.KanbanColumns
@@ -125,6 +151,27 @@ public sealed class EfKanbanRepository : IKanbanRepository
     public async Task UpdateCardAsync(KanbanCard card, CancellationToken cancellationToken = default)
     {
         _dbContext.KanbanCards.Update(card);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveBoardAsync(KanbanBoard board, CancellationToken cancellationToken = default)
+    {
+        _dbContext.KanbanCards.RemoveRange(board.Columns.SelectMany(column => column.Cards));
+        _dbContext.KanbanColumns.RemoveRange(board.Columns);
+        _dbContext.KanbanBoards.Remove(board);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveColumnAsync(KanbanColumn column, CancellationToken cancellationToken = default)
+    {
+        _dbContext.KanbanCards.RemoveRange(column.Cards);
+        _dbContext.KanbanColumns.Remove(column);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveCardAsync(KanbanCard card, CancellationToken cancellationToken = default)
+    {
+        _dbContext.KanbanCards.Remove(card);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

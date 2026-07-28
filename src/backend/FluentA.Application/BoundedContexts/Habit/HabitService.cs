@@ -1,5 +1,6 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Habit.Enums;
 using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
@@ -13,11 +14,13 @@ public sealed partial class HabitService : IHabitService
     private const string TimeFormat = "HH:mm";
     private readonly IHabitRepository _repository;
     private readonly IHabitSyncNotifier _syncNotifier;
+    private readonly ITrashService? _trash;
 
-    public HabitService(IHabitRepository repository, IHabitSyncNotifier? syncNotifier = null)
+    public HabitService(IHabitRepository repository, IHabitSyncNotifier? syncNotifier = null, ITrashService? trash = null)
     {
         _repository = repository;
         _syncNotifier = syncNotifier ?? NullHabitSyncNotifier.Instance;
+        _trash = trash;
     }
 
     public async Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(
@@ -152,17 +155,22 @@ public sealed partial class HabitService : IHabitService
             monthStart.AddMonths(1).AddDays(-1)));
     }
 
-    public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default)
     {
+        if (_trash is not null)
+        {
+            return await _trash.TrashHabitAsync(userId, habitId, cancellationToken);
+        }
+
         var habit = await _repository.GetAsync(userId, habitId, cancellationToken);
         if (habit is null)
         {
-            return OperationResult<bool>.Failure(HabitError.NotFound());
+            return OperationResult<TrashEntryDto>.Failure(HabitError.NotFound());
         }
 
-        habit.SoftDelete();
+        habit.MoveToTrash(DateTime.UtcNow);
         await _repository.UpdateAsync(habit, cancellationToken);
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Habit", habit.Id, habit.Name, "Habit tracker", DateTime.UtcNow, DateTime.UtcNow));
     }
 
     public async Task<OperationResult<IReadOnlyList<HabitEntryDto>>> ListEntriesAsync(

@@ -35,7 +35,7 @@ public sealed class TodoServiceTests
         Assert.NotNull(updated.Value.CompletedAt);
         Assert.Single(notifier.CheckedItems);
         Assert.Equal(created.Value.Id, notifier.CheckedItems[0].TodoId);
-        Assert.True(deleted.Value);
+        Assert.Equal(created.Value.Id, deleted.Value!.EntityId);
         Assert.Empty(afterDelete.Value!);
         Assert.False(deletedById.IsSuccess);
         Assert.Equal("TODO_NOT_FOUND", ((TodoError)deletedById.Error!).Code);
@@ -539,6 +539,16 @@ public sealed class TodoServiceTests
             return Task.FromResult(_items.FirstOrDefault(item => item.UserId == userId && item.Id == todoId && item.DeletedAt is null));
         }
 
+        public Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+        {
+            return GetAsync(userId, todoId, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<TodoItem>>(_items.Where(item => item.UserId == userId).ToList());
+        }
+
         public Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
         {
             var next = _items.Where(item => item.UserId == userId && item.Date == date.Date && item.DeletedAt is null).Select(item => item.SortOrder).DefaultIfEmpty(-1).Max() + 1;
@@ -557,6 +567,12 @@ public sealed class TodoServiceTests
         }
 
         public Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task RemoveRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
+        {
+            _items.RemoveAll(item => items.Contains(item));
+            return Task.CompletedTask;
+        }
 
         public Task<TodoCompletionMutationResult?> SetCompletionAsync(
             Guid userId,

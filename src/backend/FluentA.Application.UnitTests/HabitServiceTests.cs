@@ -30,7 +30,7 @@ public sealed class HabitServiceTests
         Assert.Equal(new TimeOnly(20, 0).ToString("HH:mm"), created.Value.ReminderTime);
         Assert.Single(listed.Value!);
         Assert.Equal("Read English", updated.Value!.Name);
-        Assert.True(deleted.Value);
+        Assert.Equal(created.Value.Id, deleted.Value!.EntityId);
         Assert.Empty(afterDelete.Value!);
     }
 
@@ -316,6 +316,12 @@ public sealed class HabitServiceTests
                 habit.Id == habitId && habit.UserId == userId && habit.DeletedAt is null));
         }
 
+        public Task<HabitEntity?> GetTrashedAsync(Guid userId, Guid habitId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_habits.FirstOrDefault(habit =>
+                habit.Id == habitId && habit.UserId == userId && habit.DeletedAt == trashedAt));
+        }
+
         public Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
             Guid habitId,
             DateTime startDate,
@@ -359,6 +365,13 @@ public sealed class HabitServiceTests
 
         public Task UpdateAsync(HabitEntity habit, CancellationToken cancellationToken = default)
         {
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(HabitEntity habit, CancellationToken cancellationToken = default)
+        {
+            _habits.Remove(habit);
+            _entries.RemoveAll(entry => entry.HabitId == habit.Id);
             return Task.CompletedTask;
         }
 

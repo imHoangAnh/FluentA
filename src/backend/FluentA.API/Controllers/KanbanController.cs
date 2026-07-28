@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Kanban.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -50,13 +51,13 @@ public sealed class KanbanController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Soft-deletes an owned Kanban board.</summary>
+    /// <summary>Moves an owned Kanban board to Trash.</summary>
     [HttpDelete("boards/{boardId:guid}")]
     public async Task<IActionResult> DeleteBoard(Guid boardId, CancellationToken cancellationToken)
     {
         var result = await _kanban.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Kanban board deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -80,13 +81,13 @@ public sealed class KanbanController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Deletes an empty owned Kanban column.</summary>
+    /// <summary>Moves an empty owned Kanban column to Trash.</summary>
     [HttpDelete("boards/{boardId:guid}/columns/{columnId:guid}")]
     public async Task<IActionResult> DeleteColumn(Guid boardId, Guid columnId, CancellationToken cancellationToken)
     {
         var result = await _kanban.DeleteColumnAsync(CurrentUserId(), boardId, columnId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Kanban column deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -120,13 +121,13 @@ public sealed class KanbanController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Soft-deletes an owned Kanban card.</summary>
+    /// <summary>Moves an owned Kanban card to Trash.</summary>
     [HttpDelete("cards/{cardId:guid}")]
     public async Task<IActionResult> DeleteCard(Guid cardId, CancellationToken cancellationToken)
     {
         var result = await _kanban.DeleteCardAsync(CurrentUserId(), cardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Kanban card deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -145,6 +146,10 @@ public sealed class KanbanController : ControllerBase
     {
         if (result.Error is not KanbanError error)
         {
+            if (result.Error is TrashError trashError)
+            {
+                return StatusCode(trashError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(trashError.Code, trashError.Message)));
+            }
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
 

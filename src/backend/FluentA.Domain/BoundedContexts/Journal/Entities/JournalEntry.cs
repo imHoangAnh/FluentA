@@ -51,10 +51,16 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void SoftDelete()
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        DeletedAt = DateTime.UtcNow;
+        DeletedAt = nowUtc ?? DateTime.UtcNow;
         UpdatedAt = DeletedAt.Value;
+    }
+
+    public void RestoreFromTrash(DateTime nowUtc)
+    {
+        DeletedAt = null;
+        UpdatedAt = nowUtc;
     }
 
     private void Touch()

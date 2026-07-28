@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Note.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -52,7 +53,7 @@ public sealed class NotesController : ControllerBase
     {
         var result = await _notes.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Note board deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -88,7 +89,7 @@ public sealed class NotesController : ControllerBase
     {
         var result = await _notes.DeletePageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Note page deleted." }))
+            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -105,11 +106,16 @@ public sealed class NotesController : ControllerBase
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
     {
-        if (result.Error is not NoteError error)
+        if (result.Error is NoteError noteError)
         {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
+            return StatusCode(noteError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(noteError.Code, noteError.Message, noteError.Details)));
         }
 
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+        if (result.Error is TrashError trashError)
+        {
+            return StatusCode(trashError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(trashError.Code, trashError.Message)));
+        }
+
+        return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
     }
 }

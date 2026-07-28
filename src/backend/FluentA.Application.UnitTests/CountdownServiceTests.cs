@@ -149,6 +149,14 @@ public sealed class CountdownServiceTests
                 && countdownEvent.DeletedAt is null));
         }
 
+        public Task<CountdownEventEntity?> GetTrashedAsync(Guid userId, Guid countdownId, DateTime trashedAt, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(Events.FirstOrDefault(countdownEvent =>
+                countdownEvent.UserId == userId
+                && countdownEvent.Id == countdownId
+                && countdownEvent.DeletedAt == trashedAt));
+        }
+
         public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(Events.Any(countdownEvent => countdownEvent.CoverAssetId == coverAssetId && countdownEvent.DeletedAt is null));
@@ -162,6 +170,12 @@ public sealed class CountdownServiceTests
 
         public Task UpdateAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
         {
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
+        {
+            Events.Remove(countdownEvent);
             return Task.CompletedTask;
         }
     }

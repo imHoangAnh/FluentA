@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Note.DTOs;
+using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
@@ -14,13 +15,15 @@ public sealed class NoteService : INoteService
     private readonly INoteContentProcessor _contentProcessor;
     private readonly IAssetRepository _assets;
     private readonly IAssetObjectStorage _storage;
+    private readonly ITrashService? _trashService;
 
-    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage)
+    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage, ITrashService? trashService = null)
     {
         _repository = repository;
         _contentProcessor = contentProcessor;
         _assets = assets;
         _storage = storage;
+        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<NoteBoardSummaryDto>>> ListBoardsAsync(
@@ -75,34 +78,27 @@ public sealed class NoteService : INoteService
         return OperationResult<NoteBoardSummaryDto>.Success(ToBoardSummaryDto(board));
     }
 
-    public async Task<OperationResult<bool>> DeleteBoardAsync(
+    public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(
         Guid userId,
         Guid boardId,
         CancellationToken cancellationToken = default)
     {
+        if (_trashService is not null)
+        {
+            return await _trashService.TrashNoteBoardAsync(userId, boardId, cancellationToken);
+        }
+
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
         {
-            return OperationResult<bool>.Failure(NoteError.BoardNotFound());
+            return OperationResult<TrashEntryDto>.Failure(NoteError.BoardNotFound());
         }
 
-        var pageIds = board.Pages.Where(page => page.DeletedAt is null).Select(page => page.Id).ToArray();
-        var assetIds = new HashSet<Guid>();
-        foreach (var pageId in pageIds)
-        {
-            assetIds.UnionWith(await _repository.GetPageAssetIdsAsync(pageId, cancellationToken));
-        }
-
-        var assets = await _assets.GetOwnedAsync(userId, assetIds.ToArray(), cancellationToken);
-        foreach (var asset in assets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
-        {
-            asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
-        }
-
-        await _repository.SoftDeleteBoardAsync(board, cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        await _repository.SoftDeleteBoardAsync(board, nowUtc, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Note", board.Id, board.Name, "Notes", nowUtc, nowUtc.AddDays(30)));
     }
 
     public async Task<OperationResult<NotePageDto>> CreatePageAsync(
@@ -204,28 +200,27 @@ public sealed class NoteService : INoteService
         return OperationResult<NotePageDto>.Success(await ToPageDtoAsync(userId, page, cancellationToken));
     }
 
-    public async Task<OperationResult<bool>> DeletePageAsync(
+    public async Task<OperationResult<TrashEntryDto>> DeletePageAsync(
         Guid userId,
         Guid pageId,
         CancellationToken cancellationToken = default)
     {
+        if (_trashService is not null)
+        {
+            return await _trashService.TrashNotePageAsync(userId, pageId, cancellationToken);
+        }
+
         var page = await _repository.GetPageAsync(userId, pageId, cancellationToken);
         if (page is null)
         {
-            return OperationResult<bool>.Failure(NoteError.PageNotFound());
+            return OperationResult<TrashEntryDto>.Failure(NoteError.PageNotFound());
         }
 
-        var assetIds = await _repository.GetPageAssetIdsAsync(page.Id, cancellationToken);
-        var assets = await _assets.GetOwnedAsync(userId, assetIds.ToArray(), cancellationToken);
-        foreach (var asset in assets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
-        {
-            asset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
-        }
-
-        await _repository.SoftDeletePageAsync(page, cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        await _repository.SoftDeletePageAsync(page, nowUtc, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<bool>.Success(true);
+        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Note", page.Id, page.Name, "Notes", nowUtc, nowUtc.AddDays(30)));
     }
 
     private static NoteError? ValidateBoardName(string name)
