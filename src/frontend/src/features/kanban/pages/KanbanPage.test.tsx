@@ -54,9 +54,17 @@ function board(id: string) {
         }] : [],
       },
       {
+        id: `${id}-progress`,
+        name: 'In Progress',
+        sortOrder: 1,
+        createdAt: '2026-07-20T00:00:00Z',
+        updatedAt: '2026-07-20T00:00:00Z',
+        cards: [],
+      },
+      {
         id: `${id}-done`,
         name: 'Done',
-        sortOrder: 1,
+        sortOrder: 2,
         createdAt: '2026-07-20T00:00:00Z',
         updatedAt: '2026-07-20T00:00:00Z',
         cards: [],
@@ -75,11 +83,12 @@ describe('KanbanPage project workspace', () => {
     vi.clearAllMocks()
     api.listBoards.mockResolvedValue(boards)
     api.getBoard.mockImplementation(async (id: string) => board(id))
-    api.deleteBoard.mockResolvedValue(undefined)
+    api.deleteBoard.mockResolvedValue({ id: 'trash-board-1' })
     api.createColumn.mockResolvedValue({})
     api.createCard.mockResolvedValue({})
     api.updateCard.mockResolvedValue({})
-    api.deleteCard.mockResolvedValue(undefined)
+    api.deleteColumn.mockResolvedValue({ id: 'trash-column-1' })
+    api.deleteCard.mockResolvedValue({ id: 'trash-card-1' })
     api.moveCard.mockResolvedValue({})
   })
 
@@ -91,40 +100,61 @@ describe('KanbanPage project workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Exam prep' })).toBeInTheDocument()
   })
 
-  it('confirms deletion for the exact right-clicked project', async () => {
+  it('moves the exact right-clicked project to Trash without a confirmation dialog', async () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Study project' })
 
     const inactiveProject = screen.getByRole('button', { name: 'Exam prep' })
     fireEvent.contextMenu(inactiveProject)
-    const dialog = await screen.findByRole('alertdialog', { name: 'Delete project?' })
-    expect(within(dialog).getByText(/Exam prep/)).toBeInTheDocument()
-    expect(api.deleteBoard).not.toHaveBeenCalled()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
-    expect(api.deleteBoard).not.toHaveBeenCalled()
-
-    fireEvent.keyDown(inactiveProject, { key: 'F10', shiftKey: true })
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete project' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(api.deleteBoard).toHaveBeenCalledTimes(1))
     expect(api.deleteBoard).toHaveBeenCalledWith('board-2')
   })
 
-  it('submits only one board deletion while confirmation is pending', async () => {
-    let resolveDelete: (() => void) | undefined
-    api.deleteBoard.mockImplementation(() => new Promise<void>((resolve) => { resolveDelete = resolve }))
+  it('renders the supported project-board hierarchy without reference-only controls', async () => {
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { name: 'Study project' })
+    const projectNavigation = screen.getByTestId('kanban-project-navigation')
+    const boardSurface = screen.getByTestId('kanban-board-surface')
+    const filters = screen.getByLabelText('Kanban card filters')
+
+    expect(projectNavigation.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(heading.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(filters.compareDocumentPosition(boardSurface) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add column' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Filter by priority')).toBeInTheDocument()
+    expect(screen.getByLabelText('Filter by deadline')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/search cards/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Assignee')).not.toBeInTheDocument()
+    expect(screen.queryByText('Clear filters')).not.toBeInTheDocument()
+  })
+
+  it('places Add Card before a useful empty state in every empty column', async () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Study project' })
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Study project' }), { key: 'ContextMenu' })
-    const confirm = await screen.findByRole('button', { name: 'Delete project' })
-    fireEvent.click(confirm)
-    fireEvent.click(confirm)
+    const progressColumn = screen.getByTestId('kanban-column-In Progress')
+    const addCard = within(progressColumn).getByRole('button', { name: 'Add Card' })
+    const emptyState = within(progressColumn).getByText('No cards yet')
+
+    expect(addCard.compareDocumentPosition(emptyState) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(progressColumn).getByText('Add a card to get started.')).toBeInTheDocument()
+  })
+
+  it('submits only one board deletion while the move is pending', async () => {
+    let resolveDelete: (() => void) | undefined
+    api.deleteBoard.mockImplementation(() => new Promise<{ id: string }>((resolve) => { resolveDelete = () => resolve({ id: 'trash-board-1' }) }))
+    renderPage()
+    await screen.findByRole('heading', { name: 'Study project' })
+
+    const boardTab = screen.getByRole('button', { name: 'Study project' })
+    fireEvent.keyDown(boardTab, { key: 'ContextMenu' })
+    fireEvent.keyDown(boardTab, { key: 'ContextMenu' })
 
     await waitFor(() => expect(api.deleteBoard).toHaveBeenCalledTimes(1))
     resolveDelete?.()
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(api.listBoards).toHaveBeenCalledTimes(2))
   })
 
   it('opens the same right panel for editing and creating cards while Move stays on the card', async () => {
