@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type HabitFrequency = 'Daily' | 'Custom'
 export type HabitIcon = 'Default' | 'Book' | 'Exercise' | 'Water' | 'Meditation' | 'Study' | 'Work' | 'Health'
@@ -71,7 +72,8 @@ export async function updateHabit(id: string, input: UpdateHabitInput) {
 }
 
 export async function deleteHabit(id: string) {
-  await apiClient.delete(`/habits/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/habits/${id}`)
+  return response.data.data!
 }
 
 export async function listHabitEntries(id: string, month: string, timeZoneId: string) {

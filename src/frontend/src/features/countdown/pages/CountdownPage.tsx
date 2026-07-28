@@ -2,8 +2,10 @@ import { CalendarClock, ImagePlus, MoreHorizontal, Plus, Trash2, X } from 'lucid
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { menuContentClassName, menuDestructiveItemClassName } from '@/shared/components/ui/menu-styles'
 import * as assetsApi from '@/lib/api/assets.api'
-import { DeleteCountdownConfirmationDialog } from '../components/DeleteCountdownConfirmationDialog'
+import { restoreTrashEntry } from '@/features/trash'
+import { toast } from '@/lib/toast'
 import * as countdownApi from '../api/countdown.api'
 
 const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
@@ -44,7 +46,6 @@ export function CountdownPage() {
   const [alerts, setAlerts] = useState<Array<{ alertDay: string; alertTime: string }>>([defaultAlert()])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const dialogTitleId = useId()
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -103,10 +104,21 @@ export function CountdownPage() {
 
   const deleteCountdown = useMutation({
     mutationFn: countdownApi.deleteCountdown,
-    onSuccess: async () => {
-      setDeleteTarget(null)
+    onSuccess: async (entry) => {
       await refresh()
+      toast.success('Countdown moved to Trash. Alerts were removed.', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreTrashEntry(entry.id)
+              .then(refresh)
+              .then(() => toast.success('Countdown restored without alerts.'))
+              .catch(() => toast.error('Could not restore the countdown.'))
+          },
+        },
+      })
     },
+    onError: () => toast.error('Could not move the countdown to Trash.'),
   })
 
   function submitCountdown(event: FormEvent) {
@@ -169,12 +181,12 @@ export function CountdownPage() {
                             </button>
                           </DropdownMenu.Trigger>
                           <DropdownMenu.Portal>
-                            <DropdownMenu.Content className="countdown-card-menu" align="end" sideOffset={6}>
+                            <DropdownMenu.Content className={menuContentClassName} align="end" sideOffset={6}>
                               <DropdownMenu.Item
-                                className="countdown-card-menu-item countdown-card-menu-item--danger"
+                                className={menuDestructiveItemClassName}
                                 onSelect={() => {
                                   setOpenMenuId(null)
-                                  window.setTimeout(() => setDeleteTarget({ id: item.id, name: item.name }), 0)
+                                  deleteCountdown.mutate(item.id)
                                 }}
                               >
                                 <Trash2 size={15} />
@@ -261,16 +273,6 @@ export function CountdownPage() {
               </form>
             </div>
           </div>
-        ) : null}
-
-        {deleteTarget ? (
-          <DeleteCountdownConfirmationDialog
-            countdownName={deleteTarget.name}
-            pending={deleteCountdown.isPending}
-            onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-            onRestoreFocus={() => createTriggerRef.current?.focus()}
-            onConfirm={() => deleteCountdown.mutate(deleteTarget.id)}
-          />
         ) : null}
       </main>
     </>

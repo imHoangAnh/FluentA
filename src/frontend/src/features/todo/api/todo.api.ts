@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export type TodoRepeatPattern = 'Daily' | 'Weekdays' | 'Weekly' | 'Monthly' | 'Yearly'
 
@@ -80,5 +81,6 @@ export async function duplicateTodo(id: string) {
 }
 
 export async function deleteTodo(id: string) {
-  await apiClient.delete(`/todos/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/todos/${id}`)
+  return response.data.data!
 }

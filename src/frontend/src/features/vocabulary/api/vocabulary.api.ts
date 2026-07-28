@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash'
 
 export const DEFAULT_VOCAB_COLUMN_ORDER = [
   'word',
@@ -125,7 +126,8 @@ export async function updateBoard(boardId: string, input: { name: string; langua
 }
 
 export async function deleteBoard(boardId: string) {
-  await apiClient.delete(`/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/boards/${boardId}`)
+  return response.data.data!
 }
 
 export async function createPage(boardId: string, input: { name: string }) {
@@ -139,7 +141,8 @@ export async function updatePage(boardId: string, pageId: string, input: { name:
 }
 
 export async function deletePage(boardId: string, pageId: string) {
-  await apiClient.delete(`/boards/${boardId}/pages/${pageId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/boards/${boardId}/pages/${pageId}`)
+  return response.data.data!
 }
 
 export async function listWords(boardId: string, pageId: string) {
@@ -163,7 +166,8 @@ export async function updateWordCell(boardId: string, wordId: string, columnKey:
 }
 
 export async function deleteWord(boardId: string, wordId: string) {
-  await apiClient.delete(`/boards/${boardId}/words/${wordId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/boards/${boardId}/words/${wordId}`)
+  return response.data.data!
 }
 
 export async function updateBoardPreferences(boardId: string, input: {

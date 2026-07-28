@@ -33,25 +33,18 @@ const levelFiveItems: reviewApi.LevelFiveReviewItem[] = [
     wordId: 'word-2', word: 'beta', boardId: 'board-1', boardName: 'Board A',
     pageId: 'page-2', pageName: 'Page B', status: 'active', lastReviewDate: '2026-07-07T00:00:00Z',
   },
-  {
-    wordId: 'word-3', word: 'gamma', boardId: 'board-2', boardName: 'Board B',
-    pageId: 'page-3', pageName: 'Page C', status: 'inactive', lastReviewDate: null,
-  },
 ]
-
-async function chooseFilter(user: ReturnType<typeof userEvent.setup>, label: 'All' | 'Active' | 'Inactive') {
-  await user.click(screen.getByRole('button', { name: /Filter Level 5 words/ }))
-  await user.click(await screen.findByRole('menuitemradio', { name: label }))
-}
 
 describe('LevelFiveSettingsPage redesigned management', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(reviewApi.listLevelFiveWords).mockResolvedValue(levelFiveItems)
-    vi.mocked(reviewApi.removeLevelFiveWords).mockResolvedValue(1)
+    vi.mocked(reviewApi.removeLevelFiveWords).mockResolvedValue([{
+      id: 'trash-1', entityKind: 'LevelFive', entityId: 'word-1', displayName: 'alpha', originalLocation: 'Board A / Page A', trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
+    }])
   })
 
-  it('places search before one status dropdown and keeps inactive items discoverable', async () => {
+  it('places search before one status dropdown and filters the active Level 5 library', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -60,17 +53,9 @@ describe('LevelFiveSettingsPage redesigned management', () => {
     expect(screen.getByRole('button', { name: /current filter All/ })).toBeInTheDocument()
     expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.getByText('beta')).toBeInTheDocument()
-    expect(screen.getByText('gamma')).toBeInTheDocument()
-
-    await chooseFilter(user, 'Inactive')
-    expect(screen.getByText('gamma')).toBeInTheDocument()
-    expect(screen.queryByText('alpha')).not.toBeInTheDocument()
-
-    await chooseFilter(user, 'All')
     await user.type(screen.getByRole('searchbox', { name: 'Search Level 5 words' }), 'bet')
     expect(screen.getByText('beta')).toBeInTheDocument()
     expect(screen.queryByText('alpha')).not.toBeInTheDocument()
-    expect(screen.queryByText('gamma')).not.toBeInTheDocument()
   })
 
   it('selects only visible active words from the rightmost header checkbox', async () => {
@@ -96,7 +81,7 @@ describe('LevelFiveSettingsPage redesigned management', () => {
     expect(screen.getByText('1 word selected')).toBeInTheDocument()
   })
 
-  it('requires confirmation, preserves cancel, and removes only after confirm', async () => {
+  it('moves selected words to Trash immediately and removes them from the Level 5 list', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -104,23 +89,12 @@ describe('LevelFiveSettingsPage redesigned management', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select alpha' }))
     await user.click(screen.getByRole('button', { name: 'Remove selected' }))
 
-    expect(screen.getByRole('alertdialog', { name: 'Remove selected words?' })).toBeInTheDocument()
-    expect(screen.getByText('1 word will become inactive. Review history will be preserved.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(reviewApi.removeLevelFiveWords).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'Remove selected' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm remove' }))
-
     await waitFor(() => expect(vi.mocked(reviewApi.removeLevelFiveWords).mock.calls[0]?.[0]).toEqual(['word-1']))
     expect(screen.getByRole('button', { name: 'Remove selected' })).toBeDisabled()
-
-    await chooseFilter(user, 'Inactive')
-    expect(screen.getByText('alpha')).toBeInTheDocument()
-    expect(screen.getByText('gamma')).toBeInTheDocument()
+    expect(screen.queryByText('alpha')).not.toBeInTheDocument()
   })
 
-  it('keeps the confirmation open and selection intact when remove fails', async () => {
+  it('keeps the selection intact when the move to Trash fails', async () => {
     const user = userEvent.setup()
     vi.mocked(reviewApi.removeLevelFiveWords).mockRejectedValueOnce(new Error('Temporary remove failure.'))
     renderPage()
@@ -128,11 +102,8 @@ describe('LevelFiveSettingsPage redesigned management', () => {
     expect(await screen.findByText('alpha')).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Select alpha' }))
     await user.click(screen.getByRole('button', { name: 'Remove selected' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm remove' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Temporary remove failure.')
-    expect(screen.getByRole('alertdialog', { name: 'Remove selected words?' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByRole('checkbox', { name: 'Select alpha' })).toBeChecked()
   })
 })

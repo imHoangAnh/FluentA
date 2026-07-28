@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
+import type { TrashEntry } from '@/features/trash/api/trash.api'
 
 export type NotePageSummary = {
   id: string
@@ -57,7 +58,8 @@ export async function updateBoard(boardId: string, input: { name: string }) {
 }
 
 export async function deleteBoard(boardId: string) {
-  await apiClient.delete(`/notes/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/boards/${boardId}`)
+  return response.data.data!
 }
 
 export async function createPage(boardId: string, input: CreateNotePageInput) {
@@ -76,5 +78,6 @@ export async function updatePage(pageId: string, input: UpdateNotePageInput) {
 }
 
 export async function deletePage(pageId: string) {
-  await apiClient.delete(`/notes/pages/${pageId}`)
+  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/pages/${pageId}`)
+  return response.data.data!
 }
