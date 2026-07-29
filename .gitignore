@@ -22,6 +22,9 @@ harness.db-shm
 .spikes/
 history/
 docs/
+.agents/
+.harness-backup/
+.harness-core/
 
 # Logs / temp runtime files
 logs/
