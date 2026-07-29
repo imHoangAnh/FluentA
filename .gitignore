@@ -21,6 +21,7 @@ harness.db-shm
 .agent-workflow/
 .spikes/
 history/
+docs/
 
 # Logs / temp runtime files
 logs/
@@ -58,3 +59,7 @@ scripts/
 # Harness durable layer
 scripts/bin/harness-cli
 scripts/bin/harness-cli.exe
+
+# Harness core maintenance binary
+scripts/bin/harness
+scripts/bin/harness.exe
