@@ -51,7 +51,6 @@ async function mockSettingsApis(page) {
     const request = route.request()
     const path = new URL(request.url()).pathname
 
-    if (path.endsWith('/auth/refresh')) return route.fulfill(json({ accessToken: 'settings-redesign-token', user }))
     if (path.endsWith('/auth/me')) return route.fulfill(json(user))
     if (path.endsWith('/practice/settings')) return route.fulfill(json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] }))
     if (path.endsWith('/review/settings')) return route.fulfill(json({ dailyLimit: 30, recapAfterAnswer: true }))

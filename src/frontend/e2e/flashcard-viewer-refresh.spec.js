@@ -31,7 +31,6 @@ async function mockViewerApis(page) {
     const path = new URL(route.request().url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
 
-    if (path.endsWith('/auth/refresh')) return json({ accessToken: 'flashcard-refresh-token', user })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages/page-long/words')) {
       return json({ pageId: 'page-long', boardId: 'board-long', pageName: 'Long content', boardLanguage: 'en', words: [word] })

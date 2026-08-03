@@ -14,5 +14,4 @@ export const authRoutes: RouteObject[] = [
   { path: '/verify-email', lazy: lazyAuthPage(() => import('./pages/VerifyEmailPage'), 'VerifyEmailPage') },
   { path: '/forgot-password', lazy: lazyAuthPage(() => import('./pages/ForgotPasswordPage'), 'ForgotPasswordPage') },
   { path: '/reset-password', lazy: lazyAuthPage(() => import('./pages/ResetPasswordPage'), 'ResetPasswordPage') },
-  { path: '/auth/google/callback', lazy: lazyAuthPage(() => import('./pages/GoogleCallbackPage'), 'GoogleCallbackPage') },
 ]

@@ -19,7 +19,11 @@ export function ResetPasswordPage() {
     setError(null)
 
     try {
-      const payload = await authApi.resetPassword({ token, password, confirmPassword })
+      if (password !== confirmPassword) {
+        setError('Password confirmation must match.')
+        return
+      }
+      const payload = await authApi.resetPassword({ token, newPassword: password })
       navigate('/login', { state: { notice: payload.message } })
     } catch (submissionError) {
       setError(authApiError(submissionError))

@@ -9,18 +9,15 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [developmentResetUrl, setDevelopmentResetUrl] = useState<string | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setMessage(null)
     setError(null)
-    setDevelopmentResetUrl(null)
 
     try {
       const payload = await authApi.forgotPassword({ email })
       setMessage(payload.message)
-      setDevelopmentResetUrl(payload.developmentResetUrl ?? null)
     } catch (submissionError) {
       setError(authApiError(submissionError))
     }
@@ -39,11 +36,6 @@ export function ForgotPasswordPage() {
           <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
           {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
           {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-          {developmentResetUrl ? (
-            <p role="status" className="m-0 break-all text-sm text-primary">
-              Local reset link: <a href={developmentResetUrl}>{developmentResetUrl}</a>
-            </p>
-          ) : null}
           <Button className="w-full" type="submit">Send reset link</Button>
         </form>
         <div className="flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/register" className="text-primary no-underline hover:underline">Register</Link></div>

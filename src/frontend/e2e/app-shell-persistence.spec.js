@@ -14,7 +14,7 @@ test('keeps one AppShell mounted across protected client-side navigation', async
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { accessToken: 'app-shell-persistence-token', user } }),
+        body: JSON.stringify({ data: user }),
       })
       return
     }

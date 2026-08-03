@@ -7,11 +7,11 @@ const apiUrl = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:5000/api/v1'
 const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
 
 export function useHabitSync() {
-  const accessToken = useAuthStore((state) => state.accessToken)
+  const isAuthenticated = useAuthStore((state) => state.status === 'authenticated')
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!accessToken || import.meta.env.MODE === 'test' || typeof window.WebSocket === 'undefined') return
+    if (!isAuthenticated || import.meta.env.MODE === 'test' || typeof window.WebSocket === 'undefined') return
 
     let disposed = false
     let connection: HubConnection | null = null
@@ -20,7 +20,7 @@ export function useHabitSync() {
       if (disposed) return
 
       connection = new HubConnectionBuilder()
-        .withUrl(hubUrl, { accessTokenFactory: () => accessToken })
+        .withUrl(hubUrl)
         .withAutomaticReconnect()
         .build()
 
@@ -36,5 +36,5 @@ export function useHabitSync() {
       disposed = true
       if (connection) void connection.stop()
     }
-  }, [accessToken, queryClient])
+  }, [isAuthenticated, queryClient])
 }

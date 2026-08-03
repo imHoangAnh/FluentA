@@ -19,7 +19,6 @@ async function mockAuthenticatedInbox(page, { failList = false, items: sourceIte
     const request = route.request()
     const path = new URL(request.url()).pathname
 
-    if (path.endsWith('/auth/refresh')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { accessToken: 'notification-proof-token', user } }) })
     if (path.endsWith('/auth/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
     if (path.endsWith('/notifications/unread-count')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { count: items.filter((item) => !item.readAt).length } }) })
     if (path.endsWith('/notifications') && request.method() === 'GET') {

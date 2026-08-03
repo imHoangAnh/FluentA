@@ -13,7 +13,6 @@ const publicRoutes = [
   ['/verify-email', 'Verify your email'],
   ['/forgot-password', 'Reset your password'],
   ['/reset-password', 'Choose a new password'],
-  ['/auth/google/callback', 'Google sign-in'],
 ]
 
 const protectedRoutes = [
@@ -42,15 +41,11 @@ const protectedRoutes = [
 async function mockReleaseApis(page, authState) {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
-    if (path.endsWith('/auth/refresh')) {
+    if (path.endsWith('/auth/me')) {
       if (!authState.enabled) {
         await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Anonymous route proof' }) })
         return
       }
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { accessToken: 'e27-route-proof-token', user } }) })
-      return
-    }
-    if (path.endsWith('/auth/me')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
       return
     }

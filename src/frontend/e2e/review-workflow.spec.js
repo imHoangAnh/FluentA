@@ -10,7 +10,6 @@ async function mockReviewApis(page) {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
-    if (path.endsWith('/auth/refresh')) return json({ accessToken: 'review-token', user })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Review board', boardLanguage: 'en', pages: [{ pageId: 'page-1', pageName: 'Deck', isPracticed: false, words: [{ id: 'card-1', wordId: 'word-1', word: 'alpha', wordClass: 'other', ipaPronunciation: '/ˈælfə/', meaningVn: 'alpha vn', meaningEn: 'alpha definition', example: 'alpha example', isInReview: true, nextReviewDate: '2026-07-13', lapseCount: 0 }, { id: 'card-2', wordId: 'word-2', word: 'beta', wordClass: 'other', ipaPronunciation: '/ˈbiːtə/', meaningVn: 'beta vn', meaningEn: 'beta definition', example: 'beta example', isInReview: true, nextReviewDate: '2026-07-12', lapseCount: 0 }] }] }])
     if (path.endsWith('/review/settings')) return json({ dailyLimit: 2, recapAfterAnswer: false })

@@ -34,7 +34,7 @@ test('Kanban uses the wide route and keeps extra-column overflow inside the boar
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { accessToken: 'kanban-redesign-token', user } }),
+        body: JSON.stringify({ data: user }),
       })
       return
     }

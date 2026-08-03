@@ -173,7 +173,7 @@ async function renderAppWithDeck(initialEntry: string, wordOverrides: Record<str
 
 describe('FluentA app routes', async () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, user: null, status: 'anonymous', error: null })
+    useAuthStore.setState({ user: null, status: 'anonymous', error: null })
   })
 
   afterEach(() => {
@@ -198,7 +198,6 @@ describe('FluentA app routes', async () => {
 
   it('shows the dashboard and nav links when authenticated', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: {
         id: 'user-1',
@@ -233,7 +232,6 @@ describe('FluentA app routes', async () => {
 
   it('renders the flashcard empty state for authenticated users', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -251,7 +249,6 @@ describe('FluentA app routes', async () => {
 
   it('opens the modal-first Practice flow and starts the selected deck directly', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -271,7 +268,6 @@ describe('FluentA app routes', async () => {
 
   it('renders the dedicated practice entry route with practice-first copy', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -302,7 +298,6 @@ describe('FluentA app routes', async () => {
     })
 
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -332,7 +327,6 @@ describe('FluentA app routes', async () => {
 
   it('keeps the viewer route usable when a stale API response omits IPA', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -346,7 +340,6 @@ describe('FluentA app routes', async () => {
 
   it('renders the protected profile at its dedicated route', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -360,7 +353,6 @@ describe('FluentA app routes', async () => {
 
   it('opens learning settings at Practice and excludes Profile from settings navigation', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
@@ -378,7 +370,6 @@ describe('FluentA app routes', async () => {
 
   it('renders split settings routes inside the shared shell', async () => {
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })

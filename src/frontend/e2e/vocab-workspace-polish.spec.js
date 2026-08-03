@@ -73,8 +73,7 @@ async function mockWorkspaceApis(pageInstance) {
     const path = new URL(route.request().url()).pathname
     let data = []
 
-    if (path.endsWith('/auth/refresh')) data = { accessToken: 'workspace-token', user }
-    else if (path.endsWith('/auth/me')) data = user
+    if (path.endsWith('/auth/me')) data = user
     else if (path.endsWith('/boards')) data = [board]
     else if (path.endsWith(`/boards/${board.id}`)) data = { ...board, pages, preferences }
     else if (path.includes(`/boards/${board.id}/pages/`) && path.endsWith('/words')) data = words
@@ -167,7 +166,6 @@ test('confirms the exact Board on right-click, cancels safely, then deletes and 
     const request = route.request()
     const path = new URL(request.url()).pathname
     const method = request.method()
-    if (path.endsWith('/auth/refresh')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { accessToken: 'workspace-token', user } }) })
     if (path.endsWith('/auth/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
     if (method === 'GET' && path.endsWith('/boards')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [...details.values()].map(({ pages: _pages, preferences: _preferences, ...summary }) => summary) }) })
     if (method === 'DELETE' && path.includes('/boards/')) {
