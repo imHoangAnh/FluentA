@@ -1,109 +1,143 @@
+using System.Net;
+using System.Text;
+using System.Threading.RateLimiting;
+using FluentA.API.BackgroundJobs;
 using FluentA.API.Contracts;
 using FluentA.API.Hubs;
+using FluentA.API.Middleware;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Kanban;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Todo;
-using FluentA.API.Middleware;
-using FluentA.API.BackgroundJobs;
-using Hangfire;
 using FluentA.Infrastructure;
 using FluentA.Infrastructure.Auth;
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+var authOptions = AuthSecurityOptions.FromConfiguration(builder.Configuration);
+authOptions.Validate();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
-using var signingKeyProvider = new JwtSigningKeyProvider();
-builder.Services.AddSingleton(signingKeyProvider);
 builder.Services.AddFluentAInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>();
 builder.Services.AddScoped<ITodoSyncNotifier, SignalRTodoSyncNotifier>();
 builder.Services.AddScoped<IHabitSyncNotifier, SignalRHabitSyncNotifier>();
 builder.Services.AddScoped<IKanbanSyncNotifier, SignalRKanbanSyncNotifier>();
 builder.Services.AddScoped<IPomodoroSyncNotifier, SignalRPomodoroSyncNotifier>();
-builder.Services.AddCors(options =>
+
+var frontendOrigins = builder.Configuration.GetSection("Frontend:Origins").Get<string[]>()
+    ?? ["https://localhost:5173", "https://127.0.0.1:5173"];
+builder.Services.AddCors(options => options.AddPolicy("FluentAPolicy", policy => policy
+    .WithOrigins(frontendOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials()));
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.AddPolicy("FluentAPolicy", policy =>
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    foreach (var configuredProxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
     {
-        policy
-            .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
+        if (IPAddress.TryParse(configuredProxy, out var address)) options.KnownProxies.Add(address);
+    }
 });
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddRateLimiter(options =>
+{
+    AddFixedWindowPolicy(options, "auth-login", 10, TimeSpan.FromMinutes(5));
+    AddFixedWindowPolicy(options, "auth-register", 5, TimeSpan.FromMinutes(15));
+    AddFixedWindowPolicy(options, "auth-forgot", 5, TimeSpan.FromMinutes(15));
+    AddFixedWindowPolicy(options, "auth-resend", 5, TimeSpan.FromMinutes(15));
+    AddFixedWindowPolicy(options, "auth-verify", 10, TimeSpan.FromMinutes(5));
+    AddFixedWindowPolicy(options, "auth-reset", 10, TimeSpan.FromMinutes(15));
+    AddFixedWindowPolicy(options, "auth-google", 20, TimeSpan.FromMinutes(5));
+    options.OnRejected = async (context, cancellationToken) =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "FluentA.Local",
-            ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "FluentA.Client",
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = signingKeyProvider.Key,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1)
-        };
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken)
-                    && context.HttpContext.Request.Path.StartsWithSegments("/hubs/sync"))
-                {
-                    context.Token = accessToken;
-                }
+        var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var duration)
+            ? Math.Max(1, (int)Math.Ceiling(duration.TotalSeconds))
+            : 60;
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString();
+        await context.HttpContext.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
+            "RATE_LIMITED",
+            "Too many requests. Please try again later.",
+            new { retryAfterSeconds = retryAfter })), cancellationToken);
+    };
+});
 
-                return Task.CompletedTask;
-            },
-            OnChallenge = async context =>
-            {
-                context.HandleResponse();
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
-                    "UNAUTHORIZED",
-                    "Missing or invalid authentication credentials.")));
-            }
-        };
-    });
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.JwtKey));
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = authOptions.JwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = authOptions.JwtAudience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = signingKey,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(1)
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            context.Token = context.Request.Cookies["access_token"];
+            return Task.CompletedTask;
+        },
+        OnChallenge = async context =>
+        {
+            context.HandleResponse();
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
+                "UNAUTHORIZED", "Missing or invalid authentication credentials.")));
+        }
+    };
+});
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
-if (app.Environment.IsDevelopment())
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 {
-    app.MapOpenApi();
-}
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
+        "INTERNAL_ERROR", "An unexpected error occurred.")));
+}));
 
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
-            "INTERNAL_ERROR",
-            "An unexpected error occurred.")));
-    });
-});
-
+app.UseForwardedHeaders();
+app.UseHttpsRedirection();
 app.UseCors("FluentAPolicy");
 app.UseMiddleware<RequestLogMiddleware>();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SyncHub>("/hubs/sync");
 RecurringJobRegistration.Register(app.Services.GetRequiredService<IRecurringJobManager>());
-
 app.Run();
+
+static void AddFixedWindowPolicy(RateLimiterOptions options, string name, int permitLimit, TimeSpan window)
+{
+    options.AddPolicy(name, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = window,
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+}
 
 public partial class Program;

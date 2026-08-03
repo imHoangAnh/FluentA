@@ -47,7 +47,6 @@ describe('SettingsPage profile save', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useAuthStore.setState({
-      accessToken: 'memory-token',
       status: 'authenticated',
       error: null,
       user: {

@@ -55,7 +55,6 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
     const request = route.request()
     const path = new URL(request.url()).pathname
     const json = (data, status = 200, success = true) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(success ? { success: true, data } : { success: false, error: data }) })
-    if (path.endsWith('/auth/refresh')) return json({ accessToken: 'e32-token', user })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/practice/settings')) return json({ modeSequence: ['pronunciation'] })
     if (path.endsWith('/flashcards/pages/page-1/words')) return json({ pageId: 'page-1', boardId: 'board-1', pageName: 'Pronunciation deck', boardLanguage: 'en', words: [word] })
@@ -115,7 +114,6 @@ test('Review pronunciation submits Wrong only after the second failed assessment
     const request = route.request()
     const path = new URL(request.url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ success: status < 400, data }) })
-    if (path.endsWith('/auth/refresh')) return json({ accessToken: 'e32-token', user })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Review board', boardLanguage: 'en', pages: [{ pageId: 'page-1', pageName: 'Deck', isPracticed: false, words: [word] }] }])
     if (path.endsWith('/review/settings')) return json({ dailyLimit: 20, recapAfterAnswer: false })

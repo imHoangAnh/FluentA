@@ -7,7 +7,6 @@ import { Button } from '@/shared/components/ui/button'
 
 type VerifyState = {
   email?: string
-  developmentOtp?: string | null
   resendAvailableAtUtc?: string
   verificationExpiresAtUtc?: string
 }
@@ -27,10 +26,9 @@ export function VerifyEmailPage() {
   const state = (location.state ?? {}) as VerifyState
   const initialEmail = state.email ?? searchParams.get('email') ?? ''
   const [email, setEmail] = useState(initialEmail)
-  const [otp, setOtp] = useState(state.developmentOtp ?? '')
+  const [otp, setOtp] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [developmentOtp, setDevelopmentOtp] = useState<string | null>(state.developmentOtp ?? null)
   const [resendAvailableAtUtc, setResendAvailableAtUtc] = useState<string | null>(state.resendAvailableAtUtc ?? null)
   const [verificationExpiresAtUtc, setVerificationExpiresAtUtc] = useState<string | null>(state.verificationExpiresAtUtc ?? null)
   const [secondsRemaining, setSecondsRemaining] = useState(() => secondsUntil(state.resendAvailableAtUtc ?? null))
@@ -57,7 +55,7 @@ export function VerifyEmailPage() {
     setMessage(null)
 
     try {
-      await authApi.verifyEmail({ email, otp })
+      await authApi.verifyOtp({ email, otp })
       navigate('/login', {
         state: { notice: 'Email verified. You can log in now.' },
       })
@@ -73,13 +71,9 @@ export function VerifyEmailPage() {
     try {
       const payload = await authApi.resendVerificationOtp({ email })
       setMessage(payload.message)
-      setDevelopmentOtp(payload.developmentOtp ?? null)
       setVerificationExpiresAtUtc(payload.verificationExpiresAtUtc)
       setResendAvailableAtUtc(payload.resendAvailableAtUtc)
       setSecondsRemaining(secondsUntil(payload.resendAvailableAtUtc))
-      if (payload.developmentOtp) {
-        setOtp(payload.developmentOtp)
-      }
     } catch (resendError) {
       setError(authApiError(resendError))
     }
@@ -98,7 +92,6 @@ export function VerifyEmailPage() {
           <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
           <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} />
           {expiryLabel ? <p role="status" className="m-0 text-sm text-primary">Code expires at {expiryLabel}.</p> : null}
-          {developmentOtp ? <p role="status" className="m-0 text-sm text-primary">Local development code: <strong>{developmentOtp}</strong></p> : null}
           {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
           {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
           <Button className="w-full" type="submit">Verify email</Button>

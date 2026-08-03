@@ -6,11 +6,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AngleSharp" Version="0.17.1" />
+    <PackageReference Include="AngleSharp" Version="1.7.0" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.100.2" />
-    <PackageReference Include="AWSSDK.SimpleEmailV2" Version="4.0.14.3" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
-    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+    <PackageReference Include="HtmlSanitizer" Version="9.1.982" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.21" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
@@ -22,7 +22,8 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Resend" Version="0.7.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
   </ItemGroup>

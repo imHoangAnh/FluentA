@@ -56,7 +56,6 @@ describe('NotesPage', () => {
     vi.clearAllMocks()
     Reflect.deleteProperty(document, 'execCommand')
     useAuthStore.setState({
-      accessToken: 'notes-token',
       status: 'authenticated',
       user: {
         id: 'user-1',

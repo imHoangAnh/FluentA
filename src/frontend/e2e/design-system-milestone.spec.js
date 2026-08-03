@@ -13,8 +13,7 @@ async function mockFrontendApis(page) {
     const path = url.pathname
     let data = null
 
-    if (path.endsWith('/auth/refresh')) data = { accessToken: 'visual-proof-token', user }
-    else if (path.endsWith('/auth/me')) data = user
+    if (path.endsWith('/auth/me')) data = user
     else if (path.endsWith('/review/dashboard')) data = { overdue: 3, dueToday: 9, newCards: 4, streakDays: 12 }
     else if (path.endsWith('/todos')) data = [
       { id: 'todo-1', title: 'Review vocabulary notes', isCompleted: false, createdAt: '2026-07-13T01:00:00Z', completedAt: null },

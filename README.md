@@ -117,11 +117,11 @@ dotnet tool run dotnet-ef database update `
 ### 4. Start the API
 
 ```powershell
-dotnet run --project src/backend/FluentA.API --launch-profile http
+dotnet run --project src/backend/FluentA.API --launch-profile https
 ```
 
-The API is available at `http://localhost:5000`; its development OpenAPI
-document is at `http://localhost:5000/openapi/v1.json`.
+The API is available at `https://localhost:7000`; its development OpenAPI
+document is at `https://localhost:7000/openapi/v1.json`.
 
 ### 5. Start the frontend
 
@@ -131,7 +131,7 @@ Open another terminal at the repository root:
 npm --prefix src/frontend run dev
 ```
 
-Open `http://localhost:5173`.
+Open `https://localhost:5173`.
 
 ## Usage
 

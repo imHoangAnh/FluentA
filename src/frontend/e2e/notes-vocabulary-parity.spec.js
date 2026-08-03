@@ -50,7 +50,6 @@ async function mockNoteApis(page) {
     const path = new URL(request.url()).pathname
     const method = request.method()
 
-    if (path.endsWith('/auth/refresh')) return route.fulfill(json({ accessToken: 'note-parity-token', user }))
     if (path.endsWith('/auth/me')) return route.fulfill(json(user))
     if (path.endsWith('/notes/boards') && method === 'GET') return route.fulfill(json([board]))
 

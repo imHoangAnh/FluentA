@@ -15,7 +15,7 @@ async function loginWithMockedApi(page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { accessToken: 'dropdown-polish-token', user } }),
+        body: JSON.stringify({ data: user }),
       })
       return
     }

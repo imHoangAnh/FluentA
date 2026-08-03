@@ -34,7 +34,6 @@ async function mockPracticeLibraryApis(page) {
     const path = new URL(route.request().url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
 
-    if (path.endsWith('/auth/refresh')) return json({ accessToken: 'e29-token', user })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Practice board', boardLanguage: 'en', pages }])
     if (path.endsWith('/practice/settings')) return json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })

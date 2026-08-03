@@ -51,7 +51,6 @@ describe('JournalPage workspace redesign', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useAuthStore.setState({
-      accessToken: 'journal-token',
       status: 'authenticated',
       user: {
         id: 'user-1',

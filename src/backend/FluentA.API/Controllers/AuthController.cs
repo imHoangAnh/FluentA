@@ -5,6 +5,7 @@ using FluentA.Application.BoundedContexts.Auth.DTOs;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FluentA.API.Controllers;
 
@@ -12,157 +13,117 @@ namespace FluentA.API.Controllers;
 [Route("api/v1/auth")]
 public sealed class AuthController : ControllerBase
 {
-    private const string RefreshCookieName = "fluenta_refresh";
+    private const string AccessCookieName = "access_token";
     private readonly IAuthService _auth;
 
-    public AuthController(IAuthService auth)
-    {
-        _auth = auth;
-    }
+    public AuthController(IAuthService auth) => _auth = auth;
 
-    /// <summary>Registers a password account and returns OTP verification details.</summary>
     [HttpPost("register")]
+    [EnableRateLimiting("auth-register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.RegisterAsync(request, cancellationToken);
         return result.IsSuccess
             ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<RegisterResponse>.Ok(result.Value!))
-            : ToErrorResult<RegisterResponse>(result);
+            : ToErrorResult(result);
     }
 
-    /// <summary>Verifies a password account email address from an OTP.</summary>
-    [HttpPost("verify-email")]
-    public async Task<IActionResult> VerifyEmail(VerifyEmailRequest request, CancellationToken cancellationToken)
+    [HttpPost("verify-otp")]
+    [EnableRateLimiting("auth-verify")]
+    public async Task<IActionResult> VerifyOtp(VerifyOtpRequest request, CancellationToken cancellationToken)
     {
-        var result = await _auth.VerifyEmailAsync(request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!))
-            : ToErrorResult<UserProfileDto>(result);
+        var result = await _auth.VerifyOtpAsync(request, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Resends a replacement verification OTP.</summary>
     [HttpPost("resend-verification-otp")]
+    [EnableRateLimiting("auth-resend")]
     public async Task<IActionResult> ResendVerificationOtp(ResendVerificationOtpRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.ResendVerificationOtpAsync(request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ResendVerificationOtpResponse>.Ok(result.Value!))
-            : ToErrorResult<ResendVerificationOtpResponse>(result);
+        return result.IsSuccess ? Ok(ApiEnvelope<ResendVerificationOtpResponse>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Authenticates a verified password account.</summary>
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _auth.LoginAsync(request, cancellationToken);
-        return AuthResult(result);
-    }
+    [EnableRateLimiting("auth-login")]
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken) =>
+        AuthResult(await _auth.LoginAsync(request, cancellationToken));
 
-    /// <summary>Authenticates or links a user through Google OAuth.</summary>
-    [HttpPost("google")]
-    public async Task<IActionResult> Google(GoogleLoginRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _auth.GoogleLoginAsync(request, cancellationToken);
-        return AuthResult(result);
-    }
+    [HttpPost("google-login")]
+    [EnableRateLimiting("auth-google")]
+    public async Task<IActionResult> GoogleLogin(GoogleLoginRequest request, CancellationToken cancellationToken) =>
+        AuthResult(await _auth.GoogleLoginAsync(request, cancellationToken));
 
-    /// <summary>Starts a password reset flow for a password-capable account.</summary>
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth-forgot")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.ForgotPasswordAsync(request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ForgotPasswordResponse>.Ok(result.Value!))
-            : ToErrorResult<ForgotPasswordResponse>(result);
+        return result.IsSuccess ? Ok(ApiEnvelope<ForgotPasswordResponse>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Consumes a single-use password reset link.</summary>
     [HttpPost("reset-password")]
+    [EnableRateLimiting("auth-reset")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.ResetPasswordAsync(request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<BasicMessageResponse>.Ok(result.Value!))
-            : ToErrorResult<BasicMessageResponse>(result);
+        return result.IsSuccess ? Ok(ApiEnvelope<BasicMessageResponse>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Rotates the refresh cookie and returns a new access token.</summary>
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
-    {
-        var result = await _auth.RefreshAsync(Request.Cookies[RefreshCookieName], cancellationToken);
-        return AuthResult(result);
-    }
-
-    /// <summary>Revokes the current refresh session and clears the refresh cookie.</summary>
-    [Authorize]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    public IActionResult Logout()
     {
-        var result = await _auth.LogoutAsync(Request.Cookies[RefreshCookieName], cancellationToken);
-        Response.Cookies.Delete(RefreshCookieName);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { message = "Logged out." }))
-            : ToErrorResult<bool>(result);
+        Response.Cookies.Delete(AccessCookieName, CookieOptions());
+        return Ok(ApiEnvelope<object>.Ok(new { message = "Logged out." }));
     }
 
-    /// <summary>Returns the authenticated user's profile.</summary>
     [Authorize]
     [HttpGet("me")]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
+        if (!TryGetUserId(out var userId))
         {
             return Unauthorized(ApiEnvelope<object>.Fail(new ApiErrorEnvelope("UNAUTHORIZED", "Missing or invalid authentication credentials.")));
         }
 
-        var result = await _auth.GetMeAsync(id, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult<UserProfileDto>(result);
+        var result = await _auth.GetMeAsync(userId, cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    /// <summary>Updates the authenticated user's profile details and selected avatar asset.</summary>
     [Authorize]
     [HttpPut("/api/v1/profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileBody body, CancellationToken cancellationToken)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
+        if (!TryGetUserId(out var userId))
         {
             return Unauthorized(ApiEnvelope<object>.Fail(new ApiErrorEnvelope("UNAUTHORIZED", "Missing or invalid authentication credentials.")));
         }
 
-        var result = await _auth.UpdateProfileAsync(
-            id,
-            new UpdateProfileRequest(body.FullName, body.Bio, body.RemoveAvatar, body.AvatarAssetId),
-            cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult<UserProfileDto>(result);
+        var result = await _auth.UpdateProfileAsync(userId, new UpdateProfileRequest(body.FullName, body.Bio, body.RemoveAvatar, body.AvatarAssetId), cancellationToken);
+        return result.IsSuccess ? Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     private IActionResult AuthResult(OperationResult<AuthResponse> result)
     {
-        if (!result.IsSuccess)
-        {
-            return ToErrorResult<AuthResponse>(result);
-        }
-
-        SetRefreshCookie(result.Value!.RefreshToken);
-        return Ok(ApiEnvelope<object>.Ok(new
-        {
-            result.Value.AccessToken,
-            result.Value.User
-        }));
+        if (!result.IsSuccess) return ToErrorResult(result);
+        Response.Cookies.Append(AccessCookieName, result.Value!.Token, CookieOptions(DateTimeOffset.UtcNow.AddDays(7)));
+        return Ok(ApiEnvelope<UserProfileDto>.Ok(result.Value.User));
     }
 
-    private void SetRefreshCookie(string refreshToken)
+    private static CookieOptions CookieOptions(DateTimeOffset? expires = null) => new()
     {
-        Response.Cookies.Append(RefreshCookieName, refreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = false,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(7)
-        });
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Strict,
+        Path = "/",
+        Expires = expires,
+        IsEssential = true
+    };
+
+    private bool TryGetUserId(out Guid userId)
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return Guid.TryParse(claim, out userId);
     }
 
     private IActionResult ToErrorResult<T>(OperationResult<T> result)
@@ -172,7 +133,6 @@ public sealed class AuthController : ControllerBase
             return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
         }
 
-        var envelope = ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details));
-        return StatusCode(error.StatusCode, envelope);
+        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
     }
 }

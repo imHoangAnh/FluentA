@@ -70,7 +70,6 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useAuthStore.setState({
-      accessToken: 'dashboard-token',
       status: 'authenticated',
       error: null,
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'Dashboard Learner', isEmailVerified: true },

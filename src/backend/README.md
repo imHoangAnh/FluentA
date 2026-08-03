@@ -11,8 +11,9 @@ FluentA Backend là backend ASP.NET Core trên .NET 10 của hệ thống Fluent
 xác thực và thực thi background job định kỳ bằng Hangfire.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
-Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ, Redis
-lưu refresh token và trạng thái ngắn hạn, còn MinIO lưu object phục vụ asset.
+Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
+challenge OTP/reset của auth, Redis chỉ giữ trạng thái Pomodoro ngắn hạn, còn
+MinIO lưu object phục vụ asset.
 
 ## 3. Mục lục
 
@@ -57,15 +58,16 @@ dotnet tool run dotnet-ef database update `
 ### 4.4. Chạy API
 
 ```powershell
-dotnet run --project src/backend/FluentA.API --launch-profile http
+dotnet run --project src/backend/FluentA.API --launch-profile https
 ```
 
-API chạy tại `http://localhost:5000`. Ở môi trường Development, OpenAPI JSON
-có tại `http://localhost:5000/openapi/v1.json`.
+API chạy tại `https://localhost:7000`. Ở môi trường Development, OpenAPI JSON
+có tại `https://localhost:7000/openapi/v1.json`.
 
-Các secret cho email, Google OAuth hoặc môi trường triển khai phải được cấu
-hình bằng .NET user-secrets hoặc biến môi trường. Không ghi secret vào file
-được theo dõi bởi Git.
+Các secret `Jwt:Key`, `Authentication:OtpHashKey`, `Resend:ApiKey` và cấu hình
+Google/Resend phải được cung cấp bằng .NET user-secrets hoặc biến môi trường.
+Không ghi secret vào file được theo dõi bởi Git. Xem cấu hình mẫu và lệnh cụ
+thể tại `docs/product/authentication.md`.
 
 ## 5. Cách sử dụng dự án
 
@@ -75,8 +77,10 @@ hình bằng .NET user-secrets hoặc biến môi trường. Không ghi secret v
 - Các endpoint nghiệp vụ dùng prefix `/api/v1`, ví dụ `/api/v1/auth`,
   `/api/v1/boards`, `/api/v1/flashcards`, `/api/v1/todos` và
   `/api/v1/settings`.
-- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth` để nhận access token.
-- Với endpoint được bảo vệ, gửi header `Authorization: Bearer <access-token>`.
+- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; API đặt JWT vào
+  HttpOnly cookie `access_token` và không trả token trong JSON.
+- Với endpoint được bảo vệ, client HTTPS gửi cookie bằng `withCredentials`;
+  không tạo header Bearer trong JavaScript.
 - Response body dùng envelope gồm `success`, `data` và `error`; contract đầy
   đủ được mô tả trong phần tiếp theo.
 

@@ -16,7 +16,7 @@ test('Review Queue keeps one learning word out of the Due Today circle', async (
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { accessToken: 'review-queue-token', user } }),
+        body: JSON.stringify({ data: user }),
       })
       return
     }
