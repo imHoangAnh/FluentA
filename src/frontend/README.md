@@ -26,7 +26,7 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 ### 4.1. Yêu cầu
 
 - Node.js và npm.
-- FluentA Backend đang chạy tại `http://localhost:5000`.
+- FluentA Backend đang chạy tại `https://localhost:7000`.
 - PostgreSQL, Redis và MinIO đã được khởi động theo
   [README của root project](../../README.md).
 
@@ -43,11 +43,10 @@ File `.env.local` sử dụng các biến sau:
 
 | Biến | Mục đích |
 | --- | --- |
-| `VITE_API_URL` | Base URL của REST API, mặc định local là `http://localhost:5000/api/v1` |
-| `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID; có thể để trống nếu không dùng Google login |
-| `VITE_GOOGLE_REDIRECT_URI` | Callback URL của Google OAuth |
+| `VITE_API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
+| `VITE_GOOGLE_CLIENT_ID` | Google Identity Services web client ID; có thể để trống nếu không dùng Google login |
 
-Không commit client ID hoặc thông tin cấu hình riêng của môi trường vào Git.
+Không commit thông tin cấu hình bí mật của môi trường vào Git.
 
 ### 4.3. Chạy development server
 
@@ -55,7 +54,9 @@ Không commit client ID hoặc thông tin cấu hình riêng của môi trườn
 npm run dev
 ```
 
-Mở `http://localhost:5173`. Vite tự reload khi source thay đổi.
+Mở `https://localhost:5173`. Vite dùng HTTPS để trình duyệt gửi cookie
+`Secure`; chấp nhận development certificate nếu trình duyệt yêu cầu. Vite tự
+reload khi source thay đổi.
 
 ### 4.4. Build và chạy bản preview
 
@@ -82,8 +83,8 @@ Output production được tạo trong thư mục `dist/`.
    đặt thành phần dùng chung thực sự trong `src/shared`.
 
 Các route được bảo vệ sẽ chuyển người dùng chưa xác thực về `/login`. REST API
-được gọi qua base URL trong `VITE_API_URL`; SignalR đồng bộ thay đổi realtime
-giữa các phiên đang đăng nhập.
+được gọi qua base URL trong `VITE_API_URL`; REST và SignalR đều dùng HttpOnly
+cookie, không dùng access token trong JavaScript.
 
 ## 6. Các lệnh thường dùng
 
