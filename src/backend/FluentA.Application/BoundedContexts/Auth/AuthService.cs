@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
@@ -11,36 +12,42 @@ namespace FluentA.Application.BoundedContexts.Auth;
 
 public sealed partial class AuthService : IAuthService
 {
+    private const int MaxOtpFailedAttempts = 5;
+    private static readonly TimeSpan OtpLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan OtpResendCooldown = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromMinutes(15);
+    private const string ForgotPasswordMessage = "If an eligible account exists, password reset instructions have been sent.";
+
     private readonly IUserRepository _users;
-    private readonly IAccountChallengeStore _challengeStore;
-    private readonly IRefreshTokenStore _refreshTokens;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly ITokenService _tokenService;
-    private readonly IGoogleOAuthClient _googleOAuthClient;
-    private readonly IAccountEmailSender _accountEmailSender;
+    private readonly ITokenHelper _tokenHelper;
+    private readonly IJwtService _jwtService;
+    private readonly IGoogleIdTokenVerifier _googleVerifier;
+    private readonly IEmailService _emailService;
     private readonly IAssetRepository _assets;
     private readonly IAssetObjectStorage _assetStorage;
+    private readonly string _frontendBaseUrl;
 
     public AuthService(
         IUserRepository users,
-        IAccountChallengeStore challengeStore,
-        IRefreshTokenStore refreshTokens,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService,
-        IGoogleOAuthClient googleOAuthClient,
-        IAccountEmailSender accountEmailSender,
+        ITokenHelper tokenHelper,
+        IJwtService jwtService,
+        IGoogleIdTokenVerifier googleVerifier,
+        IEmailService emailService,
         IAssetRepository assets,
-        IAssetObjectStorage assetStorage)
+        IAssetObjectStorage assetStorage,
+        AuthApplicationOptions options)
     {
         _users = users;
-        _challengeStore = challengeStore;
-        _refreshTokens = refreshTokens;
         _passwordHasher = passwordHasher;
-        _tokenService = tokenService;
-        _googleOAuthClient = googleOAuthClient;
-        _accountEmailSender = accountEmailSender;
+        _tokenHelper = tokenHelper;
+        _jwtService = jwtService;
+        _googleVerifier = googleVerifier;
+        _emailService = emailService;
         _assets = assets;
         _assetStorage = assetStorage;
+        _frontendBaseUrl = options.FrontendBaseUrl.TrimEnd('/');
     }
 
     public async Task<OperationResult<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -51,383 +58,244 @@ public sealed partial class AuthService : IAuthService
             return OperationResult<RegisterResponse>.Failure(AuthError.Validation(errors));
         }
 
-        var normalizedEmail = User.NormalizeEmail(request.Email);
+        var normalizedEmail = User.NormalizeEmail(request.Email!);
         if (await _users.EmailExistsAsync(normalizedEmail, cancellationToken))
         {
             return OperationResult<RegisterResponse>.Failure(AuthError.EmailExists());
         }
 
+        var now = DateTime.UtcNow;
+        var rawOtp = _tokenHelper.GenerateOtp();
+        var expiresAt = now.Add(OtpLifetime);
+        var resendAt = now.Add(OtpResendCooldown);
         var user = User.CreateWithPassword(normalizedEmail, request.FullName, _passwordHasher.Hash(request.Password));
+        user.IssueVerificationOtp(_tokenHelper.HashOtp(normalizedEmail, rawOtp), expiresAt, resendAt);
         await _users.AddAsync(user, cancellationToken);
-        var challenge = await _challengeStore.IssueVerificationAsync(user.Id, user.Email, cancellationToken);
-        var delivery = await _accountEmailSender.SendVerificationOtpAsync(
-            new VerificationOtpEmailMessage(
-                user.Email,
-                user.FullName,
-                challenge.Otp,
-                challenge.ExpiresAtUtc),
-            cancellationToken);
+
+        var delivered = await _emailService.SendEmailAsync(BuildVerificationEmail(user, rawOtp, expiresAt), cancellationToken);
+        if (!delivered)
+        {
+            return OperationResult<RegisterResponse>.Failure(AuthError.EmailDeliveryFailed());
+        }
 
         return OperationResult<RegisterResponse>.Success(new RegisterResponse(
-            "Registration successful. Enter the verification code we sent to your email.",
+            "Registration successful. Enter the verification code sent to your email.",
             user.Email,
-            challenge.ExpiresAtUtc,
-            challenge.ResendAvailableAtUtc,
-            delivery.DevelopmentOtp));
+            expiresAt,
+            resendAt));
     }
 
-    public async Task<OperationResult<UserProfileDto>> VerifyEmailAsync(VerifyEmailRequest request, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<UserProfileDto>> VerifyOtpAsync(VerifyOtpRequest request, CancellationToken cancellationToken = default)
     {
         var errors = new Dictionary<string, string[]>();
-        if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
+        if (!EmailPattern().IsMatch(request.Email ?? string.Empty)) errors["email"] = ["Email must be a valid email address."];
+        if (!OtpPattern().IsMatch(request.Otp ?? string.Empty)) errors["otp"] = ["Verification code must be six digits."];
+        if (errors.Count > 0) return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
+
+        var normalizedEmail = User.NormalizeEmail(request.Email!);
+        var result = await _users.ConsumeVerificationOtpAsync(
+            normalizedEmail,
+            _tokenHelper.HashOtp(normalizedEmail, request.Otp!),
+            DateTime.UtcNow,
+            MaxOtpFailedAttempts,
+            cancellationToken);
+
+        if (result != VerificationOtpConsumeResult.Verified)
         {
-            errors["email"] = ["Email must be a valid email address."];
+            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp());
         }
 
-        if (!OtpPattern().IsMatch(request.Otp ?? string.Empty))
-        {
-            errors["otp"] = ["Verification code must be six digits."];
-        }
-
-        if (errors.Count > 0)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
-        }
-
-        var email = request.Email!;
-        var otp = request.Otp!;
-        var normalizedEmail = User.NormalizeEmail(email);
         var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (user is null)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp());
-        }
-
-        var challengeResult = await _challengeStore.VerifyVerificationOtpAsync(normalizedEmail, otp, cancellationToken);
-        if (challengeResult.Status is not VerificationChallengeVerifyStatus.Verified)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp());
-        }
-
-        if (!user.IsEmailVerified)
-        {
-            user.MarkEmailVerified();
-            await _users.UpdateAsync(user, cancellationToken);
-        }
-
-        return OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
+        return user is null
+            ? OperationResult<UserProfileDto>.Failure(AuthError.InvalidVerificationOtp())
+            : OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<ResendVerificationOtpResponse>> ResendVerificationOtpAsync(ResendVerificationOtpRequest request, CancellationToken cancellationToken = default)
     {
         if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
         {
-            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]>
-            {
-                ["email"] = ["Email must be a valid email address."]
-            }));
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]> { ["email"] = ["Email must be a valid email address."] }));
         }
 
         var normalizedEmail = User.NormalizeEmail(request.Email!);
         var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (user is null)
-        {
-            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.InvalidVerificationOtp());
-        }
+        if (user is null) return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.InvalidVerificationOtp());
+        if (user.IsEmailVerified) return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.EmailAlreadyVerified());
 
-        if (user.IsEmailVerified)
-        {
-            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.EmailAlreadyVerified());
-        }
-
-        var resend = await _challengeStore.ResendVerificationAsync(user.Id, normalizedEmail, cancellationToken);
-        if (!resend.IsSuccess)
-        {
-            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.VerificationOtpCooldown(resend.ResendAvailableAtUtc));
-        }
-
-        var delivery = await _accountEmailSender.SendVerificationOtpAsync(
-            new VerificationOtpEmailMessage(
-                user.Email,
-                user.FullName,
-                resend.Otp!,
-                resend.ExpiresAtUtc),
+        var now = DateTime.UtcNow;
+        var rawOtp = _tokenHelper.GenerateOtp();
+        var expiresAt = now.Add(OtpLifetime);
+        var resendAt = now.Add(OtpResendCooldown);
+        var replaced = await _users.TryReplaceVerificationOtpAsync(
+            user.Id,
+            _tokenHelper.HashOtp(normalizedEmail, rawOtp),
+            expiresAt,
+            resendAt,
+            now,
             cancellationToken);
+        if (!replaced)
+        {
+            var current = await _users.GetByIdAsync(user.Id, cancellationToken);
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.VerificationOtpCooldown(current?.OtpResendAvailableAt ?? resendAt));
+        }
+
+        if (!await _emailService.SendEmailAsync(BuildVerificationEmail(user, rawOtp, expiresAt), cancellationToken))
+        {
+            return OperationResult<ResendVerificationOtpResponse>.Failure(AuthError.EmailDeliveryFailed());
+        }
 
         return OperationResult<ResendVerificationOtpResponse>.Success(new ResendVerificationOtpResponse(
-            "A new verification code has been sent.",
-            user.Email,
-            resend.ExpiresAtUtc,
-            resend.ResendAvailableAtUtc,
-            delivery.DevelopmentOtp));
+            "A new verification code has been sent.", user.Email, expiresAt, resendAt));
+    }
+
+    public async Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            return OperationResult<AuthResponse>.Failure(AuthError.InvalidCredentials());
+        }
+
+        var user = await _users.GetByEmailAsync(User.NormalizeEmail(request.Email!), cancellationToken);
+        if (user?.PasswordHash is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            return OperationResult<AuthResponse>.Failure(AuthError.InvalidCredentials());
+        }
+
+        if (!user.IsEmailVerified) return OperationResult<AuthResponse>.Failure(AuthError.EmailNotVerified());
+        user.RecordLogin(DateTime.UtcNow);
+        await _users.UpdateAsync(user, cancellationToken);
+        return OperationResult<AuthResponse>.Success(await BuildAuthResponseAsync(user, cancellationToken));
+    }
+
+    public async Task<OperationResult<AuthResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.IdToken))
+        {
+            return OperationResult<AuthResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]> { ["idToken"] = ["Google ID token is required."] }));
+        }
+
+        var googleResult = await _googleVerifier.VerifyAsync(request.IdToken, cancellationToken);
+        if (!googleResult.IsSuccess) return OperationResult<AuthResponse>.Failure(googleResult.Error!);
+
+        var google = googleResult.Value!;
+        var normalizedEmail = User.NormalizeEmail(google.Email);
+        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+        var now = DateTime.UtcNow;
+        if (user is null)
+        {
+            user = User.CreateWithGoogle(normalizedEmail, google.FullName, google.Subject, now);
+            await _users.AddAsync(user, cancellationToken);
+        }
+        else
+        {
+            if (user.GoogleId is not null && !string.Equals(user.GoogleId, google.Subject, StringComparison.Ordinal))
+            {
+                return OperationResult<AuthResponse>.Failure(AuthError.GoogleAccountConflict());
+            }
+
+            user.LinkGoogleAccount(google.Subject, now);
+            await _users.UpdateAsync(user, cancellationToken);
+        }
+
+        user.RecordLogin(now);
+        await _users.UpdateAsync(user, cancellationToken);
+        return OperationResult<AuthResponse>.Success(await BuildAuthResponseAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<ForgotPasswordResponse>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
         if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
         {
-            return OperationResult<ForgotPasswordResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]>
-            {
-                ["email"] = ["Email must be a valid email address."]
-            }));
+            return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(ForgotPasswordMessage));
         }
 
-        var normalizedEmail = User.NormalizeEmail(request.Email!);
-        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (user is null)
+        var user = await _users.GetByEmailAsync(User.NormalizeEmail(request.Email!), cancellationToken);
+        if (user?.PasswordHash is not null)
         {
-            return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(
-                "No FluentA account exists for this email.",
-                AccountExists: false));
+            var rawToken = _tokenHelper.GenerateRawToken();
+            var expiresAt = DateTime.UtcNow.Add(ResetTokenLifetime);
+            user.IssuePasswordReset(_tokenHelper.HashToken(rawToken), expiresAt);
+            await _users.UpdateAsync(user, cancellationToken);
+            await _emailService.SendEmailAsync(BuildPasswordResetEmail(user, rawToken, expiresAt), cancellationToken);
         }
 
-        if (user.PasswordHash is null)
-        {
-            return OperationResult<ForgotPasswordResponse>.Failure(AuthError.PasswordResetNotAvailable());
-        }
-
-        var challenge = await _challengeStore.IssuePasswordResetAsync(user.Id, user.Email, cancellationToken);
-        var resetUrl = $"/reset-password?token={Uri.EscapeDataString(challenge.Token)}";
-        var delivery = await _accountEmailSender.SendPasswordResetAsync(
-            new PasswordResetEmailMessage(
-                user.Email,
-                user.FullName,
-                resetUrl,
-                challenge.ExpiresAtUtc),
-            cancellationToken);
-
-        return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(
-            "Password reset instructions have been sent to your email.",
-            AccountExists: true,
-            delivery.DevelopmentResetUrl));
+        return OperationResult<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(ForgotPasswordMessage));
     }
 
     public async Task<OperationResult<BasicMessageResponse>> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(request.Token))
-        {
-            errors["token"] = ["Password reset token is required."];
-        }
+        if (string.IsNullOrWhiteSpace(request.Token)) errors["token"] = ["Password reset token is required."];
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8) errors["newPassword"] = ["Password must be at least 8 characters."];
+        if (errors.Count > 0) return OperationResult<BasicMessageResponse>.Failure(AuthError.Validation(errors));
 
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
-        {
-            errors["password"] = ["Password must be at least 8 characters."];
-        }
-
-        if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
-        {
-            errors["confirmPassword"] = ["Password confirmation must match."];
-        }
-
-        if (errors.Count > 0)
-        {
-            return OperationResult<BasicMessageResponse>.Failure(AuthError.Validation(errors));
-        }
-
-        var challenge = await _challengeStore.ConsumePasswordResetAsync(request.Token, cancellationToken);
-        if (challenge.Status is not PasswordResetChallengeConsumeStatus.Consumed || !challenge.UserId.HasValue)
-        {
-            return OperationResult<BasicMessageResponse>.Failure(AuthError.InvalidPasswordResetToken());
-        }
-
-        var user = await _users.GetByIdAsync(challenge.UserId.Value, cancellationToken);
-        if (user is null || user.PasswordHash is null)
-        {
-            return OperationResult<BasicMessageResponse>.Failure(AuthError.InvalidPasswordResetToken());
-        }
-
-        user.UpdatePassword(_passwordHasher.Hash(request.Password));
-        await _users.UpdateAsync(user, cancellationToken);
-
-        return OperationResult<BasicMessageResponse>.Success(new BasicMessageResponse("Password reset successful. Please log in with your new password."));
-    }
-
-    public async Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
-    {
-        var normalizedEmail = User.NormalizeEmail(request.Email);
-        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (user?.PasswordHash is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.InvalidCredentials());
-        }
-
-        if (!user.IsEmailVerified)
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.EmailNotVerified());
-        }
-
-        user.RecordLogin(DateTime.UtcNow);
-        await _users.UpdateAsync(user, cancellationToken);
-
-        return OperationResult<AuthResponse>.Success(await BuildAuthResponseAsync(user, cancellationToken));
-    }
-
-    public async Task<OperationResult<AuthResponse>> RefreshAsync(string? refreshToken, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(refreshToken))
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.Unauthorized());
-        }
-
-        var session = await _refreshTokens.FindActiveAsync(refreshToken, cancellationToken);
-        if (session is null)
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.Unauthorized());
-        }
-
-        var user = await _users.GetByIdAsync(session.UserId, cancellationToken);
-        if (user is null)
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.Unauthorized());
-        }
-
-        await _refreshTokens.RevokeAsync(refreshToken, cancellationToken);
-        return OperationResult<AuthResponse>.Success(await BuildAuthResponseAsync(user, cancellationToken));
-    }
-
-    public async Task<OperationResult<bool>> LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default)
-    {
-        if (!string.IsNullOrWhiteSpace(refreshToken))
-        {
-            await _refreshTokens.RevokeAsync(refreshToken, cancellationToken);
-        }
-
-        return OperationResult<bool>.Success(true);
+        var consumed = await _users.ConsumePasswordResetAsync(
+            _tokenHelper.HashToken(request.Token),
+            _passwordHasher.Hash(request.NewPassword),
+            DateTime.UtcNow,
+            cancellationToken);
+        return consumed
+            ? OperationResult<BasicMessageResponse>.Success(new BasicMessageResponse("Password reset successful. Please log in with your new password."))
+            : OperationResult<BasicMessageResponse>.Failure(AuthError.InvalidPasswordResetToken());
     }
 
     public async Task<OperationResult<UserProfileDto>> GetMeAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await _users.GetByIdAsync(userId, cancellationToken);
-        return user is null
-            ? OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized())
-            : OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
+        return user is null ? OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized()) : OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
     public async Task<OperationResult<UserProfileDto>> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _users.GetByIdAsync(userId, cancellationToken);
-        if (user is null)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized());
-        }
-
+        if (user is null) return OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized());
         var errors = ValidateProfileUpdate(request);
-        if (errors.Count > 0)
-        {
-            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
-        }
+        if (errors.Count > 0) return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
 
         Asset? selectedAvatarAsset = null;
         if (!request.RemoveAvatar && request.AvatarAssetId.HasValue)
         {
             selectedAvatarAsset = await _assets.GetOwnedAsync(userId, request.AvatarAssetId.Value, cancellationToken);
-            if (selectedAvatarAsset is null)
-            {
-                return OperationResult<UserProfileDto>.Failure(AuthError.AssetNotFound());
-            }
-
-            if (selectedAvatarAsset.Type != AssetType.Avatar || selectedAvatarAsset.Status != AssetStatus.Ready)
-            {
-                return OperationResult<UserProfileDto>.Failure(AuthError.AvatarAssetInvalid());
-            }
+            if (selectedAvatarAsset is null) return OperationResult<UserProfileDto>.Failure(AuthError.AssetNotFound());
+            if (selectedAvatarAsset.Type != AssetType.Avatar || selectedAvatarAsset.Status != AssetStatus.Ready) return OperationResult<UserProfileDto>.Failure(AuthError.AvatarAssetInvalid());
         }
 
-        Asset? currentAvatarAsset = null;
-        if (user.CurrentAvatarAssetId.HasValue)
-        {
-            currentAvatarAsset = await _assets.GetOwnedAsync(userId, user.CurrentAvatarAssetId.Value, cancellationToken);
-        }
-
+        Asset? currentAvatarAsset = user.CurrentAvatarAssetId.HasValue
+            ? await _assets.GetOwnedAsync(userId, user.CurrentAvatarAssetId.Value, cancellationToken)
+            : null;
         var originalName = user.FullName;
         var originalBio = user.Bio;
-        var originalCurrentAvatarAssetId = user.CurrentAvatarAssetId;
-        var isSelectingNewAvatarAsset = selectedAvatarAsset is not null && selectedAvatarAsset.Id != originalCurrentAvatarAssetId;
-        var nextCurrentAvatarAssetId = request.RemoveAvatar
-            ? (Guid?)null
-            : selectedAvatarAsset?.Id ?? originalCurrentAvatarAssetId;
-        var retiringCurrentAvatarAsset = currentAvatarAsset is not null
-            && currentAvatarAsset.Id != nextCurrentAvatarAssetId
-            && (request.RemoveAvatar || isSelectingNewAvatarAsset);
-
-        if (retiringCurrentAvatarAsset)
-        {
-            currentAvatarAsset!.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
-        }
+        var originalAvatar = user.CurrentAvatarAssetId;
+        var selectingNew = selectedAvatarAsset is not null && selectedAvatarAsset.Id != originalAvatar;
+        var nextAvatar = request.RemoveAvatar ? null : selectedAvatarAsset?.Id ?? originalAvatar;
+        if (currentAvatarAsset is not null && currentAvatarAsset.Id != nextAvatar && (request.RemoveAvatar || selectingNew)) currentAvatarAsset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
 
         try
         {
-            user.UpdateProfile(request.FullName!, request.Bio, nextCurrentAvatarAssetId);
+            user.UpdateProfile(request.FullName!, request.Bio, nextAvatar);
             await _users.UpdateAsync(user, cancellationToken);
         }
         catch
         {
-            if (isSelectingNewAvatarAsset && selectedAvatarAsset is not null)
-            {
-                await TryDeleteAssetObjectAsync(selectedAvatarAsset.ObjectKey, cancellationToken);
-            }
-
-            user.UpdateProfile(originalName, originalBio, originalCurrentAvatarAssetId);
+            if (selectingNew && selectedAvatarAsset is not null) await TryDeleteAssetObjectAsync(selectedAvatarAsset.ObjectKey, cancellationToken);
+            user.UpdateProfile(originalName, originalBio, originalAvatar);
             throw;
         }
 
         return OperationResult<UserProfileDto>.Success(await BuildProfileAsync(user, cancellationToken));
     }
 
-    public async Task<OperationResult<AuthResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(request.Code))
-        {
-            return OperationResult<AuthResponse>.Failure(AuthError.Validation(new Dictionary<string, string[]>
-            {
-                ["code"] = ["Google authorization code is required."]
-            }));
-        }
-
-        var googleUserResult = await _googleOAuthClient.ExchangeCodeAsync(request, cancellationToken);
-        if (!googleUserResult.IsSuccess)
-        {
-            return OperationResult<AuthResponse>.Failure(googleUserResult.Error!);
-        }
-
-        var googleUser = googleUserResult.Value!;
-        var normalizedEmail = User.NormalizeEmail(googleUser.Email);
-        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
-
-        if (user is null)
-        {
-            user = User.CreateWithGoogle(normalizedEmail, googleUser.FullName, googleUser.Subject);
-            await _users.AddAsync(user, cancellationToken);
-        }
-        else
-        {
-            if (user.GoogleId is not null && !string.Equals(user.GoogleId, googleUser.Subject, StringComparison.Ordinal))
-            {
-                return OperationResult<AuthResponse>.Failure(AuthError.GoogleAccountConflict());
-            }
-
-            user.LinkGoogleAccount(googleUser.Subject, googleUser.FullName);
-            await _users.UpdateAsync(user, cancellationToken);
-        }
-
-        user.RecordLogin(DateTime.UtcNow);
-        await _users.UpdateAsync(user, cancellationToken);
-
-        return OperationResult<AuthResponse>.Success(await BuildAuthResponseAsync(user, cancellationToken));
-    }
-
     private async Task<AuthResponse> BuildAuthResponseAsync(User user, CancellationToken cancellationToken)
     {
-        var refreshToken = await _refreshTokens.IssueAsync(user.Id, cancellationToken);
         var profile = await BuildProfileAsync(user, cancellationToken);
-        return new AuthResponse(_tokenService.CreateAccessToken(profile), profile, refreshToken.RawToken);
+        return new AuthResponse(_jwtService.GenerateToken(profile), profile);
     }
 
     private async Task<UserProfileDto> BuildProfileAsync(User user, CancellationToken cancellationToken)
     {
         string? downloadUrl = null;
-        DateTime? downloadUrlExpiresAtUtc = null;
-
+        DateTime? downloadExpiry = null;
         if (user.CurrentAvatarAssetId.HasValue)
         {
             var asset = await _assets.GetOwnedAsync(user.Id, user.CurrentAvatarAssetId.Value, cancellationToken);
@@ -437,84 +305,55 @@ public sealed partial class AuthService : IAuthService
                 {
                     var download = _assetStorage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5)));
                     downloadUrl = download.Url;
-                    downloadUrlExpiresAtUtc = download.ExpiresAtUtc;
+                    downloadExpiry = download.ExpiresAtUtc;
                 }
-                catch (AssetStorageUnavailableException)
-                {
-                    // Fail closed: omit the image rather than expose a durable provider URL.
-                }
+                catch (AssetStorageUnavailableException) { }
             }
         }
 
-        return new UserProfileDto(
-            user.Id,
+        return new UserProfileDto(user.Id, user.Email, user.FullName, user.IsEmailVerified, user.Bio, user.CurrentAvatarAssetId, downloadUrl, downloadExpiry);
+    }
+
+    private static EmailMessage BuildVerificationEmail(User user, string otp, DateTime expiresAt) => new(
+        user.Email,
+        "Verify your FluentA email",
+        $"<p>Hello {WebUtility.HtmlEncode(user.FullName)},</p><p>Your verification code is <strong>{otp}</strong>.</p><p>It expires at {expiresAt:O}.</p>",
+        $"Your FluentA verification code is {otp}. It expires at {expiresAt:O}.");
+
+    private EmailMessage BuildPasswordResetEmail(User user, string rawToken, DateTime expiresAt)
+    {
+        var resetUrl = $"{_frontendBaseUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+        var encodedUrl = WebUtility.HtmlEncode(resetUrl);
+        return new EmailMessage(
             user.Email,
-            user.FullName,
-            user.IsEmailVerified,
-            user.Bio,
-            user.CurrentAvatarAssetId,
-            downloadUrl,
-            downloadUrlExpiresAtUtc);
-    }
-
-    private static Dictionary<string, string[]> ValidateProfileUpdate(UpdateProfileRequest request)
-    {
-        var errors = new Dictionary<string, string[]>();
-
-        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length is < 2 or > 100)
-        {
-            errors["fullName"] = ["Full name must be between 2 and 100 characters."];
-        }
-
-        if ((request.Bio?.Trim().Length ?? 0) > 500)
-        {
-            errors["bio"] = ["Bio must be 500 characters or fewer."];
-        }
-
-        if (request.RemoveAvatar && request.AvatarAssetId.HasValue)
-        {
-            errors["avatarAssetId"] = ["Avatar asset id cannot be provided when removing the current avatar."];
-        }
-
-        if (request.AvatarAssetId.HasValue && request.AvatarAssetId.Value == Guid.Empty)
-        {
-            errors["avatarAssetId"] = ["Avatar asset id must be a non-empty GUID."];
-        }
-
-        return errors;
-    }
-
-    private async Task TryDeleteAssetObjectAsync(string objectKey, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _assetStorage.DeleteIfExistsAsync(objectKey, cancellationToken);
-        }
-        catch (AssetStorageUnavailableException)
-        {
-        }
+            "Reset your FluentA password",
+            $"<p>Hello {WebUtility.HtmlEncode(user.FullName)},</p><p><a href=\"{encodedUrl}\">Reset your password</a>.</p><p>This single-use link expires at {expiresAt:O}.</p>",
+            $"Reset your FluentA password: {resetUrl}. This single-use link expires at {expiresAt:O}.");
     }
 
     private static Dictionary<string, string[]> ValidateRegistration(RegisterRequest request)
     {
         var errors = new Dictionary<string, string[]>();
-
-        if (!EmailPattern().IsMatch(request.Email ?? string.Empty))
-        {
-            errors["email"] = ["Email must be a valid email address."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
-        {
-            errors["password"] = ["Password must be at least 8 characters."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length is < 2 or > 100)
-        {
-            errors["fullName"] = ["Full name must be between 2 and 100 characters."];
-        }
-
+        if (!EmailPattern().IsMatch(request.Email ?? string.Empty)) errors["email"] = ["Email must be a valid email address."];
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8) errors["password"] = ["Password must be at least 8 characters."];
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length is < 2 or > 100) errors["fullName"] = ["Full name must be between 2 and 100 characters."];
         return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidateProfileUpdate(UpdateProfileRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length is < 2 or > 100) errors["fullName"] = ["Full name must be between 2 and 100 characters."];
+        if ((request.Bio?.Trim().Length ?? 0) > 500) errors["bio"] = ["Bio must be 500 characters or fewer."];
+        if (request.RemoveAvatar && request.AvatarAssetId.HasValue) errors["avatarAssetId"] = ["Avatar asset id cannot be provided when removing the current avatar."];
+        if (request.AvatarAssetId == Guid.Empty) errors["avatarAssetId"] = ["Avatar asset id must be a non-empty GUID."];
+        return errors;
+    }
+
+    private async Task TryDeleteAssetObjectAsync(string objectKey, CancellationToken cancellationToken)
+    {
+        try { await _assetStorage.DeleteIfExistsAsync(objectKey, cancellationToken); }
+        catch (AssetStorageUnavailableException) { }
     }
 
     [GeneratedRegex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]

@@ -11,14 +11,14 @@ public sealed class User : BaseEntity, IAggregateRoot
         Bio = string.Empty;
     }
 
-    private User(string email, string fullName, string? passwordHash, string? googleId, bool isEmailVerified)
+    private User(string email, string fullName, string? passwordHash, string? googleId, DateTime? emailVerifiedAt)
     {
         Email = NormalizeEmail(email);
         FullName = fullName.Trim();
         Bio = string.Empty;
         PasswordHash = passwordHash;
         GoogleId = googleId;
-        IsEmailVerified = isEmailVerified;
+        EmailVerifiedAt = emailVerifiedAt;
     }
 
     public string Email { get; private set; }
@@ -27,8 +27,15 @@ public sealed class User : BaseEntity, IAggregateRoot
     public Guid? CurrentAvatarAssetId { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
-    public bool IsEmailVerified { get; private set; }
+    public DateTime? EmailVerifiedAt { get; private set; }
+    public string? OtpCode { get; private set; }
+    public DateTime? OtpExpiresAt { get; private set; }
+    public int OtpFailedAttempts { get; private set; }
+    public DateTime? OtpResendAvailableAt { get; private set; }
+    public string? ResetPasswordToken { get; private set; }
+    public DateTime? ResetPasswordExpiresAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
+    public bool IsEmailVerified => EmailVerifiedAt.HasValue;
 
     public static User CreateWithPassword(string email, string fullName, string passwordHash)
     {
@@ -37,22 +44,48 @@ public sealed class User : BaseEntity, IAggregateRoot
             throw new ArgumentException("Password hash is required.", nameof(passwordHash));
         }
 
-        return new User(email, fullName, passwordHash, googleId: null, isEmailVerified: false);
+        return new User(email, fullName, passwordHash, googleId: null, emailVerifiedAt: null);
     }
 
-    public static User CreateWithGoogle(string email, string fullName, string googleId)
+    public static User CreateWithGoogle(string email, string fullName, string googleId, DateTime verifiedAt)
     {
         if (string.IsNullOrWhiteSpace(googleId))
         {
             throw new ArgumentException("Google id is required.", nameof(googleId));
         }
 
-        return new User(email, fullName, passwordHash: null, googleId, isEmailVerified: true);
+        return new User(email, fullName, passwordHash: null, googleId, verifiedAt);
     }
 
-    public void MarkEmailVerified()
+    public void IssueVerificationOtp(string otpHash, DateTime expiresAt, DateTime resendAvailableAt)
     {
-        IsEmailVerified = true;
+        ArgumentException.ThrowIfNullOrWhiteSpace(otpHash);
+        OtpCode = otpHash;
+        OtpExpiresAt = expiresAt;
+        OtpFailedAttempts = 0;
+        OtpResendAvailableAt = resendAvailableAt;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void MarkEmailVerified(DateTime verifiedAt)
+    {
+        EmailVerifiedAt = verifiedAt;
+        ClearVerificationOtp();
+        UpdatedAt = verifiedAt;
+    }
+
+    public void IssuePasswordReset(string tokenHash, DateTime expiresAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
+        ResetPasswordToken = tokenHash;
+        ResetPasswordExpiresAt = expiresAt;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ClearPasswordReset()
+    {
+        ResetPasswordToken = null;
+        ResetPasswordExpiresAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -64,35 +97,23 @@ public sealed class User : BaseEntity, IAggregateRoot
 
     public void UpdatePassword(string passwordHash)
     {
-        if (string.IsNullOrWhiteSpace(passwordHash))
-        {
-            throw new ArgumentException("Password hash is required.", nameof(passwordHash));
-        }
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
         PasswordHash = passwordHash;
-        UpdatedAt = DateTime.UtcNow;
+        ClearPasswordReset();
     }
 
-    public void LinkGoogleAccount(string googleId, string fullName)
+    public void LinkGoogleAccount(string googleId, DateTime verifiedAt)
     {
-        if (string.IsNullOrWhiteSpace(googleId))
-        {
-            throw new ArgumentException("Google id is required.", nameof(googleId));
-        }
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(googleId);
         if (GoogleId is not null && !string.Equals(GoogleId, googleId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("This user is already linked to a different Google account.");
         }
 
         GoogleId = googleId;
-        if (!string.IsNullOrWhiteSpace(fullName))
-        {
-            FullName = fullName.Trim();
-        }
-
-        IsEmailVerified = true;
-        UpdatedAt = DateTime.UtcNow;
+        EmailVerifiedAt = verifiedAt;
+        ClearVerificationOtp();
+        UpdatedAt = verifiedAt;
     }
 
     public void UpdateProfile(string fullName, string? bio, Guid? currentAvatarAssetId = null)
@@ -114,11 +135,9 @@ public sealed class User : BaseEntity, IAggregateRoot
             throw new ArgumentOutOfRangeException(nameof(bio), "Bio must be 500 characters or fewer.");
         }
 
-        var hasCurrentAvatarAssetId = currentAvatarAssetId.HasValue && currentAvatarAssetId.Value != Guid.Empty;
-
         FullName = normalizedName;
         Bio = normalizedBio;
-        CurrentAvatarAssetId = hasCurrentAvatarAssetId ? currentAvatarAssetId : null;
+        CurrentAvatarAssetId = currentAvatarAssetId is { } assetId && assetId != Guid.Empty ? assetId : null;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -129,4 +148,12 @@ public sealed class User : BaseEntity, IAggregateRoot
     }
 
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    private void ClearVerificationOtp()
+    {
+        OtpCode = null;
+        OtpExpiresAt = null;
+        OtpFailedAttempts = 0;
+        OtpResendAvailableAt = null;
+    }
 }

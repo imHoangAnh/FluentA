@@ -42,6 +42,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using StackExchange.Redis;
+using Resend;
 
 namespace FluentA.Infrastructure;
 
@@ -70,6 +71,7 @@ public static class DependencyInjection
         var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
         var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
         var pronunciationOptions = CreatePronunciationOptions(configuration);
+        var authSecurityOptions = AuthSecurityOptions.FromConfiguration(configuration);
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
             postgresConnection,
@@ -77,13 +79,10 @@ public static class DependencyInjection
         services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
         services.AddHangfireServer(options => options.WorkerCount = hangfireWorkerCount);
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
-        services.TryAddSingleton<JwtSigningKeyProvider>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
-        services.AddSingleton<IRefreshTokenStore, RedisRefreshTokenStore>();
-        services.AddSingleton<IAccountChallengeStore, RedisAccountChallengeStore>();
         services.AddSingleton(assetStorageOptions);
         services.AddHostedService<AssetStoragePrivacyStartupService>();
         if (assetStorageOptions.Enabled)
@@ -96,16 +95,13 @@ public static class DependencyInjection
             services.AddSingleton<IAssetObjectStorage, DisabledAssetObjectStorage>();
         }
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
-        services.AddSingleton<ITokenService, JwtTokenService>();
-        services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
-        if (string.Equals(configuration["Authentication:Email:Provider"], "gmail-smtp", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddSingleton<IAccountEmailSender, GmailSmtpAccountEmailSender>();
-        }
-        else
-        {
-            services.AddSingleton<IAccountEmailSender, LocalAccountEmailSender>();
-        }
+        services.AddSingleton(authSecurityOptions);
+        services.AddSingleton(new AuthApplicationOptions(authSecurityOptions.FrontendBaseUrl));
+        services.AddSingleton<ITokenHelper, TokenHelper>();
+        services.AddSingleton<IJwtService, JwtService>();
+        services.AddSingleton<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
+        services.AddResend(options => options.ApiToken = authSecurityOptions.ResendApiKey);
+        services.AddScoped<IEmailService, ResendEmailService>();
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFlashcardRepository, EfFlashcardRepository>();

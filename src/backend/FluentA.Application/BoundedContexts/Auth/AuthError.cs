@@ -39,11 +39,14 @@ public sealed record AuthError(string Code, string Message, int StatusCode, obje
     public static AuthError InvalidPasswordResetToken() =>
         new("INVALID_PASSWORD_RESET_TOKEN", "The password reset link is invalid or expired.", 401);
 
+    public static AuthError EmailDeliveryFailed() =>
+        new("EMAIL_DELIVERY_FAILED", "Email delivery is temporarily unavailable. Please try again.", 503);
+
     public static AuthError GoogleNotConfigured() =>
         new("GOOGLE_OAUTH_NOT_CONFIGURED", "Google OAuth credentials are not configured for this environment.", 501);
 
     public static AuthError GoogleOAuthFailed() =>
-        new("GOOGLE_OAUTH_FAILED", "Google OAuth could not complete with the provided authorization code.", 401);
+        new("GOOGLE_ID_TOKEN_INVALID", "The Google identity token is invalid or expired.", 401);
 
     public static AuthError GoogleAccountConflict() =>
         new("GOOGLE_ACCOUNT_CONFLICT", "This email is already linked to a different Google account.", 409);
