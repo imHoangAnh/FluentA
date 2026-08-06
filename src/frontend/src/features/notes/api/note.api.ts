@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
-import type { TrashEntry } from '@/features/trash/api/trash.api'
+import type { TrashEntry } from '@/features/trash'
 
 export type NotePageSummary = {
   id: string

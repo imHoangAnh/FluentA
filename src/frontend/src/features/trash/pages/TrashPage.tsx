@@ -28,7 +28,7 @@ export function TrashPage() {
   const [selected, setSelected] = useState<string[]>([])
   const [deleteIntent, setDeleteIntent] = useState<DeleteIntent | null>(null)
   const query = useQuery({ queryKey: ['trash', type, search], queryFn: () => listTrash(type || undefined, search || undefined) })
-  const items = query.data ?? []
+  const items = useMemo(() => query.data ?? [], [query.data])
   const selectedIds = useMemo(() => selected.filter((id) => items.some((item) => item.id === id)), [items, selected])
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['trash'] })
   const restore = useMutation({ mutationFn: restoreTrashEntry, onSuccess: () => { refresh(); toast.success('Item restored. Reminders are not restored.') }, onError: () => toast.error('Could not restore this item.') })

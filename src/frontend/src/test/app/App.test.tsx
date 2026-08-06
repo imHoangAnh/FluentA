@@ -338,6 +338,51 @@ describe('FluentA app routes', async () => {
     expect(screen.queryByText('Load failed this page.')).not.toBeInTheDocument()
   })
 
+  it('supports Quizlet keyboard shortcuts and shuffle toggle in flashcard viewer', async () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderAppWithDeck('/flashcards/pages/page-1')
+
+    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+
+    // Test keyboard shortcut Space to flip card
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
+
+    // Test keyboard shortcut Space to flip back
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+
+    // Test shuffle toggle button
+    const shuffleBtn = screen.getByRole('button', { name: 'Enable deck shuffle' })
+    expect(shuffleBtn).toBeInTheDocument()
+    fireEvent.click(shuffleBtn)
+    expect(screen.getByRole('button', { name: 'Disable deck shuffle' })).toBeInTheDocument()
+  })
+
+  it('renders fallback notice on back face when card details are missing without crashing', async () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderAppWithDeck('/flashcards/pages/page-1', {
+      meaningEn: '',
+      meaningVn: '',
+      example: '',
+      synonyms: null,
+      antonyms: null,
+    })
+
+    const stage = screen.getByTestId('flashcard-stage')
+    fireEvent.click(screen.getByRole('button', { name: 'Show card back' }))
+    expect(stage).toHaveTextContent('No definition or example recorded for this word.')
+  })
+
   it('renders the protected profile at its dedicated route', async () => {
     useAuthStore.setState({
       status: 'authenticated',
