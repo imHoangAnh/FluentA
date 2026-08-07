@@ -75,7 +75,13 @@ export function JournalRichTextEditor({
 
   function apply(command: string, value?: string) {
     focusEditor()
-    runCommand(command, value)
+    if (command === 'hiliteColor') {
+      if (!runCommand('hiliteColor', value)) {
+        runCommand('backColor', value)
+      }
+    } else {
+      runCommand(command, value)
+    }
     onChange(editorRef.current?.innerHTML ?? '')
   }
 
@@ -113,17 +119,17 @@ export function JournalRichTextEditor({
   }
 
   const toolbar = (
-    <div className={cn('journal-toolbar', toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel}>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 1" disabled={disabled} onClick={() => apply('formatBlock', 'h1')}>
+    <div className={cn('journal-toolbar', toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel} onMouseDown={(e) => e.preventDefault()}>
+        <button className="journal-toolbar-button" type="button" aria-label="Heading 1" disabled={disabled} onClick={() => apply('formatBlock', '<H1>')}>
           <Heading1 size={16} />
         </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 2" disabled={disabled} onClick={() => apply('formatBlock', 'h2')}>
+        <button className="journal-toolbar-button" type="button" aria-label="Heading 2" disabled={disabled} onClick={() => apply('formatBlock', '<H2>')}>
           <Heading2 size={16} />
         </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 3" disabled={disabled} onClick={() => apply('formatBlock', 'h3')}>
+        <button className="journal-toolbar-button" type="button" aria-label="Heading 3" disabled={disabled} onClick={() => apply('formatBlock', '<H3>')}>
           <Heading3 size={16} />
         </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 4" disabled={disabled} onClick={() => apply('formatBlock', 'h4')}>
+        <button className="journal-toolbar-button" type="button" aria-label="Heading 4" disabled={disabled} onClick={() => apply('formatBlock', '<H4>')}>
           <Heading4 size={16} />
         </button>
         <button className="journal-toolbar-button" type="button" aria-label="Bold" disabled={disabled} onClick={() => apply('bold')}>
