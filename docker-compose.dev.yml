@@ -49,6 +49,7 @@ services:
         done
         mc mb --ignore-existing "local/$$MINIO_BUCKET"
         mc anonymous set none "local/$$MINIO_BUCKET"
+        mc anonymous set download "local/$$MINIO_BUCKET/public"
 
 volumes:
   fluenta_postgres_dev_data:
