@@ -6,7 +6,7 @@ import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDia
 import * as todoApi from '../api/todo.api'
 import { restoreTrashEntry } from '@/features/trash'
 import { MyDayView } from '../components/MyDayView'
-import { TodoDetailsPanel } from '../components/TodoDetailsPanel'
+import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
 import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../todo-date'
 import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../todo-sort'
@@ -227,29 +227,31 @@ export function TodoPage() {
       />
 
       {activeView === 'my-day' ? (
-        <main className={`todo-main-layout${selectedTask ? ' todo-main-layout--details' : ''}`}>
-          <MyDayView
-            items={todos}
-            selectedId={effectiveSelectedTaskId}
-            sortMode={sortMode}
-            loading={todosQuery.isLoading}
-            error={todosQuery.isError}
-            creating={createTodo.isPending}
-            onCreate={(title) => createTask(title, today, true)}
-            onSelect={(item) => setSelectedTaskId(item.id)}
-            onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
-            onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
-            onDelete={(item) => setDeletingTask(item)}
-            onPersistOrder={persistManualOrder}
-          />
-          {requestedTaskId && requestedTaskQuery.isLoading ? (
-            <p className="todo-my-day__status" role="status">Opening task...</p>
-          ) : null}
-          {requestedTaskId && requestedTaskQuery.isError ? (
-            <p className="todo-my-day__status todo-my-day__status--error" role="alert">
-              This task is unavailable or no longer exists.
-            </p>
-          ) : null}
+        <main className="todo-main-layout todo-main-layout--details">
+          <div className="todo-main-layout__primary">
+            <MyDayView
+              items={todos}
+              selectedId={effectiveSelectedTaskId}
+              sortMode={sortMode}
+              loading={todosQuery.isLoading}
+              error={todosQuery.isError}
+              creating={createTodo.isPending}
+              onCreate={(title) => createTask(title, today, true)}
+              onSelect={(item) => setSelectedTaskId(item.id)}
+              onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
+              onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
+              onDelete={(item) => setDeletingTask(item)}
+              onPersistOrder={persistManualOrder}
+            />
+            {requestedTaskId && requestedTaskQuery.isLoading ? (
+              <p className="todo-my-day__status" role="status">Opening task...</p>
+            ) : null}
+            {requestedTaskId && requestedTaskQuery.isError ? (
+              <p className="todo-my-day__status todo-my-day__status--error" role="alert">
+                This task is unavailable or no longer exists.
+              </p>
+            ) : null}
+          </div>
           {selectedTask ? (
             <TodoDetailsPanel
               key={selectedTask.id}
@@ -259,10 +261,10 @@ export function TodoPage() {
               onUpdate={updateTask}
               onDelete={(item) => setDeletingTask(item)}
             />
-          ) : null}
+          ) : <TodoDetailsEmptyState />}
         </main>
       ) : (
-        <main className={`todo-main-layout todo-main-layout--week${selectedTask ? ' todo-main-layout--week-details' : ''}`}>
+        <main className="todo-main-layout todo-main-layout--week todo-main-layout--week-details">
           <div className="todo-week-surface">
             {weekQuery.isLoading ? <p className="todo-my-day__status" role="status">Loading week...</p> : null}
             {weekQuery.isError ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load Todo week.</p> : null}
@@ -291,7 +293,7 @@ export function TodoPage() {
               onUpdate={updateTask}
               onDelete={(item) => setDeletingTask(item)}
             />
-          ) : null}
+          ) : <TodoDetailsEmptyState />}
         </main>
       )}
 

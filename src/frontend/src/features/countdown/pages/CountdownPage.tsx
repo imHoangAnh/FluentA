@@ -1,8 +1,9 @@
-import { CalendarClock, ImagePlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
+import { Bell, CalendarClock, ImagePlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { menuContentClassName, menuDestructiveItemClassName } from '@/shared/components/ui/menu-styles'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+import { dropdownContentClassName, dropdownDestructiveItemClassName } from '@/shared/components/ui/dropdown-styles'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 import * as assetsApi from '@/lib/api/assets.api'
 import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/lib/toast'
@@ -46,7 +47,6 @@ export function CountdownPage() {
   const [alerts, setAlerts] = useState<Array<{ alertDay: string; alertTime: string }>>([defaultAlert()])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const dialogTitleId = useId()
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -132,6 +132,7 @@ export function CountdownPage() {
       <main className="countdown-main">
         <header className="countdown-header">
           <div className="countdown-header-title">
+            <CalendarClock size={22} aria-hidden="true" />
             <h1>Countdown</h1>
           </div>
           <button
@@ -143,11 +144,12 @@ export function CountdownPage() {
             onClick={() => setShowFormModal(true)}
           >
             <Plus size={19} />
+            <span>New Countdown</span>
           </button>
         </header>
 
         <div className="countdown-canvas">
-          <section className="countdown-list-area">
+          <section className={`countdown-list-area${!countdownsQuery.isLoading && countdowns.length === 0 ? ' countdown-list-area--empty' : ''}`}>
             <div className="countdown-list-container">
               <div className="countdown-card-grid">
                 {countdowns.map((item) => (
@@ -165,36 +167,22 @@ export function CountdownPage() {
                     <div className="countdown-card-content">
                       <div className="countdown-card-topline">
                         <h2>{item.name}</h2>
-                        <DropdownMenu.Root
-                          modal={false}
-                          open={openMenuId === item.id}
-                          onOpenChange={(open) => setOpenMenuId(open ? item.id : null)}
-                        >
-                          <DropdownMenu.Trigger asChild>
-                            <button
-                              className="countdown-card-menu-trigger"
-                              type="button"
-                              aria-label={`Open actions for ${item.name}`}
-                              title="Countdown actions"
-                            >
-                              <MoreHorizontal size={18} />
-                            </button>
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.Content className={menuContentClassName} align="end" sideOffset={6}>
-                              <DropdownMenu.Item
-                                className={menuDestructiveItemClassName}
-                                onSelect={() => {
-                                  setOpenMenuId(null)
-                                  deleteCountdown.mutate(item.id)
-                                }}
-                              >
+                        <Menu as="div" className="relative inline-block">
+                          <MenuButton
+                            className="countdown-card-menu-trigger"
+                            type="button"
+                            aria-label={`Open actions for ${item.name}`}
+                            title="Countdown actions"
+                          >
+                            <MoreHorizontal size={18} />
+                          </MenuButton>
+                          <MenuItems anchor={{ to: 'bottom end', gap: '6px' }} transition className={dropdownContentClassName}>
+                            <MenuItem as="button" type="button" className={dropdownDestructiveItemClassName} onClick={() => deleteCountdown.mutate(item.id)}>
                                 <Trash2 size={15} />
                                 Delete
-                              </DropdownMenu.Item>
-                            </DropdownMenu.Content>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
+                            </MenuItem>
+                          </MenuItems>
+                        </Menu>
                       </div>
                       <div className="countdown-card-count">
                         <strong className={item.isCompleted ? 'countdown-card-count--completed' : undefined}>{statusText(item)}</strong>
@@ -208,10 +196,17 @@ export function CountdownPage() {
                 ))}
 
                 {!countdownsQuery.isLoading && countdowns.length === 0 ? (
-                  <div className="empty-panel">
-                    <CalendarClock size={32} />
-                    <h3>No countdowns yet</h3>
-                    <p>Create an exam, deadline, or milestone with one to five alerts.</p>
+                  <div className="countdown-empty-state" role="status">
+                    <div className="countdown-empty-illustration" aria-hidden="true">
+                      <CalendarClock size={66} strokeWidth={1.5} />
+                      <Bell className="countdown-empty-illustration__bell" size={28} strokeWidth={1.7} />
+                    </div>
+                    <h2>No Countdowns Yet</h2>
+                    <p>Create your first exam, deadline, or milestone and add customizable alerts.</p>
+                    <button className="countdown-empty-create-button" type="button" onClick={() => setShowFormModal(true)}>
+                      <Plus size={17} />
+                      <span>Create First Countdown</span>
+                    </button>
                   </div>
                 ) : null}
 
@@ -250,9 +245,13 @@ export function CountdownPage() {
                   <div className="notes-box countdown-alerts-list">
                     {alerts.map((alert, index) => (
                       <div className="countdown-alert-row" key={`${alert.alertDay}-${index}`}>
-                        <select aria-label={`Alert ${index + 1} day`} value={alert.alertDay} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertDay: event.target.value } : item))}>
-                          {alertDayOptions.map((option) => <option value={option} key={option}>{option}</option>)}
-                        </select>
+                        <SelectMenu
+                          aria-label={`Alert ${index + 1} day`}
+                          value={alert.alertDay}
+                          onChange={(alertDay) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertDay } : item))}
+                          options={alertDayOptions.map((option) => ({ value: option, label: option }))}
+                          className="min-w-40"
+                        />
                         <input aria-label={`Alert ${index + 1} time`} type="time" value={alert.alertTime} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))} />
                         <button type="button" className="btn-cancel" onClick={() => setAlerts((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={alerts.length === 1}>
                           Remove alert

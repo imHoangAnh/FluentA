@@ -87,9 +87,9 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
 
     renderWithProviders(<ReviewSessionPage />)
 
-    await screen.findByRole('option', { name: /board 1/i })
-    const select = screen.getByRole('combobox', { name: /vocabulary board/i })
-    fireEvent.change(select, { target: { value: 'b1' } })
+    const select = screen.getByRole('button', { name: /vocabulary board/i })
+    fireEvent.click(select)
+    fireEvent.click(await screen.findByRole('option', { name: /board 1/i }))
 
     const startBtn = await screen.findByRole('button', { name: /start review/i })
     expect(startBtn).not.toBeDisabled()
@@ -189,9 +189,9 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
 
     renderWithProviders(<ReviewSessionPage />)
 
-    await screen.findByRole('option', { name: /board 1/i })
-    const select = screen.getByRole('combobox', { name: /vocabulary board/i })
-    fireEvent.change(select, { target: { value: 'b1' } })
+    const select = screen.getByRole('button', { name: /vocabulary board/i })
+    fireEvent.click(select)
+    fireEvent.click(await screen.findByRole('option', { name: /board 1/i }))
 
     const startBtn = await screen.findByRole('button', { name: /start review/i })
     expect(startBtn).not.toBeDisabled()

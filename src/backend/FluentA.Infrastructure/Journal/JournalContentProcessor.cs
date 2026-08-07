@@ -10,12 +10,12 @@ public sealed class JournalContentProcessor : IJournalContentProcessor
 {
     private static readonly string[] SupportedTags =
     [
-        "p", "br", "h1", "h2", "h3", "strong", "b", "em", "i", "u", "s",
+        "p", "br", "h1", "h2", "h3", "h4", "strong", "b", "em", "i", "u", "s",
         "ul", "ol", "li", "blockquote", "pre", "code", "mark", "a", "hr", "span"
     ];
     private static readonly HashSet<string> TextBoundaryTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "p", "br", "h1", "h2", "h3", "li", "blockquote", "pre", "hr"
+        "p", "br", "h1", "h2", "h3", "h4", "li", "blockquote", "pre", "hr"
     };
 
     private readonly HtmlSanitizer _sanitizer;

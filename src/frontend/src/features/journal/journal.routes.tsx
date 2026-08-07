@@ -6,7 +6,7 @@ export const journalRoutes: RouteObject[] = [{
   handle: appShellRoute({
     title: 'Journal',
     description: 'Capture learning reflections and keep them organized by date.',
-    contentClassName: 'max-w-none p-0',
+    contentClassName: 'max-w-none h-screen min-h-0 overflow-hidden p-0',
   }),
   lazy: async () => ({ Component: (await import('./pages/JournalPage')).JournalPage }),
 }]

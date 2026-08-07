@@ -2,7 +2,7 @@ import * as React from 'react'
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
-import { menuContentClassName, menuItemClassName, menuSeparatorClassName } from './menu-styles'
+import { contextMenuContentClassName, contextMenuItemClassName, contextMenuSeparatorClassName } from './context-menu-styles'
 
 const ContextMenu = ContextMenuPrimitive.Root
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger
@@ -11,19 +11,19 @@ const ContextMenuSub = ContextMenuPrimitive.Sub
 function ContextMenuContent({ className, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
   return (
     <ContextMenuPrimitive.Portal>
-      <ContextMenuPrimitive.Content className={cn(menuContentClassName, 'min-w-40', className)} {...props} />
+      <ContextMenuPrimitive.Content className={cn(contextMenuContentClassName, 'min-w-40', className)} {...props} />
     </ContextMenuPrimitive.Portal>
   )
 }
 
 function ContextMenuItem({ className, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Item>) {
-  return <ContextMenuPrimitive.Item className={cn(menuItemClassName, className)} {...props} />
+  return <ContextMenuPrimitive.Item className={cn(contextMenuItemClassName, className)} {...props} />
 }
 
 function ContextMenuSubTrigger({ className, children, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
   return (
     <ContextMenuPrimitive.SubTrigger
-      className={cn(menuItemClassName, 'data-[state=open]:bg-secondary data-[state=open]:text-secondary-foreground', className)}
+      className={cn(contextMenuItemClassName, 'data-[state=open]:bg-secondary data-[state=open]:text-secondary-foreground', className)}
       {...props}
     >
       {children}
@@ -36,7 +36,7 @@ function ContextMenuSubContent({ className, ...props }: React.ComponentProps<typ
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.SubContent
-        className={cn(menuContentClassName, 'min-w-40', className)}
+        className={cn(contextMenuContentClassName, 'min-w-40', className)}
         {...props}
       />
     </ContextMenuPrimitive.Portal>
@@ -44,7 +44,7 @@ function ContextMenuSubContent({ className, ...props }: React.ComponentProps<typ
 }
 
 function ContextMenuSeparator({ className, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Separator>) {
-  return <ContextMenuPrimitive.Separator className={cn(menuSeparatorClassName, className)} {...props} />
+  return <ContextMenuPrimitive.Separator className={cn(contextMenuSeparatorClassName, className)} {...props} />
 }
 
 export {

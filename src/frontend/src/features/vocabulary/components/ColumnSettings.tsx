@@ -1,7 +1,8 @@
 import { Check, ChevronDown, Columns3 } from 'lucide-react'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { Button } from '@/shared/components/ui/button'
-import { menuContentClassName, menuItemClassName, menuLabelClassName, menuSeparatorClassName } from '@/shared/components/ui/menu-styles'
+import { dropdownContentClassName, dropdownItemClassName, dropdownLabelClassName, dropdownSeparatorClassName } from '@/shared/components/ui/dropdown-styles'
 import { cn } from '@/shared/lib/utils'
 import type { BoardPreferences } from '../api/vocabulary.api'
 
@@ -11,6 +12,11 @@ const optionalColumns = [
   { key: 'synonyms', name: 'Synonyms' },
   { key: 'antonyms', name: 'Antonyms' },
 ] as const
+
+const ColumnMenuItem = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>((props, ref) => (
+  <button {...props} ref={ref} role="menuitemcheckbox" />
+))
+ColumnMenuItem.displayName = 'ColumnMenuItem'
 
 type ColumnSettingsProps = {
   preferences: BoardPreferences
@@ -27,36 +33,32 @@ export function ColumnSettings({ preferences, onSave }: ColumnSettingsProps) {
   }
 
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <Button type="button" variant="outline" size="sm">
+    <Menu as="div" className="relative inline-block">
+        <MenuButton as={Button} type="button" variant="outline" size="sm">
           <Columns3 /> Setting Columns <ChevronDown />
-        </Button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={8}
-          className={cn(menuContentClassName, 'min-w-52')}
-        >
-          <DropdownMenu.Label className={menuLabelClassName}>Board columns</DropdownMenu.Label>
-          <DropdownMenu.Separator className={menuSeparatorClassName} />
+        </MenuButton>
+        <MenuItems anchor={{ to: 'bottom end', gap: '8px' }} transition className={cn(dropdownContentClassName, 'min-w-52')}>
+          <div className={dropdownLabelClassName}>Board columns</div>
+          <div className={dropdownSeparatorClassName} role="separator" />
           {optionalColumns.map((column) => (
-            <DropdownMenu.CheckboxItem
+            <MenuItem
               key={column.key}
-              checked={!preferences.hiddenColumns.includes(column.key)}
-              onCheckedChange={() => toggle(column.key)}
-              onSelect={(event) => event.preventDefault()}
-              className={cn(menuItemClassName, 'relative pl-8')}
+              as={ColumnMenuItem}
+              type="button"
+              aria-checked={!preferences.hiddenColumns.includes(column.key)}
+              className={cn(dropdownItemClassName, 'relative pl-8')}
+              onClick={(event) => {
+                event.preventDefault()
+                toggle(column.key)
+              }}
             >
               <span className="absolute left-2 grid size-4 place-items-center">
-                <DropdownMenu.ItemIndicator><Check className="size-3.5" /></DropdownMenu.ItemIndicator>
+                {!preferences.hiddenColumns.includes(column.key) ? <Check className="size-3.5" /> : null}
               </span>
               {column.name}
-            </DropdownMenu.CheckboxItem>
+            </MenuItem>
           ))}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+        </MenuItems>
+    </Menu>
   )
 }

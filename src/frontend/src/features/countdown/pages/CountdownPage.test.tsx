@@ -57,4 +57,17 @@ describe('CountdownPage', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => expect(countdownApi.deleteCountdown.mock.calls[0]?.[0]).toBe('countdown-1'))
   })
+
+  it('renders the empty state CTA and opens the existing create dialog', async () => {
+    const user = userEvent.setup()
+    countdownApi.listCountdowns.mockResolvedValue([])
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'No Countdowns Yet' })).toBeInTheDocument()
+    const createButton = screen.getByRole('button', { name: 'Create First Countdown' })
+    expect(createButton).toBeInTheDocument()
+
+    await user.click(createButton)
+    expect(screen.getByRole('dialog', { name: 'Create Countdown' })).toBeInTheDocument()
+  })
 })

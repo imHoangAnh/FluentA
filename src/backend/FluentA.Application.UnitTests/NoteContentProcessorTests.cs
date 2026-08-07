@@ -9,6 +9,20 @@ namespace FluentA.Application.UnitTests;
 public sealed class NoteContentProcessorTests
 {
     [Fact]
+    public async Task ProcessAsync_PreservesHeadingAndListFormatting()
+    {
+        var processor = new NoteContentProcessor(new FakeAssetRepository());
+
+        var result = await processor.ProcessAsync(
+            Guid.NewGuid(),
+            "<h4>Subheading</h4><ol><li>First</li></ol><ul><li>Second</li></ul>");
+
+        Assert.Contains("<h4>Subheading</h4>", result.Html);
+        Assert.Contains("<ol><li>First</li></ol>", result.Html);
+        Assert.Contains("<ul><li>Second</li></ul>", result.Html);
+    }
+
+    [Fact]
     public async Task ProcessAsync_PersistsOwnedReadyNoteImageReferencesWithoutSources()
     {
         var userId = Guid.NewGuid();

@@ -22,7 +22,8 @@ async function mockReviewApis(page) {
 test('review workflow keeps the board-scoped queue and completion flow', async ({ page }) => {
   await mockReviewApis(page)
   await page.goto('/review')
-  await page.getByLabel('Vocabulary board').selectOption({ label: 'Review board (2 due)' })
+  await page.getByLabel('Vocabulary board').click()
+  await page.getByRole('option', { name: 'Review board (2 due)', exact: true }).click()
   await page.getByRole('button', { name: /Sequential/ }).click()
   await page.getByRole('button', { name: 'Start review' }).click()
   await expect(page.getByText('1 / 2')).toBeVisible()

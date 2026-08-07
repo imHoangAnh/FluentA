@@ -1,7 +1,7 @@
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useEffect, useRef, useState } from 'react'
-import { Bell, Check, ChevronRight, Circle, Repeat2, Star, Trash2, X } from 'lucide-react'
-import { menuContentClassName, menuItemClassName } from '@/shared/components/ui/menu-styles'
+import { Bell, Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
+import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
 import { createBrowserReminder } from '../todo-reminder'
 
@@ -20,6 +20,21 @@ type TodoDetailsPanelProps = {
   onClose: () => void
   onUpdate: (id: string, patch: UpdateTodoInput) => Promise<void>
   onDelete: (item: TodoItem) => void
+}
+
+export function TodoDetailsEmptyState() {
+  return (
+    <aside className="todo-details todo-details--empty" aria-label="Task details">
+      <div className="todo-details__topbar">
+        <span>Task details</span>
+      </div>
+      <div className="todo-details__empty">
+        <ClipboardCheck aria-hidden="true" />
+        <strong>Select a task</strong>
+        <p>Choose a task to view and edit its details.</p>
+      </div>
+    </aside>
+  )
 }
 
 export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }: TodoDetailsPanelProps) {
@@ -195,9 +210,8 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
               </div>
             </div>
           ) : null}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <button
+          <Menu as="div" className="relative inline-block">
+              <MenuButton
                 className="todo-details__field"
                 type="button"
                 aria-label={`Repeat: ${item.repeatPattern ?? 'Does not repeat'}`}
@@ -209,25 +223,24 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
                   <strong>{item.repeatPattern ?? 'Does not repeat'}</strong>
                 </span>
                 <ChevronRight aria-hidden="true" />
-              </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content className={menuContentClassName} sideOffset={6} align="start">
+              </MenuButton>
+              <MenuItems anchor={{ to: 'bottom start', gap: '6px' }} transition className={dropdownContentClassName}>
                 {repeatOptions.map((option) => (
-                  <DropdownMenu.Item
-                    className={menuItemClassName}
+                  <MenuItem
+                    as="button"
+                    type="button"
+                    className={dropdownItemClassName}
                     key={option.value ?? 'none'}
-                    onSelect={() => void onUpdate(item.id, { repeatPattern: option.value }).catch(() => undefined)}
+                    onClick={() => void onUpdate(item.id, { repeatPattern: option.value }).catch(() => undefined)}
                   >
                     <span className="todo-details__repeat-check">
                       {item.repeatPattern === option.value ? <Check aria-hidden="true" /> : null}
                     </span>
                     {option.label}
-                  </DropdownMenu.Item>
+                  </MenuItem>
                 ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+              </MenuItems>
+          </Menu>
         </div>
         <div className="todo-details__note">
           <label htmlFor={`todo-note-${item.id}`}>Note</label>

@@ -1,15 +1,15 @@
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { ArchiveX, Check, ChevronDown, Filter, Search } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, type ButtonHTMLAttributes, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
 import * as reviewApi from '@/features/review'
 import { restoreTrashEntry } from '@/features/trash'
+import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
 import { toast } from '@/lib/toast'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
-import { menuContentClassName, menuItemClassName } from '@/shared/components/ui/menu-styles'
 import { cn } from '@/shared/lib/utils'
 
 type FilterMode = 'all' | 'active' | 'inactive'
@@ -19,6 +19,11 @@ const filterLabels: Record<FilterMode, string> = {
   active: 'Active',
   inactive: 'Inactive',
 }
+
+const FilterMenuItem = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>((props, ref) => (
+  <button {...props} ref={ref} role="menuitemradio" />
+))
+FilterMenuItem.displayName = 'FilterMenuItem'
 
 function formatDateOnly(value: string) {
   const [date] = value.split('T')
@@ -140,9 +145,9 @@ export function LevelFiveSettingsPage() {
             />
           </label>
 
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <Button
+          <Menu as="div" className="relative inline-block shrink-0">
+              <MenuButton
+                as={Button}
                 className="shrink-0 justify-between sm:min-w-36"
                 variant="outline"
                 type="button"
@@ -151,31 +156,25 @@ export function LevelFiveSettingsPage() {
                 <Filter aria-hidden="true" />
                 Filter: {filterLabels[filter]}
                 <ChevronDown aria-hidden="true" />
-              </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content
-                className={cn(menuContentClassName, 'min-w-40')}
-                align="end"
-                sideOffset={6}
-              >
-                <DropdownMenu.RadioGroup value={filter} onValueChange={(value) => setFilter(value as FilterMode)}>
-                  {(Object.keys(filterLabels) as FilterMode[]).map((value) => (
-                    <DropdownMenu.RadioItem
-                      key={value}
-                      value={value}
-                      className={menuItemClassName}
-                    >
-                      <span className="grid size-4 place-items-center">
-                        <DropdownMenu.ItemIndicator><Check className="size-3.5" aria-hidden="true" /></DropdownMenu.ItemIndicator>
-                      </span>
-                      {filterLabels[value]}
-                    </DropdownMenu.RadioItem>
-                  ))}
-                </DropdownMenu.RadioGroup>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+              </MenuButton>
+              <MenuItems anchor={{ to: 'bottom end', gap: '6px' }} transition className={cn(dropdownContentClassName, 'min-w-40')}>
+                {(Object.keys(filterLabels) as FilterMode[]).map((value) => (
+                  <MenuItem
+                    key={value}
+                    as={FilterMenuItem}
+                    type="button"
+                    aria-checked={filter === value}
+                    className={dropdownItemClassName}
+                    onClick={() => setFilter(value)}
+                  >
+                    <span className="grid size-4 place-items-center">
+                      {filter === value ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                    </span>
+                    {filterLabels[value]}
+                  </MenuItem>
+                ))}
+              </MenuItems>
+          </Menu>
         </div>
 
         <div className="overflow-x-auto rounded-md border border-border">

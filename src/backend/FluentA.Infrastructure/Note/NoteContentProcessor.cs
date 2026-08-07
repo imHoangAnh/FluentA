@@ -14,7 +14,7 @@ public sealed partial class NoteContentProcessor : INoteContentProcessor
     private const string AssetIdAttribute = "data-note-asset-id";
     private static readonly string[] SupportedTags =
     [
-        "p", "br", "h1", "h2", "h3", "strong", "b", "em", "i", "u", "s",
+        "p", "br", "h1", "h2", "h3", "h4", "strong", "b", "em", "i", "u", "s",
         "ul", "ol", "li", "blockquote", "pre", "code", "mark", "a", "hr", "span", "img"
     ];
 

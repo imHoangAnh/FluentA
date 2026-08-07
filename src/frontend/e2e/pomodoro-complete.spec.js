@@ -26,7 +26,8 @@ test('links an owned Todo and provides transient stopwatch controls', async ({ p
   await expect(page.getByText('Focused linked task')).toBeVisible()
 
   await page.getByRole('link', { name: 'Pomodoro' }).click()
-  await page.getByTestId('pomodoro-task-select').selectOption({ label: 'Todo: Focused linked task' })
+  await page.getByTestId('pomodoro-task-select').click()
+  await page.getByRole('option', { name: 'Todo: Focused linked task', exact: true }).click()
   const startRequestPromise = page.waitForRequest((request) => request.url().endsWith('/api/v1/pomodoro/start'))
   const startResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/pomodoro/start'))
   await page.getByRole('button', { name: 'Start', exact: true }).click()

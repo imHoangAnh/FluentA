@@ -77,7 +77,7 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   await expect(page.getByTestId('journal-title-input')).toHaveValue(newest.title);
 
   await page.getByTestId(`journal-calendar-day-${emptyDate}`).click();
-  await expect(page.getByTestId('journal-date-input')).toHaveValue(emptyDate);
+  await expect(page.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate);
   await expect(page.getByTestId('journal-title-input')).toHaveValue(`Learning notes for ${emptyDate}`);
   await page.getByTestId('save-journal-button').click();
   await expect(page.getByRole('button', { name: `Open journal Learning notes for ${emptyDate}` })).toBeVisible();

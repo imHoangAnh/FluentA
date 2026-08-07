@@ -48,7 +48,7 @@ export function AppShell({ children, title, description, contentClassName }: App
         'max-[1100px]:justify-center max-[1100px]:px-0',
       )}
     >
-      <Icon className="size-[18px]" aria-hidden="true" />
+      {Icon ? <Icon className="size-[18px]" aria-hidden="true" /> : null}
       <span className="truncate max-[1100px]:sr-only">{label}</span>
     </Link>
     )
@@ -124,7 +124,7 @@ export function AppShell({ children, title, description, contentClassName }: App
             aria-current={location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`) ? 'page' : undefined}
             className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground', (location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`)) && 'bg-secondary text-secondary-foreground', 'max-[1100px]:justify-center max-[1100px]:px-0')}
           >
-            <SettingsIcon className="size-[18px]" aria-hidden="true" />
+            {SettingsIcon ? <SettingsIcon className="size-[18px]" aria-hidden="true" /> : null}
             <span className="max-[1100px]:sr-only">{settingsNavigation.label}</span>
           </Link>
           <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background p-2 max-[1100px]:justify-center max-[1100px]:border-0 max-[1100px]:bg-transparent">

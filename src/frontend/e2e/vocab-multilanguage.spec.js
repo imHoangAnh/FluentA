@@ -23,7 +23,8 @@ test('Chinese board adapts vocabulary and review labels to Pinyin', async ({ pag
   await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('HSK Board');
-  await page.getByTestId('board-language-select').selectOption('zh');
+  await page.getByTestId('board-language-select').click();
+  await page.getByRole('option', { name: 'Chinese', exact: true }).click();
   await page.getByTestId('create-board-button').click();
   await page.getByTestId('page-name-input').fill('Lesson One');
   await page.getByTestId('create-page-button').click();
@@ -31,7 +32,8 @@ test('Chinese board adapts vocabulary and review labels to Pinyin', async ({ pag
   await page.getByLabel('New word', { exact: true }).fill('你好');
   await page.getByLabel('New Vietnamese meaning').fill('xin chào');
   await page.getByLabel('New Pinyin').fill('ni hao');
-  await page.getByLabel('New word class').selectOption('phrase');
+  await page.getByLabel('New word class').click();
+  await page.getByRole('option', { name: 'Phrase', exact: true }).click();
   await page.getByLabel('New example').fill('你好！');
   await page.getByTestId('create-word-button').click();
   await expect(page.getByLabel('Pinyin for 你好')).toHaveValue('ni hao');

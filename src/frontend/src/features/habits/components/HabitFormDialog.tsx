@@ -1,9 +1,10 @@
-import { ChevronRight, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import type { CreateHabitInput, Habit, HabitFrequency, HabitIcon } from '../api/habit.api'
 import { weekdays } from '../habit-date'
 import { habitIconOptions } from './habit-icon-options'
 import { HabitIconGlyph } from './habit-icons'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 const goalPresets = [7, 21, 30, 100, 365]
 
@@ -56,7 +57,6 @@ export function HabitFormDialog({
   onSubmit,
 }: HabitFormDialogProps) {
   const [form, setForm] = useState(() => initialState(habit, today))
-  const [iconMenuOpen, setIconMenuOpen] = useState(false)
   const titleId = useId()
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -129,30 +129,32 @@ export function HabitFormDialog({
 
           <div className="habit-icon-field">
             <span>Icon</span>
-            <div className="habit-icon-select">
-              <button type="button" className="habit-icon-select-trigger" aria-haspopup="listbox" aria-expanded={iconMenuOpen} aria-label="Habit icon" onClick={() => setIconMenuOpen((open) => !open)}>
-                <HabitIconGlyph icon={form.icon} size={18} />
-                <span>{form.icon}</span>
-                <ChevronRight className={iconMenuOpen ? 'open' : ''} size={17} />
-              </button>
-              {iconMenuOpen ? (
-                <div className="habit-icon-options" role="listbox" aria-label="Habit icon">
-                  {habitIconOptions.map((option) => (
-                    <button type="button" role="option" aria-selected={form.icon === option.value} key={option.value} onClick={() => { setForm((current) => ({ ...current, icon: option.value })); setIconMenuOpen(false) }}>
-                      <HabitIconGlyph icon={option.value} size={18} /><span>{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <SelectMenu
+              aria-label="Habit icon"
+              value={form.icon}
+              onChange={(icon) => setForm((current) => ({ ...current, icon }))}
+              buttonClassName="habit-icon-select-trigger"
+              optionsClassName="habit-icon-options"
+              options={habitIconOptions.map((option) => ({
+                value: option.value,
+                label: (
+                  <span className="flex items-center gap-2">
+                    <HabitIconGlyph icon={option.value} size={18} />
+                    <span>{option.label}</span>
+                  </span>
+                ),
+              }))}
+            />
           </div>
 
           <label>
             Frequency
-            <select value={form.frequency} onChange={(event) => setForm((current) => ({ ...current, frequency: event.target.value as HabitFrequency }))}>
-              <option value="Daily">Every day</option>
-              <option value="Custom">Custom days</option>
-            </select>
+            <SelectMenu
+              aria-label="Frequency"
+              value={form.frequency}
+              onChange={(frequency) => setForm((current) => ({ ...current, frequency: frequency as HabitFrequency }))}
+              options={[{ value: 'Daily', label: 'Every day' }, { value: 'Custom', label: 'Custom days' }]}
+            />
           </label>
           {form.frequency === 'Custom' ? (
             <div className="habit-weekdays-toggle" aria-label="Scheduled weekdays">
@@ -170,22 +172,23 @@ export function HabitFormDialog({
 
           <label>
             Goal Days
-            <select
-              data-testid="habit-goal-days-select"
+            <SelectMenu
+              testId="habit-goal-days-select"
+              aria-label="Goal Days"
               value={form.goalMode === 'Forever' ? 'Forever' : form.goalMode === 'Custom' ? 'Custom' : form.goalDays}
-              onChange={(event) => {
-                const value = event.target.value
+              onChange={(value) => {
                 setForm((current) => value === 'Forever'
                   ? { ...current, goalMode: 'Forever', goalDays: '' }
                   : value === 'Custom'
                     ? { ...current, goalMode: 'Custom', goalDays: current.goalMode === 'Custom' ? current.goalDays : '' }
                     : { ...current, goalMode: 'Preset', goalDays: value })
               }}
-            >
-              <option value="Forever">Forever</option>
-              {goalPresets.map((goal) => <option key={goal} value={goal}>{goal} days</option>)}
-              <option value="Custom">Custom</option>
-            </select>
+              options={[
+                { value: 'Forever', label: 'Forever' },
+                ...goalPresets.map((goal) => ({ value: String(goal), label: `${goal} days` })),
+                { value: 'Custom', label: 'Custom' },
+              ]}
+            />
           </label>
           {form.goalMode === 'Custom' ? (
             <label>
@@ -201,7 +204,7 @@ export function HabitFormDialog({
           </label>
           {form.reminderEnabled ? (
             <label>
-              Reminder Time <small>Asia/Ho_Chi_Minh</small>
+              Reminder Time
               <input type="time" data-testid="habit-reminder-time-input" step={60} required value={form.reminderTime} onChange={(event) => setForm((current) => ({ ...current, reminderTime: event.target.value }))} />
             </label>
           ) : null}

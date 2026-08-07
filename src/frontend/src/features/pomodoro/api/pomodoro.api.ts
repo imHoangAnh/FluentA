@@ -35,7 +35,7 @@ export type PomodoroToday = {
 
 export type StartPomodoroInput = {
   linkedTaskId?: string | null
-  linkedTaskSource?: 'todo' | 'kanban' | null
+  linkedTaskSource?: 'todo' | 'project' | null
 }
 
 export async function getPomodoroConfig() {

@@ -130,7 +130,8 @@ test('Review pronunciation submits Wrong only after the second failed assessment
   })
 
   await page.goto('/review')
-  await page.getByLabel('Vocabulary board').selectOption('board-1')
+  await page.getByRole('button', { name: 'Vocabulary board' }).click()
+  await page.getByRole('option', { name: /board 1/i }).click()
   await page.getByRole('button', { name: 'Start review' }).click()
 
   await recordOnce(page)

@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Layers, Mic, MicOff, Play, Volume2, X } from 'lucide-react'
+import { CheckCircle2, Layers, Mic, MicOff, Play, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
@@ -6,6 +6,7 @@ import { listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { getReviewSettings } from './api/review-settings.api'
 import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
@@ -313,25 +314,21 @@ export function ReviewSessionPage() {
               <div className="review-setup-body">
                 <div className="review-setup-field">
                   <label className="review-setup-label" htmlFor="board-select">Vocabulary board</label>
-                  <div className="review-setup-select-wrapper">
-                    <select
-                      id="board-select"
-                      className="review-setup-select"
-                      value={boardId}
-                      onChange={(event) => setBoardId(event.target.value)}
-                      aria-label="Vocabulary board"
-                    >
-                      <option value="">Select a board</option>
-                      {boards.map((board) => (
-                        <option key={board.boardId} value={board.boardId}>
-                          {board.boardName} ({board.dueCount} due)
-                        </option>
-                      ))}
-                    </select>
-                    <span className="review-setup-select-chevron">
-                      <ChevronDown size={20} />
-                    </span>
-                  </div>
+                  <SelectMenu
+                    id="board-select"
+                    className="review-setup-select-wrapper"
+                    buttonClassName="review-setup-select"
+                    value={boardId}
+                    onChange={setBoardId}
+                    aria-label="Vocabulary board"
+                    options={[
+                      { value: '', label: 'Select a board' },
+                      ...boards.map((board) => ({
+                        value: board.boardId,
+                        label: `${board.boardName} (${board.dueCount} due)`,
+                      })),
+                    ]}
+                  />
                 </div>
 
               <div className="review-setup-options" role="group" aria-label="Review order">

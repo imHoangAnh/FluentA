@@ -32,7 +32,8 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByLabel('New Vietnamese meaning').fill('giảm nhẹ');
   await page.getByLabel('New IPA pronunciation').fill('/ˈmɪt.ɪ.ɡeɪt/');
   await page.getByLabel('New definition').fill('make less severe');
-  await page.getByLabel('New word class').selectOption('verb');
+  await page.getByLabel('New word class').click();
+  await page.getByRole('option', { name: 'Verb', exact: true }).click();
   await page.getByLabel('New example').fill('Mitigate risk.');
   await page.getByTestId('create-word-button').click();
   await expect(page.getByLabel('Word for mitigate')).toBeVisible();
@@ -71,7 +72,8 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByLabel('New Vietnamese meaning').fill('giữ lại');
   await page.getByLabel('New IPA pronunciation').fill('/rɪˈteɪn/');
   await page.getByLabel('New definition').fill('continue to have');
-  await page.getByLabel('New word class').selectOption('verb');
+  await page.getByLabel('New word class').click();
+  await page.getByRole('option', { name: 'Verb', exact: true }).click();
   await page.getByLabel('New example').fill('Retain the value.');
   await page.getByLabel('New antonyms').press('Enter');
   await expect(page.getByLabel('Word for retain')).toBeVisible();

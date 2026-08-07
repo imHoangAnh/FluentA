@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { CheckCircle2, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
+import { CheckCircle2, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../api/vocabulary.api'
 import { toast } from '@/lib/toast'
 import { restoreTrashEntry } from '@/features/trash'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
 const textCellClassName = `${cellClassName} block h-auto resize-none overflow-hidden whitespace-pre-wrap break-words leading-5`
@@ -40,7 +41,7 @@ type AutosaveCellProps = {
   required?: boolean
   onSave: (value: string) => Promise<void>
   onEndEnter?: () => Promise<void> | void
-  register: (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null) => void
+  register: (element: HTMLElement | null) => void
 }
 
 type VocabTableProps = {
@@ -158,12 +159,17 @@ function AutosaveCell({ label, value, type, required, onSave, onEndEnter, regist
   return (
     <div>
       {type === 'select' ? (
-        <div className="relative">
-          <select className={`${cellClassName} ds-select-inline appearance-none pr-7`} ref={register} {...shared}>
-            {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        </div>
+        <SelectMenu
+          aria-label={label}
+          value={draft}
+          onChange={(nextValue) => {
+            setDraft(nextValue)
+            void commitValue(nextValue)
+          }}
+          buttonRef={register}
+          buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
+          options={vocabularyApi.WORD_CLASS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+        />
       ) : (
         <textarea
           className={textCellClassName}
@@ -232,7 +238,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
     ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS,
     ...preferences.columnWidths,
   })
-  const cellRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({})
+  const cellRefs = useRef<Record<string, HTMLElement | null>>({})
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
   const tableFocusRef = useRef<HTMLDivElement>(null)
 
@@ -371,7 +377,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
   function renderBlankCell(column: Column): ReactNode {
     const shared = {
-      ref: (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null) => { cellRefs.current[`new:${column.key}`] = element },
+      ref: (element: HTMLElement | null) => { cellRefs.current[`new:${column.key}`] = element },
       'aria-label': `New ${column.newLabel}`,
       value: column.value(newWord),
       required: column.required,
@@ -387,12 +393,14 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
     if (column.type === 'select') {
       return (
-        <div className="relative">
-          <select className={`${cellClassName} ds-select-inline appearance-none pr-7`} {...shared}>
-            {vocabularyApi.WORD_CLASS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        </div>
+        <SelectMenu
+          aria-label={`New ${column.newLabel}`}
+          value={column.value(newWord)}
+          onChange={(nextValue) => setNewWord((current) => column.update(current, nextValue))}
+          buttonRef={shared.ref}
+          buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
+          options={vocabularyApi.WORD_CLASS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+        />
       )
     }
 

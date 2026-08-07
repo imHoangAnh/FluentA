@@ -10,6 +10,7 @@ import {
 } from '@/shared/components/ui/dialog'
 import { Input } from '@/shared/components/ui/input'
 import { supportedLanguageProfiles } from '@/shared/lib/language'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 type CreateDialogProps = {
   pending?: boolean
@@ -60,15 +61,15 @@ export function CreateBoardDialog({ pending = false, error, onOpenChange, onConf
             </div>
             <div className="grid gap-1.5">
               <label className="text-sm font-medium" htmlFor="new-board-language">Language</label>
-              <select
+              <SelectMenu
                 id="new-board-language"
-                data-testid="board-language-select"
-                className="h-10 rounded-md border border-input bg-card px-3 text-sm"
+                testId="board-language-select"
+                buttonClassName="h-10 rounded-md border-input bg-card px-3 text-sm"
                 value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-              >
-                {supportedLanguageProfiles.map((profile) => <option key={profile.code} value={profile.code}>{profile.name}</option>)}
-              </select>
+                onChange={setLanguage}
+                aria-label="Language"
+                options={supportedLanguageProfiles.map((profile) => ({ value: profile.code, label: profile.name }))}
+              />
             </div>
             {error ? <p className="m-0 text-sm text-destructive">{error}</p> : null}
           </div>

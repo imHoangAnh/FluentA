@@ -37,7 +37,8 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('New Vietnamese meaning', { exact: true }).fill('giảm nhẹ');
   await page.getByLabel('New IPA pronunciation', { exact: true }).fill('/ˈmɪt.ɪ.ɡeɪt/');
   await page.getByLabel('New definition', { exact: true }).fill('make less severe');
-  await page.getByLabel('New word class', { exact: true }).selectOption('verb');
+  await page.getByLabel('New word class', { exact: true }).click();
+  await page.getByRole('option', { name: 'Verb', exact: true }).click();
   await page.getByLabel('New example', { exact: true }).fill('Mitigate the risk.');
   await page.getByTestId('create-word-button').click();
   await expect(page.getByLabel('Word for mitigate')).toBeVisible();
@@ -45,7 +46,8 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('Word for mitigate').fill('mitigation');
   await page.getByLabel('Word for mitigate').press('Tab');
   await expect(page.getByLabel('Word for mitigation')).toBeVisible();
-  await page.getByLabel('Class for mitigation').selectOption('noun');
+  await page.getByLabel('Class for mitigation').click();
+  await page.getByRole('option', { name: 'Noun', exact: true }).click();
   await page.getByLabel('Class for mitigation').press('Tab');
 
   await page.getByLabel('Delete mitigation').click();

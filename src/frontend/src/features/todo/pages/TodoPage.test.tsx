@@ -185,11 +185,11 @@ describe('TodoPage My Day workspace', () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Repeat: Does not repeat' }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat: Does not repeat' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Monthly' }))
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: 'Monthly' }))
 
-    fireEvent.pointerDown(await screen.findByRole('button', { name: 'Repeat: Monthly' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('button', { name: 'Repeat: Monthly' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Does not repeat' }))
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
   })
@@ -269,7 +269,7 @@ describe('TodoPage My Day workspace', () => {
     const dates = weekDates(toDateInput(new Date()))
     renderPage()
 
-    fireEvent.pointerDown(await screen.findByRole('button', { name: 'My Day menu' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('button', { name: 'My Day menu' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Week' }))
 
     expect(await screen.findByRole('heading', { name: 'Week' })).toBeInTheDocument()

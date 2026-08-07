@@ -89,9 +89,20 @@ describe('HabitPage', () => {
 
     expect(screen.getByRole('dialog', { name: 'Create Habit' })).toBeInTheDocument()
     expect(screen.getByTestId('habit-start-date-input')).toHaveValue(todayInput())
-    expect(screen.getByTestId('habit-goal-days-select')).toHaveValue('Forever')
+    expect(screen.getByTestId('habit-goal-days-select')).toHaveAttribute('data-value', 'Forever')
     expect(screen.getByTestId('habit-reminder-time-input')).toHaveValue('20:00')
     expect(screen.getByLabelText('Description')).toBeInTheDocument()
+  })
+
+  it('allows choosing a different habit icon from the form dropdown', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Create habit' }))
+
+    const iconButton = screen.getByRole('button', { name: 'Habit icon' })
+    fireEvent.click(iconButton)
+    fireEvent.click(await screen.findByRole('option', { name: 'Exercise' }))
+
+    expect(iconButton).toHaveTextContent('Exercise')
   })
 
   it('removes the dedicated stats route', () => {

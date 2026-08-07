@@ -31,7 +31,8 @@ test('main Habit details owns stats, goal progress, scrolling description, and r
   await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('Read Details');
   await page.getByTestId('habit-description-input').fill(Array.from({ length: 18 }, (_, index) => `Description line ${index + 1} with averylongunbrokentokenthatmustwrap`).join('\n'));
-  await page.getByTestId('habit-goal-days-select').selectOption('7');
+  await page.getByTestId('habit-goal-days-select').click();
+  await page.getByRole('option', { name: '7 days', exact: true }).click();
   await page.getByTestId('save-habit-button').click();
 
   await expect(page.getByRole('heading', { name: 'Read Details' })).toBeVisible();

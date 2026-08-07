@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
@@ -89,15 +89,16 @@ describe('VocabTable', () => {
     renderTable()
 
     const classSelect = await screen.findByLabelText('Class for mitigate')
-    const options = within(classSelect).getAllByRole('option')
+    await userEvent.setup().click(classSelect)
+    const options = await screen.findAllByRole('option')
 
     expect(options.map((option) => option.textContent)).toEqual([
       'Noun', 'Verb', 'Adjective', 'Adverb', 'Phrase', 'Collocation',
       'Phrasal Verb', 'Idiom', 'Proverb', 'Noun Phrase', 'Verb Phrase', 'Other',
     ])
-    expect(within(classSelect).getByRole('option', { name: 'Phrasal Verb' })).toHaveValue('phrasalverb')
-    expect(within(classSelect).getByRole('option', { name: 'Noun Phrase' })).toHaveValue('nounphrase')
-    expect(within(classSelect).getByRole('option', { name: 'Verb Phrase' })).toHaveValue('verbphrase')
+    expect(screen.getByRole('option', { name: 'Phrasal Verb' })).toHaveAttribute('data-value', 'phrasalverb')
+    expect(screen.getByRole('option', { name: 'Noun Phrase' })).toHaveAttribute('data-value', 'nounphrase')
+    expect(screen.getByRole('option', { name: 'Verb Phrase' })).toHaveAttribute('data-value', 'verbphrase')
   })
 
   it('retains a failed draft and retries it inline', async () => {

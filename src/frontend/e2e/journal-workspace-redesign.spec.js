@@ -56,16 +56,17 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
   await entryButton.click();
   const editorHeader = page.getByTestId('journal-editor-header');
   const titleInput = editorHeader.getByLabel('Journal title');
-  const dateInput = editorHeader.getByLabel('Journal date');
+  const dateDisplay = editorHeader.getByTestId('journal-date-display');
   const actions = editorHeader.getByTestId('journal-editor-actions');
   const saveButton = actions.getByTestId('save-journal-button');
   const deleteButton = actions.getByRole('button', { name: `Delete journal ${title}` });
   const editorBody = page.getByTestId('journal-editor-body');
-  const toolbar = editorBody.getByRole('toolbar', { name: 'Journal formatting tools' });
+  const toolbar = editorHeader.getByTestId('journal-toolbar-host').getByRole('toolbar', { name: 'Journal formatting tools' });
   const writingSurface = editorBody.getByLabel('Journal rich text editor');
 
   await expect(titleInput).toHaveValue(title);
-  await expect(dateInput).toHaveValue('2026-07-22');
+  await expect(dateDisplay).toHaveAttribute('data-date', '2026-07-22');
+  await expect(editorHeader.getByLabel('Journal date')).toHaveCount(0);
   await expect(actions.getByTestId('journal-save-status')).toHaveText('Saved');
   await expect(toolbar).toBeVisible();
   await expect(writingSurface).toBeVisible();
@@ -75,7 +76,7 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
     const searchInput = document.querySelector('[data-testid="journal-search-input"]');
     const workspaceElement = document.querySelector('[data-testid="journal-workspace"]');
     const titleElement = document.querySelector('[data-testid="journal-title-input"]');
-    const dateElement = document.querySelector('[data-testid="journal-date-input"]');
+    const dateElement = document.querySelector('[data-testid="journal-date-display"]');
     const saveElement = document.querySelector('[data-testid="save-journal-button"]');
     const deleteElement = document.querySelector('[aria-label^="Delete journal"]');
     const headerElement = document.querySelector('[data-testid="journal-editor-header"]');
@@ -84,6 +85,7 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
     const follows = (first, second) => Boolean(first && second && (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING));
     return follows(searchInput, workspaceElement)
       && follows(titleElement, dateElement)
+      && follows(dateElement, toolbarElement)
       && follows(saveElement, deleteElement)
       && follows(headerElement, toolbarElement)
       && follows(toolbarElement, writingElement);
@@ -129,24 +131,34 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
       const journal = document.querySelector('.journal-page');
       const rail = document.querySelector('.journal-sidebar');
       const editor = document.querySelector('.journal-editor-card');
+      const entryList = document.querySelector('.journal-entry-list');
+      const editorBody = document.querySelector('.journal-editor-body');
       const mainRect = main?.getBoundingClientRect();
       const journalRect = journal?.getBoundingClientRect();
       const railRect = rail?.getBoundingClientRect();
       const editorRect = editor?.getBoundingClientRect();
+      const entryListStyle = entryList ? getComputedStyle(entryList) : null;
+      const editorBodyStyle = editorBody ? getComputedStyle(editorBody) : null;
       return {
         hasHorizontalOverflow: root.scrollWidth > root.clientWidth,
+        hasVerticalOverflow: root.scrollHeight > root.clientHeight,
         mainWidth: mainRect?.width ?? 0,
         journalWidth: journalRect?.width ?? 0,
         railWidth: railRect?.width ?? 0,
         editorWidth: editorRect?.width ?? 0,
+        entryListOverflowY: entryListStyle?.overflowY ?? '',
+        editorBodyOverflowY: editorBodyStyle?.overflowY ?? '',
       };
     });
     expect(geometry.hasHorizontalOverflow).toBeFalsy();
+    expect(geometry.hasVerticalOverflow).toBeFalsy();
     expect(Math.abs(geometry.mainWidth - geometry.journalWidth)).toBeLessThanOrEqual(1);
     if (viewport.width >= 1024) {
-      expect(geometry.railWidth).toBeLessThanOrEqual(260);
-      expect(geometry.editorWidth).toBeGreaterThan(geometry.railWidth);
+      expect(geometry.editorWidth / geometry.railWidth).toBeGreaterThan(4.8);
+      expect(geometry.editorWidth / geometry.railWidth).toBeLessThan(5.2);
     }
+    expect(geometry.entryListOverflowY).toBe('auto');
+    expect(geometry.editorBodyOverflowY).toBe('auto');
 
     await page.screenshot({
       path: testInfo.outputPath(`journal-workspace-${viewport.width}.png`),

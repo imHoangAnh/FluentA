@@ -75,7 +75,7 @@ function createQueryClient() {
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
   queryClient.setQueryData(['note', 'boards'], [])
-  queryClient.setQueryData(['kanban', 'boards'], [])
+  queryClient.setQueryData(['project', 'boards'], [])
   queryClient.setQueryData(['pomodoro', 'config'], {
     id: 'pomodoro-config-1',
     workMinutes: 25,
@@ -219,7 +219,7 @@ describe('FluentA app routes', async () => {
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
     expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
-    expect(screen.getByRole('link', { name: 'Kanban' })).toHaveAttribute('href', '/kanban')
+    expect(screen.getByRole('link', { name: 'Project' })).toHaveAttribute('href', '/project')
     expect(screen.getByRole('link', { name: 'Pomodoro' })).toHaveAttribute('href', '/pomodoro')
   })
 

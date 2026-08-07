@@ -3,11 +3,11 @@ import { StrictMode, useState } from 'react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-type RuntimeName = 'todo' | 'habit' | 'kanban' | 'pomodoro'
+type RuntimeName = 'todo' | 'habit' | 'project' | 'pomodoro'
 
 const lifecycle = vi.hoisted(() => ({
-  active: { todo: 0, habit: 0, kanban: 0, pomodoro: 0 } as Record<RuntimeName, number>,
-  maximum: { todo: 0, habit: 0, kanban: 0, pomodoro: 0 } as Record<RuntimeName, number>,
+  active: { todo: 0, habit: 0, project: 0, pomodoro: 0 } as Record<RuntimeName, number>,
+  maximum: { todo: 0, habit: 0, project: 0, pomodoro: 0 } as Record<RuntimeName, number>,
 }))
 
 function runtimeMock(hookName: string, runtimeName: RuntimeName) {
@@ -30,7 +30,7 @@ function runtimeMock(hookName: string, runtimeName: RuntimeName) {
 
 vi.mock('@/features/todo', runtimeMock('useTodoSync', 'todo'))
 vi.mock('@/features/habits', runtimeMock('useHabitSync', 'habit'))
-vi.mock('@/features/kanban', runtimeMock('useKanbanSync', 'kanban'))
+vi.mock('@/features/project', runtimeMock('useProjectSync', 'project'))
 vi.mock('@/features/pomodoro', runtimeMock('usePomodoroSync', 'pomodoro'))
 
 import { ProtectedRuntime } from '@/app/runtime/ProtectedRuntime'

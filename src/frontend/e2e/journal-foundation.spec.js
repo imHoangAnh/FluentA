@@ -49,7 +49,6 @@ test('Journal foundation CRUD, Unicode, ordering, and ownership smoke', async ({
   await expect(page.getByRole('heading', { name: 'Journal', exact: true })).toBeVisible();
 
   await page.getByTestId('journal-title-input').fill('Học tiếng Việt');
-  await page.getByTestId('journal-date-input').fill(todayInput());
   await page.getByLabel('Journal rich text editor').fill('Xin chào thế giới. Đây là ghi chú Unicode.');
   await page.getByTestId('save-journal-button').click();
   await expect(page.getByRole('button', { name: 'Open journal Học tiếng Việt' })).toBeVisible();

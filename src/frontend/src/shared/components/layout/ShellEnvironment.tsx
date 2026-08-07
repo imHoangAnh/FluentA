@@ -12,7 +12,7 @@ export type ShellAccount = {
 export type ShellNavigationItem = {
   to: string
   label: string
-  icon: LucideIcon
+  icon?: LucideIcon
   end?: boolean
   isActive?: (pathname: string) => boolean
 }
