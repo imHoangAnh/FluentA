@@ -13,7 +13,7 @@ public interface ITrashService
     Task<OperationResult<TrashEntryDto>> TrashCountdownAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default);
     Task<OperationResult<TrashEntryDto>> TrashHabitAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default);
     Task<OperationResult<TrashEntryDto>> TrashJournalAsync(Guid userId, Guid journalId, CancellationToken cancellationToken = default);
-    Task<OperationResult<TrashEntryDto>> TrashKanbanAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default);
+    Task<OperationResult<TrashEntryDto>> TrashProjectAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default);
     Task<OperationResult<TrashListDto>> ListAsync(Guid userId, string? kind, string? search, int limit, CancellationToken cancellationToken = default);
     Task<OperationResult<bool>> RestoreAsync(Guid userId, Guid entryId, string? timeZoneId = null, CancellationToken cancellationToken = default);
     Task<OperationResult<bool>> PermanentlyDeleteAsync(Guid userId, Guid entryId, CancellationToken cancellationToken = default);

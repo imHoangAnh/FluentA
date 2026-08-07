@@ -25,7 +25,7 @@ const protectedRoutes = [
   ['/habits', 'Habits', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
   ['/notes', 'Notes', 'Notes'],
-  ['/kanban', 'Kanban', 'Kanban'],
+  ['/project', 'Project', 'Project'],
   ['/pomodoro', 'Pomodoro', 'Pomodoro'],
   ['/notifications', 'Notifications', null],
   ['/settings', 'Settings', 'Settings'],

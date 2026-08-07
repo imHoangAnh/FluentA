@@ -27,7 +27,7 @@ runs recurring jobs.
 - Configurable vocabulary boards with multilingual columns and cell autosave.
 - Synchronized flashcards, practice modes, review sessions, and spaced
   repetition scheduling.
-- Daily and weekly todos, habit tracking, countdowns, Kanban, and Pomodoro.
+- Daily and weekly todos, habit tracking, countdowns, Project, and Pomodoro.
 - Rich-text journal entries, notes, notifications, and profile settings.
 - Email/password authentication, account recovery, and Google OAuth.
 - Realtime updates across authenticated browser sessions.
@@ -139,7 +139,7 @@ Open `https://localhost:5173`.
    language.
 3. Add words and use the synchronized flashcards for practice or scheduled
    review.
-4. Plan learning with todos, habits, Kanban, countdowns, and Pomodoro sessions.
+4. Plan learning with todos, habits, Project, countdowns, and Pomodoro sessions.
 5. Capture longer-form content in Journal or Notes and review reminders in the
    notification inbox.
 

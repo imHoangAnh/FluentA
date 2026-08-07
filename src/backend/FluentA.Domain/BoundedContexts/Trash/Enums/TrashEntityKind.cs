@@ -9,5 +9,5 @@ public enum TrashEntityKind
     Journal,
     Countdown,
     Habit,
-    Kanban
+    Project
 }

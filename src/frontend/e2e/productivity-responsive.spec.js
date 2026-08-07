@@ -26,18 +26,18 @@ const productivityRoutes = [
   { path: '/todo', title: 'Todo' },
   { path: '/habits', title: 'Habits' },
   { path: '/countdowns', title: 'Countdowns' },
-  { path: '/kanban', title: 'Kanban' },
+  { path: '/project', title: 'Project' },
   { path: '/pomodoro', title: 'Pomodoro' },
 ];
 
 test('productivity routes avoid page overflow at desktop and tablet widths', async ({ page }, testInfo) => {
   await registerAndLogin(page);
 
-  await page.getByRole('link', { name: 'Kanban', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/kanban');
-  await page.getByTestId('kanban-board-name-input').fill('Responsive board');
-  await page.getByTestId('kanban-board-name-input').press('Enter');
-  await expect(page.getByTestId('kanban-column-Done')).toBeVisible();
+  await page.getByRole('link', { name: 'Project', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:5173/project');
+  await page.getByTestId('project-board-name-input').fill('Responsive board');
+  await page.getByTestId('project-board-name-input').press('Enter');
+  await expect(page.getByTestId('project-column-Done')).toBeVisible();
 
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 1000 },
@@ -49,8 +49,8 @@ test('productivity routes avoid page overflow at desktop and tablet widths', asy
       await page.getByRole('link', { name: route.title, exact: true }).click();
       await expect(page).toHaveURL(`http://127.0.0.1:5173${route.path}`);
       await expect(page.getByRole('heading', { level: 1, name: route.title })).toBeVisible();
-      if (route.path === '/kanban') {
-        await page.getByTestId('kanban-column-To Do').getByRole('button', { name: 'Add Card' }).click();
+      if (route.path === '/project') {
+        await page.getByTestId('project-column-To Do').getByRole('button', { name: 'Add Card' }).click();
         await expect(page.getByRole('complementary', { name: 'Create card' })).toBeVisible();
       }
       const dimensions = await page.evaluate(() => ({
@@ -59,7 +59,7 @@ test('productivity routes avoid page overflow at desktop and tablet widths', asy
       }));
       expect(dimensions.scrollWidth, `${route.path} should not overflow at ${viewport.width}px`).toBeLessThanOrEqual(dimensions.clientWidth);
       await page.screenshot({ path: testInfo.outputPath(`${route.title.toLowerCase()}-${viewport.name}.png`) });
-      if (route.path === '/kanban') {
+      if (route.path === '/project') {
         await page.getByRole('button', { name: 'Close card details' }).click();
       }
     }
