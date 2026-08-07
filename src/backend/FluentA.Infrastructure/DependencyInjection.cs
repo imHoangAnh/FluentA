@@ -41,7 +41,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
-using StackExchange.Redis;
 using Resend;
 
 namespace FluentA.Infrastructure;
@@ -50,7 +49,6 @@ public static class DependencyInjection
 {
     private const string DefaultPostgresConnection =
         "Host=localhost;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_dev";
-    private const string DefaultRedisConnection = "localhost:6379";
     private const int DefaultPostgresMinPoolSize = 0;
     private const int DefaultPostgresMaxPoolSize = 30;
     private const int DefaultPostgresConnectionTimeoutSeconds = 15;
@@ -68,7 +66,6 @@ public static class DependencyInjection
             configuration,
             "Hangfire:WorkerCount",
             DefaultHangfireWorkerCount);
-        var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
         var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
         var pronunciationOptions = CreatePronunciationOptions(configuration);
         var authSecurityOptions = AuthSecurityOptions.FromConfiguration(configuration);
@@ -82,7 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();
-        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
+        services.AddMemoryCache();
         services.AddSingleton(assetStorageOptions);
         services.AddHostedService<AssetStoragePrivacyStartupService>();
         if (assetStorageOptions.Enabled)
@@ -146,7 +143,7 @@ public static class DependencyInjection
         services.AddScoped<IKanbanRepository, EfKanbanRepository>();
         services.AddScoped<IKanbanService, KanbanService>();
         services.AddScoped<IPomodoroRepository, EfPomodoroRepository>();
-        services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
+        services.AddSingleton<IPomodoroCurrentStateStore, MemoryPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
     }

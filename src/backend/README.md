@@ -12,7 +12,7 @@ xác thực và thực thi background job định kỳ bằng Hangfire.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
-challenge OTP/reset của auth, Redis chỉ giữ trạng thái Pomodoro ngắn hạn, còn
+challenge OTP/reset của auth, IMemoryCache giữ trạng thái Pomodoro ngắn hạn, còn
 MinIO lưu object phục vụ asset.
 
 ## 3. Mục lục
@@ -32,7 +32,7 @@ MinIO lưu object phục vụ asset.
 
 - .NET 10 SDK.
 - Docker Desktop hoặc Docker Engine có Docker Compose.
-- PostgreSQL, Redis và MinIO theo cấu hình local của repository.
+- PostgreSQL và MinIO theo cấu hình local của repository.
 
 ### 4.2. Khôi phục dependency và chạy hạ tầng
 
@@ -93,7 +93,7 @@ trình duyệt.
 ### 5.3. Background job
 
 Khi API khởi động, Hangfire đăng ký các recurring job phục vụ reminder và cập
-nhật định kỳ. Vì vậy PostgreSQL và Redis cần sẵn sàng trước khi chạy API.
+nhật định kỳ. Vì vậy PostgreSQL cần sẵn sàng trước khi chạy API.
 
 ## 6. API Response Contract
 
@@ -139,7 +139,7 @@ src/backend/
   FluentA.API/                    Controller, middleware, SignalR, Hangfire worker và composition root
   FluentA.Application/            Use case, service và port
   FluentA.Domain/                 Entity, value object và business rule
-  FluentA.Infrastructure/         EF Core, PostgreSQL, Redis, MinIO và provider
+  FluentA.Infrastructure/         EF Core, PostgreSQL, MinIO và provider
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
   FluentA.Worker/                 Chỉ còn launch profile cũ; không có project/host buildable

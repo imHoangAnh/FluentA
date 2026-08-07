@@ -27,7 +27,7 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 
 - Node.js và npm.
 - FluentA Backend đang chạy tại `https://localhost:7000`.
-- PostgreSQL, Redis và MinIO đã được khởi động theo
+- PostgreSQL và MinIO đã được khởi động theo
   [README của root project](../../README.md).
 
 ### 4.2. Cài dependency

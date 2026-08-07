@@ -75,7 +75,7 @@ public sealed class PomodoroServiceTests
     }
 
     [Fact]
-    public async Task GetCurrentAsync_ReturnsIdleFallbackFromConfigWhenRedisIsEmpty()
+    public async Task GetCurrentAsync_ReturnsIdleFallbackFromConfigWhenStateStoreIsEmpty()
     {
         var repository = new FakePomodoroRepository();
         var userId = Guid.NewGuid();
