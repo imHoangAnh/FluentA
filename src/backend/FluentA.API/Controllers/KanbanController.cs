@@ -51,6 +51,16 @@ public sealed class KanbanController : ControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Updates an owned Kanban board.</summary>
+    [HttpPatch("boards/{boardId:guid}")]
+    public async Task<IActionResult> UpdateBoard(Guid boardId, UpdateKanbanBoardRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _kanban.UpdateBoardAsync(CurrentUserId(), boardId, request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<KanbanBoardDetailDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Moves an owned Kanban board to Trash.</summary>
     [HttpDelete("boards/{boardId:guid}")]
     public async Task<IActionResult> DeleteBoard(Guid boardId, CancellationToken cancellationToken)

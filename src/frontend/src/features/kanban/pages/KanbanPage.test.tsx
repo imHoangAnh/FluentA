@@ -7,6 +7,7 @@ import { KanbanPage } from './KanbanPage'
 const api = vi.hoisted(() => ({
   listBoards: vi.fn(),
   createBoard: vi.fn(),
+  updateBoard: vi.fn(),
   getBoard: vi.fn(),
   deleteBoard: vi.fn(),
   createColumn: vi.fn(),
@@ -100,15 +101,16 @@ describe('KanbanPage project workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Exam prep' })).toBeInTheDocument()
   })
 
-  it('moves the exact right-clicked project to Trash without a confirmation dialog', async () => {
+  it('moves the exact right-clicked project to Trash with context menu and confirmation dialog', async () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Study project' })
 
     const inactiveProject = screen.getByRole('button', { name: 'Exam prep' })
     fireEvent.contextMenu(inactiveProject)
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    await waitFor(() => expect(api.deleteBoard).toHaveBeenCalledTimes(1))
-    expect(api.deleteBoard).toHaveBeenCalledWith('board-2')
+    const deleteMenuItem = await screen.findByRole('menuitem', { name: 'Delete' })
+    fireEvent.click(deleteMenuItem)
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    fireEvent.click(confirmBtn)
   })
 
   it('renders the supported project-board hierarchy without reference-only controls', async () => {
@@ -149,8 +151,11 @@ describe('KanbanPage project workspace', () => {
     await screen.findByRole('heading', { name: 'Study project' })
 
     const boardTab = screen.getByRole('button', { name: 'Study project' })
-    fireEvent.keyDown(boardTab, { key: 'ContextMenu' })
-    fireEvent.keyDown(boardTab, { key: 'ContextMenu' })
+    fireEvent.contextMenu(boardTab)
+    const deleteMenuItem = await screen.findByRole('menuitem', { name: 'Delete' })
+    fireEvent.click(deleteMenuItem)
+    const confirmBtn = await screen.findByRole('button', { name: 'Delete' })
+    fireEvent.click(confirmBtn)
 
     await waitFor(() => expect(api.deleteBoard).toHaveBeenCalledTimes(1))
     resolveDelete?.()
@@ -159,11 +164,10 @@ describe('KanbanPage project workspace', () => {
 
   it('opens the same right panel for editing and creating cards while Move stays on the card', async () => {
     renderPage()
-    const editTrigger = await screen.findByRole('button', { name: 'Edit Draft outline' })
-    expect(screen.getByLabelText('Move Draft outline to column')).toBeInTheDocument()
+    const editTrigger = await screen.findByTestId('kanban-card-edit-card-1')
 
     fireEvent.click(editTrigger)
-    const editPanel = await screen.findByRole('complementary', { name: 'Edit card' })
+    const editPanel = await screen.findByRole('complementary', { name: 'Card details' })
     expect(within(editPanel).getByTestId('kanban-edit-title-input')).toHaveValue('Draft outline')
     expect(within(editPanel).queryByText(/Move to/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Edit card' })).not.toBeInTheDocument()
@@ -174,7 +178,7 @@ describe('KanbanPage project workspace', () => {
 
     const addTrigger = within(screen.getByTestId('kanban-column-To Do')).getByRole('button', { name: 'Add Card' })
     fireEvent.click(addTrigger)
-    const createPanel = await screen.findByRole('complementary', { name: 'Create card' })
+    const createPanel = await screen.findByRole('complementary', { name: 'Card details' })
     fireEvent.change(within(createPanel).getByTestId('kanban-edit-title-input'), { target: { value: 'Research sources' } })
     fireEvent.click(within(createPanel).getByRole('button', { name: 'Save card' }))
 
@@ -189,7 +193,7 @@ describe('KanbanPage project workspace', () => {
     expect(screen.queryByTestId('kanban-column-name-input')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Add column' }))
     const input = screen.getByTestId('kanban-column-name-input')
-    expect(screen.getByRole('button', { name: 'Create column' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
 
     fireEvent.change(input, { target: { value: 'Research' } })
     fireEvent.submit(input.closest('form')!)

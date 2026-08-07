@@ -12,6 +12,8 @@ public interface IKanbanService
     Task<OperationResult<KanbanBoardDetailDto>> CreateBoardAsync(Guid userId, CreateKanbanBoardRequest request, CancellationToken cancellationToken = default);
     /// <summary>Gets one Kanban board with active columns and cards.</summary>
     Task<OperationResult<KanbanBoardDetailDto>> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
+    /// <summary>Updates an owned Kanban board.</summary>
+    Task<OperationResult<KanbanBoardDetailDto>> UpdateBoardAsync(Guid userId, Guid boardId, UpdateKanbanBoardRequest request, CancellationToken cancellationToken = default);
     /// <summary>Moves an owned Kanban board to Trash.</summary>
     Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     /// <summary>Adds a column to an owned Kanban board.</summary>

@@ -42,6 +42,7 @@ export function KanbanCardDetailPanel({
 
   return (
     <aside className="kanban-detail-panel" aria-labelledby={headingId} aria-busy={pending}>
+
       <form
         className="kanban-detail-panel__form"
         onSubmit={(event) => {
@@ -51,8 +52,7 @@ export function KanbanCardDetailPanel({
       >
         <header className="kanban-detail-panel__header">
           <div>
-            <span>Card details</span>
-            <h2 id={headingId}>{heading}</h2>
+            <h2 id={headingId} className="kanban-detail-panel-title">Card details</h2>
           </div>
           <button type="button" aria-label="Close card details" onClick={onClose} disabled={pending}>
             <X aria-hidden="true" />

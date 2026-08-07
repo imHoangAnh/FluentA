@@ -19,6 +19,8 @@ public sealed record KanbanCardDto(
 
 public sealed record CreateKanbanBoardRequest(string Name);
 
+public sealed record UpdateKanbanBoardRequest(string? Name = null);
+
 public sealed record CreateKanbanColumnRequest(string Name);
 
 public sealed record UpdateKanbanColumnRequest(string? Name = null, int? SortOrder = null);

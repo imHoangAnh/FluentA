@@ -48,6 +48,29 @@ public sealed class KanbanService : IKanbanService
             : OperationResult<KanbanBoardDetailDto>.Success(ToDetail(board));
     }
 
+    public async Task<OperationResult<KanbanBoardDetailDto>> UpdateBoardAsync(Guid userId, Guid boardId, UpdateKanbanBoardRequest request, CancellationToken cancellationToken = default)
+    {
+        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
+        if (board is null)
+        {
+            return OperationResult<KanbanBoardDetailDto>.Failure(KanbanError.NotFound());
+        }
+
+        if (request.Name is not null)
+        {
+            var errors = ValidateName(request.Name, "name", 180);
+            if (errors.Count > 0)
+            {
+                return OperationResult<KanbanBoardDetailDto>.Failure(KanbanError.Validation(errors));
+            }
+
+            board.Rename(request.Name);
+        }
+
+        await _repository.UpdateBoardAsync(board, cancellationToken);
+        return OperationResult<KanbanBoardDetailDto>.Success(ToDetail(board));
+    }
+
     public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
         if (_trashService is not null) return await _trashService.TrashKanbanAsync(userId, boardId, cancellationToken);

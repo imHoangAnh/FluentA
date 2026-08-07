@@ -8,12 +8,17 @@ import {
   Clock3,
   Columns3,
   Flag,
+  Pencil,
   Plus,
   Trash2,
   X,
 } from 'lucide-react'
 import { type DragEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as ContextMenu from '@radix-ui/react-context-menu'
+import { menuContentClassName, menuItemClassName } from '@/shared/components/ui/menu-styles'
+import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/shared/components/ui/dialog'
 import { KanbanCardDetailPanel } from '../components/KanbanCardDetailPanel'
 import { type KanbanCardForm, kanbanPriorities } from '../components/kanban-card-editor'
 import * as kanbanApi from '../api/kanban.api'
@@ -27,10 +32,20 @@ type CardEditor =
   | { mode: 'create'; boardId: string; columnId: string }
   | { mode: 'edit'; boardId: string; card: kanbanApi.KanbanCard }
 
+function getTomorrowDateInput(): string {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const year = tomorrow.getFullYear()
+  const month = `${tomorrow.getMonth() + 1}`.padStart(2, '0')
+  const day = `${tomorrow.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function deadlineState(deadline?: string | null) {
   if (!deadline) return 'none'
-  if (deadline < todayInput) return 'overdue'
-  const deadlineDate = new Date(`${deadline}T00:00:00`)
+  const dateOnly = deadline.includes('T') ? deadline.split('T')[0] : deadline
+  if (dateOnly! < todayInput) return 'overdue'
+  const deadlineDate = new Date(`${dateOnly}T00:00:00`)
   const weekEnd = new Date()
   weekEnd.setDate(weekEnd.getDate() + 7)
   return deadlineDate <= weekEnd ? 'this-week' : 'later'
@@ -50,7 +65,7 @@ function emptyCardForm(columnId = ''): KanbanCardForm {
     title: '',
     description: '',
     priority: 'Medium',
-    deadline: '',
+    deadline: getTomorrowDateInput(),
   }
 }
 
@@ -79,11 +94,17 @@ export function KanbanPage() {
   const [filters, setFilters] = useState({ priority: '', deadline: '' })
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
+  const [editingBoardName, setEditingBoardName] = useState('')
+  const [deletingBoard, setDeletingBoard] = useState<kanbanApi.KanbanBoardSummary | null>(null)
+  const [deletingColumn, setDeletingColumn] = useState<{ boardId: string; columnId: string; name: string } | null>(null)
+  const [deletingCard, setDeletingCard] = useState<{ boardId: string; cardId: string; title: string } | null>(null)
   const editorTriggerRef = useRef<HTMLElement | null>(null)
   const boardDeletePendingRef = useRef(false)
   const boardTabRefs = useRef(new Map<string, HTMLButtonElement>())
   const newBoardInputRef = useRef<HTMLInputElement>(null)
   const columnInputRef = useRef<HTMLInputElement>(null)
+  const editingBoardInputRef = useRef<HTMLInputElement>(null)
 
   const closeEditor = useCallback(() => {
     const trigger = editorTriggerRef.current
@@ -126,6 +147,10 @@ export function KanbanPage() {
     if (columnComposerOpen) columnInputRef.current?.focus()
   }, [columnComposerOpen])
 
+  useEffect(() => {
+    if (editingBoardId) editingBoardInputRef.current?.focus()
+  }, [editingBoardId])
+
   const refresh = async (boardId: string | null = selectedBoardId) => {
     await queryClient.invalidateQueries({ queryKey: ['kanban', 'boards'] })
     if (boardId) {
@@ -139,7 +164,19 @@ export function KanbanPage() {
       setBoardName('')
       setActiveBoardId(created.id)
       await refresh(created.id)
+      toast.success('Project created.')
     },
+    onError: () => toast.error('Could not create project.'),
+  })
+
+  const updateBoard = useMutation({
+    mutationFn: ({ boardId, name }: { boardId: string; name: string }) => kanbanApi.updateBoard(boardId, name),
+    onSuccess: async (updated) => {
+      setEditingBoardId(null)
+      await refresh(updated.id)
+      toast.success('Project renamed.')
+    },
+    onError: () => toast.error('Could not rename project.'),
   })
 
   const deleteBoard = useMutation({
@@ -150,97 +187,125 @@ export function KanbanPage() {
         : selectedBoardId
 
       setMessage(null)
+      setDeletingBoard(null)
       if (selectedBoardId === boardId) setActiveBoardId(nextBoardId)
       await refresh(nextBoardId)
       window.requestAnimationFrame(() => {
         if (nextBoardId) boardTabRefs.current.get(nextBoardId)?.focus()
         else newBoardInputRef.current?.focus()
       })
-      toast.success('Kanban board moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, nextBoardId) } })
+      toast.success('Project moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, nextBoardId) } })
     },
-    onError: () => setMessage('Could not delete this project.'),
-    onSettled: () => { boardDeletePendingRef.current = false },
+    onError: () => {
+      boardDeletePendingRef.current = false
+      toast.error('Could not delete project.')
+    },
+    onSettled: () => {
+      boardDeletePendingRef.current = false
+    },
   })
 
+  const undo = async (entryId: string, activeId: string | null) => {
+    try {
+      const restored = await restoreTrashEntry(entryId)
+      await refresh(restored.entityId ?? activeId)
+      if (restored.entityId) setActiveBoardId(restored.entityId)
+      toast.success('Item restored.')
+    } catch {
+      toast.error('Could not restore the item.')
+    }
+  }
+
   const createColumn = useMutation({
-    mutationFn: (input: { boardId: string; name: string }) => kanbanApi.createColumn(input.boardId, input.name),
-    onSuccess: async () => {
+    mutationFn: ({ boardId, name }: { boardId: string; name: string }) => kanbanApi.createColumn(boardId, name),
+    onSuccess: async (column, { boardId }) => {
       setColumnName('')
       setColumnComposerOpen(false)
-      await refresh()
+      await refresh(boardId)
+      toast.success('Column created.')
     },
+    onError: () => toast.error('Could not create column.'),
   })
 
   const updateColumn = useMutation({
-    mutationFn: (input: { boardId: string; columnId: string; patch: { name?: string; sortOrder?: number } }) =>
-      kanbanApi.updateColumn(input.boardId, input.columnId, input.patch),
-    onSuccess: async () => refresh(),
+    mutationFn: ({ boardId, columnId, patch }: { boardId: string; columnId: string; patch: { name?: string; sortOrder?: number } }) =>
+      kanbanApi.updateColumn(boardId, columnId, patch),
+    onSuccess: async (_, { boardId }) => {
+      await refresh(boardId)
+    },
+    onError: () => toast.error('Could not update column.'),
   })
 
   const deleteColumn = useMutation({
-    mutationFn: (input: { boardId: string; columnId: string }) => kanbanApi.deleteColumn(input.boardId, input.columnId),
-    onSuccess: async (entry) => {
-      setMessage(null)
-      await refresh()
-      toast.success('Kanban column moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id) } })
+    mutationFn: ({ boardId, columnId }: { boardId: string; columnId: string }) => kanbanApi.deleteColumn(boardId, columnId),
+    onSuccess: async (entry, { boardId }) => {
+      await refresh(boardId)
+      toast.success('Column moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, boardId) } })
     },
-    onError: () => setMessage('Only empty columns can be deleted.'),
+    onError: (error) => {
+      const errorData = (error as { response?: { data?: { error?: { code?: string } } } }).response?.data?.error
+      if (errorData?.code === 'COLUMN_NOT_EMPTY') {
+        toast.error('Remove all cards from the column before deleting it.')
+        return
+      }
+      toast.error('Could not delete column.')
+    },
   })
 
   const createCard = useMutation({
-    mutationFn: (input: { boardId: string; card: kanbanApi.CreateKanbanCardInput }) => kanbanApi.createCard(input.boardId, input.card),
-    onSuccess: async (_, input) => {
-      closeEditor()
-      await refresh(input.boardId)
+    mutationFn: ({ boardId, input }: { boardId: string; input: kanbanApi.CreateKanbanCardInput }) => kanbanApi.createCard(boardId, input),
+    onSuccess: async (_, { boardId }) => {
+      setCardEditor(null)
+      await refresh(boardId)
+      toast.success('Card created.')
     },
+    onError: () => toast.error('Could not create card.'),
   })
 
   const updateCard = useMutation({
-    mutationFn: (input: { boardId: string; id: string; patch: kanbanApi.UpdateKanbanCardInput }) => kanbanApi.updateCard(input.id, input.patch),
-    onSuccess: async (_, input) => {
-      closeEditor()
-      await refresh(input.boardId)
+    mutationFn: ({ boardId, cardId, patch }: { boardId: string; cardId: string; patch: kanbanApi.UpdateKanbanCardInput }) =>
+      kanbanApi.updateCard(cardId, patch),
+    onSuccess: async (_, { boardId }) => {
+      setCardEditor(null)
+      await refresh(boardId)
+      toast.success('Card updated.')
     },
-  })
-
-  const moveCard = useMutation({
-    mutationFn: (input: { id: string; columnId: string; sortOrder: number }) => kanbanApi.moveCard(input.id, input.columnId, input.sortOrder),
-    onSuccess: async () => refresh(),
+    onError: () => toast.error('Could not update card.'),
   })
 
   const deleteCard = useMutation({
-    mutationFn: (input: { boardId: string; cardId: string }) => kanbanApi.deleteCard(input.cardId),
-    onSuccess: async (entry, input) => {
-      closeEditor()
-      await refresh(input.boardId)
-      toast.success('Kanban card moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, input.boardId) } })
+    mutationFn: ({ boardId, cardId }: { boardId: string; cardId: string }) => kanbanApi.deleteCard(cardId),
+    onSuccess: async (entry, { boardId }) => {
+      setCardEditor(null)
+      await refresh(boardId)
+      toast.success('Card moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, boardId) } })
     },
+    onError: () => toast.error('Could not delete card.'),
   })
+
+  const moveCard = useMutation({
+    mutationFn: ({ id, columnId, sortOrder }: { id: string; columnId: string; sortOrder: number }) => kanbanApi.moveCard(id, columnId, sortOrder),
+    onSuccess: async () => {
+      await refresh()
+    },
+    onError: () => toast.error('Could not move card.'),
+  })
+
+  function selectBoard(id: string) {
+    setActiveBoardId(id)
+    setMessage(null)
+  }
 
   function submitBoard(event: FormEvent) {
     event.preventDefault()
-    if (!boardName.trim()) return
+    if (!boardName.trim() || createBoard.isPending) return
     createBoard.mutate(boardName.trim())
   }
 
   function submitColumn(event: FormEvent) {
     event.preventDefault()
-    if (!selectedBoardId || !columnName.trim()) return
+    if (!selectedBoardId || !columnName.trim() || createColumn.isPending) return
     createColumn.mutate({ boardId: selectedBoardId, name: columnName.trim() })
-  }
-
-  function undo(entryId: string, boardId: string | null = selectedBoardId) {
-    void restoreTrashEntry(entryId)
-      .then(() => refresh(boardId))
-      .then(() => toast.success('Kanban item restored.'))
-      .catch(() => toast.error('Could not restore the Kanban item.'))
-  }
-
-  function selectBoard(boardId: string) {
-    setActiveBoardId(boardId)
-    setColumnComposerOpen(false)
-    setColumnName('')
-    setCardEditor(null)
   }
 
   function openCreateEditor(boardId: string, columnId: string, trigger: HTMLElement) {
@@ -256,7 +321,7 @@ export function KanbanPage() {
       title: card.title,
       description: card.description ?? '',
       priority: card.priority,
-      deadline: card.deadline ?? '',
+      deadline: card.deadline || getTomorrowDateInput(),
     })
     setCardEditor({ mode: 'edit', boardId, card })
   }
@@ -267,10 +332,10 @@ export function KanbanPage() {
     if (cardEditor.mode === 'create') {
       createCard.mutate({
         boardId: cardEditor.boardId,
-        card: {
+        input: {
           columnId: cardEditor.columnId,
           title: cardForm.title.trim(),
-          description: cardForm.description || null,
+          description: cardForm.description.trim() || null,
           priority: cardForm.priority,
           deadline: cardForm.deadline || null,
         },
@@ -280,10 +345,10 @@ export function KanbanPage() {
 
     updateCard.mutate({
       boardId: cardEditor.boardId,
-      id: cardEditor.card.id,
+      cardId: cardEditor.card.id,
       patch: {
         title: cardForm.title.trim(),
-        description: cardForm.description,
+        description: cardForm.description.trim(),
         priority: cardForm.priority,
         deadline: cardForm.deadline,
       },
@@ -293,8 +358,9 @@ export function KanbanPage() {
   function handleDrop(event: DragEvent, columnId: string) {
     event.preventDefault()
     if (!draggedCardId) return
-    const targetColumn = columns.find((column) => column.id === columnId)
-    moveCard.mutate({ id: draggedCardId, columnId, sortOrder: targetColumn?.cards.length ?? 0 })
+    const card = board?.columns.flatMap((col) => col.cards).find((item) => item.id === draggedCardId)
+    if (!card) return
+    moveCardToColumn(card, columnId)
     setDraggedCardId(null)
   }
 
@@ -314,42 +380,86 @@ export function KanbanPage() {
           <nav className="kanban-board-tabs" aria-label="Kanban projects" data-testid="kanban-project-navigation">
             <span className="kanban-board-tabs__label">
               <Columns3 aria-hidden="true" />
-              <span>Project boards</span>
+              <span>Project</span>
               <ChevronRight aria-hidden="true" />
             </span>
             {boardsQuery.isLoading ? <span className="kanban-loading-label">Loading projects...</span> : null}
-            {boards.map((item) => (
-              <button
-                ref={(element) => {
-                  if (element) boardTabRefs.current.set(item.id, element)
-                  else boardTabRefs.current.delete(item.id)
-                }}
-                type="button"
-                key={item.id}
-                className={`kanban-tab ${item.id === selectedBoardId ? 'kanban-tab--active' : ''}`}
-                aria-current={item.id === selectedBoardId ? 'page' : undefined}
-                title="Right-click to move this project to Trash"
-                onClick={() => selectBoard(item.id)}
-                onContextMenu={(event) => {
-                  event.preventDefault()
-                  if (!boardDeletePendingRef.current) {
-                    boardDeletePendingRef.current = true
-                    deleteBoard.mutate(item.id)
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-                    event.preventDefault()
-                    if (!boardDeletePendingRef.current) {
-                      boardDeletePendingRef.current = true
-                      deleteBoard.mutate(item.id)
-                    }
-                  }
-                }}
-              >
-                {item.name}
-              </button>
-            ))}
+            {boards.map((item) =>
+              editingBoardId === item.id ? (
+                <div
+                  key={item.id}
+                  className={`kanban-tab kanban-tab--active ${item.id === selectedBoardId ? 'kanban-tab--active' : ''}`}
+                >
+                  <input
+                    ref={editingBoardInputRef}
+                    className="kanban-tab-rename-input"
+                    value={editingBoardName}
+                    onChange={(event) => setEditingBoardName(event.target.value)}
+                    onBlur={() => {
+                      const trimmed = editingBoardName.trim()
+                      if (trimmed && trimmed !== item.name) {
+                        updateBoard.mutate({ boardId: item.id, name: trimmed })
+                      } else {
+                        setEditingBoardId(null)
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        const trimmed = editingBoardName.trim()
+                        if (trimmed && trimmed !== item.name) {
+                          updateBoard.mutate({ boardId: item.id, name: trimmed })
+                        } else {
+                          setEditingBoardId(null)
+                        }
+                      } else if (event.key === 'Escape') {
+                        setEditingBoardId(null)
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <ContextMenu.Root key={item.id}>
+                  <ContextMenu.Trigger asChild>
+                    <button
+                      ref={(element) => {
+                        if (element) boardTabRefs.current.set(item.id, element)
+                        else boardTabRefs.current.delete(item.id)
+                      }}
+                      type="button"
+                      className={`kanban-tab ${item.id === selectedBoardId ? 'kanban-tab--active' : ''}`}
+                      aria-current={item.id === selectedBoardId ? 'page' : undefined}
+                      title="Right-click for options"
+                      onClick={() => selectBoard(item.id)}
+                    >
+                      {item.name}
+                    </button>
+                  </ContextMenu.Trigger>
+                  <ContextMenu.Portal>
+                    <ContextMenu.Content className={menuContentClassName} data-testid="kanban-board-context-menu">
+                      <ContextMenu.Item
+                        className={menuItemClassName}
+                        onSelect={() => {
+                          setEditingBoardId(item.id)
+                          setEditingBoardName(item.name)
+                        }}
+                      >
+                        <Pencil className="size-4 mr-2" aria-hidden="true" />
+                        <span>Rename</span>
+                      </ContextMenu.Item>
+                      <ContextMenu.Item
+                        className={`${menuItemClassName} text-red-600 dark:text-red-400`}
+                        onSelect={() => setDeletingBoard(item)}
+                      >
+                        <Trash2 className="size-4 mr-2" aria-hidden="true" />
+                        <span>Delete</span>
+                      </ContextMenu.Item>
+                    </ContextMenu.Content>
+                  </ContextMenu.Portal>
+                </ContextMenu.Root>
+              ),
+            )}
 
             <form className="kanban-new-board-form" onSubmit={submitBoard}>
               <Plus aria-hidden="true" />
@@ -371,60 +481,14 @@ export function KanbanPage() {
             <div className="kanban-project-title-area">
               <span className="kanban-project-icon" aria-hidden="true"><Columns3 /></span>
               <div>
-                <span className="kanban-project-kicker">Current project</span>
                 <h2>{board?.name ?? (boardsQuery.isLoading || boardQuery.isLoading ? 'Loading project...' : 'Kanban projects')}</h2>
               </div>
             </div>
 
             <div className="kanban-column-tools">
-              {columnComposerOpen ? (
-                <form className="kanban-column-toolbar-form" onSubmit={submitColumn}>
-                  <label className="sr-only" htmlFor="kanban-new-column">Column name</label>
-                  <input
-                    ref={columnInputRef}
-                    id="kanban-new-column"
-                    value={columnName}
-                    onChange={(event) => setColumnName(event.target.value)}
-                    placeholder="Column name"
-                    data-testid="kanban-column-name-input"
-                    maxLength={180}
-                  />
-                  <button
-                    type="button"
-                    className="kanban-column-toolbar-cancel"
-                    aria-label="Cancel adding column"
-                    onClick={() => {
-                      setColumnName('')
-                      setColumnComposerOpen(false)
-                    }}
-                  >
-                    <X aria-hidden="true" />
-                  </button>
-                  <button type="submit" className="kanban-column-toolbar-submit" disabled={!columnName.trim() || createColumn.isPending}>
-                    <Plus aria-hidden="true" />
-                    <span>{createColumn.isPending ? 'Adding...' : 'Create column'}</span>
-                  </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  className="kanban-add-column-control"
-                  disabled={!selectedBoardId}
-                  onClick={() => setColumnComposerOpen(true)}
-                >
-                  <Plus aria-hidden="true" />
-                  Add column
-                </button>
-              )}
-            </div>
-          </section>
-
-          <header className="kanban-header" aria-label="Kanban card filters">
-            <div className="kanban-filter-bar">
-              <label className="kanban-filter-control">
-                <Flag aria-hidden="true" />
-                <span className="sr-only">Priority</span>
+              <div className="kanban-filter-bar" aria-label="Kanban card filters">
                 <select
+                  className="kanban-filter-control"
                   aria-label="Filter by priority"
                   value={filters.priority}
                   onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
@@ -432,11 +496,8 @@ export function KanbanPage() {
                   <option value="">All priorities</option>
                   {kanbanPriorities.map((priority) => <option value={priority} key={priority}>{priority}</option>)}
                 </select>
-              </label>
-              <label className="kanban-filter-control">
-                <CalendarDays aria-hidden="true" />
-                <span className="sr-only">Deadline</span>
                 <select
+                  className="kanban-filter-control"
                   aria-label="Filter by deadline"
                   value={filters.deadline}
                   onChange={(event) => setFilters((current) => ({ ...current, deadline: event.target.value }))}
@@ -446,9 +507,22 @@ export function KanbanPage() {
                   <option value="overdue">Overdue</option>
                   <option value="week">Due this week</option>
                 </select>
-              </label>
+              </div>
+
+              <button
+                type="button"
+                className="kanban-add-column-control"
+                disabled={!selectedBoardId}
+                onClick={() => {
+                  setColumnName('')
+                  setColumnComposerOpen(true)
+                }}
+              >
+                <Plus aria-hidden="true" />
+                <span>Add column</span>
+              </button>
             </div>
-          </header>
+          </section>
 
           <div className="kanban-board-container" aria-label="Kanban board" data-testid="kanban-board-surface">
             {selectedBoardId && boardQuery.isLoading ? <p className="kanban-board-loading" role="status">Loading project board...</p> : null}
@@ -492,7 +566,7 @@ export function KanbanPage() {
                           className="kanban-column-menu"
                           type="button"
                           aria-label={`Delete column ${column.name}`}
-                          onClick={() => deleteColumn.mutate({ boardId: board.id, columnId: column.id })}
+                          onClick={() => setDeletingColumn({ boardId: board.id, columnId: column.id, name: column.name })}
                         >
                           <Trash2 aria-hidden="true" />
                         </button>
@@ -525,43 +599,30 @@ export function KanbanPage() {
                           onDragEnd={() => setDraggedCardId(null)}
                           data-testid={`kanban-card-${card.title}`}
                         >
-                          <div className="kanban-card-meta-row">
-                            <span className={`kanban-priority kanban-priority--${card.priority.toLowerCase()}`}>
-                              {card.priority === 'High' || card.priority === 'Critical'
-                                ? <AlertCircle aria-hidden="true" />
-                                : <ArrowDown aria-hidden="true" />}
-                              {card.priority}
-                            </span>
-                          </div>
                           <button
                             type="button"
                             className="kanban-card-edit-btn"
+                            data-testid={`kanban-card-edit-${card.id}`}
                             aria-label={`Edit ${card.title}`}
                             onClick={(event) => openEditEditor(board.id, card, event.currentTarget)}
                           >
-                            <span className="kanban-card-title">{card.title}</span>
-                          </button>
-                          <footer className="kanban-card-footer">
-                            {card.deadline ? (
-                              <div className="kanban-card-date">
-                                <CalendarDays aria-hidden="true" />
-                                <span>{deadlineState(card.deadline) === 'overdue' ? `Overdue ${card.deadline}` : card.deadline}</span>
+                            <div className="kanban-card-content-layout">
+                              <div className="kanban-card-left">
+                                <span className="kanban-card-title">{card.title}</span>
                               </div>
-                            ) : <span />}
-                            <select
-                              className="kanban-card-move"
-                              aria-label={`Move ${card.title} to column`}
-                              value={card.columnId}
-                              disabled={moveCard.isPending}
-                              draggable={false}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => moveCardToColumn(card, event.target.value)}
-                            >
-                              {columns.map((targetColumn) => (
-                                <option value={targetColumn.id} key={targetColumn.id}>{targetColumn.name}</option>
-                              ))}
-                            </select>
-                          </footer>
+                              <div className="kanban-card-right">
+                                <span className={`kanban-priority kanban-priority--${card.priority.toLowerCase()}`}>
+                                  {card.priority}
+                                </span>
+                                {card.deadline ? (
+                                  <div className="kanban-card-date">
+                                    <CalendarDays aria-hidden="true" />
+                                    <span>{deadlineState(card.deadline) === 'overdue' ? `Overdue ${card.deadline}` : card.deadline}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </button>
                         </article>
                       ))}
                     </div>
@@ -572,20 +633,119 @@ export function KanbanPage() {
           </div>
         </div>
 
-        {cardEditor ? (
-          <KanbanCardDetailPanel
-            mode={cardEditor.mode}
-            editorKey={cardEditor.mode === 'create' ? `create-${cardEditor.columnId}` : `edit-${cardEditor.card.id}`}
-            form={cardForm}
-            pending={cardMutationPending}
-            onChange={setCardForm}
-            onSubmit={submitCard}
-            onClose={closeEditor}
-            onDelete={cardEditor.mode === 'edit'
-              ? () => deleteCard.mutate({ boardId: cardEditor.boardId, cardId: cardEditor.card.id })
-              : undefined}
-          />
-        ) : null}
+
+
+        {/* Add Column Dialog */}
+        <Dialog open={columnComposerOpen} onOpenChange={(open) => { if (!open) { setColumnName(''); setColumnComposerOpen(false) } }}>
+          <DialogContent>
+            <DialogTitle>Add Column</DialogTitle>
+            <form onSubmit={submitColumn}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label htmlFor="kanban-new-column" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ds-foreground)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  Column Name
+                  <input
+                    ref={columnInputRef}
+                    id="kanban-new-column"
+                    value={columnName}
+                    onChange={(event) => setColumnName(event.target.value)}
+                    placeholder="Enter column name"
+                    data-testid="kanban-column-name-input"
+                    maxLength={180}
+                    autoFocus
+                    required
+                    style={{ minHeight: 40, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ds-border)', background: 'var(--ds-background)', color: 'var(--ds-foreground)', fontSize: 14, outline: 'none', width: '100%' }}
+                  />
+                </label>
+              </div>
+              <DialogFooter style={{ marginTop: 20 }}>
+                <button type="button" className="kanban-secondary-btn" onClick={() => { setColumnName(''); setColumnComposerOpen(false) }}>Cancel</button>
+                <button type="submit" className="kanban-primary-btn" disabled={!columnName.trim() || createColumn.isPending}>
+                  {createColumn.isPending ? 'Adding...' : 'Confirm'}
+                </button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+
+        {/* Delete Project AlertDialog */}
+        <AlertDialog open={!!deletingBoard} onOpenChange={(open) => { if (!open && !deleteBoard.isPending) setDeletingBoard(null) }}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>"{deletingBoard?.name}"</strong>? This project will be moved to Trash.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancelButton disabled={deleteBoard.isPending}>Cancel</AlertDialogCancelButton>
+              <AlertDialogActionButton
+                disabled={deleteBoard.isPending}
+                onClick={(e) => { e.preventDefault(); if (deletingBoard) deleteBoard.mutate(deletingBoard.id) }}
+              >
+                {deleteBoard.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogActionButton>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+
+        {/* Card Editor Dialog */}
+        <Dialog open={!!cardEditor} onOpenChange={(open) => { if (!open) closeEditor() }}>
+          <DialogContent className="max-w-xl">
+            <KanbanCardDetailPanel
+              mode={cardEditor?.mode ?? 'create'}
+              editorKey={cardEditor ? (cardEditor.mode === 'create' ? `create-${cardEditor.columnId}` : `edit-${cardEditor.card.id}`) : 'none'}
+              form={cardForm}
+              pending={cardMutationPending}
+              onChange={setCardForm}
+              onSubmit={submitCard}
+              onClose={closeEditor}
+              onDelete={cardEditor?.mode === 'edit'
+                ? () => {
+                    const card = (cardEditor as { mode: 'edit'; boardId: string; card: kanbanApi.KanbanCard }).card
+                    setDeletingCard({ boardId: (cardEditor as { mode: 'edit'; boardId: string; card: kanbanApi.KanbanCard }).boardId, cardId: card.id, title: card.title })
+                  }
+                : undefined}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Column AlertDialog */}
+        <AlertDialog open={!!deletingColumn} onOpenChange={(open) => { if (!open && !deleteColumn.isPending) setDeletingColumn(null) }}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Delete Column</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete column <strong>"{deletingColumn?.name}"</strong>? All cards inside will also be removed.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancelButton disabled={deleteColumn.isPending}>Cancel</AlertDialogCancelButton>
+              <AlertDialogActionButton
+                disabled={deleteColumn.isPending}
+                onClick={(e) => { e.preventDefault(); if (deletingColumn) { deleteColumn.mutate({ boardId: deletingColumn.boardId, columnId: deletingColumn.columnId }); setDeletingColumn(null) } }}
+              >
+                {deleteColumn.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogActionButton>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Card AlertDialog */}
+        <AlertDialog open={!!deletingCard} onOpenChange={(open) => { if (!open && !deleteCard.isPending) setDeletingCard(null) }}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Delete Card</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>"{deletingCard?.title}"</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancelButton disabled={deleteCard.isPending}>Cancel</AlertDialogCancelButton>
+              <AlertDialogActionButton
+                disabled={deleteCard.isPending}
+                onClick={(e) => { e.preventDefault(); if (deletingCard) { deleteCard.mutate({ boardId: deletingCard.boardId, cardId: deletingCard.cardId }); setDeletingCard(null) } }}
+              >
+                {deleteCard.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogActionButton>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {message ? <p className="flashcard-status flashcard-status--error kanban-status-notice" role="alert">{message}</p> : null}

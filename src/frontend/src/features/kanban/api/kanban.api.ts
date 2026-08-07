@@ -70,6 +70,11 @@ export async function getBoard(boardId: string) {
   return response.data.data!
 }
 
+export async function updateBoard(boardId: string, name: string) {
+  const response = await apiClient.patch<ApiEnvelope<KanbanBoardDetail>>(`/kanban/boards/${boardId}`, { name })
+  return response.data.data!
+}
+
 export async function deleteBoard(boardId: string) {
   const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/kanban/boards/${boardId}`)
   return response.data.data!
