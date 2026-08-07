@@ -212,7 +212,7 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
 
       {sessionQuery.data && currentCard ? (
         <section className="flex min-h-[calc(100vh-8rem)] w-full items-center justify-center py-4">
-          <div className="mx-auto grid w-full max-w-3xl gap-5" data-testid="flashcard-viewer-content">
+          <div className="mx-auto grid w-full max-w-5xl gap-6" data-testid="flashcard-viewer-content">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">{sessionQuery.data.pageName}</h2>
@@ -245,13 +245,13 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
               </div>
             </div>
 
-            <progress className="h-1.5 w-full overflow-hidden rounded-full accent-primary" value={currentIndex + 1} max={Math.max(rawCards.length, 1)} />
+            <progress className="h-2 w-full overflow-hidden rounded-full accent-primary" value={currentIndex + 1} max={Math.max(rawCards.length, 1)} />
 
             {/* 3D Stage & Card Container */}
             <div
               key={`${currentIndex}-${isShuffled ? 'shuffled' : 'normal'}`}
               className={cn(
-                'flashcard-perspective relative h-[400px] w-full min-w-0 sm:h-[420px] lg:h-[500px]',
+                'flashcard-perspective relative h-[440px] w-full min-w-0 sm:h-[500px] lg:h-[580px]',
                 slideDirection === 'next' && 'flashcard-slide-next',
                 slideDirection === 'prev' && 'flashcard-slide-prev'
               )}
