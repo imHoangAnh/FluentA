@@ -1,4 +1,4 @@
-import { CheckCircle2, Layers, Mic, MicOff, Play, Volume2, X } from 'lucide-react'
+import { AudioLines, CheckCircle2, Languages, Layers, Mic, MicOff, Play, Sparkles, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
@@ -47,14 +47,25 @@ function buildBoardOptions(boards: FlashcardBoard[]) {
   })
 }
 
-function modeLabel(mode: reviewApi.ReviewSessionWord['mode']) {
-  return mode === 'meaningToWord' ? 'Meaning -> Word' : mode
+function modeLabel(mode: reviewApi.ReviewMode) {
+  switch (mode) {
+    case 'dictation':
+      return 'Dictation'
+    case 'meaningToWord':
+      return 'Meaning → Word'
+    case 'pronunciation':
+      return 'Pronunciation'
+    case 'random':
+      return 'All 3 Modes'
+    default:
+      return mode
+  }
 }
 
 export function ReviewSessionPage() {
-
   const [boardId, setBoardId] = useState('')
   const [orderType, setOrderType] = useState<reviewApi.ReviewOrderType>('sequential')
+  const [reviewMode, setReviewMode] = useState<reviewApi.ReviewMode>('random')
   const [resumeModalSession, setResumeModalSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
   const [session, setSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -189,7 +200,6 @@ export function ReviewSessionPage() {
     sessionStartedAt.current = Date.now()
     cardStartedAt.current = Date.now()
   }
-
   function resetToLanding() {
     setSession(null)
     setResumeModalSession(null)
@@ -247,7 +257,7 @@ export function ReviewSessionPage() {
     await startSessionMutation.mutateAsync({
       boardId,
       orderType,
-      mode: 'random',
+      mode: reviewMode,
       startBehavior,
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     })
@@ -331,26 +341,79 @@ export function ReviewSessionPage() {
                   />
                 </div>
 
-              <div className="review-setup-options" role="group" aria-label="Review order">
-                  <button
-                    type="button"
-                    className={`review-mode ${
-                      orderType === "sequential" ? "review-mode--active" : ""
-                    }`}
-                    onClick={() => setOrderType("sequential")}
-                  >
-                    <span>Sequential</span>
-                  </button>
+                <div className="review-setup-field">
+                  <label className="review-setup-label">Review Mode</label>
+                  <div className="rs-selection-grid" role="group" aria-label="Review Mode">
+                    <button
+                      type="button"
+                      className={`rs-selection-card ${reviewMode === 'random' ? 'active' : ''}`}
+                      onClick={() => setReviewMode('random')}
+                    >
+                      <Sparkles className="rs-selection-card__icon" size={24} />
+                      <div className="rs-selection-card__info">
+                        <strong>All 3 Modes</strong>
+                        <span>Random mix of Dictation, Meaning & Pronunciation</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`rs-selection-card ${reviewMode === 'meaningToWord' ? 'active' : ''}`}
+                      onClick={() => setReviewMode('meaningToWord')}
+                    >
+                      <Languages className="rs-selection-card__icon" size={24} />
+                      <div className="rs-selection-card__info">
+                        <strong>Meaning → Word</strong>
+                        <span>Recall word from definition</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`rs-selection-card ${reviewMode === 'dictation' ? 'active' : ''}`}
+                      onClick={() => setReviewMode('dictation')}
+                    >
+                      <AudioLines className="rs-selection-card__icon" size={24} />
+                      <div className="rs-selection-card__info">
+                        <strong>Dictation</strong>
+                        <span>Listen & type the spoken word</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`rs-selection-card ${reviewMode === 'pronunciation' ? 'active' : ''}`}
+                      onClick={() => setReviewMode('pronunciation')}
+                    >
+                      <Mic className="rs-selection-card__icon" size={24} />
+                      <div className="rs-selection-card__info">
+                        <strong>Pronunciation</strong>
+                        <span>Speak into mic for AI scoring</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
 
-                  <button
-                    type="button"
-                    className={`review-mode ${
-                      orderType === "shuffle" ? "review-mode--active" : ""
-                    }`}
-                    onClick={() => setOrderType("shuffle")}
-                  >
-                    <span>Shuffle</span>
-                  </button>
+                <div className="review-setup-field">
+                  <label className="review-setup-label">Card Order</label>
+                  <div className="review-setup-options" role="group" aria-label="Review order">
+                    <button
+                      type="button"
+                      className={`review-mode ${
+                        orderType === 'sequential' ? 'review-mode--active' : ''
+                      }`}
+                      onClick={() => setOrderType('sequential')}
+                    >
+                      <span>Sequential</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`review-mode ${
+                        orderType === 'shuffle' ? 'review-mode--active' : ''
+                      }`}
+                      onClick={() => setOrderType('shuffle')}
+                    >
+                      <span>Shuffle</span>
+                    </button>
+                  </div>
                 </div>
 
                 {noBoardSelected ? (
@@ -400,9 +463,11 @@ export function ReviewSessionPage() {
           <section className="review-session">
             <div className="review-progress">
               <div className="review-progress-header">
-                <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+                <div className="review-progress-header-left">
+                  <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+                  <span className="practice-mode-badge">{modeLabel(currentWord.mode)}</span>
+                </div>
                 <strong className="review-progress-count">{currentIndex + 1} / {words.length}</strong>
-                <span className="review-progress-spacer" aria-hidden="true" />
               </div>
               <progress value={currentIndex + 1} max={words.length} />
             </div>

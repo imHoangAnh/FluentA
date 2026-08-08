@@ -333,9 +333,13 @@ export function PracticeSessionPage() {
         <section className="review-session practice-session">
           <div className="review-progress">
             <div className="review-progress-header">
-              <span className="review-progress-order">{orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+              <div className="review-progress-header-left">
+                <span className="review-progress-order">{orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+                <span className="practice-mode-badge">
+                  {currentStep === 'meaningToWord' ? 'Meaning → Word' : currentStep === 'dictation' ? 'Dictation' : currentStep === 'pronunciation' ? 'Pronunciation' : 'Recap'}
+                </span>
+              </div>
               <strong className="review-progress-count">{currentIndex + 1} / {sessionCards.length}</strong>
-              <span className="review-progress-spacer" aria-hidden="true" />
             </div>
             <progress value={currentIndex + 1} max={sessionCards.length} />
           </div>

@@ -7,7 +7,7 @@ export const habitsRoutes: RouteObject[] = [
     handle: appShellRoute({
       title: 'Habits',
       description: 'Build consistency with small actions every day.',
-      contentClassName: 'h-screen max-w-none overflow-hidden',
+      contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
     }),
     lazy: async () => ({ Component: (await import('./pages/HabitPage')).HabitPage }),
   },

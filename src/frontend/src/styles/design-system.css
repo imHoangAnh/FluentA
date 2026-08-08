@@ -5949,7 +5949,7 @@
 
 .countdown-list-container {
   margin: 0 auto;
-  max-width: 1180px;
+  max-width: none;
 }
 
 .countdown-card-grid {
@@ -6225,8 +6225,14 @@
   gap: 16px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   margin: 0 auto;
-  max-width: 1160px;
-  min-height: min(680px, calc(100vh - 40px));
+  max-width: none;
+  min-height: 100%;
+}
+
+.countdown-main,
+.pomodoro-main {
+  height: 100%;
+  min-height: 0;
 }
 
 .pomodoro-left-column {
@@ -7240,7 +7246,7 @@
 /* Keep the productivity split aligned with the Project workspace proportions. */
 .habit-tracker-main {
   gap: 12px;
-  padding: 20px;
+  padding: 0;
 }
 
 .habit-tracker-sidebar {
@@ -7265,3 +7271,211 @@
 .countdown-list-area--empty .countdown-empty-state {
   margin: 0 auto;
 }
+
+/* Review & Practice Mode Selection Grid & Hero Cards */
+.rs-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .rs-selection-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rs-selection-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1.5px solid var(--ds-border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.rs-selection-card:hover {
+  border-color: var(--ds-primary);
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.08);
+}
+
+.rs-selection-card.active {
+  border-color: var(--ds-primary);
+  background: rgba(13, 148, 136, 0.06);
+  box-shadow: 0 0 0 1px var(--ds-primary), 0 4px 14px rgba(13, 148, 136, 0.12);
+}
+
+.rs-selection-card__icon {
+  color: var(--ds-muted-foreground);
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: color 0.2s ease;
+}
+
+.rs-selection-card.active .rs-selection-card__icon {
+  color: var(--ds-primary);
+}
+
+.rs-selection-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rs-selection-card__info strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ds-foreground);
+}
+
+.rs-selection-card__info span {
+  font-size: 12px;
+  color: var(--ds-muted-foreground);
+  line-height: 1.35;
+}
+
+/* Practice & Review Mode Badges */
+.practice-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0f9f8f;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+}
+
+.review-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.review-progress-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Dictation & Meaning & Pronunciation Hero Cards */
+.practice-dictation-hero,
+.practice-meaning-hero,
+.practice-pronunciation-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px 24px;
+  gap: 16px;
+  border-radius: 16px;
+  background: radial-gradient(circle at center, rgba(13, 148, 136, 0.05), transparent 70%);
+}
+
+.practice-meaning-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 640px;
+}
+
+.practice-meaning-vn {
+  margin: 0;
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 800;
+  color: var(--ds-foreground);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.practice-meaning-en {
+  margin: 0;
+  font-size: clamp(15px, 2.5vw, 18px);
+  color: var(--ds-muted-foreground);
+  line-height: 1.5;
+}
+
+.practice-audio-trigger-hub {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #ffffff;
+  border: 1px solid var(--ds-border);
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.practice-audio-hero-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ds-primary);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+}
+
+.practice-audio-hero-button:hover {
+  transform: scale(1.06);
+  background: #0d8276;
+}
+
+.practice-soundwave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+}
+
+.practice-soundwave span {
+  width: 3px;
+  height: 100%;
+  background: var(--ds-primary);
+  border-radius: 2px;
+  animation: soundwave 1.2s ease-in-out infinite alternate;
+}
+
+.practice-soundwave span:nth-child(2) { animation-delay: 0.2s; }
+.practice-soundwave span:nth-child(3) { animation-delay: 0.4s; }
+.practice-soundwave span:nth-child(4) { animation-delay: 0.1s; }
+.practice-soundwave span:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes soundwave {
+  0% { height: 6px; opacity: 0.4; }
+  100% { height: 24px; opacity: 1; }
+}
+
+.practice-mic-studio-btn--recording {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+

@@ -135,6 +135,13 @@
   min-width: 0;
 }
 
+.todo-my-day__sort-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+  min-height: 2.25rem;
+}
+
 .todo-quick-add {
   align-items: center;
   background: var(--ds-card);
@@ -722,11 +729,35 @@
 }
 
 .todo-main-layout--week {
+  align-items: stretch;
   overflow: hidden;
 }
 
 .todo-main-layout--week-details {
   grid-template-columns: minmax(0, 10fr) minmax(0, 2fr);
+}
+
+.todo-main-layout--week .todo-week-surface {
+  background: color-mix(in srgb, var(--ds-muted) 24%, var(--ds-card));
+  border: 1px solid var(--ds-border);
+  border-radius: 0.5rem;
+  height: 100%;
+  padding: 0.5rem;
+}
+
+.todo-main-layout--week .todo-week-grid {
+  height: 100%;
+}
+
+.todo-main-layout--week .todo-week-day {
+  min-height: 30rem;
+}
+
+.todo-main-layout--week .todo-details {
+  align-self: stretch;
+  height: 100%;
+  max-height: none;
+  position: static;
 }
 
 .todo-week-grid {
@@ -902,6 +933,107 @@
   .todo-main-layout--week-details .todo-details__title {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+}
+
+@media (min-width: 48.0625rem) {
+  .ds-root:has(.todo-page-header--week) > .min-w-0 > #main-content {
+    height: 100dvh;
+    margin-inline: 0;
+    max-width: none;
+    overflow: hidden;
+    padding-block: 1rem 0;
+    padding-inline: 1rem;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) {
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    margin-inline: 0;
+    max-width: none;
+    min-height: 0;
+    padding-bottom: 0;
+    padding-top: 1rem;
+    padding-inline: 0;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) .todo-main-layout--week {
+    min-height: 0;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) .todo-week-surface,
+  .todo-workspace-page:has(.todo-page-header--week) .todo-details {
+    min-height: 0;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) .todo-week-surface {
+    overflow: auto;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) .todo-week-day {
+    min-height: 0;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--week) .todo-week-day__tasks {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .ds-root:has(.todo-page-header--my-day) > .min-w-0 > #main-content {
+    height: 100dvh;
+    margin-inline: 0;
+    max-width: none;
+    overflow: hidden;
+    padding-block: 1rem 0;
+    padding-inline: 1rem;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) {
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    margin-inline: 0;
+    max-width: none;
+    min-height: 0;
+    padding-bottom: 0;
+    padding-inline: 0;
+    padding-top: 1rem;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout--details,
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary,
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day {
+    min-height: 0;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout--details,
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary,
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day {
+    height: 100%;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day {
+    flex: 1;
+    height: auto;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day__lists {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-details {
+    align-self: stretch;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    margin-top: 2.75rem;
+    position: static;
   }
 }
 
