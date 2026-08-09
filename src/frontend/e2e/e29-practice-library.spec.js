@@ -51,7 +51,7 @@ test('E29 uses one shared surface rhythm across Dictation, Meaning, Pronunciatio
   await expect(card).toHaveClass(/review-card--dictation/)
   await expect(page.getByText('Listen carefully, then type the word you hear')).toBeVisible()
   await page.getByTestId('practice-answer-input').fill('wrong')
-  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+  await page.getByRole('button', { name: 'Submit Answer', exact: true }).click()
   await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
   await page.getByTestId('practice-answer-input').fill('mitigate')
   await page.getByRole('button', { name: 'Submit', exact: true }).click()

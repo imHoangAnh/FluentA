@@ -101,7 +101,10 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
     fireEvent.click(startBtn)
 
     const input = await screen.findByPlaceholderText('Type the word...')
+    const submitButton = screen.getByRole('button', { name: 'Submit' })
+    expect(submitButton).toBeDisabled()
     fireEvent.change(input, { target: { value: 'apple' } })
+    expect(submitButton).toBeEnabled()
     fireEvent.keyDown(input, { key: 'Enter' })
 
     await waitFor(() => {
@@ -282,7 +285,7 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     const feedback = await screen.findByRole('status')
-    expect(feedback).toHaveTextContent('CORRECT')
+    expect(feedback).toHaveTextContent('Correct')
     expect(screen.getByTestId('active-review-card')).toHaveClass('review-card--feedback-correct')
     expect(screen.queryByText('What word matches this meaning?')).not.toBeInTheDocument()
 
@@ -298,6 +301,7 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
     fireEvent.click(finishReview)
 
     const summary = await screen.findByTestId('review-summary')
+    expect(summary).toHaveClass('review-summary--focused')
     expect(summary).toHaveTextContent('Board 1')
     expect(summary).toHaveTextContent('1 correct and 0 wrong across 1 reviewed words.')
     expect(summary).toHaveTextContent('Done')
@@ -449,7 +453,7 @@ describe('ReviewSessionPage keyboard shortcuts', () => {
     fireEvent.click(screen.getByRole('button', { name: /start review/i }))
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('WRONG')
+    expect(await screen.findByRole('status')).toHaveTextContent('Wrong')
     expect(screen.getByTestId('active-review-card')).toHaveClass('review-card--feedback-wrong')
     expect(screen.queryByTestId('review-answer')).not.toBeInTheDocument()
 

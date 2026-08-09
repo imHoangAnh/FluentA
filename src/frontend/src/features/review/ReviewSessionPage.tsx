@@ -87,6 +87,8 @@ export function ReviewSessionPage() {
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []
   const currentWord = words[currentIndex] ?? null
+  const usesLargeAnswerLayout = currentWord?.mode === 'dictation' || currentWord?.mode === 'meaningToWord'
+  const usesLargeSessionLayout = usesLargeAnswerLayout || currentWord?.mode === 'pronunciation'
   const currentLanguage = activeBoard?.boardLanguage ?? 'en'
   const recordingSupported = supportsPcmRecording()
 
@@ -153,6 +155,12 @@ export function ReviewSessionPage() {
         return
       }
 
+      if (event.key === 'Escape' && currentWord.mode === 'dictation' && !showRecap && !feedback && !isAutoAdvancing) {
+        event.preventDefault()
+        void submitOutcome(false)
+        return
+      }
+
       if ((event.key === 'r' || event.key === 'R') && currentWord.mode === 'pronunciation') {
         const target = event.target as HTMLElement | null
         const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
@@ -173,7 +181,7 @@ export function ReviewSessionPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [session, currentWord, completed, showRecap, typedAnswer, isRecording, isAutoAdvancing, recordingSupported, pronunciationMutation.isPending, pronunciationAttempts, currentLanguage])
+  }, [session, currentWord, completed, showRecap, feedback, typedAnswer, isRecording, isAutoAdvancing, recordingSupported, pronunciationMutation.isPending, pronunciationAttempts, currentLanguage])
 
   function openSession(nextSession: reviewApi.ReviewSessionCreated) {
     setSession(nextSession)
@@ -457,22 +465,24 @@ export function ReviewSessionPage() {
         ) : null}
 
         {session && currentWord && !completed ? (
-          <section className="review-session">
+          <section className={`review-session ${usesLargeSessionLayout ? 'learning-session--focused' : ''}`}>
             <div className="review-progress">
               <div className="review-progress-header">
                 <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
-                <strong className="review-progress-count">{currentIndex + 1} / {words.length}</strong>
+                <strong className="review-progress-count">
+                  {usesLargeSessionLayout ? `${currentIndex + 1} of ${words.length}` : `${currentIndex + 1} / ${words.length}`}
+                </strong>
               </div>
               <progress value={currentIndex + 1} max={words.length} />
             </div>
 
             <article
-              className={`review-card review-card--${currentWord.mode} ${feedback ? `review-card--feedback-${feedback}` : ''}`}
+              className={`review-card review-card--${currentWord.mode} ${feedback ? `review-card--feedback-${feedback}` : ''} ${usesLargeSessionLayout ? 'learning-card--focused' : ''}`}
               data-testid="active-review-card"
             >
               {feedback ? (
                 <div className={`review-feedback review-feedback--${feedback}`} role="status" aria-live="polite">
-                  {feedback === 'correct' ? 'CORRECT' : 'WRONG'}
+                  {feedback === 'correct' ? 'Correct' : 'Wrong'}
                 </div>
               ) : showRecap ? (
                 <div className="review-recap" data-testid="review-answer">
@@ -510,16 +520,19 @@ export function ReviewSessionPage() {
 
                   {currentWord.mode === 'dictation' ? (
                     <div className="review-exercise__stage review-exercise__stage--dictation">
-                      <button
-                        className="review-audio-action"
-                        type="button"
-                        aria-label="Play pronunciation"
-                        title="Play audio (Tab)"
-                        onClick={() => speakWord(currentWord.word, currentLanguage)}
-                      >
-                        <Volume2 size={22} />
-                        <span>Play audio</span>
-                      </button>
+                      <div className="practice-dictation-audio-control">
+                        <button
+                          className="review-audio-action"
+                          type="button"
+                          aria-label="Play pronunciation"
+                          aria-keyshortcuts="Tab"
+                          title="Play audio (Tab)"
+                          onClick={() => speakWord(currentWord.word, currentLanguage)}
+                        >
+                          <Volume2 size={32} />
+                        </button>
+                        <span>Play</span>
+                      </div>
                     </div>
                   ) : isMeaningToWord ? (
                     <div className="review-exercise__stage review-meaning-card">
@@ -560,14 +573,13 @@ export function ReviewSessionPage() {
                       </div>
 
                       <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2</span>
+                      {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
                     </div>
                   )}
 
                   {!isPronunciation ? (
                     <div className="review-answer-form">
-                      <label htmlFor="review-answer-input">
-                        {isMeaningToWord ? 'Type the word' : 'Type the target word'}
-                      </label>
+                      {currentWord.mode === 'meaningToWord' ? <label htmlFor="review-answer-input">Type the word</label> : null}
                       <input
                         id="review-answer-input"
                         value={typedAnswer}
@@ -583,47 +595,67 @@ export function ReviewSessionPage() {
                         }}
                       />
                       <div className="review-exercise__actions">
-                        <button className="primary-button review-submit-button" type="button" title="Submit answer (Enter)" onClick={checkTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || isAutoAdvancing || submitReviewMutation.isPending}>
-                          Submit
+                        <button className={usesLargeAnswerLayout ? 'practice-dictation-submit' : 'primary-button review-submit-button'} type="button" title="Submit answer (Enter)" onClick={checkTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || isAutoAdvancing || submitReviewMutation.isPending}>
+                          {currentWord.mode === 'dictation' ? 'Submit Answer' : 'Submit'}
                         </button>
-                        <button className="review-skip-button" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || submitReviewMutation.isPending}>
+                        <button className={usesLargeAnswerLayout ? 'practice-dictation-skip' : 'review-skip-button'} type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || submitReviewMutation.isPending}>
                           Skip
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="review-exercise__actions">
-                      <button className="review-skip-button" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || isRecording || pronunciationMutation.isPending || submitReviewMutation.isPending}>
+                      <button className="practice-dictation-skip" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || isRecording || pronunciationMutation.isPending || submitReviewMutation.isPending}>
                         Skip
                       </button>
                     </div>
                   )}
-
-                  {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
                 </div>
               )}
             </article>
+
+            {currentWord.mode === 'dictation' && !feedback && !showRecap ? (
+              <p className="practice-session__shortcut">Shortcut: Tab to replay · Enter to submit · Esc to skip.</p>
+            ) : null}
 
             {submitReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to record this answer. Try again.</p> : null}
           </section>
         ) : null}
 
         {completed && session ? (
-          <section className="review-summary" data-testid="review-summary">
-            <h1>{session.boardName}</h1>
-            <p>{correctCount} correct and {wrongCount} wrong across {correctCount + wrongCount} reviewed words.</p>
-            <div className="practice-summary-stats-grid">
-              <div className="practice-stat-card practice-stat-card--correct">
-                <span className="practice-stat-value">{correctCount}</span>
-                <span className="practice-stat-label">Correct</span>
+          <section className="review-session learning-session--focused review-complete-session">
+            <div className="review-progress">
+              <div className="review-progress-header">
+                <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+                <strong className="review-progress-count">{words.length} of {words.length}</strong>
               </div>
-              <div className="practice-stat-card practice-stat-card--wrong">
-                <span className="practice-stat-value">{wrongCount}</span>
-                <span className="practice-stat-label">Wrong</span>
-              </div>
+              <progress value={words.length} max={words.length} />
             </div>
-            <p className="text-sm text-muted-foreground">Session time: {completedElapsedSeconds} seconds.</p>
-            <button className="primary-button review-summary__done" type="button" onClick={resetToLanding}>Done</button>
+
+            <article className="review-card learning-card--focused review-summary-card">
+              <div className="review-summary review-summary--focused" data-testid="review-summary">
+                <header className="review-summary__header">
+                  <h1>{session.boardName}</h1>
+                  <p>{correctCount} correct and {wrongCount} wrong across {correctCount + wrongCount} reviewed words.</p>
+                </header>
+
+                <div className="practice-summary-stats-grid" aria-label="Review results">
+                  <div className="practice-stat-card practice-stat-card--correct">
+                    <span className="practice-stat-value">{correctCount}</span>
+                    <span className="practice-stat-label">Correct</span>
+                  </div>
+                  <div className="practice-stat-card practice-stat-card--wrong">
+                    <span className="practice-stat-value">{wrongCount}</span>
+                    <span className="practice-stat-label">Wrong</span>
+                  </div>
+                </div>
+
+                <footer className="review-summary__footer">
+                  <p className="text-sm text-muted-foreground">Session time: {completedElapsedSeconds} seconds.</p>
+                  <button className="primary-button review-summary__done" type="button" onClick={resetToLanding}>Done</button>
+                </footer>
+              </div>
+            </article>
           </section>
         ) : null}
 

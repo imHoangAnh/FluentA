@@ -1,4 +1,4 @@
-import { Mic, PenSquare, RotateCcw, Square, TriangleAlert, Volume2 } from 'lucide-react'
+import { Mic, RotateCcw, Square, TriangleAlert, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -79,6 +79,9 @@ export function PracticeSessionPage() {
   const currentStep = modeSequence[currentStepIndex] ?? 'recap'
   const recapMode = modeSequence[Math.max(0, currentStepIndex - 1)] ?? 'dictation'
   const currentSurfaceMode = currentStep === 'recap' ? recapMode : currentStep
+  const isDictationStep = currentStep === 'dictation'
+  const usesLargeAnswerLayout = isDictationStep || currentStep === 'meaningToWord'
+  const usesLargeSessionLayout = usesLargeAnswerLayout || currentStep === 'pronunciation' || currentStep === 'recap'
   const recordingSupported = supportsPcmRecording()
 
   useEffect(() => {
@@ -122,6 +125,12 @@ export function PracticeSessionPage() {
             submitTypedAnswer()
           }
         }
+        return
+      }
+
+      if (event.key === 'Escape' && currentStep !== 'recap' && !resolvedOutcome) {
+        event.preventDefault()
+        revealAndSkip()
         return
       }
 
@@ -323,16 +332,16 @@ export function PracticeSessionPage() {
       {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length === 0 ? <p role="status" className="text-sm text-muted-foreground">This page has no words to practice.</p> : null}
 
       {sessionStarted && currentCard ? (
-        <section className="review-session practice-session">
+        <section className={`review-session practice-session practice-session--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-session--focused' : ''}`}>
           <div className="review-progress">
             <div className="review-progress-header">
               <span className="review-progress-order">{orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
-              <strong className="review-progress-count">{currentIndex + 1} / {sessionCards.length}</strong>
+              <strong className="review-progress-count">{currentIndex + 1} of {sessionCards.length}</strong>
             </div>
             <progress value={currentIndex + 1} max={sessionCards.length} />
           </div>
 
-          <article className={`review-card review-card--${currentSurfaceMode}`} data-testid="active-practice-card">
+          <article className={`review-card review-card--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-card--focused' : ''}`} data-testid="active-practice-card">
             {currentStep === 'recap' ? (
               <div className="review-recap practice-recap" data-testid="practice-answer-reveal">
                 <header className="review-recap__header">
@@ -379,10 +388,12 @@ export function PracticeSessionPage() {
 
                 {currentStep === 'dictation' ? (
                   <div className="review-exercise__stage review-exercise__stage--dictation">
-                    <button className="review-audio-action" type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentCard.word, language)}>
-                      <Volume2 size={22} />
-                      <span>Play audio</span>
-                    </button>
+                    <div className="practice-dictation-audio-control">
+                      <button className="review-audio-action" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" onClick={() => speakWord(currentCard.word, language)}>
+                        <Volume2 size={28} />
+                      </button>
+                      <span>Play</span>
+                    </div>
                   </div>
                 ) : currentStep === 'meaningToWord' ? (
                   <div className="review-exercise__stage review-meaning-card">
@@ -406,12 +417,14 @@ export function PracticeSessionPage() {
                       </button>
                     </div>
                     <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2{pronunciationRetryUsed ? ' · retry pair' : ''}</span>
+                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
+                    {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
                   </div>
                 )}
 
                 {currentStep !== 'pronunciation' ? (
                   <div className="review-answer-form">
-                    <label htmlFor="practice-answer-input">{currentStep === 'meaningToWord' ? 'Type the word' : 'Type the target word'}</label>
+                    {currentStep === 'meaningToWord' || null}
                     <input
                       id="practice-answer-input"
                       value={typedAnswer}
@@ -427,27 +440,26 @@ export function PracticeSessionPage() {
                       placeholder={currentStep === 'meaningToWord' ? 'Type the word...' : 'Type your answer...'}
                       disabled={Boolean(resolvedOutcome)}
                     />
+                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
                     <div className="review-exercise__actions">
-                      <button className="primary-button review-submit-button" type="button" title="Submit answer (Enter)" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || Boolean(resolvedOutcome)}>
-                        <PenSquare size={16} /> Submit
+                      <button className={usesLargeAnswerLayout ? 'practice-dictation-submit' : 'review-skip-button review-submit-button'} type="button" title="Submit answer (Enter)" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || Boolean(resolvedOutcome)}>
+                        {isDictationStep ? 'Submit Answer' : 'Submit'}
                       </button>
-                      {!resolvedOutcome ? <button className="review-skip-button" type="button" onClick={revealAndSkip}>Skip</button> : null}
+                      {!resolvedOutcome ? <button className={usesLargeAnswerLayout ? 'practice-dictation-skip' : 'review-skip-button'} type="button" onClick={revealAndSkip}>Skip</button> : null}
                       {resolvedOutcome ? <button className="primary-button review-submit-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
                     </div>
                   </div>
                 ) : (
                   <div className="review-exercise__actions">
-                    {pronunciationPairExhausted && !resolvedOutcome && !pronunciationRetryUsed ? <button className="review-skip-button" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
-                    {!resolvedOutcome ? <button className="review-skip-button" type="button" onClick={revealAndSkip}>Skip</button> : null}
-                    {resolvedOutcome ? <button className="primary-button review-submit-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
+                    {pronunciationPairExhausted && !resolvedOutcome && !pronunciationRetryUsed ? <button className="practice-dictation-skip" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
+                    {!resolvedOutcome ? <button className="practice-dictation-skip" type="button" onClick={revealAndSkip}>Skip</button> : null}
+                    {resolvedOutcome ? <button className="practice-dictation-submit" type="button" onClick={continueResolvedStep}>Continue</button> : null}
                   </div>
                 )}
-
-                {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
-                {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
               </div>
             )}
           </article>
+          {isDictationStep ? <p className="practice-session__shortcut">Shortcut: Tab to replay · Enter to submit · Esc to skip.</p> : null}
         </section>
       ) : null}
     </>
