@@ -6,7 +6,8 @@ public sealed record CreateCountdownEventRequest(
     string Name,
     string TargetDate,
     IReadOnlyList<CreateCountdownAlertRequest> Alerts,
-    Guid? CoverAssetId = null);
+    Guid? CoverAssetId = null,
+    string? RepeatPattern = null);
 
 public sealed record CountdownAlertDto(
     Guid Id,
@@ -22,6 +23,7 @@ public sealed record CountdownEventDto(
     Guid? CoverAssetId,
     string? CoverDownloadUrl,
     DateTime? CoverDownloadUrlExpiresAt,
+    string RepeatPattern,
     bool IsCompleted,
     IReadOnlyList<CountdownAlertDto> Alerts,
     DateTime CreatedAt,

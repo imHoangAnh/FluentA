@@ -35,6 +35,7 @@ describe('CountdownPage', () => {
       coverAssetId: null,
       coverDownloadUrl: null,
       coverDownloadUrlExpiresAt: null,
+      repeatPattern: 'None',
       isCompleted: false,
       alerts: [{ id: 'alert-1', alertDay: '1DayBefore', alertTime: '09:00', scheduledAtUtc: '2026-08-20T02:00:00Z', firedAtUtc: null }],
       createdAt: '2026-07-21T00:00:00Z',
@@ -69,5 +70,28 @@ describe('CountdownPage', () => {
 
     await user.click(createButton)
     expect(screen.getByRole('dialog', { name: 'Create Countdown' })).toBeInTheDocument()
+  })
+
+  it('keeps completed memories in the closed Complete board', async () => {
+    countdownApi.listCountdowns.mockResolvedValue([{
+      id: 'countdown-completed',
+      name: 'Old memory',
+      targetDate: '2026-01-10',
+      coverAssetId: null,
+      coverDownloadUrl: null,
+      coverDownloadUrlExpiresAt: null,
+      repeatPattern: 'None',
+      isCompleted: true,
+      alerts: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-10T00:00:00Z',
+    }])
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Countdown' })).toBeInTheDocument()
+    expect(screen.queryByText('Complete at Jan 10, 2026')).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Complete board, 1 countdown' }))
+    expect(await screen.findByText('Complete at Jan 10, 2026')).toBeInTheDocument()
   })
 })

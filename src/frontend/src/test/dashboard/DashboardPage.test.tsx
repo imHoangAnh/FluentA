@@ -116,6 +116,14 @@ describe('DashboardPage', () => {
     adapters.listByDate.mockResolvedValue([todo()])
     adapters.listHabits.mockResolvedValue([habit()])
     adapters.listCountdowns.mockResolvedValue([{
+      id: 'countdown-completed',
+      name: 'Old memory',
+      targetDate: '2025-12-20',
+      isCompleted: true,
+      alerts: [],
+      createdAt: '2025-07-14T01:00:00Z',
+      updatedAt: '2025-07-14T01:00:00Z',
+    }, {
       id: 'countdown-1',
       name: 'IELTS Exam',
       targetDate: '2026-12-20',
@@ -131,6 +139,7 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Plan speaking practice')).toBeInTheDocument()
     expect(screen.getByText('Read English')).toBeInTheDocument()
     expect(screen.getByText('IELTS Exam')).toBeInTheDocument()
+    expect(screen.queryByText('Old memory')).not.toBeInTheDocument()
     expect(screen.getByTestId('dashboard-review-due-badge')).toHaveTextContent('5 due')
     expect(within(screen.getByTestId('dashboard-review-due-ring')).getByText('5')).toBeInTheDocument()
     expect(within(screen.getByTestId('dashboard-review-count')).getByText('5')).toBeInTheDocument()

@@ -40,11 +40,23 @@ public sealed class CountdownAlert : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Reschedule(DateTime scheduledAtUtc)
+    {
+        ScheduledAtUtc = NormalizeUtc(scheduledAtUtc);
+        FiredAtUtc = null;
+        Touch();
+    }
+
     public void SoftDelete(DateTime? nowUtc = null)
     {
         var now = nowUtc ?? DateTime.UtcNow;
         DeletedAt = now;
         UpdatedAt = now;
+    }
+
+    private void Touch()
+    {
+        UpdatedAt = DateTime.UtcNow;
     }
 
     private static string CleanAlertDay(string alertDay)

@@ -3,6 +3,8 @@ using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Countdown.Entities;
+using FluentA.Domain.BoundedContexts.Countdown.Enums;
+using FluentA.Domain.BoundedContexts.Countdown.Services;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
 using FluentA.Application.BoundedContexts.Trash;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
@@ -38,7 +40,7 @@ public sealed class CountdownService : ICountdownService
         var visibleEvents = events
             .Where(countdown => countdown.DeletedAt is null && countdown.IsVisibleAt(nowUtc))
             .OrderBy(countdown => countdown.IsCompletedAt(nowUtc))
-            .ThenBy(countdown => countdown.TargetDate)
+            .ThenBy(countdown => countdown.IsCompletedAt(nowUtc) ? -countdown.TargetDate.Ticks : countdown.TargetDate.Ticks)
             .ThenBy(countdown => countdown.CreatedAt)
             .ToList();
 
@@ -62,7 +64,7 @@ public sealed class CountdownService : ICountdownService
             return OperationResult<CountdownEventDto>.Failure(CountdownError.Validation(validation.Errors));
         }
 
-        var countdown = CountdownEventEntity.Create(userId, request.Name, validation.TargetDate, request.CoverAssetId);
+        var countdown = CountdownEventEntity.Create(userId, request.Name, validation.TargetDate, request.CoverAssetId, validation.RepeatPattern);
         foreach (var alert in validation.Alerts)
         {
             countdown.AddAlert(alert.AlertDay, alert.AlertTime, alert.ScheduledAtUtc);
@@ -101,16 +103,17 @@ public sealed class CountdownService : ICountdownService
         return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Countdown", countdown.Id, countdown.Name, "Countdown", DateTime.UtcNow, DateTime.UtcNow));
     }
 
-    private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts)> ValidateCreateAsync(
+    private async Task<(Dictionary<string, string[]> Errors, DateTime TargetDate, List<ValidatedAlert> Alerts, CountdownRepeatPattern RepeatPattern)> ValidateCreateAsync(
         Guid userId,
         CreateCountdownEventRequest request,
         CancellationToken cancellationToken)
     {
         var errors = ValidateName(request.Name);
         var targetDate = ParseTargetDate(request.TargetDate, errors);
-        var alerts = ValidateAlerts(request.Alerts, targetDate, errors);
+        var repeatPattern = ParseRepeatPattern(request.RepeatPattern, errors);
+        var alerts = ValidateAlerts(request.Alerts, targetDate, repeatPattern, errors);
         await ValidateCoverAssetAsync(userId, request.CoverAssetId, errors, cancellationToken);
-        return (errors, targetDate, alerts);
+        return (errors, targetDate, alerts, repeatPattern);
     }
 
     private static Dictionary<string, string[]> ValidateName(string name)
@@ -120,9 +123,9 @@ public sealed class CountdownService : ICountdownService
         {
             errors["name"] = ["Name is required."];
         }
-        else if (name.Trim().Length > 180)
+        else if (name.Trim().Length > 50)
         {
-            errors["name"] = ["Name must be at most 180 characters."];
+            errors["name"] = ["Name must be at most 50 characters."];
         }
 
         return errors;
@@ -150,6 +153,7 @@ public sealed class CountdownService : ICountdownService
     private static List<ValidatedAlert> ValidateAlerts(
         IReadOnlyList<CreateCountdownAlertRequest>? alerts,
         DateTime targetDate,
+        CountdownRepeatPattern repeatPattern,
         Dictionary<string, string[]> errors)
     {
         var validated = new List<ValidatedAlert>();
@@ -157,6 +161,17 @@ public sealed class CountdownService : ICountdownService
         {
             errors["alerts"] = ["Create requires between 1 and 5 alerts."];
             return validated;
+        }
+
+        if (targetDate == DateTime.MinValue)
+        {
+            return validated;
+        }
+
+        if (repeatPattern != CountdownRepeatPattern.None
+            && !alerts.Any(alert => alert.AlertDay == "OnTargetDay"))
+        {
+            errors["alerts"] = ["Repeating countdowns require an OnTargetDay alert."];
         }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -181,7 +196,7 @@ public sealed class CountdownService : ICountdownService
                 continue;
             }
 
-            var scheduledAtUtc = BuildScheduledAtUtc(targetDate, alert.AlertDay, localTime);
+            var scheduledAtUtc = CountdownSchedule.BuildAlertScheduledAtUtc(targetDate, alert.AlertDay, alert.AlertTime);
             if (scheduledAtUtc <= DateTime.UtcNow)
             {
                 errors["alerts"] = ["Alerts that are already in the past cannot be created."];
@@ -224,20 +239,21 @@ public sealed class CountdownService : ICountdownService
         }
     }
 
-    private static DateTime BuildScheduledAtUtc(DateTime targetDate, string alertDay, TimeOnly localTime)
+    private static CountdownRepeatPattern ParseRepeatPattern(string? value, Dictionary<string, string[]> errors)
     {
-        var localDate = alertDay switch
+        if (string.IsNullOrWhiteSpace(value))
         {
-            "OnTargetDay" => targetDate.Date,
-            "1DayBefore" => targetDate.Date.AddDays(-1),
-            "3DaysBefore" => targetDate.Date.AddDays(-3),
-            "7DaysBefore" => targetDate.Date.AddDays(-7),
-            _ => throw new InvalidOperationException("Unsupported alert day."),
-        };
+            return CountdownRepeatPattern.None;
+        }
 
-        var unspecificLocal = localDate.Add(localTime.ToTimeSpan());
-        var local = DateTime.SpecifyKind(unspecificLocal, DateTimeKind.Unspecified);
-        return TimeZoneInfo.ConvertTimeToUtc(local, CountdownTimeZone.Vietnam());
+        if (Enum.TryParse<CountdownRepeatPattern>(value, ignoreCase: false, out var pattern)
+            && pattern is CountdownRepeatPattern.None or CountdownRepeatPattern.Weekly or CountdownRepeatPattern.Monthly or CountdownRepeatPattern.Yearly)
+        {
+            return pattern;
+        }
+
+        errors["repeatPattern"] = ["Repeat pattern must be None, Weekly, Monthly, or Yearly."];
+        return CountdownRepeatPattern.None;
     }
 
     private async Task<CountdownEventDto> ToDtoAsync(Guid userId, CountdownEventEntity countdownEvent, CancellationToken cancellationToken)
@@ -266,6 +282,7 @@ public sealed class CountdownService : ICountdownService
             countdownEvent.CoverAssetId,
             coverDownload?.Url,
             coverDownload?.ExpiresAtUtc,
+            countdownEvent.RepeatPattern.ToString(),
             countdownEvent.IsCompletedAt(DateTime.UtcNow),
             countdownEvent.Alerts
                 .Where(alert => alert.DeletedAt is null)

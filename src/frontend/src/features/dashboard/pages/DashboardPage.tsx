@@ -99,7 +99,10 @@ export function DashboardPage() {
     [todosQuery.data],
   )
   const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 3), [habitsQuery.data])
-  const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
+  const countdowns = useMemo(() => (countdownsQuery.data ?? [])
+    .filter((countdown) => !countdown.isCompleted)
+    .toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime())
+    .slice(0, 1), [countdownsQuery.data])
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueReview = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)
   const learningCards = flashcardDashboard?.newCards ?? 0

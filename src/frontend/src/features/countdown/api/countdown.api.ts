@@ -9,11 +9,14 @@ export type CountdownEvent = {
   coverAssetId?: string | null
   coverDownloadUrl?: string | null
   coverDownloadUrlExpiresAt?: string | null
+  repeatPattern: CountdownRepeatPattern
   isCompleted: boolean
   alerts: CountdownAlert[]
   createdAt: string
   updatedAt: string
 }
+
+export type CountdownRepeatPattern = 'None' | 'Weekly' | 'Monthly' | 'Yearly'
 
 export type CountdownAlert = {
   id: string
@@ -31,6 +34,7 @@ export type CreateCountdownInput = {
     alertTime: string
   }>
   coverAssetId?: string | null
+  repeatPattern?: CountdownRepeatPattern
 }
 
 export async function listCountdowns() {

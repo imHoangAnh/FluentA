@@ -6029,10 +6029,87 @@
   max-width: none;
 }
 
-.countdown-card-grid {
+.countdown-board-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.countdown-board {
+  background: color-mix(in srgb, var(--ds-card) 92%, var(--ds-background));
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.countdown-board-header {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ds-foreground);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 12px 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.countdown-board-header:hover,
+.countdown-board-header:focus-visible {
+  background: color-mix(in srgb, var(--ds-secondary) 55%, transparent);
+}
+
+.countdown-board-header > span {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.countdown-board-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.countdown-board-header small {
+  color: var(--ds-muted-foreground);
+  font-size: 11px;
+}
+
+.countdown-board-chevron {
+  color: var(--ds-muted-foreground);
+  transition: transform 160ms ease;
+}
+
+.countdown-board-chevron--open {
+  transform: rotate(180deg);
+}
+
+.countdown-board-content {
+  border-top: 1px solid var(--ds-border);
+  min-height: 0;
+  padding: 16px;
+}
+
+.countdown-board-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  max-height: min(720px, calc(100vh - 180px));
+  overflow-y: auto;
+  padding: 1px;
+}
+
+.countdown-board-empty {
+  color: var(--ds-muted-foreground);
+  font-size: 13px;
+  margin: 4px 0;
+  text-align: center;
 }
 
 .countdown-card {
@@ -6041,7 +6118,8 @@
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   color: var(--ds-foreground);
-  min-height: 184px;
+  aspect-ratio: 8 / 5;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -6076,7 +6154,8 @@
 .countdown-card-content {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 184px;
+  min-height: 0;
+  height: 100%;
   padding: 16px;
   position: relative;
   z-index: 1;
@@ -6128,6 +6207,21 @@
   color: var(--ds-primary);
 }
 
+.countdown-card-delete-menu-item {
+  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.countdown-card-delete-menu-item__icon {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .countdown-card-count {
   align-items: center;
   display: flex;
@@ -6142,10 +6236,17 @@
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   letter-spacing: -0.04em;
+  max-width: 100%;
 }
 
 .countdown-card-count .countdown-card-count--completed {
-  font-size: 24px;
+  font-size: clamp(13px, 1.3vw, 18px);
+  line-height: 1.25;
+}
+
+.countdown-card--completed {
+  filter: saturate(0.55);
+  opacity: 0.62;
 }
 
 .countdown-card-footer {
@@ -6165,6 +6266,13 @@
 .countdown-card-grid > .empty-panel,
 .countdown-card-grid > .flashcard-status {
   grid-column: 1 / -1;
+}
+
+.countdown-name-hint {
+  color: var(--ds-muted-foreground);
+  font-size: 11px;
+  margin: -4px 0 0;
+  text-align: right;
 }
 
 .countdown-empty-state {
@@ -6776,6 +6884,10 @@
 }
 
 @media (max-width: 900px) {
+  .countdown-board-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .pomodoro-grid-container {
     grid-template-columns: minmax(0, 1fr);
     min-height: auto;
@@ -6801,8 +6913,9 @@
     padding: 12px;
   }
 
-  .countdown-card-grid {
+  .countdown-board-grid {
     gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pomodoro-workspace-toolbar {

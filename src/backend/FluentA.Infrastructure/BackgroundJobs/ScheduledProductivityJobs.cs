@@ -124,6 +124,8 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
     public async Task ProcessCountdownAlertsAsync(CancellationToken cancellationToken = default)
     {
+        await AdvanceCountdownRecurrencesAsync(cancellationToken);
+
         var now = DateTime.UtcNow;
         var alerts = await _dbContext.CountdownAlerts
             .Where(alert => alert.DeletedAt == null
@@ -136,15 +138,29 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
             .Where(countdown => countdown.DeletedAt == null && countdownIds.Contains(countdown.Id))
             .ToDictionaryAsync(countdown => countdown.Id, cancellationToken);
 
-        foreach (var alert in alerts)
+        var activeAlerts = alerts.Where(alert => countdowns.ContainsKey(alert.CountdownId)).ToList();
+        var deduplicationKeys = activeAlerts.ToDictionary(
+            alert => alert.Id,
+            alert => CountdownAlertDeduplicationKey(countdowns[alert.CountdownId].Id, countdowns[alert.CountdownId].TargetDate, alert.Id));
+        var existingKeys = await _dbContext.Notifications
+            .Where(notification => deduplicationKeys.Values.Contains(notification.DeduplicationKey))
+            .Select(notification => notification.DeduplicationKey)
+            .ToHashSetAsync(cancellationToken);
+
+        foreach (var alert in activeAlerts)
         {
             if (!countdowns.TryGetValue(alert.CountdownId, out var countdown))
             {
                 continue;
             }
 
-            _dbContext.Notifications.Add(Notification.Create(countdown.UserId, "CountdownAlert", "Countdown reminder",
-                $"{countdown.Name} - {alert.AlertDay} at {alert.AlertTime}.", $"countdown:{countdown.Id}:alert:{alert.Id}"));
+            var deduplicationKey = deduplicationKeys[alert.Id];
+            if (!existingKeys.Contains(deduplicationKey))
+            {
+                _dbContext.Notifications.Add(Notification.Create(countdown.UserId, "CountdownAlert", "Countdown reminder",
+                    $"{countdown.Name} - {alert.AlertDay} at {alert.AlertTime}.", deduplicationKey));
+            }
+
             alert.MarkFired(now);
             _logger.LogInformation(
                 "CountdownAlert notification queued for user {UserId}, countdown {CountdownId}, alert {AlertId}.",
@@ -155,25 +171,29 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         _logger.LogInformation("CountdownAlertJob fired {Count} countdown alerts.", alerts.Count);
     }
 
-    public async Task CleanupRetiredCountdownsAsync(CancellationToken cancellationToken = default)
+    public async Task AdvanceCountdownRecurrencesAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var countdowns = await _dbContext.CountdownEvents
             .Where(countdown => countdown.DeletedAt == null)
             .ToListAsync(cancellationToken);
 
-        var retired = 0;
-        foreach (var countdown in countdowns.Where(countdown => countdown.ShouldRetireAt(now)))
+        var advanced = 0;
+        foreach (var countdown in countdowns)
         {
-            var result = await _trashService.TrashCountdownAsync(countdown.UserId, countdown.Id, cancellationToken);
-            if (result.IsSuccess)
+            if (countdown.AdvanceRecurrenceAt(now))
             {
-                retired++;
-                _logger.LogInformation("Countdown retirement moved to Trash for user {UserId}, countdown {CountdownId}.", countdown.UserId, countdown.Id);
+                advanced++;
+                _logger.LogInformation("Countdown recurrence advanced for user {UserId}, countdown {CountdownId}, target {TargetDate}.", countdown.UserId, countdown.Id, countdown.TargetDate);
             }
         }
 
-        _logger.LogInformation("CountdownRetirementJob retired {Count} countdowns.", retired);
+        if (advanced > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("CountdownRecurrenceJob advanced {Count} countdowns.", advanced);
     }
 
     public async Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default)
@@ -228,5 +248,10 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
     private static string TodoReminderDeduplicationKey(Guid todoId, DateTime scheduledAtUtc)
     {
         return $"todo:{todoId}:reminder:{scheduledAtUtc.ToUniversalTime():yyyyMMddTHHmmssfffffffZ}";
+    }
+
+    private static string CountdownAlertDeduplicationKey(Guid countdownId, DateTime targetDate, Guid alertId)
+    {
+        return $"countdown:{countdownId}:target:{targetDate:yyyy-MM-dd}:alert:{alertId}";
     }
 }
