@@ -1,20 +1,22 @@
-import { ArrowRight, BookOpenCheck, CalendarClock, Check, CheckCircle2, Circle, GraduationCap, Timer, TrendingUp } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { CalendarClock, FolderKanban, ListChecks, Repeat2, RotateCcw, Timer } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { Badge } from '@/shared/components/ui/badge'
-import { Button } from '@/shared/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
-import { Skeleton } from '@/shared/components/ui/skeleton'
+import { useAuthStore } from '@/features/auth'
 import * as countdownApi from '@/features/countdown'
 import * as habitApi from '@/features/habits'
-import * as todoApi from '@/features/todo'
-import { HabitIconGlyph } from '@/features/habits'
-import { useAuthStore } from '@/features/auth'
+import * as pomodoroApi from '@/features/pomodoro'
+import * as projectApi from '@/features/project'
 import { getReviewDashboard } from '@/features/review'
+import * as todoApi from '@/features/todo'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { cn } from '@/shared/lib/utils'
-
-const preloadJournalEditor = () => import('@/features/journal')
+import { DashboardWidgetMenu } from '../components/DashboardWidgetMenu'
+import { CountdownAction, CountdownWidget, HabitWidget, PomodoroAction, PomodoroWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
+import { SortableDashboardWidget } from '../components/SortableDashboardWidget'
+import { dashboardWidgetLabel, dashboardWidgetRows, dashboardWidgetSlotClass, type DashboardWidgetId } from '../dashboard-widgets'
+import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../dashboard-widget-preferences'
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -31,7 +33,7 @@ function greeting(hour: number, name: string) {
   if (hour >= 5 && hour < 12) return `Good morning 🌅, ${name}`
   if (hour >= 12 && hour < 17) return `Good afternoon ☀️, ${name}`
   if (hour >= 17 && hour < 21) return `Good evening 🌇, ${name}`
-  return `Good night 🌙 , ${name}`
+  return `Good night 🌙, ${name}`
 }
 
 function remainingText(targetDate: string, now: Date) {
@@ -44,25 +46,43 @@ function remainingText(targetDate: string, now: Date) {
   return `${hours} hours`
 }
 
+function WidgetError({ label }: { label: string }) {
+  return <p className="m-0 p-4 text-sm text-destructive" role="alert">Could not load {label}.</p>
+}
+
+const widgetMeta: Record<DashboardWidgetId, { description: string; icon: ReactNode }> = {
+  review: { description: 'Scheduled reviews stay separate from new words.', icon: <RotateCcw className="size-4" /> },
+  todo: { description: 'Your three most relevant tasks.', icon: <ListChecks className="size-4" /> },
+  countdown: { description: 'Keep the nearest milestone in view.', icon: <CalendarClock className="size-4" /> },
+  habits: { description: 'Small actions that keep your learning rhythm alive.', icon: <Repeat2 className="size-4" /> },
+  project: { description: 'Your boards and active project cards at a glance.', icon: <FolderKanban className="size-4" /> },
+  pomodoro: { description: 'Current focus state and today\'s completed sessions.', icon: <Timer className="size-4" /> },
+}
+
 export function DashboardPage() {
   const queryClient = useQueryClient()
   const user = useAuthStore((state) => state.user)
   const [now, setNow] = useState(() => new Date())
+  const [visibleWidgets, setVisibleWidgets] = useState<DashboardWidgetId[]>(() => readDashboardWidgetOrder())
+  const [activeWidget, setActiveWidget] = useState<DashboardWidgetId | null>(null)
 
   const today = useMemo(() => toDateInput(new Date()), [])
   const timeZoneId = useMemo(() => browserTimeZone(), [])
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+  const visible = (id: DashboardWidgetId) => visibleWidgets.includes(id)
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000)
-    void preloadJournalEditor()
     return () => window.clearInterval(intervalId)
   }, [])
 
-  const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today) })
-  const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId) })
-  const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns })
-  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => getReviewDashboard(timeZoneId) })
+  const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
+  const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
+  const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
+  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
+  const projectBoardsQuery = useQuery({ queryKey: ['project', 'boards'], queryFn: projectApi.listBoards, enabled: visible('project') })
+  const pomodoroCurrentQuery = useQuery({ queryKey: ['pomodoro', 'current'], queryFn: pomodoroApi.getPomodoroCurrent, enabled: visible('pomodoro') })
+  const pomodoroTodayQuery = useQuery({ queryKey: ['pomodoro', 'today'], queryFn: pomodoroApi.getPomodoroToday, enabled: visible('pomodoro') })
 
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
@@ -75,157 +95,104 @@ export function DashboardPage() {
   })
 
   const todos = useMemo(
-    () => (todosQuery.data ?? []).toSorted((left, right) =>
-      Number(left.isCompleted) - Number(right.isCompleted)
-      || (left.completedAt ?? left.createdAt).localeCompare(right.completedAt ?? right.createdAt)),
+    () => (todosQuery.data ?? []).toSorted((left, right) => Number(left.isCompleted) - Number(right.isCompleted) || (left.completedAt ?? left.createdAt).localeCompare(right.completedAt ?? right.createdAt)),
     [todosQuery.data],
   )
-  const visibleTodos = todos.slice(0, 3)
   const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 3), [habitsQuery.data])
   const countdowns = useMemo(() => (countdownsQuery.data ?? []).toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime()).slice(0, 1), [countdownsQuery.data])
   const flashcardDashboard = flashcardDashboardQuery.data
   const dueReview = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)
   const learningCards = flashcardDashboard?.newCards ?? 0
-  const hasDueReview = dueReview > 0
-  const isLoading = todosQuery.isLoading || habitsQuery.isLoading || countdownsQuery.isLoading || flashcardDashboardQuery.isLoading
+  const isLoading = (visible('todo') && todosQuery.isLoading)
+    || (visible('habits') && habitsQuery.isLoading)
+    || (visible('countdown') && countdownsQuery.isLoading)
+    || (visible('review') && flashcardDashboardQuery.isLoading)
+    || (visible('project') && projectBoardsQuery.isLoading)
+    || (visible('pomodoro') && (pomodoroCurrentQuery.isLoading || pomodoroTodayQuery.isLoading))
+
+  function saveWidgetOrder(nextOrder: readonly DashboardWidgetId[]) {
+    const normalized = normalizeDashboardWidgetOrder(nextOrder)
+    setVisibleWidgets(normalized)
+    persistDashboardWidgetOrder(normalized)
+  }
+
+  function handleWidgetToggle(id: DashboardWidgetId) {
+    saveWidgetOrder(toggleDashboardWidget(visibleWidgets, id))
+  }
+
+  function handleDragStart({ active }: { active: { id: string | number } }) {
+    setActiveWidget(active.id as DashboardWidgetId)
+  }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    setActiveWidget(null)
+    if (!over) return
+    saveWidgetOrder(reorderDashboardWidgets(visibleWidgets, String(active.id), String(over.id)))
+  }
+
+  function renderWidget(id: DashboardWidgetId) {
+    if (id === 'review') return flashcardDashboardQuery.isError ? <WidgetError label="Review queue" /> : <ReviewQueueWidget dueReview={dueReview} learningCards={learningCards} />
+    if (id === 'todo') return todosQuery.isError ? <WidgetError label="Todo" /> : <TodoWidget todos={todos} onToggle={(todo) => todoToggle.mutate(todo)} />
+    if (id === 'countdown') return countdownsQuery.isError ? <WidgetError label="Countdowns" /> : <CountdownWidget countdown={countdowns[0]} remainingText={(targetDate) => remainingText(targetDate, now)} />
+    if (id === 'habits') return habitsQuery.isError ? <WidgetError label="Habit tracker" /> : <HabitWidget habits={habits} onToggle={(habit) => habitToggle.mutate(habit)} />
+    if (id === 'project') return projectBoardsQuery.isError ? <WidgetError label="Project" /> : <ProjectWidget boards={projectBoardsQuery.data ?? []} />
+    return pomodoroCurrentQuery.isError || pomodoroTodayQuery.isError
+      ? <WidgetError label="Pomodoro" />
+      : <PomodoroWidget current={pomodoroCurrentQuery.data} today={pomodoroTodayQuery.data} />
+  }
+
+  function renderWidgetFooter(id: DashboardWidgetId) {
+    if (id === 'review') return <ReviewQueueAction />
+    if (id === 'todo') return <TodoAction />
+    if (id === 'countdown') return <CountdownAction />
+    if (id === 'project') return <ProjectAction />
+    if (id === 'pomodoro') return <PomodoroAction />
+    return undefined
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   return (
-    <>
-      <section className="mb-6 flex flex-wrap items-end justify-between gap-4" aria-labelledby="welcome-heading">
-        <div>
-          <h2 id="welcome-heading" className="m-0 text-3xl font-semibold tracking-[-0.035em] text-foreground">{greeting(now.getHours(), displayName)}</h2>
-          <p className="m-0 mt-2 text-sm text-muted-foreground">
-            {new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}
-          </p>
+    <div className="flex h-full min-h-0 flex-col gap-3" data-testid="dashboard-overview">
+      <section className="flex shrink-0 flex-wrap items-end justify-between gap-3" aria-labelledby="welcome-heading">
+        <div className="min-w-0">
+          <h2 id="welcome-heading" className="m-0 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-3xl">{greeting(now.getHours(), displayName)}</h2>
+          <p className="m-0 mt-1.5 text-sm text-muted-foreground">{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}</p>
         </div>
+        <DashboardWidgetMenu visibleWidgets={visibleWidgets} onToggle={handleWidgetToggle} />
       </section>
 
       {isLoading ? (
-        <div className="grid grid-cols-12 gap-4" aria-label="Loading dashboard" aria-busy="true">
-          <Skeleton className="col-span-8 h-80 max-xl:col-span-12" />
-          <Skeleton className="col-span-4 h-80 max-xl:col-span-12" />
-          <Skeleton className="col-span-6 h-56 max-xl:col-span-12" />
-          <Skeleton className="col-span-6 h-56 max-xl:col-span-12" />
+        <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} aria-label="Loading dashboard" aria-busy="true">
+          {visibleWidgets.map((id, index) => <Skeleton key={id} className={cn('h-full min-h-0', dashboardWidgetSlotClass(index))} />)}
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-3">
-          <Card className="col-span-6 overflow-hidden max-xl:col-span-12">
-            <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground" aria-hidden="true">
-                  <BookOpenCheck className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <CardTitle>Review queue</CardTitle>
-                  <CardDescription className="mt-1">Scheduled reviews stay separate from new words.</CardDescription>
-                </div>
-              </div>
-              <Badge data-testid="dashboard-review-due-badge" variant={hasDueReview ? 'default' : 'outline'} className="shrink-0">{dueReview} due</Badge>
-            </CardHeader>
-            <CardContent className="grid grid-cols-[152px_minmax(0,1fr)] items-stretch gap-6 max-sm:grid-cols-1">
-              <div
-                data-testid="dashboard-review-due-ring"
-                className="relative mx-auto grid size-36 place-items-center rounded-full bg-[radial-gradient(circle_at_center,var(--ds-card)_58%,var(--ds-secondary)_100%)]"
-                aria-label={`${dueReview} ${dueReview === 1 ? 'word' : 'words'} due for review today. ${learningCards} new ${learningCards === 1 ? 'word' : 'words'} available to learn.`}
-              >
-                <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="var(--ds-muted)" strokeWidth="7" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    fill="none"
-                    stroke="var(--ds-primary)"
-                    strokeWidth="7"
-                    strokeLinecap="round"
-                    pathLength="100"
-                    strokeDasharray={hasDueReview ? '74 26' : '0 100'}
-                  />
-                </svg>
-                <div className="relative grid place-items-center gap-1 text-center">
-                  <BookOpenCheck className="size-5 text-primary" aria-hidden="true" />
-                  <strong className="text-4xl leading-none tracking-[-0.04em] text-foreground">{dueReview}</strong>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Due today</span>
-                </div>
-              </div>
-              <div className="flex min-w-0 flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3 max-[420px]:grid-cols-1">
-                  <div data-testid="dashboard-review-count" className="rounded-lg border border-primary/15 bg-secondary/65 p-3.5">
-                    <div className="flex items-center gap-2 text-xs font-medium text-secondary-foreground"><BookOpenCheck className="size-4" aria-hidden="true" />Review</div>
-                    <p className="m-0 mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{dueReview}</p>
-                    <p className="m-0 mt-0.5 text-xs text-muted-foreground">Scheduled words</p>
-                  </div>
-                  <div data-testid="dashboard-learning-count" className="rounded-lg border border-border bg-muted/45 p-3.5">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><GraduationCap className="size-4" aria-hidden="true" />Learning</div>
-                    <p className="m-0 mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{learningCards}</p>
-                    <p className="m-0 mt-0.5 text-xs text-muted-foreground">New words</p>
-                  </div>
-                </div>
-                <p className="m-0 text-sm text-muted-foreground">
-                  {hasDueReview
-                    ? `${dueReview} ${dueReview === 1 ? 'word is' : 'words are'} ready for spaced review.`
-                    : 'No reviews due today.'}
-                </p>
-                <Button asChild className="mt-auto w-full justify-between"><Link to="/review">Open Review<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="col-span-6 max-xl:col-span-12">
-            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Daily todo</CardTitle><CardDescription>Your three most relevant tasks.</CardDescription></div><Check className="size-5 text-primary" /></CardHeader>
-            <CardContent className="flex h-[226px] flex-col">
-              <ul className="m-0 grid list-none gap-2 p-0" role="list">
-                {visibleTodos.map((todo) => (
-                  <li key={todo.id}>
-                    <button
-                      type="button"
-                      className={cn('flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-md border border-transparent px-2 text-left text-sm transition-colors hover:bg-accent', todo.isCompleted && 'text-muted-foreground line-through')}
-                      aria-label={`${todo.isCompleted ? 'Uncheck' : 'Check'} todo ${todo.title}`}
-                      onClick={() => todoToggle.mutate(todo)}
-                    >
-                      {todo.isCompleted ? <CheckCircle2 className="size-[18px] text-primary" /> : <Circle className="size-[18px] text-muted-foreground" />}
-                      <span>{todo.title}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {todos.length === 0 ? <div className="grid flex-1 place-content-center text-center"><CheckCircle2 className="mx-auto mb-2 size-7 text-muted-foreground" /><p className="m-0 text-sm text-muted-foreground">No tasks for today.</p></div> : null}
-              <Button asChild variant="ghost" size="sm" className="mt-auto self-start"><Link to="/todo">View all tasks</Link></Button>
-            </CardContent>
-          </Card>
-
-          <Card className="col-span-5 max-xl:col-span-12">
-            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Next event</CardTitle><CardDescription>Keep the nearest milestone in view.</CardDescription></div><CalendarClock className="size-5 text-primary" /></CardHeader>
-            <CardContent>
-              <div className="rounded-lg bg-secondary p-5 text-center">
-                <p className="m-0 text-3xl font-semibold tracking-[-0.03em] text-secondary-foreground">{countdowns.length ? remainingText(countdowns[0].targetDate, now) : '--:--'}</p>
-                <p className="m-0 mt-2 text-sm text-muted-foreground">{countdowns[0]?.name ?? 'No upcoming events'}</p>
-              </div>
-              <Button asChild variant="outline" className="mt-4 w-full"><Link to="/countdowns"><Timer /> Open countdowns</Link></Button>
-            </CardContent>
-          </Card>
-
-          <Card className="col-span-7 max-xl:col-span-12">
-            <CardHeader className="flex-row items-start justify-between"><div><CardTitle>Habit tracker</CardTitle><CardDescription>Small actions that keep your learning rhythm alive.</CardDescription></div><TrendingUp className="size-5 text-primary" /></CardHeader>
-            <CardContent className="grid gap-3">
-              {habits.map((habit) => (
-                <button
-                  type="button"
-                  key={habit.id}
-                  className="grid min-h-12 cursor-pointer grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-left transition-colors hover:border-primary/35 hover:bg-accent/50"
-                  aria-label={`${habit.isCheckedToday ? 'Uncheck' : 'Check'} habit ${habit.name}`}
-                  onClick={() => habitToggle.mutate(habit)}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveWidget(null)} onDragEnd={handleDragEnd}>
+          <SortableContext items={visibleWidgets} strategy={rectSortingStrategy}>
+            <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} data-testid="dashboard-widget-grid">
+              {visibleWidgets.map((id, index) => (
+                <SortableDashboardWidget
+                  key={id}
+                  id={id}
+                  index={index}
+                  title={dashboardWidgetLabel(id)}
+                  description={widgetMeta[id].description}
+                  icon={widgetMeta[id].icon}
+                  removeDisabled={visibleWidgets.length <= 3}
+                  onRemove={() => handleWidgetToggle(id)}
+                  footer={renderWidgetFooter(id)}
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium"><HabitIconGlyph icon={habit.icon} size={16} /> {habit.name}</span>
-                  <span className="text-xs font-semibold text-muted-foreground">{habit.currentStreak} day streak</span>
-                  <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted"><span className={cn('block h-full rounded-full bg-primary transition-[width] duration-200', habit.isCheckedToday ? 'w-full' : 'w-0')} /></span>
-                </button>
+                  {renderWidget(id)}
+                </SortableDashboardWidget>
               ))}
-              {habits.length === 0 ? <div className="grid min-h-28 place-content-center text-center"><TrendingUp className="mx-auto mb-2 size-7 text-muted-foreground" /><p className="m-0 text-sm text-muted-foreground">No habits scheduled today.</p></div> : null}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </SortableContext>
+          <div className="sr-only" aria-live="polite">{activeWidget ? `Moving ${dashboardWidgetLabel(activeWidget)} widget` : ''}</div>
+        </DndContext>
       )}
-    </>
+    </div>
   )
 }

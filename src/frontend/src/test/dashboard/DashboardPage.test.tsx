@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
 import { useAuthStore } from '@/features/auth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
+import { DASHBOARD_WIDGET_STORAGE_KEY } from '@/features/dashboard/dashboard-widget-preferences'
 
 const adapters = vi.hoisted(() => ({
   listByDate: vi.fn(),
@@ -13,15 +14,21 @@ const adapters = vi.hoisted(() => ({
   toggleHabitEntry: vi.fn(),
   listCountdowns: vi.fn(),
   getReviewDashboard: vi.fn(),
+  listBoards: vi.fn(),
+  getPomodoroCurrent: vi.fn(),
+  getPomodoroToday: vi.fn(),
 }))
 
 vi.mock('@/features/todo', () => ({ listByDate: adapters.listByDate, updateTodo: adapters.updateTodo }))
 vi.mock('@/features/habits', () => ({ listHabits: adapters.listHabits, toggleHabitEntry: adapters.toggleHabitEntry, HabitIconGlyph: () => null }))
 vi.mock('@/features/countdown', () => ({ listCountdowns: adapters.listCountdowns }))
 vi.mock('@/features/review', () => ({ getReviewDashboard: adapters.getReviewDashboard }))
+vi.mock('@/features/project', () => ({ listBoards: adapters.listBoards }))
+vi.mock('@/features/pomodoro', () => ({ getPomodoroCurrent: adapters.getPomodoroCurrent, getPomodoroToday: adapters.getPomodoroToday }))
 vi.mock('@/features/journal', () => ({ JournalRichTextEditor: () => null }))
 
-function renderDashboard() {
+function renderDashboard(order = ['review', 'todo', 'countdown']) {
+  window.localStorage.setItem(DASHBOARD_WIDGET_STORAGE_KEY, JSON.stringify({ version: 1, order }))
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return {
     ...render(
@@ -78,12 +85,15 @@ describe('DashboardPage', () => {
     adapters.listHabits.mockResolvedValue([])
     adapters.listCountdowns.mockResolvedValue([])
     adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 0 })
+    adapters.listBoards.mockResolvedValue([])
+    adapters.getPomodoroCurrent.mockResolvedValue({ state: 'Idle', phase: 'Work', remainingSeconds: 0, durationSeconds: 0 })
+    adapters.getPomodoroToday.mockResolvedValue({ completedWorkSessions: 0 })
     adapters.updateTodo.mockResolvedValue(todo({ isCompleted: true }))
     adapters.toggleHabitEntry.mockResolvedValue(habit({ isCheckedToday: true }))
   })
 
   it('renders current empty states, links, and local date/timezone queries', async () => {
-    renderDashboard()
+    renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
     expect(await screen.findByText('No reviews due today.')).toBeInTheDocument()
     expect(screen.getByText('No tasks for today.')).toBeInTheDocument()
@@ -97,6 +107,9 @@ describe('DashboardPage', () => {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     expect(adapters.listHabits).toHaveBeenCalledWith(timeZone)
     expect(adapters.getReviewDashboard).toHaveBeenCalledWith(timeZone)
+    expect(adapters.listBoards).not.toHaveBeenCalled()
+    expect(adapters.getPomodoroCurrent).not.toHaveBeenCalled()
+    expect(adapters.getPomodoroToday).not.toHaveBeenCalled()
   })
 
   it('renders populated cross-domain widgets', async () => {
@@ -113,7 +126,7 @@ describe('DashboardPage', () => {
     }])
     adapters.getReviewDashboard.mockResolvedValue({ overdue: 2, dueToday: 3, newCards: 4 })
 
-    renderDashboard()
+    renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
     expect(await screen.findByText('Plan speaking practice')).toBeInTheDocument()
     expect(screen.getByText('Read English')).toBeInTheDocument()
@@ -127,7 +140,7 @@ describe('DashboardPage', () => {
   it('keeps new learning words out of the Due Today count', async () => {
     adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 7 })
 
-    renderDashboard()
+    renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
     const ring = await screen.findByTestId('dashboard-review-due-ring')
     expect(ring).toHaveAttribute('aria-label', '0 words due for review today. 7 new words available to learn.')
@@ -141,7 +154,7 @@ describe('DashboardPage', () => {
   it('keeps Todo and Habit quick-toggle mutation contracts', async () => {
     adapters.listByDate.mockResolvedValue([todo()])
     adapters.listHabits.mockResolvedValue([habit()])
-    const { queryClient } = renderDashboard()
+    const { queryClient } = renderDashboard(['review', 'todo', 'countdown', 'habits'])
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Check todo Plan speaking practice' }))
