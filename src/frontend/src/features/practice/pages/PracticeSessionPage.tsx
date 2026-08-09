@@ -1,5 +1,5 @@
 import { Mic, RotateCcw, Square, TriangleAlert, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
@@ -95,68 +95,6 @@ export function PracticeSessionPage() {
   }, [])
 
   useEffect(() => {
-    if (!sessionStarted || !currentCard) return
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        speakWord(currentCard.word, language)
-        return
-      }
-
-      if (event.key === 'Enter') {
-        if (currentStep === 'recap') {
-          event.preventDefault()
-          if (currentIndex + 1 >= sessionCards.length) {
-            void finishPractice()
-          } else {
-            advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')
-          }
-          return
-        }
-        if (resolvedOutcome) {
-          event.preventDefault()
-          continueResolvedStep()
-          return
-        }
-        if (currentStep !== 'pronunciation') {
-          if (normalizeAnswer(typedAnswer).length > 0) {
-            event.preventDefault()
-            submitTypedAnswer()
-          }
-        }
-        return
-      }
-
-      if (event.key === 'Escape' && currentStep !== 'recap' && !resolvedOutcome) {
-        event.preventDefault()
-        revealAndSkip()
-        return
-      }
-
-      if ((event.key === 'r' || event.key === 'R') && currentStep === 'pronunciation') {
-        const target = event.target as HTMLElement | null
-        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !pronunciationPairExhausted && !resolvedOutcome) {
-          event.preventDefault()
-          void startRecording()
-        }
-        return
-      }
-
-      if ((event.key === ' ' || event.key === 'Space') && currentStep === 'pronunciation') {
-        if (isRecording) {
-          event.preventDefault()
-          void recordingRef.current?.stop()
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [sessionStarted, currentCard, currentStep, wordHasMistake, resolvedOutcome, typedAnswer, isRecording, recordingSupported, pronunciationMutation.isPending, pronunciationPairExhausted, language])
-
-  useEffect(() => {
     const cards = sessionQuery.data?.words ?? []
     const sessionKey = `${pageId}:${orderType}`
     if (!sessionQuery.data || !practiceSettingsQuery.isSuccess || cards.length === 0 || initializedSessionKeyRef.current === sessionKey) return
@@ -188,7 +126,7 @@ export function PracticeSessionPage() {
     pronunciationMutation.reset()
   }, [addToReviewMutation, orderType, pageId, practiceSettingsQuery.isSuccess, pronunciationMutation, saveSummaryMutation, sessionQuery.data])
 
-  function resetStepState() {
+  const resetStepState = useCallback(() => {
     setTypedAnswer('')
     setFeedback(null)
     setResolvedOutcome(null)
@@ -200,9 +138,9 @@ export function PracticeSessionPage() {
     recordingRef.current = null
     setIsRecording(false)
     pronunciationMutation.reset()
-  }
+  }, [pronunciationMutation])
 
-  async function persistCompletion(nextCorrectCards: number, nextWrongCards: number) {
+  const persistCompletion = useCallback(async (nextCorrectCards: number, nextWrongCards: number) => {
     if (!sessionQuery.data) return
     return saveSummaryMutation.mutateAsync({
       pageId: sessionQuery.data.pageId,
@@ -212,9 +150,9 @@ export function PracticeSessionPage() {
       wrongCards: nextWrongCards,
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     })
-  }
+  }, [practiceSettingsQuery.data?.modeSequence, saveSummaryMutation, sessionCards.length, sessionQuery.data])
 
-  function advanceAfterRecap(outcome: PracticeOutcome) {
+  const advanceAfterRecap = useCallback((outcome: PracticeOutcome) => {
     const nextCorrect = correctWords + (outcome === 'correct' ? 1 : 0)
     const nextWrong = wrongWords + (outcome === 'wrong' ? 1 : 0)
     setCorrectWords(nextCorrect)
@@ -228,22 +166,22 @@ export function PracticeSessionPage() {
     setCurrentStepIndex(0)
     setWordHasMistake(false)
     resetStepState()
-  }
+  }, [correctWords, currentIndex, resetStepState, sessionCards.length, wrongWords])
 
 
 
-  function resolveStep(outcome: PracticeOutcome) {
+  const resolveStep = useCallback((outcome: PracticeOutcome) => {
     setResolvedOutcome(outcome)
     setFeedback(outcome === 'wrong' ? 'wrong' : null)
     if (outcome === 'wrong') setWordHasMistake(true)
-  }
+  }, [])
 
-  function continueResolvedStep() {
+  const continueResolvedStep = useCallback(() => {
     setCurrentStepIndex((value) => value + 1)
     resetStepState()
-  }
+  }, [resetStepState])
 
-  function submitTypedAnswer() {
+  const submitTypedAnswer = useCallback(() => {
     if (!currentCard || resolvedOutcome || currentStep === 'recap') return
     if (normalizeAnswer(typedAnswer) === normalizeAnswer(currentCard.word)) {
       continueResolvedStep()
@@ -251,13 +189,13 @@ export function PracticeSessionPage() {
     }
     setFeedback('wrong')
     setWordHasMistake(true)
-  }
+  }, [continueResolvedStep, currentCard, currentStep, resolvedOutcome, typedAnswer])
 
-  function revealAndSkip() {
+  const revealAndSkip = useCallback(() => {
     if (currentCard && !resolvedOutcome) resolveStep('wrong')
-  }
+  }, [currentCard, resolveStep, resolvedOutcome])
 
-  async function handlePronunciationAudio(audio: Blob) {
+  const handlePronunciationAudio = useCallback(async (audio: Blob) => {
     recordingRef.current = null
     setIsRecording(false)
     if (!currentCard) return
@@ -277,9 +215,9 @@ export function PracticeSessionPage() {
     } catch {
       setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
     }
-  }
+  }, [continueResolvedStep, currentCard, pronunciationAttempts, pronunciationMutation])
 
-  async function startRecording() {
+  const startRecording = useCallback(async () => {
     setPronunciationError(null)
     pronunciationMutation.reset()
     try {
@@ -288,7 +226,7 @@ export function PracticeSessionPage() {
     } catch {
       setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
-  }
+  }, [handlePronunciationAudio, pronunciationMutation])
 
   function retryPronunciationPair() {
     setPronunciationRetryUsed(true)
@@ -309,7 +247,7 @@ export function PracticeSessionPage() {
     setReviewStatuses((current) => ({ ...current, [result.wordId]: result.status }))
   }
 
-  async function finishPractice() {
+  const finishPractice = useCallback(async () => {
     const nextCorrect = correctWords + (wordHasMistake ? 0 : 1)
     const nextWrong = wrongWords + (wordHasMistake ? 1 : 0)
     setCorrectWords(nextCorrect)
@@ -321,7 +259,65 @@ export function PracticeSessionPage() {
     } catch {
       // The recap remains visible so the learner can retry saving the session.
     }
-  }
+  }, [correctWords, navigate, persistCompletion, wordHasMistake, wrongWords])
+
+  useEffect(() => {
+    if (!sessionStarted || !currentCard) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        speakWord(currentCard.word, language)
+        return
+      }
+
+      if (event.key === 'Enter') {
+        if (currentStep === 'recap') {
+          event.preventDefault()
+          if (currentIndex + 1 >= sessionCards.length) {
+            void finishPractice()
+          } else {
+            advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')
+          }
+          return
+        }
+        if (resolvedOutcome) {
+          event.preventDefault()
+          continueResolvedStep()
+          return
+        }
+        if (currentStep !== 'pronunciation' && normalizeAnswer(typedAnswer).length > 0) {
+          event.preventDefault()
+          submitTypedAnswer()
+        }
+        return
+      }
+
+      if (event.key === 'Escape' && currentStep !== 'recap' && !resolvedOutcome) {
+        event.preventDefault()
+        revealAndSkip()
+        return
+      }
+
+      if ((event.key === 'r' || event.key === 'R') && currentStep === 'pronunciation') {
+        const target = event.target as HTMLElement | null
+        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !pronunciationPairExhausted && !resolvedOutcome) {
+          event.preventDefault()
+          void startRecording()
+        }
+        return
+      }
+
+      if ((event.key === ' ' || event.key === 'Space') && currentStep === 'pronunciation' && isRecording) {
+        event.preventDefault()
+        void recordingRef.current?.stop()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [advanceAfterRecap, continueResolvedStep, currentCard, currentIndex, currentStep, finishPractice, isRecording, language, pronunciationMutation.isPending, pronunciationPairExhausted, recordingSupported, revealAndSkip, resolvedOutcome, sessionCards.length, sessionStarted, startRecording, submitTypedAnswer, typedAnswer, wordHasMistake])
 
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 

@@ -289,10 +289,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
 
-                    b.Property<DateTime?>("RestoredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("restored_at_utc");
-
                     b.Property<string>("RepeatPattern")
                         .IsRequired()
                         .HasMaxLength(16)

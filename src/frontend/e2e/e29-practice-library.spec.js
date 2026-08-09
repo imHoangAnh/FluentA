@@ -54,7 +54,7 @@ test('E29 uses one shared surface rhythm across Dictation, Meaning, Pronunciatio
   await page.getByRole('button', { name: 'Submit Answer', exact: true }).click()
   await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
   await page.getByTestId('practice-answer-input').fill('mitigate')
-  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+  await page.getByRole('button', { name: 'Submit Answer', exact: true }).click()
 
   await expect(card).toHaveClass(/review-card--meaningToWord/)
   await expect(page.getByText('What word matches this meaning?')).toBeVisible()
@@ -89,7 +89,7 @@ test('E29 opens a query-selected deck, preserves Shuffle in the session URL, and
   await expect(page.getByText('Meaning → Word')).toBeVisible()
   await expect(page.getByText('Pronunciation')).toBeVisible()
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page).toHaveURL('http://127.0.0.1:5173/practice')
+  await expect(page).toHaveURL('/practice')
 
   await page.goto('/practice?deck=page-1')
   await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible()
@@ -103,7 +103,7 @@ test('E29 opens a query-selected deck, preserves Shuffle in the session URL, and
   await expect(page.getByTestId('active-practice-card')).toBeVisible()
 
   await page.goto('/flashcards/practice')
-  await expect(page).toHaveURL('http://127.0.0.1:5173/')
+  await expect(page).toHaveURL('/')
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 })
 

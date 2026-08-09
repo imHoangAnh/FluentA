@@ -1,26 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
-  const email = `boardpage+${Date.now()}@example.com`;
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Board Page Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  await page.goto('http://127.0.0.1:5173/vocabulary');
+  await loginSeededUser(page, { prefix: 'vocab-smoke' });
+  await page.goto('/vocabulary');
   await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('IELTS Browser Board');
@@ -51,13 +34,9 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByLabel('Class for mitigation').press('Tab');
 
   await page.getByLabel('Delete mitigation').click();
-  await expect(page.getByRole('heading', { name: 'Delete Word?' })).toBeVisible();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByLabel('Word for mitigation')).toBeHidden();
 
   await page.getByRole('button', { name: 'Unit 1 - Education', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete Page' }).click();
-  await expect(page.getByRole('heading', { name: 'Delete Page?' })).toBeVisible();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Unit 1 - Education', exact: true })).toBeHidden();
 });

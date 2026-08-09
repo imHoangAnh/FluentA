@@ -94,7 +94,7 @@ test('Project uses the wide route and keeps extra-column overflow inside the boa
   })
 
   await page.setViewportSize({ width: 1920, height: 1080 })
-  await page.goto('http://localhost:5173/login')
+  await page.goto('/login')
   await page.getByLabel('Email').fill(user.email)
   await page.getByLabel('Password').fill('SecurePass123')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
@@ -136,7 +136,7 @@ test('Project uses the wide route and keeps extra-column overflow inside the boa
 
   await page.getByRole('button', { name: 'Add column' }).click()
   await page.getByTestId('project-column-name-input').fill('Review')
-  await page.getByRole('button', { name: 'Create column' }).click()
+  await page.getByTestId('project-column-name-input').press('Enter')
   await expect(page.getByTestId('project-column-Review')).toBeVisible()
 
   await page.setViewportSize({ width: 1024, height: 900 })
@@ -154,7 +154,7 @@ test('Project uses the wide route and keeps extra-column overflow inside the boa
   expect(overflowLayout.documentScrollWidth).toBeLessThanOrEqual(overflowLayout.documentClientWidth)
 
   await page.getByTestId('project-column-To Do').getByRole('button', { name: 'Add Card' }).click()
-  await expect(page.getByRole('complementary', { name: 'Create card' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => document.documentElement.clientWidth),
   )

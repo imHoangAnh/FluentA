@@ -1,5 +1,5 @@
 import { AudioLines, CheckCircle2, Languages, Mic, Play, Sparkles, Square, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
@@ -129,60 +129,6 @@ export function ReviewSessionPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!session || !currentWord || completed) return
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        speakWord(currentWord.word, currentLanguage)
-        return
-      }
-
-      if (event.key === 'Enter') {
-        if (isAutoAdvancing) return
-        if (showRecap) {
-          event.preventDefault()
-          moveToNextWord()
-          return
-        }
-        if (currentWord.mode !== 'pronunciation') {
-          if (normalizeAnswer(typedAnswer).length > 0) {
-            event.preventDefault()
-            checkTypedAnswer()
-          }
-        }
-        return
-      }
-
-      if (event.key === 'Escape' && currentWord.mode === 'dictation' && !showRecap && !feedback && !isAutoAdvancing) {
-        event.preventDefault()
-        void submitOutcome(false)
-        return
-      }
-
-      if ((event.key === 'r' || event.key === 'R') && currentWord.mode === 'pronunciation') {
-        const target = event.target as HTMLElement | null
-        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && pronunciationAttempts < 2) {
-          event.preventDefault()
-          void startRecording()
-        }
-        return
-      }
-
-      if ((event.key === ' ' || event.key === 'Space') && currentWord.mode === 'pronunciation') {
-        if (isRecording) {
-          event.preventDefault()
-          void recordingRef.current?.stop()
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [session, currentWord, completed, showRecap, feedback, typedAnswer, isRecording, isAutoAdvancing, recordingSupported, pronunciationMutation.isPending, pronunciationAttempts, currentLanguage])
-
   function openSession(nextSession: reviewApi.ReviewSessionCreated) {
     setSession(nextSession)
     setCurrentIndex(0)
@@ -219,48 +165,17 @@ export function ReviewSessionPage() {
     return value.trim().toLowerCase()
   }
 
-  async function handlePronunciationAudio(audio: Blob) {
-    recordingRef.current = null
-    setIsRecording(false)
-    if (!currentWord) return
-
-    try {
-      const result = await pronunciationMutation.mutateAsync({ wordId: currentWord.wordId, audio })
-      const attempts = pronunciationAttempts + 1
-      setPronunciationAttempts(attempts)
-      if (result.correct) {
-        await submitOutcome(true)
-      } else if (attempts >= 2) {
-        await submitOutcome(false)
-      }
-    } catch {
-      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
+  const moveToNextWord = useCallback(() => {
+    if (currentIndex + 1 >= words.length) {
+      setCompletedElapsedSeconds(Math.max(0, Math.round((Date.now() - sessionStartedAt.current) / 1000)))
+      setCompleted(true)
+      return
     }
-  }
 
-  async function startRecording() {
-    setPronunciationError(null)
-    pronunciationMutation.reset()
-    try {
-      recordingRef.current = await startPcmRecording(handlePronunciationAudio)
-      setIsRecording(true)
-    } catch {
-      setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
-    }
-  }
+    setCurrentIndex((value) => value + 1)
+  }, [currentIndex, words.length])
 
-  async function startReview() {
-    if (!boardId) return
-
-    await startSessionMutation.mutateAsync({
-      boardId,
-      orderType,
-      mode: reviewMode,
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    })
-  }
-
-  function schedulePostAnswerTransition() {
+  const schedulePostAnswerTransition = useCallback(() => {
     setIsAutoAdvancing(true)
     if (feedbackTimerRef.current !== null) {
       window.clearTimeout(feedbackTimerRef.current)
@@ -276,9 +191,9 @@ export function ReviewSessionPage() {
 
       moveToNextWord()
     }, 2000)
-  }
+  }, [moveToNextWord, recapEnabled])
 
-  async function submitOutcome(correct: boolean) {
+  const submitOutcome = useCallback(async (correct: boolean) => {
     if (!session || !currentWord || submitReviewMutation.isPending) return
 
     await submitReviewMutation.mutateAsync({
@@ -297,23 +212,104 @@ export function ReviewSessionPage() {
 
     setFeedback(correct ? 'correct' : 'wrong')
     schedulePostAnswerTransition()
-  }
+  }, [currentWord, schedulePostAnswerTransition, session, submitReviewMutation])
 
-  function moveToNextWord() {
-    if (currentIndex + 1 >= words.length) {
-      setCompletedElapsedSeconds(Math.max(0, Math.round((Date.now() - sessionStartedAt.current) / 1000)))
-      setCompleted(true)
-      return
+  const handlePronunciationAudio = useCallback(async (audio: Blob) => {
+    recordingRef.current = null
+    setIsRecording(false)
+    if (!currentWord) return
+
+    try {
+      const result = await pronunciationMutation.mutateAsync({ wordId: currentWord.wordId, audio })
+      const attempts = pronunciationAttempts + 1
+      setPronunciationAttempts(attempts)
+      if (result.correct) {
+        await submitOutcome(true)
+      } else if (attempts >= 2) {
+        await submitOutcome(false)
+      }
+    } catch {
+      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
     }
+  }, [currentWord, pronunciationAttempts, pronunciationMutation, submitOutcome])
 
-    setCurrentIndex((value) => value + 1)
+  const startRecording = useCallback(async () => {
+    setPronunciationError(null)
+    pronunciationMutation.reset()
+    try {
+      recordingRef.current = await startPcmRecording(handlePronunciationAudio)
+      setIsRecording(true)
+    } catch {
+      setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
+    }
+  }, [handlePronunciationAudio, pronunciationMutation])
+
+  async function startReview() {
+    if (!boardId) return
+
+    await startSessionMutation.mutateAsync({
+      boardId,
+      orderType,
+      mode: reviewMode,
+      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    })
   }
 
-  function checkTypedAnswer() {
+  const checkTypedAnswer = useCallback(() => {
     if (!currentWord || isAutoAdvancing) return
     const correct = normalizeAnswer(typedAnswer) === normalizeAnswer(currentWord.word)
     void submitOutcome(correct)
-  }
+  }, [currentWord, isAutoAdvancing, submitOutcome, typedAnswer])
+
+  useEffect(() => {
+    if (!session || !currentWord || completed) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        speakWord(currentWord.word, currentLanguage)
+        return
+      }
+
+      if (event.key === 'Enter') {
+        if (isAutoAdvancing) return
+        if (showRecap) {
+          event.preventDefault()
+          moveToNextWord()
+          return
+        }
+        if (currentWord.mode !== 'pronunciation' && normalizeAnswer(typedAnswer).length > 0) {
+          event.preventDefault()
+          checkTypedAnswer()
+        }
+        return
+      }
+
+      if (event.key === 'Escape' && currentWord.mode === 'dictation' && !showRecap && !feedback && !isAutoAdvancing) {
+        event.preventDefault()
+        void submitOutcome(false)
+        return
+      }
+
+      if ((event.key === 'r' || event.key === 'R') && currentWord.mode === 'pronunciation') {
+        const target = event.target as HTMLElement | null
+        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && pronunciationAttempts < 2) {
+          event.preventDefault()
+          void startRecording()
+        }
+        return
+      }
+
+      if ((event.key === ' ' || event.key === 'Space') && currentWord.mode === 'pronunciation' && isRecording) {
+        event.preventDefault()
+        void recordingRef.current?.stop()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [checkTypedAnswer, completed, currentLanguage, currentWord, feedback, isAutoAdvancing, isRecording, moveToNextWord, pronunciationAttempts, pronunciationMutation.isPending, recordingSupported, session, showRecap, startRecording, submitOutcome, typedAnswer])
 
   const noBoardSelected = !boardId
   const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { apiUrl, loginSeededApi } from './support/auth-fixture.js'
 
 const user = {
   id: 'notification-proof-user',
@@ -89,17 +90,10 @@ test('Notifications inbox exposes a recoverable error state', async ({ page }) =
 })
 
 test('Notifications API keeps empty inbox and unknown notification owner scoped', async ({ request }) => {
-  const email = `notifications-api+${crypto.randomUUID()}@example.com`
-  const password = 'SecurePass123'
-  const register = await request.post('http://127.0.0.1:5000/api/v1/auth/register', { data: { email, fullName: 'Notification API Learner', password } })
-  const registration = await register.json()
-  await request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', { data: { email, otp: registration.data.developmentOtp } })
-  const login = await request.post('http://127.0.0.1:5000/api/v1/auth/login', { data: { email, password } })
-  const token = (await login.json()).data.accessToken
-  const headers = { Authorization: `Bearer ${token}` }
+  const { headers } = await loginSeededApi(request, { prefix: 'notifications-api' })
 
-  expect((await request.get('http://127.0.0.1:5000/api/v1/notifications', { headers })).status()).toBe(200)
-  expect((await request.get('http://127.0.0.1:5000/api/v1/notifications/unread-count', { headers })).status()).toBe(200)
-  expect((await request.patch('http://127.0.0.1:5000/api/v1/notifications/33333333-3333-3333-3333-333333333333/read', { headers })).status()).toBe(404)
-  expect((await request.patch('http://127.0.0.1:5000/api/v1/notifications/read-all', { headers })).status()).toBe(200)
+  expect((await request.get(apiUrl('/notifications'), { headers })).status()).toBe(200)
+  expect((await request.get(apiUrl('/notifications/unread-count'), { headers })).status()).toBe(200)
+  expect((await request.patch(apiUrl('/notifications/33333333-3333-3333-3333-333333333333/read'), { headers })).status()).toBe(404)
+  expect((await request.patch(apiUrl('/notifications/read-all'), { headers })).status()).toBe(200)
 })

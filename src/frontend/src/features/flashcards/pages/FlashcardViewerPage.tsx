@@ -211,16 +211,16 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
       ) : null}
 
       {sessionQuery.data && currentCard ? (
-        <section className="flex min-h-[calc(100vh-8rem)] w-full items-center justify-center py-4">
-          <div className="mx-auto grid w-full max-w-5xl gap-6" data-testid="flashcard-viewer-content">
-            <div className="flex items-center justify-between gap-4">
+        <section className="flex min-h-[calc(100vh-8rem)] w-full min-w-0 items-center justify-center py-4">
+          <div className="mx-auto grid w-full min-w-0 max-w-5xl grid-cols-[minmax(0,1fr)] gap-6" data-testid="flashcard-viewer-content">
+            <div className="flex min-w-0 items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">{sessionQuery.data.pageName}</h2>
+                <h2 className="m-0 break-words text-2xl font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{sessionQuery.data.pageName}</h2>
               </div>
               <div className="text-center">
                 <strong className="text-lg font-semibold">{progressLabel}</strong>
               </div>
-              <div className="flex items-center justify-end gap-2 flex-1">
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
                 <Button
                   variant={isShuffled ? 'default' : 'outline'}
                   size="sm"
@@ -368,12 +368,12 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
             </div>
 
             {/* Navigation and Toolbar */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
               <Button variant="outline" type="button" onClick={goPrevious} disabled={currentIndex === 0}>
                 <ChevronLeft /> Previous
               </Button>
               {isFinalCard ? (
-                <div className="flex gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap justify-end gap-2">
                   <Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button>
                   <Button asChild><Link to={`/practice?deck=${pageId}`}>Let's practice</Link></Button>
                 </div>

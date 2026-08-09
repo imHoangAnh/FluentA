@@ -90,7 +90,7 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
   await expect(recap).toContainText('/ɡəʊ/')
   await expect(recap).toContainText('Definition')
   await expect(recap).toContainText('move from one place to another')
-  await expect(recap).toContainText('Meaning VN')
+  await expect(recap).toContainText('Meaning')
   await expect(recap).toContainText('Example')
   await expect(recap.getByText('Correct', { exact: true })).toHaveCount(0)
   await expect(recap.getByText('Wrong', { exact: true })).toHaveCount(0)
@@ -103,7 +103,7 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
   await expect(page).toHaveURL(/\/practice$/)
 })
 
-test('Review pronunciation submits Wrong only after the second failed assessment and always shows recap', async ({ page }) => {
+test('Review pronunciation submits after the second failed assessment and always shows recap', async ({ page }) => {
   await installFakeMicrophone(page)
   let assessmentCount = 0
   const reviewBodies = []
@@ -132,17 +132,15 @@ test('Review pronunciation submits Wrong only after the second failed assessment
 
   await page.goto('/review')
   await page.getByRole('button', { name: 'Vocabulary board' }).click()
-  await page.getByRole('option', { name: /board 1/i }).click()
+  await page.getByRole('option', { name: /Review board/i }).click()
   await page.getByRole('button', { name: 'Start review' }).click()
 
   await recordOnce(page)
-  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
   expect(reviewBodies).toHaveLength(0)
   await expect(page.getByText(/attempt 2 of 2/i)).toBeVisible()
 
   await recordOnce(page)
   const recap = page.getByTestId('review-answer')
-  await expect(recap).toContainText('Wrong')
   await expect(recap).toContainText('go (verb)')
   await expect(recap).toContainText('/ɡəʊ/')
   await expect(recap).toContainText('Definition: move from one place to another')

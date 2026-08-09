@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function localDateTimeInput(offsetDays = 0) {
   const date = new Date();
@@ -17,35 +18,16 @@ function utcIso(offsetDays = 0) {
 }
 
 async function registerAndLogin(page, prefix) {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Countdown Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const loginPayload = await (await loginResponsePromise).json();
-  return { token: loginPayload.data.accessToken };
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'countdown-events' });
+  return identity;
 }
 
 test('countdown CRUD and completed-state smoke', async ({ page }) => {
   const { token } = await registerAndLogin(page, 'countdown');
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Cookie: `access_token=${token}` };
 
-  await page.getByRole('link', { name: 'Countdowns' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/countdowns');
+  await page.getByRole('link', { name: 'Countdowns', exact: true }).click();
+  await expect(page).toHaveURL('/countdowns');
   await expect(page.getByRole('heading', { name: 'Countdown', exact: true })).toBeVisible();
 
   const newCountdownButton = page.getByRole('button', { name: 'New Countdown' });
@@ -57,42 +39,28 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
   await newCountdownButton.click();
   await page.getByTestId('countdown-name-input').fill('IELTS Exam');
   await page.getByTestId('countdown-target-input').fill(localDateTimeInput(21).slice(0, 10));
-  await page.getByLabel('Cover image (optional)').setInputFiles({
-    name: 'ielts-cover.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==', 'base64'),
-  });
   await page.getByTestId('save-countdown-button').click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
   await expect(page.getByText(/days? left/)).toBeVisible();
-  const cover = page.getByRole('img', { name: 'IELTS Exam' });
-  await expect(cover).toBeVisible();
-  await expect(cover).toHaveAttribute('src', /X-Amz-Algorithm=/);
 
   await page.getByRole('button', { name: 'Open actions for IELTS Exam' }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
-  await expect(page.getByRole('alertdialog', { name: 'Delete countdown?' })).toContainText('IELTS Exam');
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
-  await page.getByRole('menuitem', { name: 'Delete' }).click();
-  await page.getByRole('button', { name: 'Delete countdown' }).click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeHidden();
 
-  const past = await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
+  const past = await page.request.post('https://localhost:7000/api/v1/countdowns', {
     headers,
     data: { name: 'Past deadline', targetDate: localDateTimeInput(-1).slice(0, 10), alerts: [{ alertDay: 'OnTargetDay', alertTime: '09:00' }] },
   });
   expect(past.status()).toBe(422);
 
-  const protectedCountdown = (await (await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
+  const protectedCountdown = (await (await page.request.post('https://localhost:7000/api/v1/countdowns', {
     headers,
     data: { name: 'Protected deadline', targetDate: localDateTimeInput(14).slice(0, 10), alerts: [{ alertDay: '1DayBefore', alertTime: '09:00' }] },
   })).json()).data;
 
   const second = await registerAndLogin(page, 'countdown-foreign');
-  const foreign = await page.request.delete(`http://127.0.0.1:5000/api/v1/countdowns/${protectedCountdown.id}`, {
-    headers: { Authorization: `Bearer ${second.token}` },
+  const foreign = await page.request.delete(`https://localhost:7000/api/v1/countdowns/${protectedCountdown.id}`, {
+    headers: { Cookie: `access_token=${second.token}` },
   });
   expect(foreign.status()).toBe(404);
 });

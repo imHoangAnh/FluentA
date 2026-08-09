@@ -1,25 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 async function registerAndLogin(page) {
-  const email = `productivity-responsive+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Responsive Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  const identity = await loginSeededUser(page, { prefix: 'productivity-responsive' });
+  return identity;
 }
 
 const productivityRoutes = [
@@ -34,9 +18,10 @@ test('productivity routes avoid page overflow at desktop and tablet widths', asy
   await registerAndLogin(page);
 
   await page.getByRole('link', { name: 'Project', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/project');
-  await page.getByTestId('project-board-name-input').fill('Responsive board');
-  await page.getByTestId('project-board-name-input').press('Enter');
+  await expect(page).toHaveURL('/project');
+  await page.getByTestId('project-empty-new-project').click();
+  await page.getByTestId('project-empty-project-input').fill('Responsive board');
+  await page.getByTestId('project-empty-project-input').press('Enter');
   await expect(page.getByTestId('project-column-Done')).toBeVisible();
 
   for (const viewport of [
@@ -47,11 +32,11 @@ test('productivity routes avoid page overflow at desktop and tablet widths', asy
 
     for (const route of productivityRoutes) {
       await page.getByRole('link', { name: route.title, exact: true }).click();
-      await expect(page).toHaveURL(`http://127.0.0.1:5173${route.path}`);
+      await expect(page).toHaveURL(`${route.path}`);
       await expect(page.getByRole('heading', { level: 1, name: route.title })).toBeVisible();
       if (route.path === '/project') {
         await page.getByTestId('project-column-To Do').getByRole('button', { name: 'Add Card' }).click();
-        await expect(page.getByRole('complementary', { name: 'Create card' })).toBeVisible();
+        await expect(page.getByRole('dialog')).toBeVisible();
       }
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,

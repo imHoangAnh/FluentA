@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function monthInput(date = new Date()) {
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}`;
@@ -9,33 +10,12 @@ function dateInput(day) {
 }
 
 async function registerAndLogin(page, prefix) {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Journal Calendar Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Create a password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Enter your password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const loginPayload = await (await loginResponsePromise).json();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return loginPayload.data.accessToken;
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'journal-calendar' });
+  return identity;
 }
 
 async function createJournal(page, headers, title, date) {
-  const response = await page.request.post('http://127.0.0.1:5000/api/v1/journal', {
+  const response = await page.request.post('https://localhost:7000/api/v1/journal', {
     headers,
     data: { title, content: `<p>${title}</p>`, date },
   });
@@ -44,8 +24,8 @@ async function createJournal(page, headers, title, date) {
 }
 
 test('Journal learning-date calendar opens populated dates and prepares empty dates', async ({ context, page }, testInfo) => {
-  const token = await registerAndLogin(page, 'journal-calendar');
-  const headers = { Authorization: `Bearer ${token}` };
+  const { token } = await registerAndLogin(page, 'journal-calendar');
+  const headers = { Cookie: `access_token=${token}` };
   const populatedDate = dateInput(12);
   const deletedDate = dateInput(13);
   const emptyDate = dateInput(20);
@@ -53,18 +33,19 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   await createJournal(page, headers, 'First calendar note', populatedDate);
   const newest = await createJournal(page, headers, 'Newest calendar note', populatedDate);
   const deleted = await createJournal(page, headers, 'Deleted calendar note', deletedDate);
-  await page.request.delete(`http://127.0.0.1:5000/api/v1/journal/${deleted.id}`, { headers });
+  await page.request.delete(`https://localhost:7000/api/v1/journal/${deleted.id}`, { headers });
 
   const foreignPage = await context.newPage();
-  const foreignToken = await registerAndLogin(foreignPage, 'journal-calendar-foreign');
-  await createJournal(foreignPage, { Authorization: `Bearer ${foreignToken}` }, 'Foreign calendar note', populatedDate);
+  const { token: foreignToken } = await registerAndLogin(foreignPage, 'journal-calendar-foreign');
+  await createJournal(foreignPage, { Cookie: `access_token=${foreignToken}` }, 'Foreign calendar note', populatedDate);
   await foreignPage.close();
+  await page.context().addCookies([{ name: 'access_token', value: token, url: 'https://localhost:5173/', httpOnly: true, secure: true, sameSite: 'Strict' }]);
 
-  const calendarResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/journal/calendar?month=${monthInput()}`, { headers });
+  const calendarResponse = await page.request.get(`https://localhost:7000/api/v1/journal/calendar?month=${monthInput()}`, { headers });
   expect(calendarResponse.status()).toBe(200);
   const calendarDays = (await calendarResponse.json()).data;
   expect(calendarDays).toEqual([{ date: populatedDate, count: 2 }]);
-  const invalidResponse = await page.request.get('http://127.0.0.1:5000/api/v1/journal/calendar?month=June', { headers });
+  const invalidResponse = await page.request.get('https://localhost:7000/api/v1/journal/calendar?month=June', { headers });
   expect(invalidResponse.status()).toBe(422);
 
   await page.getByRole('link', { name: 'Journal' }).click();

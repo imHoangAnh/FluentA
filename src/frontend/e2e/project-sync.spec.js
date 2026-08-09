@@ -1,34 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 async function registerAndLogin(page, prefix) {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Project Sync Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  const token = await login(page, email, password);
-  return { email, password, token };
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'project-sync' });
+  return identity;
 }
 
 async function login(page, email, password) {
-  await page.goto('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const token = (await (await loginResponsePromise).json()).data.accessToken;
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return token;
+  return loginSeededUser(page, { email, password });
 }
 
 test('ProjectCardMoved syncs card movement across same-user tabs', async ({ context, page }) => {
@@ -43,8 +22,9 @@ test('ProjectCardMoved syncs card movement across same-user tabs', async ({ cont
   const { email, password } = await registerAndLogin(page, 'project-sync');
 
   await page.getByRole('link', { name: 'Project' }).click();
-  await page.getByTestId('project-board-name-input').fill('Sync board');
-  await page.getByTestId('project-board-name-input').press('Enter');
+  await page.getByTestId('project-empty-new-project').click();
+  await page.getByTestId('project-empty-project-input').fill('Sync board');
+  await page.getByTestId('project-empty-project-input').press('Enter');
   await expect(page.getByTestId('project-column-To Do')).toBeVisible();
   await expect(page.getByTestId('project-column-In Progress')).toBeVisible();
 

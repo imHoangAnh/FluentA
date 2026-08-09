@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
+import { loginSeededUser } from './support/auth-fixture.js';
 
-const appUrl = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
-const apiUrl = process.env.E2E_API_URL ?? 'http://127.0.0.1:5000/api/v1'
+const appUrl = process.env.E2E_BASE_URL ?? ''
+const apiUrl = process.env.E2E_API_URL ?? 'https://localhost:7000/api/v1'
 
 function localDateTime(offsetMilliseconds) {
   const date = new Date(Date.now() + offsetMilliseconds)
@@ -13,33 +14,14 @@ function localDateTime(offsetMilliseconds) {
 }
 
 async function registerAndLogin(page, prefix) {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`
-  const password = 'SecurePass123'
-
-  await page.goto(`${appUrl}/register`)
-  await page.getByLabel('Full name').fill('Todo Reminder Learner')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'))
-  await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  const registerPayload = await (await registerResponsePromise).json()
-  await page.request.post(`${apiUrl}/auth/verify-email`, {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  })
-
-  await page.goto(`${appUrl}/login`)
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'))
-  await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  const loginPayload = await (await loginResponsePromise).json()
-  return { token: loginPayload.data.accessToken }
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'todo-reminder-notification' });
+  return identity;
 }
 
 test('Todo reminder delivers once and its notification opens the owned task details', async ({ page }) => {
   test.setTimeout(180_000)
   const { token } = await registerAndLogin(page, 'todo-reminder')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = { Cookie: `access_token=${token}` }
   const reminder = localDateTime(90_000)
 
   await page.goto(`${appUrl}/todo`)
@@ -76,7 +58,7 @@ test('Todo reminder delivers once and its notification opens the owned task deta
 
 test('Todo reminder lifecycle clears past moves, copies recurrence, and hides foreign tasks', async ({ page }) => {
   const owner = await registerAndLogin(page, 'todo-reminder-lifecycle')
-  const headers = { Authorization: `Bearer ${owner.token}` }
+  const headers = { Cookie: `access_token=${owner.token}` }
   const future = localDateTime(48 * 60 * 60 * 1000)
   const yesterday = localDateTime(-24 * 60 * 60 * 1000).date
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -115,7 +97,7 @@ test('Todo reminder lifecycle clears past moves, copies recurrence, and hides fo
 
   const foreign = await registerAndLogin(page, 'todo-reminder-foreign')
   const foreignRead = await page.request.get(`${apiUrl}/todos/${recurring.id}`, {
-    headers: { Authorization: `Bearer ${foreign.token}` },
+    headers: foreign.headers,
   })
   expect(foreignRead.status()).toBe(404)
 })

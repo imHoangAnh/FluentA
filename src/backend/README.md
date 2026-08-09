@@ -142,7 +142,6 @@ src/backend/
   FluentA.Infrastructure/         EF Core, PostgreSQL, MinIO và provider
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
-  FluentA.Worker/                 Chỉ còn launch profile cũ; không có project/host buildable
   FluentA.slnx                    .NET solution
 ```
 

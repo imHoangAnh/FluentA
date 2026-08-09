@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function todayInput() {
   const date = new Date();
@@ -13,36 +14,16 @@ function currentMonth() {
 }
 
 async function registerAndLogin(page) {
-  const email = `habit-sync+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Habit Sync Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const token = (await (await loginResponsePromise).json()).data.accessToken;
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return { email, password, token };
+  const identity = await loginSeededUser(page, { prefix: 'habit-sync' });
+  return identity;
 }
 
 async function login(page, email, password) {
-  await page.goto('http://127.0.0.1:5173/login');
+  await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await expect(page).toHaveURL('/');
 }
 
 test('HabitChecked refreshes inactive Habit caches across protected routes', async ({ context, page }) => {
@@ -55,8 +36,8 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   page.on('console', collectConsoleError);
 
   const { email, password, token } = await registerAndLogin(page);
-  const headers = { Authorization: `Bearer ${token}` };
-  const habit = (await (await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
+  const headers = { Cookie: `access_token=${token}` };
+  const habit = (await (await page.request.post('https://localhost:7000/api/v1/habits', {
     headers,
     data: {
       name: 'Cross-tab reading',
@@ -102,3 +83,4 @@ test('HabitChecked refreshes inactive Habit caches across protected routes', asy
   await expect(secondTab.getByLabel(`Uncheck Cross-tab reading for selected date ${todayInput()}`)).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
+

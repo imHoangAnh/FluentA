@@ -389,7 +389,7 @@ describe('FluentA app routes', async () => {
 
     await renderApp('/profile')
 
-    expect(screen.getByRole('heading', { name: 'Profile', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('main').querySelector('form h1')).toHaveTextContent('Profile')
     expect(screen.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
     expect(screen.queryByRole('navigation', { name: 'Settings navigation' })).not.toBeInTheDocument()
   })

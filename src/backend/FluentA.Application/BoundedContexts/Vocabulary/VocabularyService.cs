@@ -122,14 +122,6 @@ public sealed class VocabularyService : IVocabularyService
         return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Vocabulary", board.Id, board.Name, "Vocabulary", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
     }
 
-    public async Task<OperationResult<IReadOnlyList<PageDto>>> ListPagesAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
-    {
-        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
-        return board is null
-            ? OperationResult<IReadOnlyList<PageDto>>.Failure(VocabularyError.NotFound())
-            : OperationResult<IReadOnlyList<PageDto>>.Success(ToPages(board));
-    }
-
     public async Task<OperationResult<PageDto>> CreatePageAsync(Guid userId, Guid boardId, CreatePageRequest request, CancellationToken cancellationToken = default)
     {
         var errors = ValidatePage(request.Name);

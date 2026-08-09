@@ -32,7 +32,6 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     public DateTime TargetDate { get; private set; }
     public Guid? CoverAssetId { get; private set; }
     public CountdownRepeatPattern RepeatPattern { get; private set; }
-    public DateTime? RestoredAtUtc { get; private set; }
     public IReadOnlyList<CountdownAlert> Alerts => _alerts.AsReadOnly();
 
     public static CountdownEvent Create(
@@ -118,8 +117,6 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
     {
         var now = NormalizeUtc(nowUtc);
         DeletedAt = null;
-        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(now, CountdownTimeZone.Vietnam()).Date;
-        RestoredAtUtc = vietnamNow > TargetDate.Date.AddDays(7) ? now : null;
         UpdatedAt = now;
     }
 

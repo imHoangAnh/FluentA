@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function todayInput() {
   const date = new Date();
@@ -9,33 +10,15 @@ function todayInput() {
 }
 
 async function registerAndLogin(page) {
-  const email = `habit-grid+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Habit Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  const responsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const payload = await (await responsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: payload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  const identity = await loginSeededUser(page, { prefix: 'habit-grid' });
+  return identity;
 }
 
 test('semantic icon and selected-week Habit layout work on desktop and tablet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await registerAndLogin(page);
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/habits');
+  await expect(page).toHaveURL('/habits');
 
   const createHabitButton = page.getByRole('button', { name: 'Create habit' });
   await createHabitButton.click();
@@ -55,9 +38,9 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
   await page.getByRole('option', { name: '21 days', exact: true }).click();
   await page.getByTestId('habit-reminder-time-input').fill('07:30');
   await page.getByRole('button', { name: 'Habit icon' }).click();
-  const iconOptions = page.getByRole('menu').getByRole('menuitem');
+  const iconOptions = page.getByRole('listbox').getByRole('option');
   await expect(iconOptions).toHaveCount(8);
-  await page.getByRole('menuitem', { name: 'Book' }).click();
+  await page.getByRole('option', { name: 'Book', exact: true }).click();
   await page.getByTestId('save-habit-button').click();
 
   await expect(page.getByRole('heading', { name: 'Read English' })).toBeVisible();
@@ -92,7 +75,8 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
 
   const desktopSidebar = await page.locator('.habit-tracker-sidebar').boundingBox();
   const desktopDetails = await page.locator('.habit-tracker-details').boundingBox();
-  expect(Math.abs((desktopSidebar?.width ?? 0) - (desktopDetails?.width ?? 0))).toBeLessThan(4);
+  expect(desktopSidebar?.width ?? 0).toBeGreaterThan(desktopDetails?.width ?? 0);
+  expect((desktopSidebar?.width ?? 0) / Math.max(desktopDetails?.width ?? 1, 1)).toBeGreaterThan(1.5);
   expect(await page.evaluate(() => document.documentElement.scrollHeight > document.documentElement.clientHeight)).toBe(false);
 
   await page.setViewportSize({ width: 1024, height: 768 });

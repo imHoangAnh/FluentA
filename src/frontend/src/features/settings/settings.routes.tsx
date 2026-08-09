@@ -27,7 +27,7 @@ export const settingsRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="practice" replace /> },
       { path: 'practice', lazy: lazySettingsPage(() => import('./pages/SettingsPracticePage'), 'SettingsPracticePage') },
       { path: 'level5', lazy: lazySettingsPage(() => import('./pages/LevelFiveSettingsPage'), 'LevelFiveSettingsPage') },
-      { path: 'review', element: <Navigate to="practice" replace /> },
+      { path: 'review', element: <Navigate to="/settings/practice" replace /> },
     ],
   },
 ]

@@ -36,7 +36,7 @@ test('keeps one AppShell mounted across protected client-side navigation', async
   await page.getByLabel('Password').fill('SecurePass123')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/')
+  await expect(page).toHaveURL('/')
   await expect(page.getByLabel('Primary navigation')).toBeVisible()
   await expect(page.getByLabel('Primary navigation').getByRole('link', { name: 'Overview', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Log out' }).hover()
@@ -46,7 +46,7 @@ test('keeps one AppShell mounted across protected client-side navigation', async
   await expect(page.getByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).toHaveCount(0)
   await page.getByRole('link', { name: 'Todo', exact: true }).click()
 
-  await expect(page).toHaveURL('http://127.0.0.1:5173/todo')
+  await expect(page).toHaveURL('/todo')
   await expect(page.getByRole('link', { name: 'Go to overview' })).toHaveAttribute('href', '/')
   const todoTitleInput = page.getByTestId('todo-title-input')
   await todoTitleInput.focus()
@@ -63,7 +63,8 @@ test('keeps one AppShell mounted across protected client-side navigation', async
   expect(await initialShell.evaluate((node, nextNode) => node === nextNode, currentShell)).toBe(true)
 
   await page.getByRole('link', { name: 'Open profile' }).click()
-  await expect(page).toHaveURL('http://127.0.0.1:5173/profile')
+  await expect(page).toHaveURL('/profile')
   await page.getByRole('link', { name: 'Go to overview' }).click()
-  await expect(page).toHaveURL('http://127.0.0.1:5173/')
+  await expect(page).toHaveURL('/')
 })
+
