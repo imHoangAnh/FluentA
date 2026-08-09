@@ -57,7 +57,6 @@ async function mockReleaseApis(page, authState) {
           data: {
             profile: { ...user, bio: '' },
             practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-            reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
           },
         }),
       })

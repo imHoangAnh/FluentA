@@ -53,14 +53,12 @@ async function mockSettingsApis(page) {
 
     if (path.endsWith('/auth/me')) return route.fulfill(json(user))
     if (path.endsWith('/practice/settings')) return route.fulfill(json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] }))
-    if (path.endsWith('/review/settings')) return route.fulfill(json({ dailyLimit: 30, recapAfterAnswer: true }))
     if (path.endsWith('/review/level-five/remove')) return route.fulfill(json(2))
     if (path.endsWith('/review/level-five')) return route.fulfill(json(levelFiveWords))
     if (path.endsWith('/settings')) {
       return route.fulfill(json({
         profile: user,
         practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-        reviewSettings: { dailyLimit: 30, recapAfterAnswer: true },
       }))
     }
 
@@ -85,7 +83,6 @@ for (const viewport of [
 
     for (const [name, heading] of [
       ['Practice', 'Practice'],
-      ['Review', 'Review'],
       ['Level 5', 'Level 5 words'],
       ['Profile', 'Profile'],
     ]) {

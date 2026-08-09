@@ -29,15 +29,6 @@ public sealed class ReviewController : ControllerBase
             : ToErrorResult(result);
     }
 
-    [HttpGet("sessions/{sessionId:guid}/summary")]
-    public async Task<IActionResult> GetReviewSessionSummary(Guid sessionId, CancellationToken cancellationToken)
-    {
-        var result = await _review.GetReviewSessionSummaryAsync(CurrentUserId(), sessionId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSessionSummaryDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard([FromQuery] string? timeZoneId, CancellationToken cancellationToken)
     {
@@ -53,22 +44,6 @@ public sealed class ReviewController : ControllerBase
         var result = await _review.GetDashboardAsync(CurrentUserId(), boardId, timeZoneId, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiEnvelope<FlashcardDashboardDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    [HttpGet("settings")]
-    public async Task<IActionResult> GetReviewSettings(CancellationToken cancellationToken)
-    {
-        var settings = await _review.GetReviewSettingsAsync(CurrentUserId(), cancellationToken);
-        return Ok(ApiEnvelope<ReviewSettingsDto>.Ok(settings));
-    }
-
-    [HttpPut("settings")]
-    public async Task<IActionResult> UpdateReviewSettings(UpdateReviewSettingsRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _review.UpdateReviewSettingsAsync(CurrentUserId(), request, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSettingsDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

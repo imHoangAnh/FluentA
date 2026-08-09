@@ -11,18 +11,6 @@ public interface IReviewService
         CreateReviewSessionRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<ReviewSessionSummaryDto>> GetReviewSessionSummaryAsync(
-        Guid userId,
-        Guid sessionId,
-        CancellationToken cancellationToken = default);
-
-    Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    Task<OperationResult<ReviewSettingsDto>> UpdateReviewSettingsAsync(
-        Guid userId,
-        UpdateReviewSettingsRequest request,
-        CancellationToken cancellationToken = default);
-
     Task<OperationResult<FlashcardDashboardDto>> GetDashboardAsync(
         Guid userId,
         Guid? boardId,

@@ -36,7 +36,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<ReviewSessionItem> ReviewSessionItems => Set<ReviewSessionItem>();
     public DbSet<PracticeSessionSummary> PracticeSessionSummaries => Set<PracticeSessionSummary>();
     public DbSet<PracticeSettings> PracticeSettings => Set<PracticeSettings>();
-    public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();

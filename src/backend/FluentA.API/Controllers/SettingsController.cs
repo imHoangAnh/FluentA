@@ -3,7 +3,6 @@ using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
 using FluentA.Application.BoundedContexts.Practice;
-using FluentA.Application.BoundedContexts.Review;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,13 +15,10 @@ public sealed class SettingsController : ControllerBase
 {
     private readonly IAuthService _auth;
     private readonly IPracticeService _practice;
-    private readonly IReviewService _review;
-
-    public SettingsController(IAuthService auth, IPracticeService practice, IReviewService review)
+    public SettingsController(IAuthService auth, IPracticeService practice)
     {
         _auth = auth;
         _practice = practice;
-        _review = review;
     }
 
     [HttpGet("settings")]
@@ -36,9 +32,7 @@ public sealed class SettingsController : ControllerBase
         }
 
         var practiceSettings = await _practice.GetPracticeSettingsAsync(userId, cancellationToken);
-        var reviewSettings = await _review.GetReviewSettingsAsync(userId, cancellationToken);
-
-        return Ok(ApiEnvelope<SettingsDto>.Ok(new SettingsDto(profileResult.Value!, practiceSettings, reviewSettings)));
+        return Ok(ApiEnvelope<SettingsDto>.Ok(new SettingsDto(profileResult.Value!, practiceSettings)));
     }
 
     private Guid CurrentUserId()

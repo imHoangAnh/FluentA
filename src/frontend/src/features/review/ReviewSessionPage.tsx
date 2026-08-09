@@ -1,9 +1,8 @@
-import { AudioLines, CheckCircle2, Languages, Layers, Mic, MicOff, Play, Sparkles, Volume2, X } from 'lucide-react'
+import { AudioLines, CheckCircle2, Languages, Mic, Play, Sparkles, Square, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
-import { getReviewSettings } from './api/review-settings.api'
 import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
@@ -27,10 +26,23 @@ function formatWordClass(value: string) {
   return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim())
+}
+
 function buildBoardOptions(boards: FlashcardBoard[]) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const today = `${parts.find((part) => part.type === 'year')?.value}-${parts.find((part) => part.type === 'month')?.value}-${parts.find((part) => part.type === 'day')?.value}`
+
   const options = boards.map((board) => {
     const words = board.pages.flatMap((page) => page.words)
-    const dueCount = words.filter((word) => word.isInReview && word.nextReviewDate).length
+    const dueCount = words.filter((word) => word.isInReview && word.nextReviewDate && word.nextReviewDate <= today).length
 
     return {
       boardId: board.boardId,
@@ -47,26 +59,11 @@ function buildBoardOptions(boards: FlashcardBoard[]) {
   })
 }
 
-function modeLabel(mode: reviewApi.ReviewMode) {
-  switch (mode) {
-    case 'dictation':
-      return 'Dictation'
-    case 'meaningToWord':
-      return 'Meaning → Word'
-    case 'pronunciation':
-      return 'Pronunciation'
-    case 'random':
-      return 'All 3 Modes'
-    default:
-      return mode
-  }
-}
-
 export function ReviewSessionPage() {
   const [boardId, setBoardId] = useState('')
   const [orderType, setOrderType] = useState<reviewApi.ReviewOrderType>('sequential')
   const [reviewMode, setReviewMode] = useState<reviewApi.ReviewMode>('random')
-  const [resumeModalSession, setResumeModalSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
+  const [recapEnabled, setRecapEnabled] = useState(true)
   const [session, setSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
@@ -75,35 +72,27 @@ export function ReviewSessionPage() {
   const [correctCount, setCorrectCount] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
   const [showRecap, setShowRecap] = useState(false)
-  const [lastOutcome, setLastOutcome] = useState<'correct' | 'wrong' | null>(null)
   const [completedElapsedSeconds, setCompletedElapsedSeconds] = useState(0)
   const [pronunciationAttempts, setPronunciationAttempts] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false)
   const [completed, setCompleted] = useState(false)
   const sessionStartedAt = useRef(0)
   const cardStartedAt = useRef(0)
   const recordingRef = useRef<ActivePcmRecording | null>(null)
+  const feedbackTimerRef = useRef<number | null>(null)
 
   const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: listBoards })
-  const reviewSettingsQuery = useQuery({ queryKey: ['review', 'settings'], queryFn: getReviewSettings })
   const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? []), [decksQuery.data])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []
   const currentWord = words[currentIndex] ?? null
-  const recapAfterAnswer = reviewSettingsQuery.data?.recapAfterAnswer ?? true
   const currentLanguage = activeBoard?.boardLanguage ?? 'en'
   const recordingSupported = supportsPcmRecording()
 
   const startSessionMutation = useMutation({
     mutationFn: reviewApi.createReviewSession,
-    onSuccess: (result) => {
-      if (result.startDisposition === 'prompt') {
-        setResumeModalSession(result)
-        return
-      }
-
-      openSession(result)
-    },
+    onSuccess: openSession,
   })
 
   const submitReviewMutation = useMutation({ mutationFn: reviewApi.submitReview })
@@ -119,7 +108,6 @@ export function ReviewSessionPage() {
     setPronunciationError(null)
     setPronunciationAttempts(0)
     setShowRecap(false)
-    setLastOutcome(null)
     void recordingRef.current?.cancel()
     recordingRef.current = null
     setIsRecording(false)
@@ -131,6 +119,9 @@ export function ReviewSessionPage() {
 
   useEffect(() => () => {
     void recordingRef.current?.cancel()
+    if (feedbackTimerRef.current !== null) {
+      window.clearTimeout(feedbackTimerRef.current)
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
@@ -147,6 +138,7 @@ export function ReviewSessionPage() {
       }
 
       if (event.key === 'Enter') {
+        if (isAutoAdvancing) return
         if (showRecap) {
           event.preventDefault()
           moveToNextWord()
@@ -181,10 +173,9 @@ export function ReviewSessionPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [session, currentWord, completed, showRecap, typedAnswer, isRecording, recordingSupported, pronunciationMutation.isPending, pronunciationAttempts, currentLanguage])
+  }, [session, currentWord, completed, showRecap, typedAnswer, isRecording, isAutoAdvancing, recordingSupported, pronunciationMutation.isPending, pronunciationAttempts, currentLanguage])
 
   function openSession(nextSession: reviewApi.ReviewSessionCreated) {
-    setResumeModalSession(null)
     setSession(nextSession)
     setCurrentIndex(0)
     setTypedAnswer('')
@@ -193,8 +184,8 @@ export function ReviewSessionPage() {
     setCorrectCount(0)
     setWrongCount(0)
     setShowRecap(false)
-    setLastOutcome(null)
     setPronunciationAttempts(0)
+    setIsAutoAdvancing(false)
     setCompletedElapsedSeconds(0)
     setCompleted(false)
     sessionStartedAt.current = Date.now()
@@ -202,16 +193,16 @@ export function ReviewSessionPage() {
   }
   function resetToLanding() {
     setSession(null)
-    setResumeModalSession(null)
     setBoardId('')
+    setRecapEnabled(true)
     setTypedAnswer('')
     setFeedback(null)
     setPronunciationError(null)
     setCorrectCount(0)
     setWrongCount(0)
     setShowRecap(false)
-    setLastOutcome(null)
     setPronunciationAttempts(0)
+    setIsAutoAdvancing(false)
     setCompletedElapsedSeconds(0)
     setCompleted(false)
   }
@@ -229,7 +220,6 @@ export function ReviewSessionPage() {
       const result = await pronunciationMutation.mutateAsync({ wordId: currentWord.wordId, audio })
       const attempts = pronunciationAttempts + 1
       setPronunciationAttempts(attempts)
-      setFeedback(result.correct ? 'correct' : 'wrong')
       if (result.correct) {
         await submitOutcome(true)
       } else if (attempts >= 2) {
@@ -251,16 +241,33 @@ export function ReviewSessionPage() {
     }
   }
 
-  async function startReview(startBehavior: reviewApi.ReviewStartBehavior) {
+  async function startReview() {
     if (!boardId) return
 
     await startSessionMutation.mutateAsync({
       boardId,
       orderType,
       mode: reviewMode,
-      startBehavior,
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     })
+  }
+
+  function schedulePostAnswerTransition() {
+    setIsAutoAdvancing(true)
+    if (feedbackTimerRef.current !== null) {
+      window.clearTimeout(feedbackTimerRef.current)
+    }
+    feedbackTimerRef.current = window.setTimeout(() => {
+      feedbackTimerRef.current = null
+      setFeedback(null)
+      setIsAutoAdvancing(false)
+      if (recapEnabled) {
+        setShowRecap(true)
+        return
+      }
+
+      moveToNextWord()
+    }, 2000)
   }
 
   async function submitOutcome(correct: boolean) {
@@ -280,14 +287,8 @@ export function ReviewSessionPage() {
       setWrongCount((value) => value + 1)
     }
 
-    setLastOutcome(correct ? 'correct' : 'wrong')
     setFeedback(correct ? 'correct' : 'wrong')
-    if (correct && !recapAfterAnswer) {
-      moveToNextWord()
-      return
-    }
-
-    setShowRecap(true)
+    schedulePostAnswerTransition()
   }
 
   function moveToNextWord() {
@@ -301,26 +302,22 @@ export function ReviewSessionPage() {
   }
 
   function checkTypedAnswer() {
-    if (!currentWord) return
+    if (!currentWord || isAutoAdvancing) return
     const correct = normalizeAnswer(typedAnswer) === normalizeAnswer(currentWord.word)
     void submitOutcome(correct)
   }
 
   const noBoardSelected = !boardId
-  const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0 && !resumeModalSession?.startOptions.hasActiveSameDaySession
+  const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0
   const isMeaningToWord = currentWord?.mode === 'meaningToWord'
   const isPronunciation = currentWord?.mode === 'pronunciation'
 
   return (
     <>
-      <div className="flex flex-col">
+      <div className={`flex h-full min-h-0 flex-col ${session ? 'overflow-y-auto' : 'overflow-hidden'}`} data-testid="review-page">
         {!session ? (
           <div className="review-setup-container">
             <div className="review-setup-card">
-              <div className="review-setup-header">
-                <span className="review-setup-badge">Review</span>
-              </div>
-
               <div className="review-setup-body">
                 <div className="review-setup-field">
                   <label className="review-setup-label" htmlFor="board-select">Vocabulary board</label>
@@ -339,10 +336,15 @@ export function ReviewSessionPage() {
                       })),
                     ]}
                   />
+                  {noBoardSelected ? (
+                    <p className="review-setup-state" data-testid="review-setup-state">Select a board to start review</p>
+                  ) : noDueWords ? (
+                    <p className="review-setup-state" data-testid="review-setup-state">No words due today</p>
+                  ) : null}
                 </div>
 
                 <div className="review-setup-field">
-                  <label className="review-setup-label">Review Mode</label>
+                  <label className="review-setup-label">Review mode</label>
                   <div className="rs-selection-grid" role="group" aria-label="Review Mode">
                     <button
                       type="button"
@@ -392,7 +394,7 @@ export function ReviewSessionPage() {
                 </div>
 
                 <div className="review-setup-field">
-                  <label className="review-setup-label">Card Order</label>
+                  <label className="review-setup-label">Card order</label>
                   <div className="review-setup-options" role="group" aria-label="Review order">
                     <button
                       type="button"
@@ -416,26 +418,21 @@ export function ReviewSessionPage() {
                   </div>
                 </div>
 
-                {noBoardSelected ? (
-                  <div className="empty-panel flashcard-empty">
-                    <Layers size={28} />
-                    <h2>Select a board to start review</h2>
-                  </div>
-                ) : null}
-
-                {noDueWords ? (
-                  <div className="empty-panel flashcard-empty">
-                    <CheckCircle2 size={28} />
-                    <h2>No words due today</h2>
-                  </div>
-                ) : null}
+                <label className="review-recap-toggle">
+                  <input
+                    type="checkbox"
+                    checked={recapEnabled}
+                    onChange={(event) => setRecapEnabled(event.target.checked)}
+                  />
+                  <span>Show recap after each answer</span>
+                </label>
 
                 <div className="review-setup-actions">
                   <button
                     className="review-setup-start-btn"
                     type="button"
                     disabled={!boardId || noDueWords || startSessionMutation.isPending}
-                    onClick={() => void startReview('prompt')}
+                    onClick={() => void startReview()}
                   >
                     <Play size={20} fill="currentColor" />
                     Start review
@@ -463,149 +460,146 @@ export function ReviewSessionPage() {
           <section className="review-session">
             <div className="review-progress">
               <div className="review-progress-header">
-                <div className="review-progress-header-left">
-                  <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
-                  <span className="practice-mode-badge">{modeLabel(currentWord.mode)}</span>
-                </div>
+                <span className="review-progress-order">{session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
                 <strong className="review-progress-count">{currentIndex + 1} / {words.length}</strong>
               </div>
               <progress value={currentIndex + 1} max={words.length} />
             </div>
 
-            <article className={`review-card review-card--soft review-card--${currentWord.mode}`} data-testid="active-review-card">
-              {currentWord.mode === 'dictation' ? (
-                <div className="practice-dictation-hero">
-                  <h2>Listen, then type the spoken word</h2>
-                  <div className="practice-audio-trigger-hub">
-                    <button
-                      className="practice-audio-hero-button"
-                      type="button"
-                      aria-label="Play pronunciation"
-                      title="Play audio (Tab)"
-                      onClick={() => speakWord(currentWord.word, currentLanguage)}
-                    >
-                      <Volume2 size={28} />
-                    </button>
-                    <div className="practice-soundwave" aria-hidden="true">
-                      <span /><span /><span /><span /><span />
+            <article
+              className={`review-card review-card--${currentWord.mode} ${feedback ? `review-card--feedback-${feedback}` : ''}`}
+              data-testid="active-review-card"
+            >
+              {feedback ? (
+                <div className={`review-feedback review-feedback--${feedback}`} role="status" aria-live="polite">
+                  {feedback === 'correct' ? 'CORRECT' : 'WRONG'}
+                </div>
+              ) : showRecap ? (
+                <div className="review-recap" data-testid="review-answer">
+                  <header className="review-recap__header">
+                    <h2>
+                      {currentWord.word}
+                      {hasText(currentWord.wordClass) ? <span> ({formatWordClass(currentWord.wordClass)})</span> : null}
+                    </h2>
+                    {hasText(currentWord.ipaPronunciation) ? <p>{formatIpa(currentWord.ipaPronunciation)}</p> : null}
+                  </header>
+
+                  {hasText(currentWord.meaningEn) || hasText(currentWord.meaningVn) || hasText(currentWord.example) || hasText(currentWord.thesaurus) || hasText(currentWord.collocation) ? (
+                    <div className="review-recap__details review-recap__details--inline">
+                      {hasText(currentWord.meaningEn) ? <p><strong><em>Definition:</em></strong> {currentWord.meaningEn}</p> : null}
+                      {hasText(currentWord.meaningVn) ? <p><strong><em>Meaning:</em></strong> {currentWord.meaningVn}</p> : null}
+                      {hasText(currentWord.example) ? <p><strong><em>Example:</em></strong> {currentWord.example}</p> : null}
+                      {hasText(currentWord.thesaurus) ? <p><strong><em>Synonyms:</em></strong> {currentWord.thesaurus}</p> : null}
+                      {hasText(currentWord.collocation) ? <p><strong><em>Antonyms:</em></strong> {currentWord.collocation}</p> : null}
                     </div>
-                  </div>
-                </div>
-              ) : isMeaningToWord ? (
-                <div className="practice-meaning-hero">
-                  <div className="practice-meaning-box">
-                    {currentWord.meaningVn ? (
-                      <h2 className="practice-meaning-vn">{currentWord.meaningVn}</h2>
-                    ) : null}
-                    {currentWord.meaningEn ? (
-                      <p className="practice-meaning-en">{currentWord.meaningEn}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ) : isPronunciation ? (
-                <div className="practice-pronunciation-hero">
-                  <h2>Listen to target word, then record your voice</h2>
-                  <div className="practice-attempt-trackers">
-                    <span className={`practice-attempt-dot ${pronunciationAttempts >= 0 ? 'practice-attempt-dot--active' : ''}`} />
-                    <span className={`practice-attempt-dot ${pronunciationAttempts >= 1 ? 'practice-attempt-dot--active' : ''}`} />
-                    <span className="practice-attempt-copy">Attempt {pronunciationAttempts + 1} of 2</span>
-                  </div>
-                  <div className="practice-pronunciation-controls">
-                    <button className="icon-button practice-audio-button" type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentWord.word, currentLanguage)}>
-                      <Volume2 size={20} />
-                    </button>
-                    <button className={`secondary-button ${isRecording ? 'practice-mic-studio-btn--recording' : ''}`} type="button" title="Record (R)" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationAttempts >= 2 || !recordingSupported}>
-                      <Mic size={16} /> Record
-                    </button>
-                    <button className="secondary-button" type="button" title="Stop (Space)" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
-                      <MicOff size={16} /> Stop
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="review-card__front">
-                  <span>{modeLabel(currentWord.mode)}</span>
-                  <h1>{currentWord.word}</h1>
-                  <p>{currentWord.wordClass}</p>
-                  <button className="icon-button" type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentWord.word, currentLanguage)}>
-                    <Volume2 size={18} />
+                  ) : null}
+
+                  <button className="primary-button review-recap__continue" type="button" onClick={moveToNextWord}>
+                    {currentIndex + 1 >= words.length ? 'Finish review' : 'Continue'}
                   </button>
                 </div>
-              )}
+              ) : (
+                <div className="review-exercise">
+                  <h2 className="review-exercise__prompt">
+                    {currentWord.mode === 'dictation'
+                      ? 'Listen carefully, then type the word you hear'
+                      : isMeaningToWord
+                        ? 'What word matches this meaning?'
+                        : 'Say the word naturally'}
+                  </h2>
 
-              {!showRecap ? (
-                <div className="practice-answer-panel">
+                  {currentWord.mode === 'dictation' ? (
+                    <div className="review-exercise__stage review-exercise__stage--dictation">
+                      <button
+                        className="review-audio-action"
+                        type="button"
+                        aria-label="Play pronunciation"
+                        title="Play audio (Tab)"
+                        onClick={() => speakWord(currentWord.word, currentLanguage)}
+                      >
+                        <Volume2 size={22} />
+                        <span>Play audio</span>
+                      </button>
+                    </div>
+                  ) : isMeaningToWord ? (
+                    <div className="review-exercise__stage review-meaning-card">
+                      {currentWord.meaningVn ? <strong>{currentWord.meaningVn}</strong> : null}
+                      {currentWord.meaningEn ? <p>{currentWord.meaningEn}</p> : null}
+                    </div>
+                  ) : (
+                    <div className="review-exercise__stage review-pronunciation-stage">
+                      <div className="review-pronunciation-target">
+                        <strong>{currentWord.word}</strong>
+                        {hasText(currentWord.ipaPronunciation) ? <span>{formatIpa(currentWord.ipaPronunciation)}</span> : null}
+                        <button type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentWord.word, currentLanguage)}>
+                          <Volume2 size={20} />
+                        </button>
+                      </div>
+
+                      <div className="review-pronunciation-controls">
+                        <button
+                          className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`}
+                          type="button"
+                          aria-label="Start recording"
+                          title="Record (R)"
+                          onClick={() => void startRecording()}
+                          disabled={isAutoAdvancing || isRecording || pronunciationMutation.isPending || pronunciationAttempts >= 2 || !recordingSupported}
+                        >
+                          <Mic size={22} />
+                        </button>
+                        <button
+                          className="review-stop-button"
+                          type="button"
+                          aria-label="Stop recording"
+                          title="Stop (Space)"
+                          onClick={() => void recordingRef.current?.stop()}
+                          disabled={!isRecording}
+                        >
+                          <Square size={18} fill="currentColor" />
+                        </button>
+                      </div>
+
+                      <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2</span>
+                    </div>
+                  )}
+
                   {!isPronunciation ? (
-                    <div className="practice-input-group">
-                      <label className="practice-label" htmlFor="review-answer-input">
-                        {isMeaningToWord ? 'Type the word for this meaning' : 'Type what you hear'}
+                    <div className="review-answer-form">
+                      <label htmlFor="review-answer-input">
+                        {isMeaningToWord ? 'Type the word' : 'Type the target word'}
                       </label>
                       <input
                         id="review-answer-input"
-                        className="practice-input"
                         value={typedAnswer}
-                        placeholder={isMeaningToWord ? 'Enter the target word' : 'Enter the spoken word'}
+                        disabled={isAutoAdvancing || submitReviewMutation.isPending}
+                        placeholder={isMeaningToWord ? 'Type the word...' : 'Type your answer...'}
                         onChange={(event) => setTypedAnswer(event.target.value)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' && normalizeAnswer(typedAnswer).length > 0) {
                             event.preventDefault()
+                            event.stopPropagation()
                             checkTypedAnswer()
                           }
                         }}
                       />
-                      <div className="practice-actions-stacked">
-                        <button className="primary-button practice-btn-submit" type="button" title="Submit answer (Enter)" onClick={checkTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0}>
-                          Submit answer
+                      <div className="review-exercise__actions">
+                        <button className="primary-button review-submit-button" type="button" title="Submit answer (Enter)" onClick={checkTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || isAutoAdvancing || submitReviewMutation.isPending}>
+                          Submit
                         </button>
-                        <button className="secondary-button practice-btn-skip" type="button" onClick={() => void submitOutcome(false)}>
-                          Reveal / skip
+                        <button className="review-skip-button" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || submitReviewMutation.isPending}>
+                          Skip
                         </button>
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="review-exercise__actions">
+                      <button className="review-skip-button" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || isRecording || pronunciationMutation.isPending || submitReviewMutation.isPending}>
+                        Skip
+                      </button>
+                    </div>
+                  )}
 
-                  {feedback === 'wrong' ? (
-                    <div className="answer-feedback-banner answer-feedback-banner--wrong" role="status">
-                      ✕ Wrong
-                    </div>
-                  ) : null}
                   {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
-                </div>
-              ) : (
-                <div className="learning-recap" data-testid="review-answer">
-                  {lastOutcome ? (
-                    <div className={`answer-feedback-banner answer-feedback-banner--${lastOutcome}`} role="status">
-                      {lastOutcome === 'correct' ? '✓ Correct' : '✕ Wrong'}
-                    </div>
-                  ) : null}
-                  <div className="learning-recap__word">
-                    <h2>{currentWord.word} <span>({formatWordClass(currentWord.wordClass)})</span></h2>
-                    <button className="icon-button" type="button" aria-label="Play pronunciation" onClick={() => speakWord(currentWord.word, currentLanguage)}><Volume2 size={18} /></button>
-                  </div>
-                  <p className="learning-recap__ipa">{formatIpa(currentWord.ipaPronunciation)}</p>
-                  <div className="learning-recap-details-card">
-                    {currentWord.meaningEn ? (
-                      <div className="learning-recap-detail-item">
-                        <span className="learning-recap-detail-label">Definition</span>
-                        <span className="learning-recap-detail-value">{currentWord.meaningEn}</span>
-                      </div>
-                    ) : null}
-                    {currentWord.meaningVn ? (
-                      <div className="learning-recap-detail-item">
-                        <span className="learning-recap-detail-label">Meaning (VN)</span>
-                        <span className="learning-recap-detail-value">{currentWord.meaningVn}</span>
-                      </div>
-                    ) : null}
-                    {currentWord.example ? (
-                      <div className="learning-recap-example-quote">
-                        <span className="learning-recap-detail-label">Example</span>
-                        <p className="m-0">{currentWord.example}</p>
-                      </div>
-                    ) : null}
-                  </div>
-                  <button className="primary-button practice-btn-submit" type="button" onClick={moveToNextWord}>
-                    {currentIndex + 1 >= words.length ? 'Finish review' : 'Continue'}
-                  </button>
                 </div>
               )}
             </article>
@@ -616,10 +610,6 @@ export function ReviewSessionPage() {
 
         {completed && session ? (
           <section className="review-summary" data-testid="review-summary">
-            <div className="practice-summary-badge-icon">
-              <CheckCircle2 size={40} />
-            </div>
-            <span className="preview-label">Review complete</span>
             <h1>{session.boardName}</h1>
             <p>{correctCount} correct and {wrongCount} wrong across {correctCount + wrongCount} reviewed words.</p>
             <div className="practice-summary-stats-grid">
@@ -637,33 +627,6 @@ export function ReviewSessionPage() {
           </section>
         ) : null}
 
-        {resumeModalSession ? (
-          <div className="habit-modal-overlay" role="presentation">
-            <div className="habit-modal" role="dialog" aria-modal="true" aria-label="Resume review session">
-              <div className="habit-modal-header">
-                <div>
-                  <span className="preview-label">Resume review</span>
-                  <h3>{resumeModalSession.boardName}</h3>
-                </div>
-                <button type="button" onClick={() => setResumeModalSession(null)} aria-label="Close resume modal">
-                  <X size={18} />
-                </button>
-              </div>
-              <p>{resumeModalSession.startOptions.remainingWords} words are still waiting in today&apos;s unfinished review session.</p>
-              <div className="deck-actions">
-                <button className="primary-button" type="button" onClick={() => void startReview('continue')}>
-                  Continue Review
-                </button>
-                <button className="secondary-button" type="button" onClick={() => void startReview('replace')}>
-                  Start New Session
-                </button>
-                <button className="ghost-button ghost-button--inline" type="button" onClick={() => setResumeModalSession(null)}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </>
   )

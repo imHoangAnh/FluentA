@@ -57,7 +57,6 @@ function createQueryClient() {
     newCards: 0,
     forecast: [],
   })
-  queryClient.setQueryData(['review', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
   queryClient.setQueryData(['review', 'level-five'], [])
   queryClient.setQueryData(['practice', 'settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
   queryClient.setQueryData(['settings'], {
@@ -69,7 +68,6 @@ function createQueryClient() {
       bio: '',
     },
     practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-    reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
   })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
@@ -406,7 +404,7 @@ describe('FluentA app routes', async () => {
 
     const settingsNavigation = within(screen.getByRole('navigation', { name: 'Settings navigation' }))
     expect(settingsNavigation.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(settingsNavigation.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
+    expect(settingsNavigation.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
     expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
     expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
     expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
@@ -419,14 +417,9 @@ describe('FluentA app routes', async () => {
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    let view = await renderApp('/settings/practice')
+    const view = await renderApp('/settings/practice')
     expect(screen.getByRole('heading', { name: 'Practice' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
-
-    view.unmount()
-    view = await renderApp('/settings/review')
-    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     await renderApp('/settings/level5')

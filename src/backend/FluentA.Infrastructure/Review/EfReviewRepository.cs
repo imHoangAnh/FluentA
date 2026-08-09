@@ -80,7 +80,6 @@ public sealed class EfReviewRepository : IReviewRepository
         Guid boardId,
         string orderType,
         string mode,
-        string startBehavior,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         Guid sessionId,
@@ -104,59 +103,16 @@ public sealed class EfReviewRepository : IReviewRepository
 
         var localToday = ReviewTime.LocalDate(utcNow, timeZone);
         var sessionDate = localToday;
-        var activeSession = await _dbContext.ReviewSessions
-            .SingleOrDefaultAsync(
-                session => session.UserId == userId
-                    && session.BoardId == boardId
-                    && session.Status == ReviewSessionStatus.Active
-                    && session.DeletedAt == null,
-                cancellationToken);
-
-        if (activeSession is not null)
+        var activeSessions = await _dbContext.ReviewSessions
+            .Where(session => session.UserId == userId
+                && session.BoardId == boardId
+                && session.Status == ReviewSessionStatus.Active
+                && session.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var activeSession in activeSessions)
         {
-            if (activeSession.SessionDate == sessionDate)
-            {
-                var remainingCount = await CountRemainingSessionItemsAsync(activeSession.Id, cancellationToken);
-                if (startBehavior == "prompt")
-                {
-                    return new ReviewSessionCreatedDto(
-                        activeSession.Id,
-                        board.Id,
-                        board.Name,
-                        activeSession.OrderType,
-                        mode,
-                        "prompt",
-                        activeSession.StartedAt,
-                        remainingCount,
-                        new ReviewStartOptionsDto(true, activeSession.Id, remainingCount, true),
-                        []);
-                }
-
-                if (startBehavior == "continue")
-                {
-                    return await BuildSessionDtoAsync(
-                        activeSession,
-                        board.Name,
-                        board.Language,
-                        mode,
-                        includeReviewed: false,
-                        startDisposition: "continued",
-                        startOptions: new ReviewStartOptionsDto(true, activeSession.Id, remainingCount, false),
-                        cancellationToken);
-                }
-
-                activeSession.Replace();
-            }
-            else
-            {
-                activeSession.Replace();
-            }
+            activeSession.Replace();
         }
-
-        var settings = await _dbContext.ReviewSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
-        var dailyLimit = settings?.DailyLimit ?? ReviewSettings.DefaultDailyLimit;
 
         var dueWords = await (
             from state in _dbContext.WordReviewStates
@@ -191,23 +147,9 @@ public sealed class EfReviewRepository : IReviewRepository
             .ThenBy(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        var kept = dueWords.Take(dailyLimit).ToList();
-        var overflow = dueWords.Skip(dailyLimit).ToList();
-        if (overflow.Count > 0)
-        {
-            var tomorrow = localToday.AddDays(1);
-            foreach (var item in overflow)
-            {
-                item.state.MoveDueDate(tomorrow);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        if (orderType == "shuffle")
-        {
-            kept = kept.OrderBy(_ => Random.Shared.Next()).ToList();
-        }
+        var kept = orderType == "shuffle"
+            ? dueWords.OrderBy(_ => Random.Shared.Next()).ToList()
+            : dueWords;
 
         var reviewSession = ReviewSession.CreateActive(
             userId,
@@ -215,6 +157,11 @@ public sealed class EfReviewRepository : IReviewRepository
             orderType,
             sessionDate,
             utcNow);
+        if (kept.Count == 0)
+        {
+            reviewSession.Complete(utcNow);
+        }
+
         await _dbContext.ReviewSessions.AddAsync(reviewSession, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -246,79 +193,9 @@ public sealed class EfReviewRepository : IReviewRepository
             board.Name,
             orderType,
             mode,
-            "started",
             reviewSession.StartedAt,
             assignedModes.Count,
-            new ReviewStartOptionsDto(false, null, assignedModes.Count, false),
             assignedModes);
-    }
-
-    public async Task<ReviewSessionSummaryDto?> GetReviewSessionSummaryAsync(
-        Guid userId,
-        Guid sessionId,
-        CancellationToken cancellationToken = default)
-    {
-        var materialized = await _dbContext.WordReviewHistories
-            .AsNoTracking()
-            .Where(review => review.UserId == userId && review.SessionId == sessionId)
-            .Where(review => review.DeletedAt == null)
-            .Select(review => new
-            {
-                review.Result,
-                review.TimeSpentSeconds
-            })
-            .ToListAsync(cancellationToken);
-
-        if (materialized.Count == 0)
-        {
-            return null;
-        }
-
-        var correct = materialized.Count(review => review.Result == FluentAsrsReviewResult.Correct);
-        var wrong = materialized.Count(review => review.Result == FluentAsrsReviewResult.Wrong);
-        var total = materialized.Count;
-        var averageTime = (int)Math.Round(materialized.Average(review => review.TimeSpentSeconds), MidpointRounding.AwayFromZero);
-
-        return new ReviewSessionSummaryDto(
-            sessionId,
-            total,
-            correct,
-            wrong,
-            Percentage(correct, total),
-            Percentage(wrong, total),
-            averageTime);
-    }
-
-    public async Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var settings = await _dbContext.ReviewSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
-
-        return settings is null
-            ? new ReviewSettingsDto(ReviewSettings.DefaultDailyLimit, true)
-            : new ReviewSettingsDto(settings.DailyLimit, settings.RecapAfterAnswer);
-    }
-
-    public async Task<ReviewSettingsDto> UpdateReviewSettingsAsync(
-        Guid userId,
-        int dailyLimit,
-        bool recapAfterAnswer,
-        CancellationToken cancellationToken = default)
-    {
-        var settings = await _dbContext.ReviewSettings.SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
-        if (settings is null)
-        {
-            settings = ReviewSettings.Create(userId, dailyLimit, recapAfterAnswer);
-            await _dbContext.ReviewSettings.AddAsync(settings, cancellationToken);
-        }
-        else
-        {
-            settings.Update(dailyLimit, recapAfterAnswer);
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return new ReviewSettingsDto(settings.DailyLimit, settings.RecapAfterAnswer);
     }
 
     public async Task<FlashcardDashboardDto?> GetDashboardAsync(
@@ -488,11 +365,6 @@ public sealed class EfReviewRepository : IReviewRepository
                 cancellationToken);
         if (remainingItems == 0)
         {
-            await DeferRemainingDueWordsAsync(
-                reviewSession.UserId,
-                reviewSession.BoardId,
-                reviewSession.SessionDate,
-                cancellationToken);
             reviewSession.Complete(reviewedAt);
         }
 
@@ -570,114 +442,6 @@ public sealed class EfReviewRepository : IReviewRepository
             1 => "pronunciation",
             _ => "meaningToWord",
         };
-    }
-
-    private async Task<ReviewSessionCreatedDto> BuildSessionDtoAsync(
-        ReviewSession session,
-        string boardName,
-        string boardLanguage,
-        string mode,
-        bool includeReviewed,
-        string startDisposition,
-        ReviewStartOptionsDto startOptions,
-        CancellationToken cancellationToken)
-    {
-        var itemsQuery =
-            from item in _dbContext.ReviewSessionItems.AsNoTracking()
-            join word in _dbContext.Words.AsNoTracking() on item.VocabWordId equals word.Id
-            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
-            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
-            where item.ReviewSessionId == session.Id
-                && item.DeletedAt == null
-                && word.DeletedAt == null
-                && page.DeletedAt == null
-                && board.DeletedAt == null
-                && (includeReviewed || !item.IsReviewed)
-            select new
-            {
-                item.Id,
-                item.IsReviewed,
-                WordId = word.Id,
-                word.Word,
-                WordClass = word.Class,
-                word.IpaPronunciation,
-                MeaningVn = word.MeaningVn,
-                MeaningEn = word.Definition,
-                word.Example,
-                Thesaurus = word.Synonyms,
-                Collocation = word.Antonyms,
-                word.Note,
-            };
-
-        var items = await itemsQuery.ToListAsync(cancellationToken);
-        var orderedItems = session.OrderType == "shuffle"
-            ? items.OrderBy(_ => Random.Shared.Next()).ToList()
-            : items;
-
-        var words = orderedItems.Select(item => new ReviewSessionWordDto(
-            item.WordId,
-            item.Word,
-            item.WordClass.ToString(),
-            item.IpaPronunciation,
-            item.MeaningVn,
-            item.MeaningEn ?? string.Empty,
-            item.Example,
-            item.Thesaurus,
-            item.Collocation,
-            item.Note,
-            mode == "random" ? PickRandomReviewMode() : mode)).ToList();
-
-        return new ReviewSessionCreatedDto(
-            session.Id,
-            session.BoardId,
-            boardName,
-            session.OrderType,
-            mode,
-            startDisposition,
-            session.StartedAt,
-            words.Count,
-            startOptions,
-            words);
-    }
-
-    private Task<int> CountRemainingSessionItemsAsync(Guid sessionId, CancellationToken cancellationToken) =>
-        _dbContext.ReviewSessionItems
-            .AsNoTracking()
-            .CountAsync(
-                item => item.ReviewSessionId == sessionId
-                    && !item.IsReviewed
-                    && item.DeletedAt == null,
-                cancellationToken);
-
-    private async Task DeferRemainingDueWordsAsync(
-        Guid userId,
-        Guid boardId,
-        DateOnly sessionDate,
-        CancellationToken cancellationToken)
-    {
-        var tomorrow = sessionDate.AddDays(1);
-        var states = await (
-            from state in _dbContext.WordReviewStates
-            join word in _dbContext.Words on state.WordId equals word.Id
-            join page in _dbContext.Pages on word.PageId equals page.Id
-            join board in _dbContext.Boards on page.BoardId equals board.Id
-            where state.UserId == userId
-                && board.Id == boardId
-                && state.DeletedAt == null
-                && state.Status == WordReviewStatus.Active
-                && word.DeletedAt == null
-                && page.DeletedAt == null
-                && board.DeletedAt == null
-            select state)
-            .ToListAsync(cancellationToken);
-
-        foreach (var state in states)
-        {
-            if (state.NextReviewDate < tomorrow)
-            {
-                state.MoveDueDate(tomorrow);
-            }
-        }
     }
 
     private IQueryable<Guid> QueryActiveBoardWords(Guid userId, Guid? boardId) =>
@@ -758,6 +522,4 @@ public sealed class EfReviewRepository : IReviewRepository
         return reviews.AnyAsync(review => review.ReviewedAt >= startUtc && review.ReviewedAt < endUtc, cancellationToken);
     }
 
-    private static int Percentage(int count, int total) =>
-        total == 0 ? 0 : (int)Math.Round((double)count / total * 100, MidpointRounding.AwayFromZero);
 }

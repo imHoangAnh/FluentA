@@ -2,11 +2,6 @@ import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
 import type { TrashEntry } from '@/features/trash'
 
-export type ReviewSettings = {
-  dailyLimit: number
-  recapAfterAnswer: boolean
-}
-
 export type LevelFiveReviewItem = {
   wordId: string
   word: string
@@ -16,16 +11,6 @@ export type LevelFiveReviewItem = {
   pageName: string
   status: 'active' | 'inactive'
   lastReviewDate?: string | null
-}
-
-export async function getReviewSettings() {
-  const response = await apiClient.get<ApiEnvelope<ReviewSettings>>('/review/settings')
-  return response.data.data!
-}
-
-export async function updateReviewSettings(input: ReviewSettings) {
-  const response = await apiClient.put<ApiEnvelope<ReviewSettings>>('/review/settings', input)
-  return response.data.data!
 }
 
 export async function listLevelFiveWords() {

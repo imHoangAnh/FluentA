@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
         services.AddHangfireServer(options => options.WorkerCount = hangfireWorkerCount);
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
+        services.AddScoped<ReviewDueDeferralJob>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();

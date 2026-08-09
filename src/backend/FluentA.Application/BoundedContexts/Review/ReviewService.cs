@@ -50,11 +50,6 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             errors["mode"] = ["Mode must be dictation, pronunciation, meaningToWord, or random."];
         }
 
-        if (!IsAllowedStartBehavior(request.StartBehavior))
-        {
-            errors["startBehavior"] = ["Start behavior must be prompt, continue, or replace."];
-        }
-
         if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
         {
             errors["timeZoneId"] = ["A valid browser timezone id is required."];
@@ -70,7 +65,6 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             request.BoardId,
             request.OrderType,
             request.Mode,
-            request.StartBehavior,
             timeZone!,
             DateTime.UtcNow,
             Guid.NewGuid(),
@@ -79,46 +73,6 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
         return session is null
             ? OperationResult<ReviewSessionCreatedDto>.Failure(ReviewError.DeckOrCardNotFound())
             : OperationResult<ReviewSessionCreatedDto>.Success(session);
-    }
-
-    public async Task<OperationResult<ReviewSessionSummaryDto>> GetReviewSessionSummaryAsync(
-        Guid userId,
-        Guid sessionId,
-        CancellationToken cancellationToken = default)
-    {
-        if (sessionId == Guid.Empty)
-        {
-            return OperationResult<ReviewSessionSummaryDto>.Failure(ReviewError.Validation(new Dictionary<string, string[]>
-            {
-                ["sessionId"] = ["Session id is required."]
-            }));
-        }
-
-        var summary = await _repository.GetReviewSessionSummaryAsync(userId, sessionId, cancellationToken);
-        return summary is null
-            ? OperationResult<ReviewSessionSummaryDto>.Failure(ReviewError.DeckOrCardNotFound())
-            : OperationResult<ReviewSessionSummaryDto>.Success(summary);
-    }
-
-    public Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default) =>
-        _repository.GetReviewSettingsAsync(userId, cancellationToken);
-
-    public async Task<OperationResult<ReviewSettingsDto>> UpdateReviewSettingsAsync(
-        Guid userId,
-        UpdateReviewSettingsRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var errors = ValidateSettings(request);
-        if (errors.Count > 0)
-        {
-            return OperationResult<ReviewSettingsDto>.Failure(ReviewError.Validation(errors));
-        }
-
-        return OperationResult<ReviewSettingsDto>.Success(await _repository.UpdateReviewSettingsAsync(
-            userId,
-            request.DailyLimit,
-            request.RecapAfterAnswer,
-            cancellationToken));
     }
 
     public async Task<OperationResult<FlashcardDashboardDto>> GetDashboardAsync(
@@ -231,23 +185,10 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             Enumerable.Range(0, removed).Select(_ => new TrashEntryDto(Guid.Empty, "LevelFive", Guid.Empty, string.Empty, "Review", DateTime.UtcNow, DateTime.UtcNow)).ToArray());
     }
 
-    private static Dictionary<string, string[]> ValidateSettings(UpdateReviewSettingsRequest request)
-    {
-        var errors = new Dictionary<string, string[]>();
-        if (request.DailyLimit is < 1 or > ReviewSettings.MaximumDailyLimit)
-        {
-            errors["dailyLimit"] = [$"Daily limit must be between 1 and {ReviewSettings.MaximumDailyLimit}."];
-        }
-
-        return errors;
-    }
-
     private static bool IsAllowedOrderType(string? value) =>
         value is "sequential" or "shuffle";
 
     private static bool IsAllowedReviewMode(string? value) =>
         value is "dictation" or "pronunciation" or "meaningToWord" or "random";
 
-    private static bool IsAllowedStartBehavior(string? value) =>
-        value is "prompt" or "continue" or "replace";
 }

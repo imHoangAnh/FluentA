@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('review settings save and dashboard counts aggregate page decks', async ({ page }) => {
+test('dashboard counts aggregate page decks after review settings removal', async ({ page }) => {
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => undefined;
     window.speechSynthesis.cancel = () => undefined;
@@ -28,12 +28,8 @@ test('review settings save and dashboard counts aggregate page decks', async ({ 
   const headers = { Authorization: `Bearer ${token}` };
 
   await page.goto('/settings/review');
-  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible();
-  await page.getByLabel('Daily review limit').fill('1');
-  const reviewSettingsResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/review/settings') && response.request().method() === 'PUT');
-  await page.getByRole('button', { name: 'Save review settings' }).click();
-  expect((await reviewSettingsResponse).status()).toBe(200);
-  await expect(page.getByText('Review settings saved.')).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/practice$/);
+  await expect(page.getByRole('heading', { name: 'Practice', exact: true })).toBeVisible();
 
   const board = (await (await page.request.post('http://127.0.0.1:5000/api/v1/boards', {
     headers,

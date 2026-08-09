@@ -69,10 +69,6 @@ describe('SettingsPage profile save', () => {
       practiceSettings: {
         modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
       },
-      reviewSettings: {
-        dailyLimit: 300,
-        recapAfterAnswer: true,
-      },
     })
   })
 

@@ -18,23 +18,9 @@ public interface IReviewRepository
         Guid boardId,
         string orderType,
         string mode,
-        string startBehavior,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         Guid sessionId,
-        CancellationToken cancellationToken = default);
-
-    Task<ReviewSessionSummaryDto?> GetReviewSessionSummaryAsync(
-        Guid userId,
-        Guid sessionId,
-        CancellationToken cancellationToken = default);
-
-    Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    Task<ReviewSettingsDto> UpdateReviewSettingsAsync(
-        Guid userId,
-        int dailyLimit,
-        bool recapAfterAnswer,
         CancellationToken cancellationToken = default);
 
     Task<FlashcardDashboardDto?> GetDashboardAsync(

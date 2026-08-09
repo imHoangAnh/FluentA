@@ -12,7 +12,7 @@ public sealed record ResetPasswordRequest(string Token, string NewPassword);
 public sealed record BasicMessageResponse(string Message);
 public sealed record GoogleLoginRequest(string IdToken);
 public sealed record UpdateProfileRequest(string? FullName = null, string? Bio = null, bool RemoveAvatar = false, Guid? AvatarAssetId = null);
-public sealed record SettingsDto(UserProfileDto Profile, FluentA.Application.BoundedContexts.Practice.DTOs.PracticeSettingsDto PracticeSettings, FluentA.Application.BoundedContexts.Review.DTOs.ReviewSettingsDto ReviewSettings);
+public sealed record SettingsDto(UserProfileDto Profile, FluentA.Application.BoundedContexts.Practice.DTOs.PracticeSettingsDto PracticeSettings);
 public sealed record AuthResponse(string Token, UserProfileDto User);
 public sealed record UserProfileDto(Guid Id, string Email, string FullName, bool IsEmailVerified, string? Bio = null, Guid? AvatarAssetId = null, string? AvatarDownloadUrl = null, DateTime? AvatarDownloadUrlExpiresAtUtc = null);
 public sealed record GoogleUserInfo(string Subject, string Email, string FullName, bool EmailVerified);

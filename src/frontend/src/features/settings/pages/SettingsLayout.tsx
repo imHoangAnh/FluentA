@@ -1,11 +1,10 @@
-import { Brain, Headphones, Trophy } from 'lucide-react'
+import { Headphones, Trophy } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Card } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 
 const settingsLinks = [
   { to: '/settings/practice', label: 'Practice', icon: Headphones },
-  { to: '/settings/review', label: 'Review', icon: Brain },
   { to: '/settings/level5', label: 'Level 5', icon: Trophy },
 ]
 

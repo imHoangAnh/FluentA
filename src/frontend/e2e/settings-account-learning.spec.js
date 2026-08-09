@@ -50,7 +50,7 @@ test('Settings avatar uploads and renders through signed delivery without a dura
   await expect(page.locator('.settings-avatar-preview')).toHaveAttribute('src', /X-Amz-Algorithm/)
 })
 
-test('Settings profile, Practice, Review, Level 5, and responsive routes persist through the API', async ({ page }, testInfo) => {
+test('Settings profile, Practice, Level 5, and responsive routes persist through the API', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await registerAndLogin(page)
   await page.goto('/profile')
@@ -70,14 +70,6 @@ test('Settings profile, Practice, Review, Level 5, and responsive routes persist
   await page.getByRole('button', { name: 'Save practice settings' }).click()
   expect((await practicePromise).status()).toBe(200)
   await expect(page.getByText('Practice settings saved.')).toBeVisible()
-
-  await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name: 'Review' }).click()
-  const dailyLimit = page.getByLabel('Daily review limit')
-  await dailyLimit.fill('275')
-  const reviewPromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/review/settings') && response.request().method() === 'PUT')
-  await page.getByRole('button', { name: 'Save review settings' }).click()
-  expect((await reviewPromise).status()).toBe(200)
-  await expect(page.getByText('Review settings saved.')).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name: 'Level 5' }).click()
   await expect(page.getByRole('heading', { name: 'Level 5 words', exact: true })).toBeVisible()
