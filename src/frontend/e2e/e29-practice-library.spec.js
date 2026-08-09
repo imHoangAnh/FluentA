@@ -38,9 +38,47 @@ async function mockPracticeLibraryApis(page) {
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Practice board', boardLanguage: 'en', pages }])
     if (path.endsWith('/practice/settings')) return json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
     if (path.endsWith('/flashcards/pages/page-1/words')) return json({ pageId: 'page-1', boardId: 'board-1', pageName: 'Practice deck 1', boardLanguage: 'en', words })
+    if (path.endsWith('/practice/sessions')) return json({ id: 'practice-summary-1' })
     return json({ message: 'Unexpected E29 request' }, 503)
   })
 }
+
+test('E29 uses one shared surface rhythm across Dictation, Meaning, Pronunciation, and recap', async ({ page }) => {
+  await mockPracticeLibraryApis(page)
+  await page.goto('/practice/page-1?order=sequential')
+
+  const card = page.getByTestId('active-practice-card')
+  await expect(card).toHaveClass(/review-card--dictation/)
+  await expect(page.getByText('Listen carefully, then type the word you hear')).toBeVisible()
+  await page.getByTestId('practice-answer-input').fill('wrong')
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
+  await page.getByTestId('practice-answer-input').fill('mitigate')
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+
+  await expect(card).toHaveClass(/review-card--meaningToWord/)
+  await expect(page.getByText('What word matches this meaning?')).toBeVisible()
+  await page.getByTestId('practice-answer-input').fill('mitigate')
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+
+  await expect(card).toHaveClass(/review-card--pronunciation/)
+  await expect(page.getByText('Say the word naturally')).toBeVisible()
+  await expect(page.getByText('/ˈmɪt.ɪ.ɡeɪt/')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible()
+  await page.getByRole('button', { name: 'Skip' }).click()
+  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  const recap = page.getByTestId('practice-answer-reveal')
+  await expect(recap).toBeVisible()
+  await expect(recap.getByText('Correct', { exact: true })).toHaveCount(0)
+  await expect(recap.getByText('Wrong', { exact: true })).toHaveCount(0)
+  await expect(recap.getByRole('button', { name: 'Add to Review' })).toBeVisible()
+  await expect(recap.getByRole('button', { name: 'Previous' })).toBeVisible()
+  await expect(recap.getByRole('button', { name: 'Finish' })).toBeVisible()
+  await recap.getByRole('button', { name: 'Finish' }).click()
+  await expect(page).toHaveURL(/\/practice$/)
+})
 
 test('E29 opens a query-selected deck, preserves Shuffle in the session URL, and removes legacy routes', async ({ page }) => {
   await mockPracticeLibraryApis(page)
