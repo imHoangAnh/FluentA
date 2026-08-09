@@ -25,13 +25,12 @@ const protectedRoutes = [
   ['/habits', 'Habits', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
   ['/notes', 'Notes', 'Notes'],
-  ['/kanban', 'Kanban', 'Kanban'],
+  ['/project', 'Project', 'Project'],
   ['/pomodoro', 'Pomodoro', 'Pomodoro'],
   ['/notifications', 'Notifications', null],
   ['/settings', 'Settings', 'Settings'],
   ['/profile', 'Profile', null],
   ['/settings/practice', 'Settings', 'Settings'],
-  ['/settings/review', 'Settings', 'Settings'],
   ['/settings/level5', 'Settings', 'Settings'],
   ['/review', 'Review', 'Review'],
   ['/flashcards/pages/route-proof', 'Flashcard viewer', 'Flashcard'],
@@ -57,9 +56,16 @@ async function mockReleaseApis(page, authState) {
           data: {
             profile: { ...user, bio: '' },
             practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-            reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
           },
         }),
+      })
+      return
+    }
+    if (path === '/api/v1/practice/settings') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] } }),
       })
       return
     }
@@ -96,6 +102,10 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
     authState.enabled = true
+    // Re-enter the protected shell after the anonymous-route assertion so the
+    // auth store rehydrates from the now-enabled `/auth/me` fixture.
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 
     for (const [path, heading, activeNavigation] of protectedRoutes) {
       await page.goto(path)
@@ -106,6 +116,9 @@ for (const viewport of [
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     }
+
+    await page.goto('/settings/review')
+    await expect(page).toHaveURL(/\/settings\/practice$/)
 
     await page.goto('/practice?deck=route-proof&order=shuffle')
     await expect(page).toHaveURL(/\/practice\?deck=route-proof&order=shuffle$/)

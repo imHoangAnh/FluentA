@@ -18,7 +18,7 @@ learning. It brings learning tools, personal planning, focus sessions, notes,
 and progress tracking into one web application.
 
 The repository contains a React single-page application and an ASP.NET Core
-modular monolith. PostgreSQL is the durable store, Redis manages short-lived
+modular monolith. PostgreSQL is the durable store, in-memory caching manages short-lived
 state, SignalR synchronizes active sessions, MinIO stores assets, and Hangfire
 runs recurring jobs.
 
@@ -27,7 +27,7 @@ runs recurring jobs.
 - Configurable vocabulary boards with multilingual columns and cell autosave.
 - Synchronized flashcards, practice modes, review sessions, and spaced
   repetition scheduling.
-- Daily and weekly todos, habit tracking, countdowns, Kanban, and Pomodoro.
+- Daily and weekly todos, habit tracking, countdowns, Project, and Pomodoro.
 - Rich-text journal entries, notes, notifications, and profile settings.
 - Email/password authentication, account recovery, and Google OAuth.
 - Realtime updates across authenticated browser sessions.
@@ -41,7 +41,6 @@ flowchart LR
     API --> APP["Application and Domain"]
     APP --> INFRA["Infrastructure"]
     INFRA --> PG[("PostgreSQL")]
-    INFRA --> REDIS[("Redis")]
     INFRA --> MINIO[("MinIO")]
     API --> JOBS["Hangfire jobs"]
 ```
@@ -59,7 +58,7 @@ flows.
 | Frontend | React 19, TypeScript, Vite, React Router |
 | Client state and data | TanStack Query, Zustand, Axios |
 | Backend | ASP.NET Core, .NET 10, Entity Framework Core |
-| Data and infrastructure | PostgreSQL 16, Redis 7, MinIO, Docker Compose |
+| Data and infrastructure | PostgreSQL 16, MinIO, Docker Compose |
 | Realtime and jobs | SignalR, Hangfire |
 | Testing | xUnit, Vitest, Playwright |
 
@@ -100,7 +99,7 @@ Copy-Item src/frontend/.env.example src/frontend/.env.local
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-This starts PostgreSQL, Redis, MinIO, and the local MinIO bucket bootstrap.
+This starts PostgreSQL, MinIO, and the local MinIO bucket bootstrap.
 The FluentA development database is `fluenta_dev`, exposed on
 `localhost:5432`, and persisted in the Docker volume
 `fluenta-postgres-dev-data`.
@@ -140,7 +139,7 @@ Open `https://localhost:5173`.
    language.
 3. Add words and use the synchronized flashcards for practice or scheduled
    review.
-4. Plan learning with todos, habits, Kanban, countdowns, and Pomodoro sessions.
+4. Plan learning with todos, habits, Project, countdowns, and Pomodoro sessions.
 5. Capture longer-form content in Journal or Notes and review reminders in the
    notification inbox.
 

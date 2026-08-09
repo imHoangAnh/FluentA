@@ -6,6 +6,7 @@ export const pomodoroRoutes: RouteObject[] = [{
   handle: appShellRoute({
     title: 'Pomodoro',
     description: 'Focus with a server-synchronized timer.',
+    contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
   }),
   lazy: async () => ({ Component: (await import('./pages/PomodoroPage')).PomodoroPage }),
 }]

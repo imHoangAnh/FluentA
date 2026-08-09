@@ -36,10 +36,10 @@ async function loginWithMockedApi(page) {
   await page.getByLabel('Email').fill(user.email)
   await page.getByLabel('Password').fill('SecurePass123')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page).toHaveURL('http://127.0.0.1:5173/')
+  await expect(page).toHaveURL('/')
 }
 
-test('native selects and action menus use the shared polished treatment', async ({ page }) => {
+test('Headless selection menus and action menus use the shared polished treatment', async ({ page }) => {
   await loginWithMockedApi(page)
 
   await page.getByRole('link', { name: 'Pomodoro', exact: true }).click()
@@ -50,22 +50,18 @@ test('native selects and action menus use the shared polished treatment', async 
     const style = getComputedStyle(element)
     return {
       appearance: style.appearance,
-      backgroundImage: style.backgroundImage,
       borderRadius: style.borderRadius,
       minHeight: style.minHeight,
     }
   })).toEqual({
-    appearance: 'none',
-    backgroundImage: expect.stringContaining('svg'),
+    appearance: 'button',
     borderRadius: '8px',
     minHeight: '40px',
   })
 
   await select.focus()
-  await expect.poll(() => select.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return { outline: style.outlineStyle, boxShadow: style.boxShadow }
-  })).toEqual({ outline: 'none', boxShadow: expect.stringContaining('inset') })
+  await expect.poll(() => select.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none')
+  await expect.poll(() => select.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
 
   await page.getByRole('link', { name: 'Todo', exact: true }).click()
   await page.getByRole('button', { name: 'Sort My Day tasks' }).click()
@@ -78,7 +74,7 @@ test('native selects and action menus use the shared polished treatment', async 
   await expect.poll(() => menu.evaluate((element) => {
     const style = getComputedStyle(element)
     return { borderRadius: style.borderRadius, padding: style.padding, shadow: style.boxShadow }
-  })).toEqual({ borderRadius: '10px', padding: '6px', shadow: expect.not.stringMatching(/^none$/) })
+  })).toEqual({ borderRadius: '8px', padding: '4px 0px', shadow: expect.not.stringMatching(/^none$/) })
 
   await expect.poll(() => menuItem.evaluate((element) => getComputedStyle(element).minHeight)).toBe('40px')
 })

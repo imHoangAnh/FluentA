@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function todayInput() {
   const date = new Date();
@@ -16,29 +17,8 @@ function utcIso(offsetDays = 0) {
 }
 
 async function registerAndLogin(page) {
-  const email = `dashboard+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Dashboard Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const loginPayload = await (await loginResponsePromise).json();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return { token: loginPayload.data.accessToken };
+  const identity = await loginSeededUser(page, { prefix: 'dashboard-overview' });
+  return identity;
 }
 
 test('Dashboard Overview is the default authenticated home with actionable widgets', async ({ page }) => {
@@ -50,18 +30,22 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   });
 
   const { token } = await registerAndLogin(page);
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Cookie: `access_token=${token}` };
   const today = todayInput();
 
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review');
   await expect(page.getByText('No reviews due today.')).toBeVisible();
+  const widgetsMenu = page.getByRole('button', { name: 'Overview widgets' });
+  await widgetsMenu.click();
+  const widgets = page.getByRole('menu');
+  await widgets.getByRole('menuitem', { name: 'Habit tracker' }).click();
 
-  await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  await page.request.post('https://localhost:7000/api/v1/todos', {
     headers,
     data: { title: 'Dashboard planning task', date: today, note: 'Overview proof' },
   });
-  await page.request.post('http://127.0.0.1:5000/api/v1/habits', {
+  await page.request.post('https://localhost:7000/api/v1/habits', {
     headers,
     data: {
       name: 'Dashboard reading habit',
@@ -74,13 +58,13 @@ test('Dashboard Overview is the default authenticated home with actionable widge
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   });
-  await page.request.post('http://127.0.0.1:5000/api/v1/countdowns', {
+  await page.request.post('https://localhost:7000/api/v1/countdowns', {
     headers,
     data: { name: 'Dashboard IELTS date', targetDate: utcIso(14).slice(0, 10), alerts: [{ alertDay: '1DayBefore', alertTime: '09:00' }] },
   });
 
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
-  await page.getByRole('link', { name: 'Go to overview' }).click();
+  await page.goto('/');
 
   await expect(page.getByText('Dashboard planning task')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Dashboard reading habit')).toBeVisible();
@@ -92,11 +76,11 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   await page.getByLabel('Check habit Dashboard reading habit').click();
   await expect(page.getByLabel('Uncheck habit Dashboard reading habit')).toBeVisible();
 
-  const todoResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/todos?date=${today}`, { headers });
+  const todoResponse = await page.request.get(`https://localhost:7000/api/v1/todos?date=${today}`, { headers });
   const todos = (await todoResponse.json()).data;
   expect(todos.find((todo) => todo.title === 'Dashboard planning task')?.isCompleted).toBe(true);
 
-  const habitResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers });
+  const habitResponse = await page.request.get(`https://localhost:7000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers });
   const habits = (await habitResponse.json()).data;
   expect(habits.find((habit) => habit.name === 'Dashboard reading habit')?.isCheckedToday).toBe(true);
   expect(consoleErrors).toEqual([]);

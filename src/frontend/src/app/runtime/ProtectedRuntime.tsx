@@ -1,13 +1,13 @@
 import { Outlet } from 'react-router-dom'
 import { useTodoSync } from '@/features/todo'
 import { useHabitSync } from '@/features/habits'
-import { useKanbanSync } from '@/features/kanban'
+import { useProjectSync } from '@/features/project'
 import { usePomodoroSync } from '@/features/pomodoro'
 
 export function ProtectedRuntime() {
   useTodoSync()
   useHabitSync()
-  useKanbanSync()
+  useProjectSync()
   usePomodoroSync()
   return <Outlet />
 }

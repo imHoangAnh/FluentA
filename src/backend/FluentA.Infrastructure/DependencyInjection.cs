@@ -6,7 +6,7 @@ using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
-using FluentA.Application.BoundedContexts.Kanban;
+using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Practice;
@@ -26,7 +26,7 @@ using FluentA.Infrastructure.Countdown;
 using FluentA.Infrastructure.Flashcards;
 using FluentA.Infrastructure.Habit;
 using FluentA.Infrastructure.Journal;
-using FluentA.Infrastructure.Kanban;
+using FluentA.Infrastructure.Project;
 using FluentA.Infrastructure.Note;
 using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Pomodoro;
@@ -41,7 +41,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
-using StackExchange.Redis;
 using Resend;
 
 namespace FluentA.Infrastructure;
@@ -50,7 +49,6 @@ public static class DependencyInjection
 {
     private const string DefaultPostgresConnection =
         "Host=localhost;Port=5432;Database=fluenta_dev;Username=fluenta;Password=fluenta_dev";
-    private const string DefaultRedisConnection = "localhost:6379";
     private const int DefaultPostgresMinPoolSize = 0;
     private const int DefaultPostgresMaxPoolSize = 30;
     private const int DefaultPostgresConnectionTimeoutSeconds = 15;
@@ -68,7 +66,6 @@ public static class DependencyInjection
             configuration,
             "Hangfire:WorkerCount",
             DefaultHangfireWorkerCount);
-        var redisConnection = configuration.GetConnectionString("Redis") ?? DefaultRedisConnection;
         var assetStorageOptions = AssetStorageOptions.FromConfiguration(configuration);
         var pronunciationOptions = CreatePronunciationOptions(configuration);
         var authSecurityOptions = AuthSecurityOptions.FromConfiguration(configuration);
@@ -79,10 +76,11 @@ public static class DependencyInjection
         services.AddHangfire(configuration => configuration.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnection)));
         services.AddHangfireServer(options => options.WorkerCount = hangfireWorkerCount);
         services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
+        services.AddScoped<ReviewDueDeferralJob>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();
-        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
+        services.AddMemoryCache();
         services.AddSingleton(assetStorageOptions);
         services.AddHostedService<AssetStoragePrivacyStartupService>();
         if (assetStorageOptions.Enabled)
@@ -130,7 +128,7 @@ public static class DependencyInjection
         services.AddScoped<ITrashParticipant, CountdownTrashParticipant>();
         services.AddScoped<ITrashParticipant, HabitTrashParticipant>();
         services.AddScoped<ITrashParticipant, JournalTrashParticipant>();
-        services.AddScoped<ITrashParticipant, KanbanTrashParticipant>();
+        services.AddScoped<ITrashParticipant, ProjectTrashParticipant>();
         services.AddScoped<ITrashService, TrashService>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<ICountdownRepository, EfCountdownRepository>();
@@ -143,10 +141,10 @@ public static class DependencyInjection
         services.AddScoped<INoteRepository, EfNoteRepository>();
         services.AddScoped<INoteContentProcessor, NoteContentProcessor>();
         services.AddScoped<INoteService, NoteService>();
-        services.AddScoped<IKanbanRepository, EfKanbanRepository>();
-        services.AddScoped<IKanbanService, KanbanService>();
+        services.AddScoped<IProjectRepository, EfProjectRepository>();
+        services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IPomodoroRepository, EfPomodoroRepository>();
-        services.AddSingleton<IPomodoroCurrentStateStore, RedisPomodoroCurrentStateStore>();
+        services.AddSingleton<IPomodoroCurrentStateStore, MemoryPomodoroCurrentStateStore>();
         services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
     }

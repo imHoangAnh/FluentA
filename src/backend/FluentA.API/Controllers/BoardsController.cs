@@ -60,13 +60,6 @@ public sealed class BoardsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    [HttpGet("{boardId:guid}/pages")]
-    public async Task<IActionResult> ListPages(Guid boardId, CancellationToken cancellationToken)
-    {
-        var result = await _vocabulary.ListPagesAsync(CurrentUserId(), boardId, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<IReadOnlyList<PageDto>>.Ok(result.Value!)) : ToErrorResult(result);
-    }
-
     [HttpPost("{boardId:guid}/pages")]
     public async Task<IActionResult> CreatePage(Guid boardId, CreatePageRequest request, CancellationToken cancellationToken)
     {

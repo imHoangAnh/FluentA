@@ -9,10 +9,4 @@ public enum AssetStatus
     PendingDeletion = 5,
     Deleted = 6,
 
-    [Obsolete("Use PendingUpload.")]
-    Pending = PendingUpload,
-    [Obsolete("Use Ready.")]
-    Finalized = Ready,
-    [Obsolete("Use Failed.")]
-    Expired = Failed
 }

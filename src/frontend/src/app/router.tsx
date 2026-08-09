@@ -8,7 +8,7 @@ import { flashcardRoutes } from '@/features/flashcards'
 import { practiceRoutes } from '@/features/practice'
 import { reviewRoutes } from '@/features/review'
 import { todoRoutes } from '@/features/todo'
-import { kanbanRoutes } from '@/features/kanban'
+import { projectRoutes } from '@/features/project'
 import { journalRoutes } from '@/features/journal'
 import { notesRoutes } from '@/features/notes'
 import { pomodoroRoutes } from '@/features/pomodoro'
@@ -35,7 +35,7 @@ export const protectedAppRoutes: RouteObject[] = [
   ...practiceRoutes,
   ...reviewRoutes,
   ...todoRoutes,
-  ...kanbanRoutes,
+  ...projectRoutes,
   ...journalRoutes,
   ...notesRoutes,
   ...pomodoroRoutes,

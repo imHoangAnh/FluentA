@@ -2,9 +2,9 @@ using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Pomodoro.DTOs;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Application.BoundedContexts.Todo;
-using FluentA.Application.BoundedContexts.Kanban;
+using FluentA.Application.BoundedContexts.Project;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
-using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Project.Entities;
 
 namespace FluentA.Application.UnitTests;
 
@@ -75,7 +75,7 @@ public sealed class PomodoroServiceTests
     }
 
     [Fact]
-    public async Task GetCurrentAsync_ReturnsIdleFallbackFromConfigWhenRedisIsEmpty()
+    public async Task GetCurrentAsync_ReturnsIdleFallbackFromConfigWhenStateStoreIsEmpty()
     {
         var repository = new FakePomodoroRepository();
         var userId = Guid.NewGuid();

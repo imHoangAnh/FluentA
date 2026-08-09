@@ -2,11 +2,13 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from '@/lib/toast'
+import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import * as todoApi from '../api/todo.api'
 import { restoreTrashEntry } from '@/features/trash'
 import { MyDayView } from '../components/MyDayView'
-import { TodoDetailsPanel } from '../components/TodoDetailsPanel'
+import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
+import { TodoSortMenu } from '../components/TodoSortMenu'
 import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../todo-date'
 import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../todo-sort'
 import { TodoWeekView } from './TodoWeekView'
@@ -29,6 +31,7 @@ export function TodoPage() {
   const [weekAnchor, setWeekAnchor] = useState(today)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<TodoSortMode | null>(() => readTodoSortMode())
+  const [deletingTask, setDeletingTask] = useState<todoApi.TodoItem | null>(null)
   const orderQueue = useRef<Promise<void>>(Promise.resolve())
 
   const dates = useMemo(() => weekDates(weekAnchor), [weekAnchor])
@@ -129,6 +132,7 @@ export function TodoPage() {
       )
       if (selectedTaskId === deletedId) setSelectedTaskId(null)
       queryClient.removeQueries({ queryKey: ['todo-item', deletedId] })
+      setDeletingTask(null)
       await refresh()
       toast.success('Moved to Trash.', {
         action: {
@@ -214,8 +218,6 @@ export function TodoPage() {
       <TodoPageHeader
         view={activeView}
         subtitle={activeView === 'my-day' ? formatMyDayDate(today) : formatWeekRange(dates[0], dates[6])}
-        sortMode={sortMode}
-        onSortChange={changeSortMode}
         onViewChange={changeView}
         onShiftWeek={(days) => {
           setSelectedTaskId(null)
@@ -224,42 +226,47 @@ export function TodoPage() {
       />
 
       {activeView === 'my-day' ? (
-        <main className={`todo-main-layout${selectedTask ? ' todo-main-layout--details' : ''}`}>
-          <MyDayView
-            items={todos}
-            selectedId={effectiveSelectedTaskId}
-            sortMode={sortMode}
-            loading={todosQuery.isLoading}
-            error={todosQuery.isError}
-            creating={createTodo.isPending}
-            onCreate={(title) => createTask(title, today, true)}
-            onSelect={(item) => setSelectedTaskId(item.id)}
-            onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
-            onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
-            onDelete={(item) => deleteTodo.mutate(item.id)}
-            onPersistOrder={persistManualOrder}
-          />
-          {requestedTaskId && requestedTaskQuery.isLoading ? (
-            <p className="todo-my-day__status" role="status">Opening task...</p>
-          ) : null}
-          {requestedTaskId && requestedTaskQuery.isError ? (
-            <p className="todo-my-day__status todo-my-day__status--error" role="alert">
-              This task is unavailable or no longer exists.
-            </p>
-          ) : null}
-          {selectedTask ? (
-            <TodoDetailsPanel
-              key={selectedTask.id}
-              item={selectedTask}
-              pending={updateTodo.isPending}
-              onClose={closeDetails}
-              onUpdate={updateTask}
-              onDelete={(item) => deleteTodo.mutate(item.id)}
-            />
-          ) : null}
+        <main className="todo-main-layout todo-main-layout--details">
+            <div className="todo-main-layout__primary">
+              <div className="todo-my-day__sort-row">
+                <TodoSortMenu sortMode={sortMode} onSortChange={changeSortMode} />
+              </div>
+              <MyDayView
+                items={todos}
+                selectedId={effectiveSelectedTaskId}
+                sortMode={sortMode}
+                loading={todosQuery.isLoading}
+                error={todosQuery.isError}
+                creating={createTodo.isPending}
+                onCreate={(title) => createTask(title, today, true)}
+                onSelect={(item) => setSelectedTaskId(item.id)}
+                onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
+                onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
+                onDelete={(item) => setDeletingTask(item)}
+                onPersistOrder={persistManualOrder}
+              />
+              {requestedTaskId && requestedTaskQuery.isLoading ? (
+                <p className="todo-my-day__status" role="status">Opening task...</p>
+              ) : null}
+              {requestedTaskId && requestedTaskQuery.isError ? (
+                <p className="todo-my-day__status todo-my-day__status--error" role="alert">
+                  This task is unavailable or no longer exists.
+                </p>
+              ) : null}
+            </div>
+            {selectedTask ? (
+              <TodoDetailsPanel
+                key={selectedTask.id}
+                item={selectedTask}
+                pending={updateTodo.isPending}
+                onClose={closeDetails}
+                onUpdate={updateTask}
+                onDelete={(item) => setDeletingTask(item)}
+              />
+            ) : <TodoDetailsEmptyState />}
         </main>
       ) : (
-        <main className={`todo-main-layout todo-main-layout--week${selectedTask ? ' todo-main-layout--week-details' : ''}`}>
+        <main className="todo-main-layout todo-main-layout--week todo-main-layout--week-details">
           <div className="todo-week-surface">
             {weekQuery.isLoading ? <p className="todo-my-day__status" role="status">Loading week...</p> : null}
             {weekQuery.isError ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load Todo week.</p> : null}
@@ -274,7 +281,7 @@ export function TodoPage() {
                 onToggle={(item) => safelyUpdateTask(item, { isCompleted: !item.isCompleted })}
                 onToggleImportant={(item) => safelyUpdateTask(item, { isImportant: !item.isImportant })}
                 onDuplicate={(item) => duplicateTodo.mutate(item)}
-                onDelete={(item) => deleteTodo.mutate(item.id)}
+                onDelete={(item) => setDeletingTask(item)}
                 onMove={(item, date, sortOrder) => safelyUpdateTask(item, { date, sortOrder })}
               />
             ) : null}
@@ -286,11 +293,29 @@ export function TodoPage() {
               pending={updateTodo.isPending}
               onClose={closeDetails}
               onUpdate={updateTask}
-              onDelete={(item) => deleteTodo.mutate(item.id)}
+              onDelete={(item) => setDeletingTask(item)}
             />
-          ) : null}
+          ) : <TodoDetailsEmptyState />}
         </main>
       )}
+
+      <AlertDialog open={!!deletingTask} onOpenChange={(open) => { if (!open && !deleteTodo.isPending) setDeletingTask(null) }}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete Task</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete <strong>"{deletingTask?.title}"</strong>? The task will be moved to Trash.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancelButton disabled={deleteTodo.isPending}>Cancel</AlertDialogCancelButton>
+            <AlertDialogActionButton
+              disabled={deleteTodo.isPending}
+              onClick={(e) => { e.preventDefault(); if (deletingTask) deleteTodo.mutate(deletingTask.id) }}
+            >
+              {deleteTodo.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogActionButton>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -79,12 +79,12 @@ describe('JournalPage workspace redesign', () => {
 
     const search = await screen.findByTestId('journal-search-input')
     const workspace = screen.getByTestId('journal-workspace')
+    const sidebar = workspace.querySelector('.journal-sidebar')
     expect(screen.queryByText('My Journal')).not.toBeInTheDocument()
-    expect(search.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sidebar).toContainElement(search)
 
     const entryButton = await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` })
     expect(entryButton).toHaveTextContent(journalEntry.title)
-    expect(within(entryButton).queryByText('ENTRY')).not.toBeInTheDocument()
     expect(within(entryButton).getByTestId('journal-entry-date')).toBeInTheDocument()
     expect(within(entryButton).getAllByText(journalEntry.title)).toHaveLength(1)
 
@@ -92,22 +92,47 @@ describe('JournalPage workspace redesign', () => {
 
     const editorHeader = await screen.findByTestId('journal-editor-header')
     const titleInput = within(editorHeader).getByLabelText('Journal title')
-    const dateInput = within(editorHeader).getByLabelText('Journal date')
+    const dateDisplay = within(editorHeader).getByTestId('journal-date-display')
     const actions = within(editorHeader).getByTestId('journal-editor-actions')
     const saveButton = within(actions).getByTestId('save-journal-button')
     const deleteButton = within(actions).getByRole('button', { name: `Delete journal ${journalEntry.title}` })
 
     expect(titleInput).toHaveValue(journalEntry.title)
-    expect(titleInput.compareDocumentPosition(dateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(dateDisplay).toHaveAttribute('data-date', journalEntry.date)
+    expect(within(editorHeader).queryByLabelText('Journal date')).not.toBeInTheDocument()
     expect(saveButton.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(actions).getByTestId('journal-save-status')).toHaveTextContent('Saved')
 
     const editorBody = screen.getByTestId('journal-editor-body')
-    const toolbar = await within(editorBody).findByRole('toolbar', { name: 'Journal formatting tools' })
+    const toolbar = await within(editorHeader).findByRole('toolbar', { name: 'Journal formatting tools' })
     const writingSurface = within(editorBody).getByLabelText('Journal rich text editor')
     expect(editorHeader.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(toolbar.compareDocumentPosition(writingSurface) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(document.querySelector('.journal-editor-footer')).not.toBeInTheDocument()
+  })
+
+  it('uses Save for a new entry while keeping the date read-only', async () => {
+    renderPage()
+
+    const saveButton = await screen.findByTestId('save-journal-button')
+    expect(saveButton).toHaveTextContent('Save')
+    expect(saveButton).not.toHaveTextContent('Create')
+    expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+    expect(screen.queryByTestId('journal-date-input')).not.toBeInTheDocument()
+  })
+
+  it('renders the recent journals empty state with a New Journal action', async () => {
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValueOnce([])
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'No journals yet' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Recent journals' })).toBeInTheDocument()
+
+    const newJournalButton = screen.getByRole('button', { name: 'New Journal' })
+    await userEvent.click(newJournalButton)
+
+    expect(screen.getByLabelText('Journal title')).toHaveValue('New Journal')
   })
 
   it('keeps the two-second autosave behavior for persisted entries', async () => {

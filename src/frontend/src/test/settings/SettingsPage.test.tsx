@@ -69,10 +69,6 @@ describe('SettingsPage profile save', () => {
       practiceSettings: {
         modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
       },
-      reviewSettings: {
-        dailyLimit: 300,
-        recapAfterAnswer: true,
-      },
     })
   })
 
@@ -105,6 +101,10 @@ describe('SettingsPage profile save', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Full name')).toHaveValue('FluentA Learner')
+    expect(screen.getByLabelText('Email')).toHaveValue('learner@example.com')
+    expect(screen.getByLabelText('About')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
     await user.upload(screen.getByLabelText(/choose avatar/i), avatarFile)
     await user.click(screen.getByRole('button', { name: 'Save profile' }))
 

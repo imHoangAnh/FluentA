@@ -48,7 +48,7 @@ public sealed class TrashRestoreDomainTests
     }
 
     [Fact]
-    public void ExpiredCountdown_RestoreStaysVisibleForSevenDaysThenRetiresAgain()
+    public void ExpiredCountdown_RestoreRemainsVisibleAsADurableMemory()
     {
         var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", new DateTime(2026, 7, 1));
         var restoredAt = new DateTime(2026, 7, 28, 10, 0, 0, DateTimeKind.Utc);
@@ -59,9 +59,7 @@ public sealed class TrashRestoreDomainTests
         Assert.Null(countdown.DeletedAt);
         Assert.True(countdown.IsCompletedAt(restoredAt));
         Assert.True(countdown.IsVisibleAt(restoredAt.AddDays(7)));
-        Assert.False(countdown.ShouldRetireAt(restoredAt.AddDays(7)));
-        Assert.False(countdown.IsVisibleAt(restoredAt.AddDays(8)));
-        Assert.True(countdown.ShouldRetireAt(restoredAt.AddDays(8)));
+        Assert.True(countdown.IsVisibleAt(restoredAt.AddDays(8)));
     }
 
     [Fact]

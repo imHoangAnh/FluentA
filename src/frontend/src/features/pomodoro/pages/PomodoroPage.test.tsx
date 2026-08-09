@@ -26,7 +26,7 @@ vi.mock('@/features/todo', () => ({
   listByDate: vi.fn().mockResolvedValue([{ id: 'todo-1', title: 'Read English' }]),
 }))
 
-vi.mock('@/features/kanban', () => ({
+vi.mock('@/features/project', () => ({
   getBoard: vi.fn(),
   listBoards: vi.fn().mockResolvedValue([]),
 }))

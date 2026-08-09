@@ -12,25 +12,11 @@ export type AssetPayload = {
   updatedAtUtc: string
 }
 
-export type OwnedAssetPayload = AssetPayload & {
-  isCurrentAvatar: boolean
-}
-
 type PresignedAssetUploadPayload = {
   asset: AssetPayload
   uploadUrl: string
   expiresAtUtc: string
   method: string
-}
-
-export async function listAssets(assetType = 'avatar') {
-  const response = await apiClient.get<ApiEnvelope<OwnedAssetPayload[]>>('/assets', {
-    params: {
-      assetType,
-    },
-  })
-
-  return response.data.data ?? []
 }
 
 type UploadFileMetadata = Pick<File, 'name' | 'size' | 'type'>
@@ -71,10 +57,6 @@ export async function presignNoteImageUpload(file: UploadFileMetadata) {
 export async function finalizeAsset(assetId: string) {
   const response = await apiClient.post<ApiEnvelope<AssetPayload>>('/assets/finalize', { assetId })
   return response.data.data!
-}
-
-export async function deleteAsset(assetId: string) {
-  await apiClient.delete(`/assets/${assetId}`)
 }
 
 export async function uploadAvatarAsset(file: File) {

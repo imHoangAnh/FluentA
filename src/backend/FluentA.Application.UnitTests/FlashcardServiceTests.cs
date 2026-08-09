@@ -58,10 +58,10 @@ public sealed class FlashcardServiceTests
         var userId = Guid.NewGuid();
         var boardId = Guid.NewGuid();
 
-        var invalid = await service.CreateReviewSessionAsync(userId, new CreateReviewSessionRequest(Guid.Empty, "sequential", "dictation", "prompt", "UTC"));
+        var invalid = await service.CreateReviewSessionAsync(userId, new CreateReviewSessionRequest(Guid.Empty, "sequential", "dictation", "UTC"));
         Assert.False(invalid.IsSuccess);
 
-        var result = await service.CreateReviewSessionAsync(userId, new CreateReviewSessionRequest(boardId, "shuffle", "random", "continue", "UTC"));
+        var result = await service.CreateReviewSessionAsync(userId, new CreateReviewSessionRequest(boardId, "shuffle", "random", "UTC"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(userId, repository.RequestedUserId);
@@ -69,7 +69,6 @@ public sealed class FlashcardServiceTests
         Assert.NotEqual(Guid.Empty, repository.RequestedCreatedSessionId);
         Assert.Equal(repository.RequestedCreatedSessionId, result.Value!.SessionId);
         Assert.Equal(boardId, result.Value.BoardId);
-        Assert.Equal("continue", repository.RequestedStartBehavior);
     }
 
     [Fact]
@@ -156,38 +155,6 @@ public sealed class FlashcardServiceTests
     }
 
     [Fact]
-    public async Task GetReviewSessionSummary_ValidatesSessionAndUsesAuthenticatedUserScope()
-    {
-        var repository = new RecordingReviewRepository();
-        var service = CreateReviewService(repository);
-        var userId = Guid.NewGuid();
-        var sessionId = Guid.NewGuid();
-
-        var invalid = await service.GetReviewSessionSummaryAsync(userId, Guid.Empty);
-        Assert.False(invalid.IsSuccess);
-
-        var result = await service.GetReviewSessionSummaryAsync(userId, sessionId);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(userId, repository.RequestedUserId);
-        Assert.Equal(sessionId, repository.RequestedSummarySessionId);
-        Assert.Equal(4, result.Value!.TotalWordsReviewed);
-        Assert.Equal(75, result.Value.CorrectPercent);
-    }
-
-    [Fact]
-    public async Task GetReviewSessionSummary_ReturnsNotFoundForForeignOrMissingSession()
-    {
-        var repository = new RecordingReviewRepository { SummaryMissing = true };
-        var service = CreateReviewService(repository);
-
-        var result = await service.GetReviewSessionSummaryAsync(Guid.NewGuid(), Guid.NewGuid());
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal("DECK_OR_CARD_NOT_FOUND", ((ReviewError)result.Error!).Code);
-    }
-
-    [Fact]
     public async Task SubmitReview_RejectsInvalidTimeZoneBeforeRepository()
     {
         var repository = new RecordingReviewRepository();
@@ -210,23 +177,6 @@ public sealed class FlashcardServiceTests
         var result = ReviewTime.NextReviewDate(new DateTime(2026, 3, 8, 7, 30, 0, DateTimeKind.Utc), 1, zone);
 
         Assert.Equal(new DateOnly(2026, 3, 9), result);
-    }
-
-    [Fact]
-    public async Task ReviewSettings_ValidatesAndUsesAuthenticatedUserScope()
-    {
-        var repository = new RecordingReviewRepository();
-        var service = CreateReviewService(repository);
-        var userId = Guid.NewGuid();
-
-        var invalid = await service.UpdateReviewSettingsAsync(userId, new UpdateReviewSettingsRequest(0, true));
-        Assert.False(invalid.IsSuccess);
-
-        var result = await service.UpdateReviewSettingsAsync(userId, new UpdateReviewSettingsRequest(10, false));
-        Assert.True(result.IsSuccess);
-        Assert.Equal(userId, repository.RequestedUserId);
-        Assert.Equal(10, result.Value!.DailyLimit);
-        Assert.False(result.Value.RecapAfterAnswer);
     }
 
     [Fact]
@@ -308,14 +258,12 @@ public sealed class FlashcardServiceTests
         public Guid RequestedWordId { get; private set; }
         public Guid RequestedPageId { get; private set; }
         public Guid RequestedCreatedSessionId { get; private set; }
-        public Guid RequestedSummarySessionId { get; private set; }
         public Guid? RequestedBoardId { get; private set; }
         public PracticeMode RequestedPracticeMode { get; private set; }
         public bool RequestedCorrect { get; private set; }
         public int RequestedTimeSpentSeconds { get; private set; }
         public TimeZoneInfo? RequestedTimeZone { get; private set; }
         public bool DashboardMissing { get; init; }
-        public bool SummaryMissing { get; init; }
         public PracticeSessionSummarySaveStatus PracticeSessionSaveStatus { get; init; } = PracticeSessionSummarySaveStatus.Success;
 
         public Task<IReadOnlyList<FlashcardBoardDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -399,14 +347,11 @@ public sealed class FlashcardServiceTests
         public Guid RequestedWordId { get; private set; }
         public Guid RequestedPageId { get; private set; }
         public Guid RequestedCreatedSessionId { get; private set; }
-        public Guid RequestedSummarySessionId { get; private set; }
         public Guid? RequestedBoardId { get; private set; }
-        public string? RequestedStartBehavior { get; private set; }
         public bool RequestedCorrect { get; private set; }
         public int RequestedTimeSpentSeconds { get; private set; }
         public TimeZoneInfo? RequestedTimeZone { get; private set; }
         public bool DashboardMissing { get; init; }
-        public bool SummaryMissing { get; init; }
 
         public Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
             Guid userId,
@@ -428,7 +373,6 @@ public sealed class FlashcardServiceTests
             Guid boardId,
             string orderType,
             string mode,
-            string startBehavior,
             TimeZoneInfo timeZone,
             DateTime utcNow,
             Guid sessionId,
@@ -436,7 +380,6 @@ public sealed class FlashcardServiceTests
         {
             RequestedUserId = userId;
             RequestedBoardId = boardId;
-            RequestedStartBehavior = startBehavior;
             RequestedTimeZone = timeZone;
             RequestedCreatedSessionId = sessionId;
             return Task.FromResult<ReviewSessionCreatedDto?>(new ReviewSessionCreatedDto(
@@ -445,41 +388,11 @@ public sealed class FlashcardServiceTests
                 "HSK",
                 orderType,
                 mode,
-                "started",
                 utcNow,
                 4,
-                new ReviewStartOptionsDto(false, null, 4, false),
                 [
                     new ReviewSessionWordDto(Guid.NewGuid(), "mitigate", "verb", "/mɪtɪɡeɪt/", "giam nhe", "make less severe", "Mitigate risk.", null, null, null, "dictation")
                 ]));
-        }
-
-        public Task<ReviewSessionSummaryDto?> GetReviewSessionSummaryAsync(
-            Guid userId,
-            Guid sessionId,
-            CancellationToken cancellationToken = default)
-        {
-            RequestedUserId = userId;
-            RequestedSummarySessionId = sessionId;
-            return Task.FromResult(SummaryMissing
-                ? null
-                : new ReviewSessionSummaryDto(sessionId, 4, 3, 1, 75, 25, 8));
-        }
-
-        public Task<ReviewSettingsDto> GetReviewSettingsAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            RequestedUserId = userId;
-            return Task.FromResult(new ReviewSettingsDto(300, true));
-        }
-
-        public Task<ReviewSettingsDto> UpdateReviewSettingsAsync(
-            Guid userId,
-            int dailyLimit,
-            bool recapAfterAnswer,
-            CancellationToken cancellationToken = default)
-        {
-            RequestedUserId = userId;
-            return Task.FromResult(new ReviewSettingsDto(dailyLimit, recapAfterAnswer));
         }
 
         public Task<FlashcardDashboardDto?> GetDashboardAsync(

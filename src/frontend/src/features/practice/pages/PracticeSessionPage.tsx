@@ -1,13 +1,13 @@
-import { CheckCircle2, Mic, MicOff, PenSquare, RotateCcw, TriangleAlert, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Mic, RotateCcw, Square, TriangleAlert, Volume2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
 import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { Button } from '@/shared/components/ui/button'
+
 
 type PracticeOutcome = 'correct' | 'wrong'
 type PracticeOrderType = 'sequential' | 'shuffle'
@@ -26,6 +26,10 @@ function formatWordClass(value: string) {
   return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim())
+}
+
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
   window.speechSynthesis.cancel()
@@ -42,6 +46,7 @@ function shuffleCards(cards: FlashcardCard[]) {
 export function PracticeSessionPage() {
   const { pageId = '' } = useParams()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const orderType: PracticeOrderType = searchParams.get('order') === 'shuffle' ? 'shuffle' : 'sequential'
   const [sessionStarted, setSessionStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -58,7 +63,6 @@ export function PracticeSessionPage() {
   const [correctWords, setCorrectWords] = useState(0)
   const [wrongWords, setWrongWords] = useState(0)
   const [sessionCards, setSessionCards] = useState<FlashcardCard[]>([])
-  const [completedSession, setCompletedSession] = useState<{ correctCards: number; wrongCards: number } | null>(null)
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const initializedSessionKeyRef = useRef<string | null>(null)
@@ -73,6 +77,11 @@ export function PracticeSessionPage() {
   const language = sessionQuery.data?.boardLanguage ?? 'en'
   const modeSequence = useMemo(() => [...(practiceSettingsQuery.data?.modeSequence ?? []), 'recap' as const], [practiceSettingsQuery.data?.modeSequence])
   const currentStep = modeSequence[currentStepIndex] ?? 'recap'
+  const recapMode = modeSequence[Math.max(0, currentStepIndex - 1)] ?? 'dictation'
+  const currentSurfaceMode = currentStep === 'recap' ? recapMode : currentStep
+  const isDictationStep = currentStep === 'dictation'
+  const usesLargeAnswerLayout = isDictationStep || currentStep === 'meaningToWord'
+  const usesLargeSessionLayout = usesLargeAnswerLayout || currentStep === 'pronunciation' || currentStep === 'recap'
   const recordingSupported = supportsPcmRecording()
 
   useEffect(() => {
@@ -111,14 +120,13 @@ export function PracticeSessionPage() {
     setIsRecording(false)
     setCorrectWords(0)
     setWrongWords(0)
-    setCompletedSession(null)
     setReviewStatuses(initialReviewStatuses)
     saveSummaryMutation.reset()
     addToReviewMutation.reset()
     pronunciationMutation.reset()
   }, [addToReviewMutation, orderType, pageId, practiceSettingsQuery.isSuccess, pronunciationMutation, saveSummaryMutation, sessionQuery.data])
 
-  function resetStepState() {
+  const resetStepState = useCallback(() => {
     setTypedAnswer('')
     setFeedback(null)
     setResolvedOutcome(null)
@@ -130,9 +138,9 @@ export function PracticeSessionPage() {
     recordingRef.current = null
     setIsRecording(false)
     pronunciationMutation.reset()
-  }
+  }, [pronunciationMutation])
 
-  async function persistCompletion(nextCorrectCards: number, nextWrongCards: number) {
+  const persistCompletion = useCallback(async (nextCorrectCards: number, nextWrongCards: number) => {
     if (!sessionQuery.data) return
     return saveSummaryMutation.mutateAsync({
       pageId: sessionQuery.data.pageId,
@@ -142,15 +150,14 @@ export function PracticeSessionPage() {
       wrongCards: nextWrongCards,
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     })
-  }
+  }, [practiceSettingsQuery.data?.modeSequence, saveSummaryMutation, sessionCards.length, sessionQuery.data])
 
-  function advanceAfterRecap(outcome: PracticeOutcome) {
+  const advanceAfterRecap = useCallback((outcome: PracticeOutcome) => {
     const nextCorrect = correctWords + (outcome === 'correct' ? 1 : 0)
     const nextWrong = wrongWords + (outcome === 'wrong' ? 1 : 0)
     setCorrectWords(nextCorrect)
     setWrongWords(nextWrong)
     if (currentIndex + 1 >= sessionCards.length) {
-      setCompletedSession({ correctCards: nextCorrect, wrongCards: nextWrong })
       setSessionStarted(false)
       return
     }
@@ -159,33 +166,36 @@ export function PracticeSessionPage() {
     setCurrentStepIndex(0)
     setWordHasMistake(false)
     resetStepState()
-  }
+  }, [correctWords, currentIndex, resetStepState, sessionCards.length, wrongWords])
 
-  function resolveStep(outcome: PracticeOutcome) {
+
+
+  const resolveStep = useCallback((outcome: PracticeOutcome) => {
     setResolvedOutcome(outcome)
-    setFeedback(outcome)
+    setFeedback(outcome === 'wrong' ? 'wrong' : null)
     if (outcome === 'wrong') setWordHasMistake(true)
-  }
+  }, [])
 
-  function continueResolvedStep() {
+  const continueResolvedStep = useCallback(() => {
     setCurrentStepIndex((value) => value + 1)
     resetStepState()
-  }
+  }, [resetStepState])
 
-  function submitTypedAnswer() {
+  const submitTypedAnswer = useCallback(() => {
     if (!currentCard || resolvedOutcome || currentStep === 'recap') return
     if (normalizeAnswer(typedAnswer) === normalizeAnswer(currentCard.word)) {
-      resolveStep('correct')
+      continueResolvedStep()
       return
     }
     setFeedback('wrong')
-  }
+    setWordHasMistake(true)
+  }, [continueResolvedStep, currentCard, currentStep, resolvedOutcome, typedAnswer])
 
-  function revealAndSkip() {
-    if (currentCard) resolveStep('wrong')
-  }
+  const revealAndSkip = useCallback(() => {
+    if (currentCard && !resolvedOutcome) resolveStep('wrong')
+  }, [currentCard, resolveStep, resolvedOutcome])
 
-  async function handlePronunciationAudio(audio: Blob) {
+  const handlePronunciationAudio = useCallback(async (audio: Blob) => {
     recordingRef.current = null
     setIsRecording(false)
     if (!currentCard) return
@@ -195,18 +205,19 @@ export function PracticeSessionPage() {
       const nextAttempt = pronunciationAttempts + 1
       setPronunciationAttempts(nextAttempt)
       if (result.correct) {
-        resolveStep('correct')
+        continueResolvedStep()
         return
       }
 
       setFeedback('wrong')
+      setWordHasMistake(true)
       if (nextAttempt >= 2) setPronunciationPairExhausted(true)
     } catch {
       setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
     }
-  }
+  }, [continueResolvedStep, currentCard, pronunciationAttempts, pronunciationMutation])
 
-  async function startRecording() {
+  const startRecording = useCallback(async () => {
     setPronunciationError(null)
     pronunciationMutation.reset()
     try {
@@ -215,7 +226,7 @@ export function PracticeSessionPage() {
     } catch {
       setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
-  }
+  }, [handlePronunciationAudio, pronunciationMutation])
 
   function retryPronunciationPair() {
     setPronunciationRetryUsed(true)
@@ -236,118 +247,215 @@ export function PracticeSessionPage() {
     setReviewStatuses((current) => ({ ...current, [result.wordId]: result.status }))
   }
 
-  async function finalizePractice() {
-    if (completedSession) await persistCompletion(completedSession.correctCards, completedSession.wrongCards)
-  }
+  const finishPractice = useCallback(async () => {
+    const nextCorrect = correctWords + (wordHasMistake ? 0 : 1)
+    const nextWrong = wrongWords + (wordHasMistake ? 1 : 0)
+    setCorrectWords(nextCorrect)
+    setWrongWords(nextWrong)
+    try {
+      await persistCompletion(nextCorrect, nextWrong)
+      setSessionStarted(false)
+      navigate('/practice')
+    } catch {
+      // The recap remains visible so the learner can retry saving the session.
+    }
+  }, [correctWords, navigate, persistCompletion, wordHasMistake, wrongWords])
+
+  useEffect(() => {
+    if (!sessionStarted || !currentCard) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        speakWord(currentCard.word, language)
+        return
+      }
+
+      if (event.key === 'Enter') {
+        if (currentStep === 'recap') {
+          event.preventDefault()
+          if (currentIndex + 1 >= sessionCards.length) {
+            void finishPractice()
+          } else {
+            advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')
+          }
+          return
+        }
+        if (resolvedOutcome) {
+          event.preventDefault()
+          continueResolvedStep()
+          return
+        }
+        if (currentStep !== 'pronunciation' && normalizeAnswer(typedAnswer).length > 0) {
+          event.preventDefault()
+          submitTypedAnswer()
+        }
+        return
+      }
+
+      if (event.key === 'Escape' && currentStep !== 'recap' && !resolvedOutcome) {
+        event.preventDefault()
+        revealAndSkip()
+        return
+      }
+
+      if ((event.key === 'r' || event.key === 'R') && currentStep === 'pronunciation') {
+        const target = event.target as HTMLElement | null
+        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !pronunciationPairExhausted && !resolvedOutcome) {
+          event.preventDefault()
+          void startRecording()
+        }
+        return
+      }
+
+      if ((event.key === ' ' || event.key === 'Space') && currentStep === 'pronunciation' && isRecording) {
+        event.preventDefault()
+        void recordingRef.current?.stop()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [advanceAfterRecap, continueResolvedStep, currentCard, currentIndex, currentStep, finishPractice, isRecording, language, pronunciationMutation.isPending, pronunciationPairExhausted, recordingSupported, revealAndSkip, resolvedOutcome, sessionCards.length, sessionStarted, startRecording, submitTypedAnswer, typedAnswer, wordHasMistake])
 
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button asChild variant="outline" size="sm"><Link to="/practice">Back to decks</Link></Button>
-      </div>
       {sessionQuery.isLoading || practiceSettingsQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading practice session...</p> : null}
       {sessionQuery.isError || practiceSettingsQuery.isError ? <p role="alert" className="text-sm text-destructive">This practice session is unavailable.</p> : null}
       {sessionQuery.data && practiceSettingsQuery.isSuccess && sessionQuery.data.words.length === 0 ? <p role="status" className="text-sm text-muted-foreground">This page has no words to practice.</p> : null}
 
-      {!sessionStarted && completedSession ? (
-        <section className="review-summary practice-summary" data-testid="practice-summary">
-          <CheckCircle2 size={38} />
-          <span className="preview-label">Practice complete</span>
-          <h1>{sessionQuery.data?.pageName}</h1>
-          <p>{correctWords} correct and {wrongWords} wrong across {sessionCards.length} practiced words.</p>
-          {saveSummaryMutation.isSuccess ? <Link className="primary-button review-summary__done" to="/practice">Done</Link> : (
-            <button className="primary-button review-summary__done" type="button" onClick={() => void finalizePractice()} disabled={saveSummaryMutation.isPending}>Finish</button>
-          )}
-          {saveSummaryMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to save this practice result. Try again.</p> : null}
-        </section>
-      ) : null}
-
       {sessionStarted && currentCard ? (
-        <section className="review-session practice-session">
+        <section className={`review-session practice-session practice-session--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-session--focused' : ''}`}>
           <div className="review-progress">
-            <div>
-              <span className="preview-label">{currentStep === 'meaningToWord' ? 'Meaning → Word' : currentStep} · {orderType}</span>
-              <strong>{currentIndex + 1} / {sessionCards.length}</strong>
+            <div className="review-progress-header">
+              <span className="review-progress-order">{orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
+              <strong className="review-progress-count">{currentIndex + 1} of {sessionCards.length}</strong>
             </div>
             <progress value={currentIndex + 1} max={sessionCards.length} />
           </div>
 
-          <article className="review-card review-card--soft" data-testid="active-practice-card">
-            {currentStep === 'dictation' ? (
-              <div className="practice-prompt">
-                <span className="preview-label">Dictation</span>
-                <h2>Listen, then type the exact word</h2>
-                <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
-              </div>
-            ) : null}
-
-            {currentStep === 'meaningToWord' ? (
-              <div className="practice-prompt">
-                <span className="preview-label">Meaning → Word</span>
-                <h2>Type the target word</h2>
-                <p>{currentCard.meaningVn}</p>
-                <p>{currentCard.meaningEn}</p>
-              </div>
-            ) : null}
-
-            {currentStep === 'pronunciation' ? (
-              <div className="practice-prompt">
-                <span className="preview-label">Pronunciation</span>
-                <h2>Listen, then record your pronunciation</h2>
-                <p className="practice-attempt-copy">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2{pronunciationRetryUsed ? ' · retry pair' : ''}</p>
-                {!recordingSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
-                <div className="practice-pronunciation-controls">
-                  <button className="icon-button practice-audio-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
-                  <button className="secondary-button" type="button" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationPairExhausted || !recordingSupported}><Mic size={16} /> Record</button>
-                  <button className="secondary-button" type="button" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}><MicOff size={16} /> Stop</button>
-                </div>
-              </div>
-            ) : null}
-
+          <article className={`review-card review-card--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-card--focused' : ''}`} data-testid="active-practice-card">
             {currentStep === 'recap' ? (
-              <div className="learning-recap" data-testid="practice-answer-reveal">
-                <div className="learning-recap__word">
-                  <h2>{currentCard.word} <span>({formatWordClass(currentCard.wordClass)})</span></h2>
-                  <button className="icon-button" type="button" aria-label="Replay word audio" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={18} /></button>
-                </div>
-                <p className="learning-recap__ipa">{formatIpa(currentCard.ipaPronunciation)}</p>
-                <p><em>Definition:</em> {currentCard.meaningEn}</p>
-                <p><em>Meaning:</em> {currentCard.meaningVn}</p>
-                <p><em>Example:</em> {currentCard.example}</p>
-                <div className="deck-actions learning-recap__actions">
-                  <button className="secondary-button" type="button" onClick={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}>Previous</button>
-                  {currentReviewStatus === 'alreadyInReview' ? <button className="secondary-button" type="button" disabled>Already in Review</button>
-                    : currentReviewStatus === 'added' ? <button className="secondary-button" type="button" disabled>Added</button>
-                      : <button className="secondary-button" type="button" onClick={() => void addCurrentWordToReview()} disabled={addToReviewMutation.isPending}>Add to Review</button>}
-                  <button className="primary-button" type="button" onClick={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')} data-testid="practice-next-card">{currentIndex + 1 >= sessionCards.length ? 'Finish practice' : 'Next'}</button>
-                </div>
-                {addToReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to add this word to Review. Try again.</p> : null}
-              </div>
-            ) : (
-              <div className="practice-answer-panel">
-                {currentStep !== 'pronunciation' && !resolvedOutcome ? (
-                  <>
-                    <label className="practice-label" htmlFor="practice-answer-input">Type the target word</label>
-                    <input id="practice-answer-input" className="practice-input" value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} data-testid="practice-answer-input" />
-                    <button className="primary-button" type="button" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0}><PenSquare size={16} /> Submit answer</button>
-                    <button className="secondary-button practice-skip-button" type="button" onClick={revealAndSkip}>Reveal / skip</button>
-                  </>
-                ) : null}
+              <div className="review-recap practice-recap" data-testid="practice-answer-reveal">
+                <header className="review-recap__header">
+                  <h2>
+                    {currentCard.word}
+                    {hasText(currentCard.wordClass) ? <span> ({formatWordClass(currentCard.wordClass)})</span> : null}
+                  </h2>
+                  {hasText(currentCard.ipaPronunciation) ? <p>{formatIpa(currentCard.ipaPronunciation)}</p> : null}
+                </header>
 
-                {feedback ? <p className={`answer-feedback answer-feedback--${feedback}`} role="status">{feedback === 'correct' ? 'Correct' : 'Wrong'}</p> : null}
-                {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
-                {pronunciationPairExhausted && !resolvedOutcome ? (
-                  <div className="deck-actions">
-                    {!pronunciationRetryUsed ? <button className="secondary-button" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
-                    <button className="primary-button" type="button" onClick={revealAndSkip}>Skip</button>
+                {hasText(currentCard.meaningEn) || hasText(currentCard.meaningVn) || hasText(currentCard.example) || hasText(currentCard.synonyms) || hasText(currentCard.antonyms) ? (
+                  <div className="review-recap__details practice-recap__details">
+                    {hasText(currentCard.meaningEn) ? <p><strong><em>Definition:</em></strong> {currentCard.meaningEn}</p> : null}
+                    {hasText(currentCard.meaningVn) ? <p><strong><em>Meaning:</em></strong> {currentCard.meaningVn}</p> : null}
+                    {hasText(currentCard.example) ? <p><strong><em>Example:</em></strong> {currentCard.example}</p> : null}
+                    {hasText(currentCard.synonyms) ? <p><strong><em>Synonyms:</em></strong> {currentCard.synonyms}</p> : null}
+                    {hasText(currentCard.antonyms) ? <p><strong><em>Antonyms:</em></strong> {currentCard.antonyms}</p> : null}
                   </div>
                 ) : null}
-                {resolvedOutcome ? <button className="primary-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
+
+                <div className="practice-recap-actions">
+                  <button className="practice-recap__nav-button" type="button" onClick={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}>Previous</button>
+                  {currentReviewStatus === 'alreadyInReview' ? <button className="practice-recap__add-button" type="button" disabled>Already in Review</button>
+                    : currentReviewStatus === 'added' ? <button className="practice-recap__add-button" type="button" disabled>Added</button>
+                      : <button className="practice-recap__add-button" type="button" onClick={() => void addCurrentWordToReview()} disabled={addToReviewMutation.isPending}>Add to Review</button>}
+                  {currentIndex + 1 >= sessionCards.length ? (
+                    <button className="practice-recap__finish-button" type="button" onClick={() => void finishPractice()} disabled={saveSummaryMutation.isPending} data-testid="practice-next-card">Finish</button>
+                  ) : (
+                    <button className="practice-recap__nav-button" type="button" onClick={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')} data-testid="practice-next-card">Next</button>
+                  )}
+                </div>
+                {addToReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to add this word to Review. Try again.</p> : null}
+                {saveSummaryMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to save this practice result. Try again.</p> : null}
+              </div>
+            ) : (
+              <div className="review-exercise">
+                <h2 className="review-exercise__prompt">
+                  {currentStep === 'dictation'
+                    ? 'Listen carefully, then type the word you hear'
+                    : currentStep === 'meaningToWord'
+                      ? 'What word matches this meaning?'
+                      : 'Say the word naturally'}
+                </h2>
+
+                {currentStep === 'dictation' ? (
+                  <div className="review-exercise__stage review-exercise__stage--dictation">
+                    <div className="practice-dictation-audio-control">
+                      <button className="review-audio-action" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" onClick={() => speakWord(currentCard.word, language)}>
+                        <Volume2 size={28} />
+                      </button>
+                      <span>Play</span>
+                    </div>
+                  </div>
+                ) : currentStep === 'meaningToWord' ? (
+                  <div className="review-exercise__stage review-meaning-card">
+                    {hasText(currentCard.meaningVn) ? <strong>{currentCard.meaningVn}</strong> : null}
+                    {hasText(currentCard.meaningEn) ? <p>{currentCard.meaningEn}</p> : null}
+                  </div>
+                ) : (
+                  <div className="review-exercise__stage review-pronunciation-stage">
+                    <div className="review-pronunciation-target">
+                      <strong>{currentCard.word}</strong>
+                      {hasText(currentCard.ipaPronunciation) ? <span>{formatIpa(currentCard.ipaPronunciation)}</span> : null}
+                      <button type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={20} /></button>
+                    </div>
+                    {!recordingSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
+                    <div className="review-pronunciation-controls">
+                      <button className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`} type="button" aria-label="Start recording" title="Record (R)" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationPairExhausted || !recordingSupported}>
+                        <Mic size={22} />
+                      </button>
+                      <button className="review-stop-button" type="button" aria-label="Stop recording" title="Stop (Space)" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
+                        <Square size={18} fill="currentColor" />
+                      </button>
+                    </div>
+                    <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2{pronunciationRetryUsed ? ' · retry pair' : ''}</span>
+                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
+                    {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
+                  </div>
+                )}
+
+                {currentStep !== 'pronunciation' ? (
+                  <div className="review-answer-form">
+                    {currentStep === 'meaningToWord' || null}
+                    <input
+                      id="practice-answer-input"
+                      value={typedAnswer}
+                      onChange={(event) => setTypedAnswer(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && normalizeAnswer(typedAnswer).length > 0) {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          submitTypedAnswer()
+                        }
+                      }}
+                      data-testid="practice-answer-input"
+                      placeholder={currentStep === 'meaningToWord' ? 'Type the word...' : 'Type your answer...'}
+                      disabled={Boolean(resolvedOutcome)}
+                    />
+                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
+                    <div className="review-exercise__actions">
+                      <button className={usesLargeAnswerLayout ? 'practice-dictation-submit' : 'review-skip-button review-submit-button'} type="button" title="Submit answer (Enter)" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || Boolean(resolvedOutcome)}>
+                        {isDictationStep ? 'Submit Answer' : 'Submit'}
+                      </button>
+                      {!resolvedOutcome ? <button className={usesLargeAnswerLayout ? 'practice-dictation-skip' : 'review-skip-button'} type="button" onClick={revealAndSkip}>Skip</button> : null}
+                      {resolvedOutcome ? <button className="primary-button review-submit-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="review-exercise__actions">
+                    {pronunciationPairExhausted && !resolvedOutcome && !pronunciationRetryUsed ? <button className="practice-dictation-skip" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
+                    {!resolvedOutcome ? <button className="practice-dictation-skip" type="button" onClick={revealAndSkip}>Skip</button> : null}
+                    {resolvedOutcome ? <button className="practice-dictation-submit" type="button" onClick={continueResolvedStep}>Continue</button> : null}
+                  </div>
+                )}
               </div>
             )}
           </article>
+          {isDictationStep ? <p className="practice-session__shortcut">Shortcut: Tab to replay · Enter to submit · Esc to skip.</p> : null}
         </section>
       ) : null}
     </>

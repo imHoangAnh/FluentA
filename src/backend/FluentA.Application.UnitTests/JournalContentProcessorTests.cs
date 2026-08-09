@@ -9,9 +9,12 @@ public sealed class JournalContentProcessorTests
     {
         var processor = new JournalContentProcessor();
 
-        var result = processor.Process("<h2>Học tiếng Việt</h2><p><strong>Xin chào</strong> thế giới</p><mark>Nhớ nhé</mark>");
+        var result = processor.Process("<h2>Học tiếng Việt</h2><h4>Mục nhỏ</h4><ol><li>Một</li></ol><ul><li>Hai</li></ul><p><strong>Xin chào</strong> thế giới</p><mark>Nhớ nhé</mark>");
 
         Assert.Contains("<h2>Học tiếng Việt</h2>", result.Html);
+        Assert.Contains("<h4>Mục nhỏ</h4>", result.Html);
+        Assert.Contains("<ol><li>Một</li></ol>", result.Html);
+        Assert.Contains("<ul><li>Hai</li></ul>", result.Html);
         Assert.Contains("<strong>Xin chào</strong>", result.Html);
         Assert.Contains("<mark>Nhớ nhé</mark>", result.Html);
         Assert.Contains("Học tiếng Việt", result.PlainText);

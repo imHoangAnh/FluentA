@@ -1,6 +1,6 @@
 using FluentA.Application.BoundedContexts.Pomodoro.DTOs;
 using FluentA.Application.Common;
-using FluentA.Application.BoundedContexts.Kanban;
+using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 
@@ -12,20 +12,20 @@ public sealed class PomodoroService : IPomodoroService
     private readonly IPomodoroCurrentStateStore _currentStateStore;
     private readonly IPomodoroSyncNotifier _syncNotifier;
     private readonly ITodoRepository? _todoRepository;
-    private readonly IKanbanRepository? _kanbanRepository;
+    private readonly IProjectRepository? _projectRepository;
 
     public PomodoroService(
         IPomodoroRepository repository,
         IPomodoroCurrentStateStore currentStateStore,
         IPomodoroSyncNotifier? syncNotifier = null,
         ITodoRepository? todoRepository = null,
-        IKanbanRepository? kanbanRepository = null)
+        IProjectRepository? projectRepository = null)
     {
         _repository = repository;
         _currentStateStore = currentStateStore;
         _syncNotifier = syncNotifier ?? NullPomodoroSyncNotifier.Instance;
         _todoRepository = todoRepository;
-        _kanbanRepository = kanbanRepository;
+        _projectRepository = projectRepository;
     }
 
     public async Task<OperationResult<PomodoroConfigDto>> GetConfigAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -222,7 +222,7 @@ public sealed class PomodoroService : IPomodoroService
         var exists = source switch
         {
             "todo" when _todoRepository is not null => await _todoRepository.GetAsync(userId, request.LinkedTaskId.Value, cancellationToken) is not null,
-            "kanban" when _kanbanRepository is not null => await _kanbanRepository.GetCardAsync(userId, request.LinkedTaskId.Value, cancellationToken) is not null,
+            "project" when _projectRepository is not null => await _projectRepository.GetCardAsync(userId, request.LinkedTaskId.Value, cancellationToken) is not null,
             _ => false,
         };
         return exists ? null : PomodoroError.LinkedTaskNotFound();

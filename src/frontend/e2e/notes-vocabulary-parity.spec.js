@@ -105,7 +105,7 @@ async function mockNoteApis(page) {
 test('Notes page titles use an ellipsis instead of overflowing the rail', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 900 })
   await mockNoteApis(page)
-  await page.goto('http://localhost:5173/notes')
+  await page.goto('/notes')
 
   const longPageName = 'A very long Notes page title that must stay inside the page rail and end with an ellipsis'
   const pageButton = page.getByRole('button', { name: longPageName })
@@ -136,7 +136,7 @@ for (const viewport of [
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await mockNoteApis(page)
 
-    await page.goto('http://localhost:5173/notes')
+    await page.goto('/notes')
     await expect(page.getByLabel('Note title')).toHaveValue('Vocabulary recap')
 
     const header = page.getByTestId('note-editor-header')
@@ -188,18 +188,14 @@ for (const viewport of [
 
     await renamedPage.click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Delete Page' }).click()
-    await expect(page.getByRole('alertdialog')).toContainText('Delete “Renamed browser page”?')
-    await page.getByRole('button', { name: 'Delete' }).click()
-    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(renamedPage).toHaveCount(0)
     await expect(page.getByTestId('notes-rail-scroll')).toBeFocused()
     await expect(page.getByLabel('Note title')).toHaveValue('Vocabulary recap')
 
     const boardTrigger = page.getByRole('button', { name: /Learning Notes/ })
     await boardTrigger.click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Delete Board' }).click()
-    await expect(page.getByRole('alertdialog')).toContainText('Delete “Learning Notes”?')
-    await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(boardTrigger).toBeFocused()
+    await expect(boardTrigger).toBeVisible()
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })

@@ -1,6 +1,5 @@
 import {
   Bell,
-  BookOpenText,
   LogOut,
   Trash2,
 } from 'lucide-react'
@@ -49,7 +48,7 @@ export function AppShell({ children, title, description, contentClassName }: App
         'max-[1100px]:justify-center max-[1100px]:px-0',
       )}
     >
-      <Icon className="size-[18px]" aria-hidden="true" />
+      {Icon ? <Icon className="size-[18px]" aria-hidden="true" /> : null}
       <span className="truncate max-[1100px]:sr-only">{label}</span>
     </Link>
     )
@@ -66,17 +65,25 @@ export function AppShell({ children, title, description, contentClassName }: App
         )}
         aria-label="Primary navigation"
       >
-        <div className="flex h-12 items-center px-1 max-[1100px]:justify-center">
+        <div className="flex h-14 items-center px-1 max-[1100px]:justify-center">
           <Link
             to="/"
             aria-label="Go to overview"
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 max-[1100px]:flex-none"
+            className="flex min-w-0 flex-1 items-end gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 max-[1100px]:flex-none"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <BookOpenText className="size-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1 max-[1100px]:hidden">
-              <span className="block truncate text-base font-bold tracking-[-0.02em] text-foreground">FluentA</span>
+            <img
+              src="http://localhost:9000/fluenta-assets-dev/public/logo.png"
+              onError={(e) => {
+                const target = e.currentTarget
+                if (target.src !== `${window.location.origin}/logo.png`) {
+                  target.src = '/logo.png'
+                }
+              }}
+              alt="FluentA Logo Icon"
+              className="size-14 shrink-0 object-contain"
+            />
+            <span className="min-w-0 flex-1 max-[1100px]:hidden pb-1">
+              <span className="block truncate text-xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">FluentA</span>
             </span>
           </Link>
         </div>
@@ -117,7 +124,7 @@ export function AppShell({ children, title, description, contentClassName }: App
             aria-current={location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`) ? 'page' : undefined}
             className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground', (location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`)) && 'bg-secondary text-secondary-foreground', 'max-[1100px]:justify-center max-[1100px]:px-0')}
           >
-            <SettingsIcon className="size-[18px]" aria-hidden="true" />
+            {SettingsIcon ? <SettingsIcon className="size-[18px]" aria-hidden="true" /> : null}
             <span className="max-[1100px]:sr-only">{settingsNavigation.label}</span>
           </Link>
           <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-background p-2 max-[1100px]:justify-center max-[1100px]:border-0 max-[1100px]:bg-transparent">
@@ -149,7 +156,7 @@ export function AppShell({ children, title, description, contentClassName }: App
       </aside>
 
       <div className="min-w-0 flex-1">
-        <main id="main-content" className={cn('mx-auto w-full max-w-[1480px] p-6 lg:p-8', contentClassName)}>
+        <main id="main-content" className={cn('w-full max-w-none min-h-screen p-3 lg:p-4', contentClassName)}>
           <h1 className="sr-only">{title}</h1>
           {description ? <p className="sr-only">{description}</p> : null}
           {children}

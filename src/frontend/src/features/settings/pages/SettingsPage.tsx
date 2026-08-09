@@ -1,9 +1,9 @@
 import { ImageMinus, Save, Upload } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as assetsApi from '../api/avatar-assets.api'
 import * as settingsApi from '../api/settings.api'
-import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
+import { SettingsErrorPanel, SettingsLoadingPanel } from '../components/SettingsPanel'
 import { SettingsSaveStatus } from '../components/SettingsSaveStatus'
 import { useAuthStore } from '@/features/auth'
 import { Button } from '@/shared/components/ui/button'
@@ -129,47 +129,46 @@ export function SettingsPage() {
     setProfileError(null)
   }
 
+  const status = (
+    <SettingsSaveStatus
+      errorLabel={profileError ?? 'Unable to save profile.'}
+      hasUnsavedChanges={hasUnsavedChanges}
+      state={saveState}
+      successLabel={profileMessage ?? 'Profile saved.'}
+    />
+  )
+
+  function submitProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (hasUnsavedChanges && profile && !updateProfile.isPending) updateProfile.mutate(profile)
+  }
+
   return (
-    <SettingsPanel
-      eyebrow="Account"
-      title="Profile"
-      description="Update the identity shown across your FluentA workspace."
-      status={(
-        <SettingsSaveStatus
-          errorLabel={profileError ?? 'Unable to save profile.'}
-          hasUnsavedChanges={hasUnsavedChanges}
-          state={saveState}
-          successLabel={profileMessage ?? 'Profile saved.'}
-        />
-      )}
-      footer={(
-        <>
-          <span className="text-xs text-muted-foreground">Changes stay local until you save.</span>
-          <Button
-            type="button"
-            disabled={!hasUnsavedChanges || updateProfile.isPending}
-            onClick={() => updateProfile.mutate(profile)}
-          >
-            <Save aria-hidden="true" />
-            {updateProfile.isPending ? 'Saving profile...' : 'Save profile'}
-          </Button>
-        </>
-      )}
-    >
-      <div className="flex flex-wrap items-center gap-4">
-        <img
-          className="settings-avatar-preview size-20 shrink-0 rounded-full border border-border object-cover shadow-sm"
-          src={profileAvatarPreview}
-          alt={`${profile.fullName} avatar preview`}
-        />
-        <div className="grid min-w-0 gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
-              <label htmlFor="profile-avatar-file">
-                <Upload aria-hidden="true" />
-                Choose avatar
+    <form className="mx-auto max-w-4xl space-y-12 rounded-lg bg-white px-4 py-6 sm:px-6 lg:px-8" onSubmit={submitProfile}>
+      <div className="border-b border-gray-900/10 pb-12">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl/8 font-semibold text-gray-900">Profile</h1>
+            <p className="mt-1 text-sm/6 text-gray-600">This information will be displayed publicly so be careful what you share.</p>
+          </div>
+          <div className="pt-1">{status}</div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+          <div className="col-span-full sm:col-span-4">
+            <span className="block text-base/7 font-semibold text-gray-900">Photo</span>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <img
+                className="size-16 shrink-0 rounded-full border border-gray-200 bg-gray-50 object-cover"
+                src={profileAvatarPreview}
+                alt={`${profile.fullName} avatar preview`}
+              />
+              <label htmlFor="profile-avatar-file" className="inline-flex cursor-pointer items-center rounded-md bg-white px-4 py-2.5 text-base font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-600">
+                <Upload aria-hidden="true" className="mr-2 size-5" />
+                Change
                 <input
                   id="profile-avatar-file"
+                  aria-label="Choose avatar"
                   accept="image/jpeg,image/png,image/webp"
                   className="sr-only"
                   type="file"
@@ -180,48 +179,73 @@ export function SettingsPage() {
                   })}
                 />
               </label>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={() => updateDraft({ avatarFile: null, avatarAssetId: null, removeAvatar: true })}
-            >
-              <ImageMinus aria-hidden="true" />
-              Remove
-            </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                className="h-auto px-2 py-2 text-base font-medium text-gray-600 hover:text-gray-900"
+                onClick={() => updateDraft({ avatarFile: null, avatarAssetId: null, removeAvatar: true })}
+              >
+                <ImageMinus aria-hidden="true" className="size-5" />
+                Remove
+              </Button>
+            </div>
+            <p className="mt-4 text-base/7 text-gray-600">JPG, PNG, or WebP. Maximum 2 MB.</p>
           </div>
-          <p className="m-0 text-xs text-muted-foreground">JPG, PNG, or WebP. Maximum 2 MB.</p>
+
+          <div className="sm:col-span-3">
+            <label htmlFor="profile-full-name" className="block text-sm/6 font-medium text-gray-900">Full name</label>
+            <div className="mt-2">
+              <Input
+                id="profile-full-name"
+                className="block h-10 rounded-md border-gray-300 bg-white py-1.5 text-base text-gray-900 shadow-none outline-1 -outline-offset-1 outline-gray-300 focus-visible:border-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:ring-0 sm:text-sm/6"
+                value={profile.fullName}
+                onChange={(event) => updateDraft({ fullName: event.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="sm:col-span-3">
+            <label htmlFor="profile-email" className="block text-sm/6 font-medium text-gray-900">Email</label>
+            <div className="mt-2">
+              <Input
+                id="profile-email"
+                className="block h-10 rounded-md border-gray-300 bg-gray-50 py-1.5 text-base text-gray-500 shadow-none outline-1 -outline-offset-1 outline-gray-300 sm:text-sm/6"
+                value={profile.email}
+                readOnly
+              />
+            </div>
+          </div>
+
+          <div className="col-span-full">
+            <label htmlFor="profile-bio" className="block text-sm/6 font-medium text-gray-900">About</label>
+            <div className="mt-2">
+              <textarea
+                id="profile-bio"
+                className="block min-h-28 w-full resize-y rounded-md border-0 bg-white px-3 py-1.5 text-base text-gray-900 shadow-none outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                maxLength={500}
+                placeholder="Write a few sentences about yourself."
+                rows={4}
+                value={profile.bio}
+                onChange={(event) => updateDraft({ bio: event.target.value })}
+              />
+            </div>
+            <p className="mt-3 text-right text-sm/6 text-gray-600">{profile.bio.length}/500</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-sm font-medium text-foreground" htmlFor="profile-full-name">
-          Full name
-          <Input
-            id="profile-full-name"
-            value={profile.fullName}
-            onChange={(event) => updateDraft({ fullName: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1.5 text-sm font-medium text-foreground" htmlFor="profile-email">
-          Email
-          <Input id="profile-email" value={profile.email} readOnly />
-        </label>
-        <label className="grid gap-1.5 text-sm font-medium text-foreground sm:col-span-2" htmlFor="profile-bio">
-          Bio
-          <textarea
-            id="profile-bio"
-            className="min-h-28 w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
-            maxLength={500}
-            rows={4}
-            value={profile.bio}
-            onChange={(event) => updateDraft({ bio: event.target.value })}
-          />
-          <span className="text-right text-xs font-normal text-muted-foreground">{profile.bio.length}/500 characters</span>
-        </label>
+      <div className="flex items-center justify-end gap-x-6">
+        <span className="text-sm/6 text-gray-500">Changes stay local until you save.</span>
+        <Button
+          type="submit"
+          className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 focus-visible:ring-0"
+          disabled={!hasUnsavedChanges || updateProfile.isPending}
+        >
+          <Save aria-hidden="true" />
+          {updateProfile.isPending ? 'Saving profile...' : 'Save profile'}
+        </Button>
       </div>
-    </SettingsPanel>
+    </form>
   )
 }
 

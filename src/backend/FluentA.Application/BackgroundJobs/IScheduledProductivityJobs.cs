@@ -6,7 +6,7 @@ public interface IScheduledProductivityJobs
     Task ProcessTodoRemindersAsync(CancellationToken cancellationToken = default);
     Task SendHabitRemindersAsync(CancellationToken cancellationToken = default);
     Task ProcessCountdownAlertsAsync(CancellationToken cancellationToken = default);
-    Task CleanupRetiredCountdownsAsync(CancellationToken cancellationToken = default);
+    Task AdvanceCountdownRecurrencesAsync(CancellationToken cancellationToken = default);
     Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default);
     Task PurgeExpiredArchivedAssetsAsync(CancellationToken cancellationToken = default);
     Task PurgeExpiredTrashAsync(CancellationToken cancellationToken = default);

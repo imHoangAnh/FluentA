@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Edit3 } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
@@ -76,7 +76,7 @@ export function JournalPage() {
   const queryClient = useQueryClient()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState('New Journal')
   const [content, setContent] = useState('')
   const [entryDate, setEntryDate] = useState(() => toDateInput(new Date()))
   const [openingId, setOpeningId] = useState<string | null>(null)
@@ -86,6 +86,7 @@ export function JournalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => toMonthInput(new Date()))
+  const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null)
   const openRequestRef = useRef(0)
   const draftVersionRef = useRef(0)
 
@@ -127,7 +128,7 @@ export function JournalPage() {
     setOpeningId(null)
     setOpenFailed(false)
     setSelectedId(null)
-    setTitle('')
+    setTitle('New Journal')
     setContent('')
     setEntryDate(toDateInput(new Date()))
     setIsDirty(false)
@@ -266,46 +267,9 @@ export function JournalPage() {
     createEntry.mutate({ title, content, date: entryDate })
   }
 
-  const textContent = useMemo(() => {
-    const div = document.createElement('div')
-    div.innerHTML = content
-    return div.textContent || ''
-  }, [content])
-  const wordCount = useMemo(() => textContent.trim() ? textContent.trim().split(/\s+/).length : 0, [textContent])
-  const charCount = textContent.length
-
-  const showEmptyState = !selectedId && !title && !content && !isOpening;
-
   return (
-    <>
-        <div className="journal-page">
-      <header className="journal-header">
-        <div>
-          <h2>My Journal</h2>
-        </div>
-        <div className="journal-header-actions">
-          <label className="journal-search">
-            <Search size={17} />
-            <span className="sr-only">Search journal title</span>
-            <input
-              aria-label="Search journal title"
-              data-testid="journal-search-input"
-              maxLength={100}
-              placeholder="Search journal..."
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-            {searchQuery ? (
-              <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
-                <X size={16} />
-              </button>
-            ) : null}
-          </label>
-        </div>
-      </header>
-
-      <div className="journal-content">
+    <div className="journal-page">
+      <div className="journal-content" data-testid="journal-workspace">
         <div className="journal-sidebar">
           <section className="journal-calendar-card" aria-label="Journal date calendar">
             <header>
@@ -349,21 +313,52 @@ export function JournalPage() {
             {calendarQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load calendar dates.</p> : null}
           </section>
 
+          <div className="journal-sidebar-search">
+            <label className="journal-search">
+              <Search size={15} />
+              <span className="sr-only">Search journal title</span>
+              <input
+                aria-label="Search journal title"
+                data-testid="journal-search-input"
+                maxLength={100}
+                placeholder="Search journal..."
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              {searchQuery ? (
+                <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
+                  <X size={15} />
+                </button>
+              ) : null}
+            </label>
+          </div>
+
           <section className="journal-entries-card">
             <div className="journal-entries-card-header">
-              <h3>Recent Entries</h3>
+              <h3>Recent journals</h3>
               <button type="button" aria-label="New journal entry" onClick={clearEditor}>
-                New Entry
+                New Journal
               </button>
             </div>
 
             {isListLoading ? <p className="flashcard-status">{isSearching ? 'Searching journal entries...' : 'Loading journal entries...'}</p> : null}
             {isListError ? <p className="flashcard-status flashcard-status--error">Could not load journal entries.</p> : null}
             {!isListLoading && !isListError && entries.length === 0 ? (
-              <div className="journal-empty">
-                <p className="text-center text-sm text-muted-foreground">
-                  {isSearching ? `No content matches "${debouncedSearchQuery}".` : "No entries found."}
+              <div className="journal-empty-state" role="status">
+                <div className="journal-empty-state-icon" aria-hidden="true">
+                  <BookOpen size={32} strokeWidth={1.5} />
+                </div>
+                <h4>{isSearching ? 'No journals found' : 'No journals yet'}</h4>
+                <p>
+                  {isSearching ? `No journals match "${debouncedSearchQuery}".` : 'Start writing your first journal and keep your thoughts organized.'}
                 </p>
+                {!isSearching ? (
+                  <button className="journal-empty-create-button" type="button" onClick={clearEditor}>
+                    <Plus size={15} aria-hidden="true" />
+                    <span>New Journal</span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
@@ -377,8 +372,7 @@ export function JournalPage() {
                   aria-label={`Open journal ${entry.title}`}
                 >
                   <div className="journal-entry-card-top">
-                    <span className="journal-entry-badge">ENTRY</span>
-                    <span className="journal-entry-date">{formatDate(entry.date)}</span>
+                    <span className="journal-entry-date" data-testid="journal-entry-date">{formatDate(entry.date)}</span>
                   </div>
                   <strong>{entry.title}</strong>
                   {hasHighlights(entry) && entry.highlights.length > 0 ? <p><HighlightedPreview entry={entry} /></p> : null}
@@ -389,11 +383,48 @@ export function JournalPage() {
         </div>
 
         <form className="journal-editor-card" onSubmit={submitEntry}>
-          <div className="journal-editor-toolbar">
-            <div className="journal-editor-toolbar-left">
+          <div className="journal-editor-header" data-testid="journal-editor-header">
+            <div className="journal-editor-heading">
+              <input
+                aria-label="Journal title"
+                className="journal-title-input"
+                data-testid="journal-title-input"
+                disabled={isOpening}
+                value={title}
+                maxLength={240}
+                onChange={(event) => {
+                  setTitle(event.target.value)
+                  markChanged()
+                }}
+                placeholder="New Journal"
+              />
+              <p className="journal-date-display" data-date={entryDate} data-testid="journal-date-display">
+                {formatDate(entryDate)}
+              </p>
+            </div>
+
+            <div className="journal-editor-toolbar-host" ref={setToolbarHost} data-testid="journal-toolbar-host" />
+
+            <div className="journal-editor-actions" data-testid="journal-editor-actions">
+              <small data-testid="journal-save-status">
+                {selectedId
+                  ? saveStatus === 'saving'
+                    ? 'Saving...'
+                    : saveStatus === 'saved'
+                      ? 'Saved'
+                      : saveStatus === 'error'
+                        ? 'Save failed'
+                        : isDirty
+                          ? 'Unsaved changes'
+                          : 'Saved'
+                  : isDirty ? 'Unsaved changes' : 'Draft'}
+              </small>
+              <button className="primary-button m-0 min-h-9 w-auto px-4" type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
+                {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId && saveStatus === 'error' ? 'Retry' : 'Save'}
+              </button>
               {selectedId ? (
                 <button
-                  className="journal-toolbar-button"
+                  className="journal-delete-button"
                   type="button"
                   aria-label={`Delete journal ${title}`}
                   disabled={deleteEntry.isPending}
@@ -404,47 +435,15 @@ export function JournalPage() {
                 </button>
               ) : null}
             </div>
-            <div className="journal-editor-toolbar-right">
-              <button className="primary-button m-0 min-h-9 w-auto px-4" type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
-                {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId ? saveStatus === 'error' ? 'Retry' : 'Save' : 'Create'}
-              </button>
-            </div>
           </div>
 
-          <div className="journal-editor-body">
+          <div className="journal-editor-body" data-testid="journal-editor-body">
             <div className="journal-editor-inner">
-              <div className="journal-date-display">
-                <CalendarDays size={18} />
-                <input
-                  data-testid="journal-date-input"
-                  disabled={isOpening}
-                  value={entryDate}
-                  type="date"
-                  onChange={(event) => {
-                    setEntryDate(event.target.value)
-                    markChanged()
-                  }}
-                  aria-label="Journal date"
-                />
-              </div>
-
-              <input
-                className="journal-title-input"
-                data-testid="journal-title-input"
-                disabled={isOpening}
-                value={title}
-                maxLength={240}
-                onChange={(event) => {
-                  setTitle(event.target.value)
-                  markChanged()
-                }}
-                placeholder="What did you feel today?"
-              />
-
               <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
                 <JournalRichTextEditor
                   disabled={isOpening}
                   content={content}
+                  toolbarHost={toolbarHost}
                   onChange={(html) => {
                     setContent(html)
                     markChanged()
@@ -454,55 +453,13 @@ export function JournalPage() {
             </div>
           </div>
 
-          <footer className="journal-editor-footer">
-            <div className="journal-editor-stats">
-              <span><strong>{wordCount}</strong> words</span>
-              <span><strong>{charCount}</strong> characters</span>
-            </div>
-            <small data-testid="journal-save-status">
-              {selectedId
-                ? saveStatus === 'saving'
-                  ? 'Saving...'
-                  : saveStatus === 'saved'
-                    ? 'Saved'
-                    : saveStatus === 'error'
-                      ? 'Save failed'
-                      : isDirty
-                        ? 'Unsaved changes'
-                        : 'Saved'
-                : `${charCount.toLocaleString()} / 100,000 characters`}
-            </small>
-          </footer>
-
-          {showEmptyState && (
-            <div className="journal-empty-overlay" id="empty-state">
-              <div className="journal-empty-icon">
-                <Edit3 size={40} />
-              </div>
-              <h3>Your journey is waiting</h3>
-              <p>Write your first thought from today's language practice to track your growth over time.</p>
-              <button 
-                type="button"
-                className="primary-button m-0 w-auto px-6"
-                onClick={() => {
-                  setTitle('New Entry');
-                  document.querySelector<HTMLInputElement>('.journal-title-input')?.focus();
-                }}
-              >
-                <FilePlus2 size={18} />
-                Create First Entry
-              </button>
-            </div>
-          )}
-
           {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
-            <div className="absolute bottom-[70px] left-1/2 z-[100] -translate-x-1/2 rounded-lg bg-destructive px-4 py-2 text-destructive-foreground" role="alert">
+            <div className="journal-editor-error" role="alert">
               The journal entry could not be saved.
             </div>
           )}
         </form>
       </div>
-        </div>
-    </>
+    </div>
   )
 }

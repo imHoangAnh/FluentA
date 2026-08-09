@@ -27,7 +27,7 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 
 - Node.js và npm.
 - FluentA Backend đang chạy tại `https://localhost:7000`.
-- PostgreSQL, Redis và MinIO đã được khởi động theo
+- PostgreSQL và MinIO đã được khởi động theo
   [README của root project](../../README.md).
 
 ### 4.2. Cài dependency
@@ -75,7 +75,7 @@ Output production được tạo trong thư mục `dist/`.
    - `/vocabulary`: quản lý vocabulary board, page và từ vựng.
    - `/flashcards`, `/practice`, `/review`: học và ôn tập.
    - `/todo`, `/habits`, `/countdowns`: quản lý kế hoạch cá nhân.
-   - `/kanban`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
+   - `/project`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
    - `/journal`, `/notes`: lưu nhật ký và ghi chú.
    - `/notifications`: xem thông báo.
    - `/settings`: cập nhật hồ sơ và thiết lập học tập.

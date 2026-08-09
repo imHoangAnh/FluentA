@@ -41,9 +41,9 @@ async function installFakeMicrophone(page) {
 }
 
 async function recordOnce(page) {
-  await page.getByRole('button', { name: 'Record' }).click()
-  await expect(page.getByRole('button', { name: 'Stop' })).toBeEnabled()
-  await page.getByRole('button', { name: 'Stop' }).click()
+  await page.getByRole('button', { name: /^(Start recording|Record)$/ }).click()
+  await expect(page.getByRole('button', { name: /^(Stop recording|Stop)$/ })).toBeEnabled()
+  await page.getByRole('button', { name: /^(Stop recording|Stop)$/ }).click()
 }
 
 test('Practice pronunciation preserves attempts on 503 and offers one fresh two-attempt retry pair', async ({ page }) => {
@@ -58,6 +58,7 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/practice/settings')) return json({ modeSequence: ['pronunciation'] })
     if (path.endsWith('/flashcards/pages/page-1/words')) return json({ pageId: 'page-1', boardId: 'board-1', pageName: 'Pronunciation deck', boardLanguage: 'en', words: [word] })
+    if (path.endsWith('/practice/sessions')) return json({ id: 'practice-summary-1' })
     if (path.endsWith('/pronunciation/words/word-1/assessment')) {
       audioBodies.push(request.postDataBuffer())
       const outcome = outcomes.shift()
@@ -76,7 +77,7 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
   await expect(page.getByText(/Attempt 1 of 2/)).toBeVisible()
 
   await recordOnce(page)
-  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
+  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
   await expect(page.getByText(/Attempt 2 of 2/)).toBeVisible()
   await recordOnce(page)
   await expect(page.getByRole('button', { name: /Retry · 2 more attempts/ })).toBeVisible()
@@ -84,29 +85,30 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
   await page.getByRole('button', { name: /Retry · 2 more attempts/ }).click()
   await expect(page.getByText(/Attempt 1 of 2 · retry pair/)).toBeVisible()
   await recordOnce(page)
-  await expect(page.getByText('Correct', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Continue' }).click()
-
   const recap = page.getByTestId('practice-answer-reveal')
   await expect(recap).toContainText('go (verb)')
   await expect(recap).toContainText('/ɡəʊ/')
-  await expect(recap).toContainText('Definition: move from one place to another')
-  await expect(recap).toContainText('Meaning: đi')
-  await expect(recap).toContainText('Example: I go to work.')
+  await expect(recap).toContainText('Definition')
+  await expect(recap).toContainText('move from one place to another')
+  await expect(recap).toContainText('Meaning')
+  await expect(recap).toContainText('Example')
+  await expect(recap.getByText('Correct', { exact: true })).toHaveCount(0)
+  await expect(recap.getByText('Wrong', { exact: true })).toHaveCount(0)
   await page.setViewportSize({ width: 320, height: 900 })
   expect(await recap.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   expect(audioBodies).toHaveLength(4)
   expect(audioBodies.every((body) => body && body.length >= 44)).toBe(true)
+  await recap.getByRole('button', { name: 'Finish' }).click()
+  await expect(page).toHaveURL(/\/practice$/)
 })
 
-test('Review pronunciation submits Wrong only after the second failed assessment and always shows recap', async ({ page }) => {
+test('Review pronunciation submits after the second failed assessment and always shows recap', async ({ page }) => {
   await installFakeMicrophone(page)
   let assessmentCount = 0
   const reviewBodies = []
   const reviewSession = {
-    sessionId: 'session-1', boardId: 'board-1', boardName: 'Review board', orderType: 'sequential', mode: 'random', startDisposition: 'started', startedAt: '2026-07-20T00:00:00Z', totalWords: 1,
-    startOptions: { hasActiveSameDaySession: false, remainingWords: 1, requiresDecision: false },
+    sessionId: 'session-1', boardId: 'board-1', boardName: 'Review board', orderType: 'sequential', mode: 'random', startedAt: '2026-07-20T00:00:00Z', totalWords: 1,
     words: [{ ...word, mode: 'pronunciation' }],
   }
 
@@ -116,7 +118,6 @@ test('Review pronunciation submits Wrong only after the second failed assessment
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ success: status < 400, data }) })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Review board', boardLanguage: 'en', pages: [{ pageId: 'page-1', pageName: 'Deck', isPracticed: false, words: [word] }] }])
-    if (path.endsWith('/review/settings')) return json({ dailyLimit: 20, recapAfterAnswer: false })
     if (path.endsWith('/review/sessions')) return json(reviewSession)
     if (path.endsWith('/pronunciation/words/word-1/assessment')) {
       assessmentCount += 1
@@ -130,17 +131,16 @@ test('Review pronunciation submits Wrong only after the second failed assessment
   })
 
   await page.goto('/review')
-  await page.getByLabel('Vocabulary board').selectOption('board-1')
+  await page.getByRole('button', { name: 'Vocabulary board' }).click()
+  await page.getByRole('option', { name: /Review board/i }).click()
   await page.getByRole('button', { name: 'Start review' }).click()
 
   await recordOnce(page)
-  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
   expect(reviewBodies).toHaveLength(0)
   await expect(page.getByText(/attempt 2 of 2/i)).toBeVisible()
 
   await recordOnce(page)
   const recap = page.getByTestId('review-answer')
-  await expect(recap).toContainText('Wrong')
   await expect(recap).toContainText('go (verb)')
   await expect(recap).toContainText('/ɡəʊ/')
   await expect(recap).toContainText('Definition: move from one place to another')

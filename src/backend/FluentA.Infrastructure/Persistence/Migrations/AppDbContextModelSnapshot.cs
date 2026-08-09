@@ -289,9 +289,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
 
-                    b.Property<DateTime?>("RestoredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("restored_at_utc");
+                    b.Property<string>("RepeatPattern")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("repeat_pattern");
 
                     b.Property<DateTime>("TargetDate")
                         .HasColumnType("date")
@@ -489,141 +491,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "Date");
 
                     b.ToTable("journal", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanBoard", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "DeletedAt");
-
-                    b.HasIndex("UserId", "Name");
-
-                    b.ToTable("kanban_boards", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanCard", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ColumnId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("column_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("Deadline")
-                        .HasColumnType("date")
-                        .HasColumnName("deadline");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Priority")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("priority");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("title");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Deadline");
-
-                    b.HasIndex("ColumnId", "DeletedAt", "SortOrder");
-
-                    b.ToTable("kanban_cards", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanColumn", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BoardId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("board_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BoardId", "DeletedAt", "SortOrder");
-
-                    b.ToTable("kanban_columns", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
@@ -1018,6 +885,141 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("practice_settings", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectBoard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DeletedAt");
+
+                    b.HasIndex("UserId", "Name");
+
+                    b.ToTable("project_boards", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectCard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ColumnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("column_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("Deadline")
+                        .HasColumnType("date")
+                        .HasColumnName("deadline");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("priority");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Deadline");
+
+                    b.HasIndex("ColumnId", "DeletedAt", "SortOrder");
+
+                    b.ToTable("project_cards", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectColumn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BoardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("board_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardId", "DeletedAt", "SortOrder");
+
+                    b.ToTable("project_columns", (string)null);
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1119,46 +1121,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("review_session_items", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DailyLimit")
-                        .HasColumnType("integer")
-                        .HasColumnName("daily_limit");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("RecapAfterAnswer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("recap_after_answer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_review_settings_user_id");
-
-                    b.ToTable("review_settings", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
@@ -1710,24 +1672,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanCard", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanColumn", null)
-                        .WithMany("Cards")
-                        .HasForeignKey("ColumnId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanColumn", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanBoard", null)
-                        .WithMany("Columns")
-                        .HasForeignKey("BoardId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
@@ -1785,6 +1729,24 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectCard", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Project.Entities.ProjectColumn", null)
+                        .WithMany("Cards")
+                        .HasForeignKey("ColumnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectColumn", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Project.Entities.ProjectBoard", null)
+                        .WithMany("Columns")
+                        .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
@@ -1811,15 +1773,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
                         .WithMany()
                         .HasForeignKey("VocabWordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithOne()
-                        .HasForeignKey("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSettings", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -1882,19 +1835,19 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.Navigation("Alerts");
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanBoard", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
+                {
+                    b.Navigation("Pages");
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectBoard", b =>
                 {
                     b.Navigation("Columns");
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Kanban.Entities.KanbanColumn", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectColumn", b =>
                 {
                     b.Navigation("Cards");
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
-                {
-                    b.Navigation("Pages");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", b =>

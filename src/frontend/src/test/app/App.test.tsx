@@ -57,7 +57,6 @@ function createQueryClient() {
     newCards: 0,
     forecast: [],
   })
-  queryClient.setQueryData(['review', 'settings'], { dailyLimit: 300, recapAfterAnswer: true })
   queryClient.setQueryData(['review', 'level-five'], [])
   queryClient.setQueryData(['practice', 'settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
   queryClient.setQueryData(['settings'], {
@@ -69,13 +68,12 @@ function createQueryClient() {
       bio: '',
     },
     practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-    reviewSettings: { dailyLimit: 300, recapAfterAnswer: true },
   })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
   queryClient.setQueryData(['note', 'boards'], [])
-  queryClient.setQueryData(['kanban', 'boards'], [])
+  queryClient.setQueryData(['project', 'boards'], [])
   queryClient.setQueryData(['pomodoro', 'config'], {
     id: 'pomodoro-config-1',
     workMinutes: 25,
@@ -219,7 +217,7 @@ describe('FluentA app routes', async () => {
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
     expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
-    expect(screen.getByRole('link', { name: 'Kanban' })).toHaveAttribute('href', '/kanban')
+    expect(screen.getByRole('link', { name: 'Project' })).toHaveAttribute('href', '/project')
     expect(screen.getByRole('link', { name: 'Pomodoro' })).toHaveAttribute('href', '/pomodoro')
   })
 
@@ -338,6 +336,51 @@ describe('FluentA app routes', async () => {
     expect(screen.queryByText('Load failed this page.')).not.toBeInTheDocument()
   })
 
+  it('supports Quizlet keyboard shortcuts and shuffle toggle in flashcard viewer', async () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderAppWithDeck('/flashcards/pages/page-1')
+
+    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+
+    // Test keyboard shortcut Space to flip card
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
+
+    // Test keyboard shortcut Space to flip back
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+
+    // Test shuffle toggle button
+    const shuffleBtn = screen.getByRole('button', { name: 'Enable deck shuffle' })
+    expect(shuffleBtn).toBeInTheDocument()
+    fireEvent.click(shuffleBtn)
+    expect(screen.getByRole('button', { name: 'Disable deck shuffle' })).toBeInTheDocument()
+  })
+
+  it('renders fallback notice on back face when card details are missing without crashing', async () => {
+    useAuthStore.setState({
+      status: 'authenticated',
+      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+    })
+
+    await renderAppWithDeck('/flashcards/pages/page-1', {
+      meaningEn: '',
+      meaningVn: '',
+      example: '',
+      synonyms: null,
+      antonyms: null,
+    })
+
+    const stage = screen.getByTestId('flashcard-stage')
+    fireEvent.click(screen.getByRole('button', { name: 'Show card back' }))
+    expect(stage).toHaveTextContent('No definition or example recorded for this word.')
+  })
+
   it('renders the protected profile at its dedicated route', async () => {
     useAuthStore.setState({
       status: 'authenticated',
@@ -346,7 +389,7 @@ describe('FluentA app routes', async () => {
 
     await renderApp('/profile')
 
-    expect(screen.getByRole('heading', { name: 'Profile', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('main').querySelector('form h1')).toHaveTextContent('Profile')
     expect(screen.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
     expect(screen.queryByRole('navigation', { name: 'Settings navigation' })).not.toBeInTheDocument()
   })
@@ -361,7 +404,7 @@ describe('FluentA app routes', async () => {
 
     const settingsNavigation = within(screen.getByRole('navigation', { name: 'Settings navigation' }))
     expect(settingsNavigation.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(settingsNavigation.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/settings/review')
+    expect(settingsNavigation.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
     expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
     expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
     expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
@@ -374,14 +417,9 @@ describe('FluentA app routes', async () => {
       user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
     })
 
-    let view = await renderApp('/settings/practice')
+    const view = await renderApp('/settings/practice')
     expect(screen.getByRole('heading', { name: 'Practice' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
-
-    view.unmount()
-    view = await renderApp('/settings/review')
-    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Review' })).toHaveAttribute('aria-current', 'page')
 
     view.unmount()
     await renderApp('/settings/level5')

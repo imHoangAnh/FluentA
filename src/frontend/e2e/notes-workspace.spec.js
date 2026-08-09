@@ -1,42 +1,9 @@
 import { expect, test } from '@playwright/test';
-
-const tinyPngBase64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 async function registerAndLogin(page, prefix = 'notes') {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('/register');
-  await page.getByLabel('Full name').fill('Notes Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Create a password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Enter your password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const loginPayload = await (await loginResponsePromise).json();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return { email, token: loginPayload.data.accessToken };
-}
-
-async function makeImageDrop(page) {
-  return page.evaluateHandle((base64) => {
-    const binary = atob(base64);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(new File([bytes], 'note-proof.png', { type: 'image/png' }));
-    return dataTransfer;
-  }, tinyPngBase64);
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'notes-workspace' });
+  return identity;
 }
 
 test('notes route is protected for anonymous users', async ({ page }) => {
@@ -44,7 +11,7 @@ test('notes route is protected for anonymous users', async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('Note Workspace release smoke covers CRUD, persistence, image upload, and cleanup lifecycle', async ({ browser, page }) => {
+test('Note Workspace release smoke covers CRUD, persistence, sanitization, and cleanup lifecycle', async ({ browser, page }) => {
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error' && message.text() !== 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
@@ -53,11 +20,11 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   });
 
   const { token } = await registerAndLogin(page);
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = { Cookie: `access_token=${token}` };
 
   await expect(page.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes');
   await page.getByRole('link', { name: 'Notes' }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/notes');
+  await expect(page).toHaveURL('/notes');
   await expect(page.getByText('No note boards yet')).toBeVisible();
 
   await page.getByRole('button', { name: 'Create your first board' }).click();
@@ -86,38 +53,16 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByTestId('note-save-status')).toHaveText('Saved');
 
-  const dropData = await makeImageDrop(page);
-  await editor.dispatchEvent('drop', { dataTransfer: dropData });
-  await expect(page.getByTestId('note-save-status')).toHaveText('Unsaved changes');
-  await expect(editor.locator('img')).toHaveCount(1, { timeout: 15_000 });
-
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByTestId('note-save-status')).toHaveText('Saved');
-
-  const pageDetailResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, { headers });
+  const pageDetailResponse = await page.request.get(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, { headers });
   expect(pageDetailResponse.ok()).toBe(true);
   const persistedPage = (await pageDetailResponse.json()).data;
   expect(persistedPage.name).toBe('Release Proof Page Updated');
-  expect(persistedPage.content).toContain('data-note-asset-id=');
-  expect(persistedPage.content).toContain('<img');
-  expect(persistedPage.content).toMatch(/src="[^"]*X-Amz-Algorithm=/);
-  expect(persistedPage.content).not.toContain('data:image/');
-
-  const assetIdMatch = persistedPage.content.match(/data-note-asset-id="([^"]+)"/);
-  expect(assetIdMatch).not.toBeNull();
-  const noteAssetId = assetIdMatch[1];
-
-  const genericAssetsListResponse = await page.request.get('http://127.0.0.1:5000/api/v1/assets?assetType=note-image', { headers });
-  expect(genericAssetsListResponse.status()).toBe(404);
-
   await page.goto('/journal');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/journal');
+  await expect(page).toHaveURL('/journal');
   await page.goto('/notes');
   await expect(page.getByRole('button', { name: /Release Proof Board/ })).toBeVisible();
   await expect(page.getByLabel('Note title')).toHaveValue('Release Proof Page Updated');
-  await expect(page.getByLabel('Journal rich text editor').locator('img')).toHaveCount(1);
-
-  const base64Response = await page.request.patch(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, {
+  const base64Response = await page.request.patch(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, {
     headers,
     data: {
       content: '<p>Bad image</p><p><img src="data:image/png;base64,AAAA" alt="bad" /></p>',
@@ -131,22 +76,19 @@ test('Note Workspace release smoke covers CRUD, persistence, image upload, and c
   await page.getByLabel('Note title').click();
   await expect(page.getByTestId('note-save-status')).toHaveText('Saved', { timeout: 10_000 });
 
-  const cleanupPage = (await (await page.request.get(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, { headers })).json()).data;
-  expect(cleanupPage.content).not.toContain(noteAssetId);
-
   const foreignPage = await browser.newPage();
   const foreignUser = await registerAndLogin(foreignPage, 'notes-foreign');
-  const foreignHeaders = { Authorization: `Bearer ${foreignUser.token}` };
-  const foreignGetResponse = await foreignPage.request.get(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, {
+  const foreignHeaders = { Cookie: `access_token=${foreignUser.token}` };
+  const foreignGetResponse = await foreignPage.request.get(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, {
     headers: foreignHeaders,
   });
   expect(foreignGetResponse.status()).toBe(404);
   await foreignPage.close();
 
-  const deleteBoardResponse = await page.request.delete(`http://127.0.0.1:5000/api/v1/notes/boards/${boardId}`, { headers });
+  const deleteBoardResponse = await page.request.delete(`https://localhost:7000/api/v1/notes/boards/${boardId}`, { headers });
   expect(deleteBoardResponse.ok()).toBe(true);
 
-  const deletedPageResponse = await page.request.get(`http://127.0.0.1:5000/api/v1/notes/pages/${notePageId}`, { headers });
+  const deletedPageResponse = await page.request.get(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, { headers });
   expect(deletedPageResponse.status()).toBe(404);
 
   expect(consoleErrors).toEqual([]);

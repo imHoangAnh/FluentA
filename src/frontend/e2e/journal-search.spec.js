@@ -1,33 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 async function registerAndLogin(page, prefix) {
-  const email = `${prefix}+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Journal Search Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Create a password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByPlaceholder('Enter your password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const loginPayload = await (await loginResponsePromise).json();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  return loginPayload.data.accessToken;
+  const identity = await loginSeededUser(page, { prefix: prefix ?? 'journal-search' });
+  return identity;
 }
 
 async function createJournal(page, headers, title, content) {
-  const response = await page.request.post('http://127.0.0.1:5000/api/v1/journal', {
+  const response = await page.request.post('https://localhost:7000/api/v1/journal', {
     headers,
     data: { title, content, date: new Date().toISOString().slice(0, 10) },
   });
@@ -36,8 +16,8 @@ async function createJournal(page, headers, title, content) {
 }
 
 test('Journal Unicode content search highlights owned active matches', async ({ context, page }, testInfo) => {
-  const token = await registerAndLogin(page, 'journal-search');
-  const headers = { Authorization: `Bearer ${token}` };
+  const { token } = await registerAndLogin(page, 'journal-search');
+  const headers = { Cookie: `access_token=${token}` };
   const matching = await createJournal(
     page,
     headers,
@@ -46,26 +26,27 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
   );
   await createJournal(page, headers, 'Grammar review', '<p>Past tense and sentence order.</p>');
   const deleted = await createJournal(page, headers, 'Deleted private match', '<p>xin chào deleted</p>');
-  await page.request.delete(`http://127.0.0.1:5000/api/v1/journal/${deleted.id}`, { headers });
+  await page.request.delete(`https://localhost:7000/api/v1/journal/${deleted.id}`, { headers });
 
   const foreignPage = await context.newPage();
-  const foreignToken = await registerAndLogin(foreignPage, 'journal-search-foreign');
+  const { token: foreignToken } = await registerAndLogin(foreignPage, 'journal-search-foreign');
   await createJournal(
     foreignPage,
-    { Authorization: `Bearer ${foreignToken}` },
+    { Cookie: `access_token=${foreignToken}` },
     'Foreign private match',
     '<p>xin chào foreign</p>',
   );
   await foreignPage.close();
+  await page.context().addCookies([{ name: 'access_token', value: token, url: 'https://localhost:5173/', httpOnly: true, secure: true, sameSite: 'Strict' }]);
 
-  const apiSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journal/search?q=xin%20ch%C3%A0o', { headers });
+  const apiSearch = await page.request.get('https://localhost:7000/api/v1/journal/search?q=xin%20ch%C3%A0o', { headers });
   expect(apiSearch.status()).toBe(200);
   const apiMatches = (await apiSearch.json()).data;
   expect(apiMatches).toHaveLength(1);
   expect(apiMatches[0].id).toBe(matching.id);
   expect(apiMatches[0].highlights).toHaveLength(1);
 
-  const invalidSearch = await page.request.get('http://127.0.0.1:5000/api/v1/journal/search?q=%20', { headers });
+  const invalidSearch = await page.request.get('https://localhost:7000/api/v1/journal/search?q=%20', { headers });
   expect(invalidSearch.status()).toBe(422);
 
   await page.getByRole('link', { name: 'Journal' }).click();

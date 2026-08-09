@@ -1,27 +1,24 @@
-import { Brain, Headphones, Trophy } from 'lucide-react'
+import { Headphones, Trophy } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Badge } from '@/shared/components/ui/badge'
 import { Card } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 
 const settingsLinks = [
   { to: '/settings/practice', label: 'Practice', icon: Headphones },
-  { to: '/settings/review', label: 'Review', icon: Brain },
   { to: '/settings/level5', label: 'Level 5', icon: Trophy },
 ]
 
 export function SettingsLayout() {
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="grid min-w-0 gap-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Settings</h2>
           <p className="mt-1 text-sm text-muted-foreground">Manage your learning preferences.</p>
         </div>
-        <Badge variant="outline">3 sections</Badge>
       </header>
 
-      <div className="grid min-w-0 items-start gap-4 min-[900px]:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="grid min-w-0 items-start gap-3 min-[900px]:grid-cols-[minmax(0,2fr)_minmax(0,10fr)]">
         <Card className="p-2 min-[900px]:sticky min-[900px]:top-6">
           <nav className="grid grid-cols-1 gap-1 min-[400px]:grid-cols-2 min-[900px]:grid-cols-1" aria-label="Settings navigation">
             {settingsLinks.map(({ icon: Icon, label, to }) => (

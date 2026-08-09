@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../api/pomodoro.api'
 import * as todoApi from '@/features/todo'
-import * as kanbanApi from '@/features/kanban'
+import * as projectApi from '@/features/project'
 import { PomodoroConfigurationDialog, type PomodoroConfigFormValues } from '../components/PomodoroConfigurationDialog'
+import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)
@@ -49,10 +50,10 @@ export function PomodoroPage() {
     queryKey: ['todos', 'pomodoro-today'],
     queryFn: () => todoApi.listByDate(new Date().toISOString().slice(0, 10)),
   })
-  const boardsQuery = useQuery({ queryKey: ['kanban', 'boards'], queryFn: kanbanApi.listBoards })
+  const boardsQuery = useQuery({ queryKey: ['project', 'boards'], queryFn: projectApi.listBoards })
   const boardDetailsQuery = useQuery({
-    queryKey: ['kanban', 'pomodoro-cards', boardsQuery.data?.map((board) => board.id).join(',')],
-    queryFn: () => Promise.all((boardsQuery.data ?? []).map((board) => kanbanApi.getBoard(board.id))),
+    queryKey: ['project', 'pomodoro-cards', boardsQuery.data?.map((board) => board.id).join(',')],
+    queryFn: () => Promise.all((boardsQuery.data ?? []).map((board) => projectApi.getBoard(board.id))),
     enabled: Boolean(boardsQuery.data?.length),
   })
 
@@ -126,7 +127,7 @@ export function PomodoroPage() {
     })
   }, [completeTimer, current, shownSeconds, timerCommandPending])
 
-  const kanbanCards = (boardDetailsQuery.data ?? []).flatMap((board) =>
+  const projectCards = (boardDetailsQuery.data ?? []).flatMap((board) =>
     board.columns.flatMap((column) => column.cards.map((card) => ({ ...card, boardName: board.name }))),
   )
 
@@ -183,7 +184,7 @@ export function PomodoroPage() {
                   {timerState === 'Idle' ? (
                     <button className="pomodoro-primary-action" type="button" aria-label="Start" onClick={() => {
                       const [source, id] = linkedTask.split(':')
-                      timerCommand.mutate({ command: 'start', startInput: id ? { linkedTaskId: id, linkedTaskSource: source as 'todo' | 'kanban' } : {} })
+                      timerCommand.mutate({ command: 'start', startInput: id ? { linkedTaskId: id, linkedTaskSource: source as 'todo' | 'project' } : {} })
                     }} disabled={timerCommandPending || currentQuery.isLoading}>
                       <Play size={18} fill="currentColor" /> Start
                     </button>
@@ -253,11 +254,18 @@ export function PomodoroPage() {
               <h2>Target Task</h2>
               <p>Select a task to link this session's effort.</p>
               <div className="pomodoro-select-wrapper">
-                <select data-testid="pomodoro-task-select" aria-label="Linked task" value={linkedTask} onChange={(event) => setLinkedTask(event.target.value)} disabled={timerState !== 'Idle'}>
-                  <option value="">No linked task</option>
-                  {(todosQuery.data ?? []).map((todo) => <option key={todo.id} value={`todo:${todo.id}`}>Todo: {todo.title}</option>)}
-                  {kanbanCards.map((card) => <option key={card.id} value={`kanban:${card.id}`}>Kanban: {card.boardName} / {card.title}</option>)}
-                </select>
+                <SelectMenu
+                  testId="pomodoro-task-select"
+                  aria-label="Linked task"
+                  value={linkedTask}
+                  onChange={setLinkedTask}
+                  disabled={timerState !== 'Idle'}
+                  options={[
+                    { value: '', label: 'No linked task' },
+                    ...(todosQuery.data ?? []).map((todo) => ({ value: `todo:${todo.id}`, label: `Todo: ${todo.title}` })),
+                    ...projectCards.map((card) => ({ value: `project:${card.id}`, label: `Project: ${card.boardName} / ${card.title}` })),
+                  ]}
+                />
               </div>
               {current?.linkedTaskId && timerState !== 'Idle' ? <p className="pomodoro-linked-status" data-testid="pomodoro-linked-task">Linked {current.linkedTaskSource} task</p> : null}
             </section>

@@ -43,6 +43,26 @@ public sealed class CountdownServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_ValidatesRepeatAndUsesTheFiftyCharacterNewNameLimit()
+    {
+        var service = new CountdownService(new FakeCountdownRepository());
+        var target = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd");
+
+        var missingOnTarget = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
+            "Weekly reminder", target, [new CreateCountdownAlertRequest("1DayBefore", "09:00")], null, "Weekly"));
+        var tooLong = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
+            new string('x', 51), target, [new CreateCountdownAlertRequest("OnTargetDay", "09:00")]));
+        var valid = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
+            "Weekly reminder", target, [new CreateCountdownAlertRequest("OnTargetDay", "09:00")], null, "Weekly"));
+
+        Assert.False(missingOnTarget.IsSuccess);
+        Assert.False(tooLong.IsSuccess);
+        Assert.True(valid.IsSuccess);
+        Assert.Equal("Weekly", valid.Value!.RepeatPattern);
+        Assert.False(valid.Value.IsCompleted);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsDuplicateAlertsAndInvalidCover()
     {
         var service = new CountdownService(new FakeCountdownRepository(), new FakeAssetRepository());

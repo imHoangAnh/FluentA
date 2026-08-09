@@ -17,14 +17,7 @@ public sealed record CreateReviewSessionRequest(
     Guid BoardId,
     string OrderType,
     string Mode,
-    string StartBehavior,
     string TimeZoneId);
-
-public sealed record ReviewStartOptionsDto(
-    bool HasActiveSameDaySession,
-    Guid? ExistingSessionId,
-    int RemainingWords,
-    bool RequiresDecision);
 
 public sealed record ReviewSessionCreatedDto(
     Guid SessionId,
@@ -32,24 +25,9 @@ public sealed record ReviewSessionCreatedDto(
     string BoardName,
     string OrderType,
     string Mode,
-    string StartDisposition,
     DateTime StartedAt,
     int TotalWords,
-    ReviewStartOptionsDto StartOptions,
     IReadOnlyList<ReviewSessionWordDto> Words);
-
-public sealed record ReviewSessionSummaryDto(
-    Guid SessionId,
-    int TotalWordsReviewed,
-    int Correct,
-    int Wrong,
-    int CorrectPercent,
-    int WrongPercent,
-    int AverageTimeSpentSeconds);
-
-public sealed record ReviewSettingsDto(int DailyLimit, bool RecapAfterAnswer);
-
-public sealed record UpdateReviewSettingsRequest(int DailyLimit, bool RecapAfterAnswer);
 
 public sealed record DashboardForecastPointDto(string Date, int DueCount);
 

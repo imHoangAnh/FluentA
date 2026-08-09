@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, RotateCw, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Keyboard, RotateCcw, Shuffle, Volume2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../api/flashcard.api'
@@ -69,6 +69,17 @@ function speakWord(word: string, language: string) {
   window.speechSynthesis.speak(utterance)
 }
 
+function shuffleArray(length: number): number[] {
+  const indices = Array.from({ length }, (_, i) => i)
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = indices[i]
+    indices[i] = indices[j]
+    indices[j] = temp
+  }
+  return indices
+}
+
 export function FlashcardViewerPage() {
   const { pageId = '' } = useParams()
   return <FlashcardViewerPageContent key={pageId} pageId={pageId} />
@@ -77,6 +88,9 @@ export function FlashcardViewerPage() {
 function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [slideDirection, setSlideDirection] = useState<'next' | 'prev' | null>(null)
+  const [isShuffled, setIsShuffled] = useState(false)
+  const [shuffledOrder, setShuffledOrder] = useState<number[]>([])
 
   const sessionQuery = useQuery({
     queryKey: ['flashcard', 'page-session', pageId],
@@ -84,70 +98,191 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
     enabled: Boolean(pageId),
   })
 
-  const cards = sessionQuery.data?.words ?? []
-  const currentCard = cards[currentIndex] ?? null
+  const rawCards = useMemo(() => sessionQuery.data?.words ?? [], [sessionQuery.data?.words])
+
+  const activeIndices = useMemo(() => {
+    if (!isShuffled || rawCards.length === 0) {
+      return rawCards.map((_, index) => index)
+    }
+    if (shuffledOrder.length === rawCards.length) {
+      return shuffledOrder
+    }
+    return shuffleArray(rawCards.length)
+  }, [rawCards, isShuffled, shuffledOrder])
+
+  const currentCardIndex = activeIndices[currentIndex] ?? 0
+  const currentCard = rawCards[currentCardIndex] ?? null
   const boardLanguage = sessionQuery.data?.boardLanguage ?? 'en'
-  const isFinalCard = currentIndex + 1 >= cards.length
+  const isFinalCard = currentIndex + 1 >= rawCards.length
   const speechSupported = browserSpeechSupported()
   const formattedIpa = formatIpa(currentCard?.ipaPronunciation)
   const backDensity = useMemo(() => getBackDensity(currentCard), [currentCard])
   const backTypography = backDensityClasses[backDensity]
 
   const progressLabel = useMemo(() => {
-    if (cards.length === 0) {
+    if (rawCards.length === 0) {
       return '0 / 0'
     }
-
-    return `${currentIndex + 1} / ${cards.length}`
-  }, [cards.length, currentIndex])
+    return `${currentIndex + 1} / ${rawCards.length}`
+  }, [rawCards.length, currentIndex])
 
   useEffect(() => cancelSpeech, [])
 
-  function goPrevious() {
+  const goPrevious = useCallback(() => {
+    if (currentIndex === 0) return
     cancelSpeech()
+    setSlideDirection('prev')
     setCurrentIndex((value) => Math.max(0, value - 1))
     setFlipped(false)
-  }
+  }, [currentIndex])
 
-  function goNext() {
+  const goNext = useCallback(() => {
+    if (currentIndex >= rawCards.length - 1) return
     cancelSpeech()
-    setCurrentIndex((value) => Math.min(cards.length - 1, value + 1))
+    setSlideDirection('next')
+    setCurrentIndex((value) => Math.min(rawCards.length - 1, value + 1))
     setFlipped(false)
-  }
+  }, [currentIndex, rawCards.length])
+
+  const toggleShuffle = useCallback(() => {
+    cancelSpeech()
+    if (!isShuffled) {
+      const order = shuffleArray(rawCards.length)
+      setShuffledOrder(order)
+      setIsShuffled(true)
+    } else {
+      setIsShuffled(false)
+      setShuffledOrder([])
+    }
+    setCurrentIndex(0)
+    setFlipped(false)
+    setSlideDirection(null)
+  }, [isShuffled, rawCards.length])
+
+  const restartDeck = useCallback(() => {
+    cancelSpeech()
+    setCurrentIndex(0)
+    setFlipped(false)
+    setSlideDirection(null)
+  }, [])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+
+      if (event.key === ' ' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault()
+        setFlipped((val) => !val)
+      } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        event.preventDefault()
+        goPrevious()
+      } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+        event.preventDefault()
+        goNext()
+      } else if (event.key === 's' || event.key === 'S') {
+        event.preventDefault()
+        toggleShuffle()
+      } else if (event.key === 'r' || event.key === 'R') {
+        event.preventDefault()
+        restartDeck()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [goNext, goPrevious, restartDeck, toggleShuffle])
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button asChild variant="outline" size="sm"><Link to="/flashcards">Back to decks</Link></Button>
-      </div>
       {sessionQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading flashcard viewer...</p> : null}
       {sessionQuery.isError ? <p role="alert" className="text-sm text-destructive">This page is unavailable.</p> : null}
 
-      {sessionQuery.data && cards.length === 0 ? (
+      {sessionQuery.data && rawCards.length === 0 ? (
         <Card className="mx-auto max-w-xl"><CardContent className="grid gap-4 p-8 text-center"><p className="m-0 text-sm font-semibold text-primary">Flashcard viewer</p><h2 className="m-0 text-2xl font-semibold">{sessionQuery.data.pageName}</h2><p className="m-0 text-sm text-muted-foreground">This page has no words yet.</p><Button asChild className="justify-self-center"><Link to="/flashcards">Finish</Link></Button></CardContent></Card>
       ) : null}
 
       {sessionQuery.data && currentCard ? (
-        <section className="grid w-full gap-5">
-          <div className="mx-auto grid w-full gap-5 md:w-2/3" data-testid="flashcard-viewer-content">
-            <div className="flex items-end justify-between gap-4"><div><p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-primary">Vocabulary page</p><h2 className="m-0 mt-1 text-2xl font-semibold tracking-[-0.02em]">{sessionQuery.data.pageName}</h2></div><div className="text-right"><p className="m-0 text-xs text-muted-foreground">Flashcard</p><strong className="text-lg">{progressLabel}</strong></div></div>
-            <progress className="h-1.5 w-full overflow-hidden rounded-full accent-primary" value={currentIndex + 1} max={Math.max(cards.length, 1)} />
-            <p className="m-0 text-sm text-muted-foreground">Click the card to flip between prompt and answer.</p>
+        <section className="flex min-h-[calc(100vh-8rem)] w-full min-w-0 items-center justify-center py-4">
+          <div className="mx-auto grid w-full min-w-0 max-w-5xl grid-cols-[minmax(0,1fr)] gap-6" data-testid="flashcard-viewer-content">
+            <div className="flex min-w-0 items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="m-0 break-words text-2xl font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]">{sessionQuery.data.pageName}</h2>
+              </div>
+              <div className="text-center">
+                <strong className="text-lg font-semibold">{progressLabel}</strong>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                <Button
+                  variant={isShuffled ? 'default' : 'outline'}
+                  size="sm"
+                  type="button"
+                  aria-label={isShuffled ? 'Disable deck shuffle' : 'Enable deck shuffle'}
+                  onClick={toggleShuffle}
+                  className="gap-1.5"
+                >
+                  <Shuffle className="h-4 w-4" />
+                  <span className="hidden sm:inline">{isShuffled ? 'Shuffled' : 'Shuffle'}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  aria-label="Restart deck from first card"
+                  onClick={restartDeck}
+                  title="Restart deck (R)"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
+            <progress className="h-2 w-full overflow-hidden rounded-full accent-primary" value={currentIndex + 1} max={Math.max(rawCards.length, 1)} />
+
+            {/* 3D Stage & Card Container */}
             <div
-              className="relative h-[400px] w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-[420px] lg:h-[500px]"
+              key={`${currentIndex}-${isShuffled ? 'shuffled' : 'normal'}`}
+              className={cn(
+                'flashcard-perspective relative h-[440px] w-full min-w-0 sm:h-[500px] lg:h-[580px]',
+                slideDirection === 'next' && 'flashcard-slide-next',
+                slideDirection === 'prev' && 'flashcard-slide-prev'
+              )}
               data-testid="flashcard-stage"
               data-density={flipped ? backDensity : undefined}
+              onAnimationEnd={() => setSlideDirection(null)}
             >
-              <button
-                className="absolute inset-0 z-0 cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                type="button"
-                aria-label={flipped ? 'Show card front' : 'Show card back'}
-                onClick={() => setFlipped((value) => !value)}
-              />
-
-              {!flipped ? (
-                <div className="pointer-events-none relative z-10 flex h-full min-w-0 flex-col items-center justify-center gap-5 overflow-hidden p-5 text-center sm:p-6 lg:p-8">
+              <div
+                className={cn(
+                  'flashcard-flipper',
+                  flipped && 'is-flipped'
+                )}
+              >
+                {/* FRONT FACE (3D Card entity) */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Show card back"
+                  onClick={() => setFlipped(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setFlipped(true)
+                    }
+                  }}
+                  className={cn(
+                    'flashcard-card-face flashcard-card-front flex h-full min-w-0 cursor-pointer flex-col items-center justify-center gap-5 p-5 text-center sm:p-6 lg:p-8',
+                    flipped ? 'pointer-events-none' : 'pointer-events-auto'
+                  )}
+                  aria-hidden={flipped}
+                >
                   <p className="m-0 w-full min-w-0 whitespace-normal break-words text-lg font-semibold leading-7 text-foreground [overflow-wrap:anywhere]">
                     {currentCard.word} ({currentCard.wordClass.toLowerCase()})
                   </p>
@@ -159,39 +294,61 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
                     <p className="m-0 text-sm text-destructive" role="alert">IPA is unavailable. Refresh after the API restarts.</p>
                   )}
                   <Button
-                    className="pointer-events-auto rounded-full"
+                    className="pointer-events-auto z-30 rounded-full"
                     type="button"
                     variant="outline"
                     size="icon"
                     aria-label={`Listen to ${currentCard.word}`}
                     aria-describedby={!speechSupported ? 'flashcard-audio-unavailable' : undefined}
                     disabled={!speechSupported}
-                    onClick={() => speakWord(currentCard.word, boardLanguage)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      speakWord(currentCard.word, boardLanguage)
+                    }}
                   >
                     <Volume2 aria-hidden="true" />
                   </Button>
                   {!speechSupported ? <span id="flashcard-audio-unavailable" className="text-xs text-muted-foreground">Audio is unavailable in this browser.</span> : null}
                 </div>
-              ) : (
+
+                {/* BACK FACE (3D Card entity) */}
                 <div
-                  className="relative z-10 flex h-full min-h-0 min-w-0 cursor-pointer items-center p-5 text-left sm:p-6 lg:p-8"
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Show card front"
                   onClick={() => setFlipped(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setFlipped(false)
+                    }
+                  }}
+                  className={cn(
+                    'flashcard-card-face flashcard-card-back flex h-full min-h-0 min-w-0 cursor-pointer items-center p-5 text-left sm:p-6 lg:p-8',
+                    !flipped ? 'pointer-events-none' : 'pointer-events-auto'
+                  )}
+                  aria-hidden={!flipped}
                 >
                   <div
                     className={cn('grid max-h-full w-full min-w-0 overflow-y-auto overscroll-contain pr-1 text-foreground', backTypography.spacing)}
                     data-testid="flashcard-back-content"
                   >
-                    {currentCard.meaningEn.trim() ? (
+                    {currentCard.meaningEn?.trim() ? (
                       <p className={cn('m-0 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]', backTypography.content)}>
                         <em className="font-medium">Definition:</em> {currentCard.meaningEn}
                       </p>
                     ) : null}
-                    <p className={cn('m-0 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]', backTypography.content)}>
-                      <em className="font-medium">Meaning:</em> {currentCard.meaningVn}
-                    </p>
-                    <p className={cn('m-0 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]', backTypography.content)}>
-                      <em className="font-medium">Example:</em> {currentCard.example}
-                    </p>
+                    {currentCard.meaningVn?.trim() ? (
+                      <p className={cn('m-0 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]', backTypography.content)}>
+                        <em className="font-medium">Meaning:</em> {currentCard.meaningVn}
+                      </p>
+                    ) : null}
+                    {currentCard.example?.trim() ? (
+                      <p className={cn('m-0 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]', backTypography.content)}>
+                        <em className="font-medium">Example:</em> {currentCard.example}
+                      </p>
+                    ) : null}
                     {currentCard.synonyms?.trim() ? (
                       <p className={cn('m-0 min-w-0 whitespace-normal break-words text-muted-foreground [overflow-wrap:anywhere]', backTypography.supporting)}>
                         <em className="font-medium text-foreground">Synonyms:</em> {currentCard.synonyms}
@@ -202,20 +359,42 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
                         <em className="font-medium text-foreground">Antonyms:</em> {currentCard.antonyms}
                       </p>
                     ) : null}
+                    {!currentCard.meaningEn?.trim() && !currentCard.meaningVn?.trim() && !currentCard.example?.trim() ? (
+                      <p className="m-0 text-sm italic text-muted-foreground">No definition or example recorded for this word.</p>
+                    ) : null}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Navigation and Toolbar */}
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
+              <Button variant="outline" type="button" onClick={goPrevious} disabled={currentIndex === 0}>
+                <ChevronLeft /> Previous
+              </Button>
+              {isFinalCard ? (
+                <div className="flex min-w-0 max-w-full flex-wrap justify-end gap-2">
+                  <Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button>
+                  <Button asChild><Link to={`/practice?deck=${pageId}`}>Let's practice</Link></Button>
+                </div>
+              ) : (
+                <Button type="button" onClick={goNext}>
+                  Next <ChevronRight />
+                </Button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button variant="outline" type="button" onClick={goPrevious} disabled={currentIndex === 0}><ChevronLeft /> Previous</Button>
-              {isFinalCard ? (
-                <div className="flex gap-2"><Button asChild variant="outline"><Link to="/flashcards">Finish</Link></Button><Button asChild><Link to={`/practice?deck=${pageId}`}>Let's practice</Link></Button></div>
-              ) : (
-                <Button type="button" onClick={goNext}>Next <ChevronRight /></Button>
-              )}
+            {/* Keyboard Shortcuts Hint Bar (Borderless) */}
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-3 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1 font-medium text-foreground">
+                <Keyboard size={14} /> Shortcuts:
+              </span>
+              <span><kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] border border-border shadow-xs">Space</kbd> Flip</span>
+              <span><kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] border border-border shadow-xs">←</kbd> Prev</span>
+              <span><kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] border border-border shadow-xs">→</kbd> Next</span>
+              <span><kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] border border-border shadow-xs">S</kbd> Shuffle</span>
+              <span><kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] border border-border shadow-xs">R</kbd> Reset</span>
             </div>
-            <p className="m-0 flex items-center justify-center gap-2 text-xs text-muted-foreground"><RotateCw size={14} aria-hidden="true" /> Click anywhere on the card to flip</p>
           </div>
         </section>
       ) : null}

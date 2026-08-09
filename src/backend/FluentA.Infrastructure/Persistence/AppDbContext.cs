@@ -1,7 +1,7 @@
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
-using FluentA.Domain.BoundedContexts.Kanban.Entities;
+using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Domain.BoundedContexts.Note.Entities;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
@@ -36,7 +36,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<ReviewSessionItem> ReviewSessionItems => Set<ReviewSessionItem>();
     public DbSet<PracticeSessionSummary> PracticeSessionSummaries => Set<PracticeSessionSummary>();
     public DbSet<PracticeSettings> PracticeSettings => Set<PracticeSettings>();
-    public DbSet<ReviewSettings> ReviewSettings => Set<ReviewSettings>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
@@ -47,9 +46,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<NoteBoard> NoteBoards => Set<NoteBoard>();
     public DbSet<NotePage> NotePages => Set<NotePage>();
     public DbSet<NotePageAsset> NotePageAssets => Set<NotePageAsset>();
-    public DbSet<KanbanBoard> KanbanBoards => Set<KanbanBoard>();
-    public DbSet<KanbanColumn> KanbanColumns => Set<KanbanColumn>();
-    public DbSet<KanbanCard> KanbanCards => Set<KanbanCard>();
+    public DbSet<ProjectBoard> ProjectBoards => Set<ProjectBoard>();
+    public DbSet<ProjectColumn> ProjectColumns => Set<ProjectColumn>();
+    public DbSet<ProjectCard> ProjectCards => Set<ProjectCard>();
     public DbSet<PomodoroConfig> PomodoroConfigs => Set<PomodoroConfig>();
     public DbSet<PomodoroSession> PomodoroSessions => Set<PomodoroSession>();
     public DbSet<Notification> Notifications => Set<Notification>();

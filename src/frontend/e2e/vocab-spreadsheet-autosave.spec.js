@@ -1,25 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 test('spreadsheet keyboard autosave preserves failed drafts and retries', async ({ page }) => {
-  const email = `spreadsheet+${Date.now()}@example.com`;
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Spreadsheet Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-  await page.goto('http://127.0.0.1:5173/login');
-  await expect(page).toHaveURL('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('SecurePass123');
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  await page.goto('http://127.0.0.1:5173/vocabulary');
+  await loginSeededUser(page, { prefix: 'vocab-spreadsheet-autosave' });
+  await page.goto('/vocabulary');
   await page.getByRole('button', { name: 'Create board' }).click();
 
   await page.getByTestId('board-name-input').fill('Spreadsheet Board');
@@ -32,7 +16,8 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByLabel('New Vietnamese meaning').fill('giảm nhẹ');
   await page.getByLabel('New IPA pronunciation').fill('/ˈmɪt.ɪ.ɡeɪt/');
   await page.getByLabel('New definition').fill('make less severe');
-  await page.getByLabel('New word class').selectOption('verb');
+  await page.getByLabel('New word class').click();
+  await page.getByRole('option', { name: 'Verb', exact: true }).click();
   await page.getByLabel('New example').fill('Mitigate risk.');
   await page.getByTestId('create-word-button').click();
   await expect(page.getByLabel('Word for mitigate')).toBeVisible();
@@ -71,9 +56,11 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByLabel('New Vietnamese meaning').fill('giữ lại');
   await page.getByLabel('New IPA pronunciation').fill('/rɪˈteɪn/');
   await page.getByLabel('New definition').fill('continue to have');
-  await page.getByLabel('New word class').selectOption('verb');
+  await page.getByLabel('New word class').click();
+  await page.getByRole('option', { name: 'Verb', exact: true }).click();
   await page.getByLabel('New example').fill('Retain the value.');
   await page.getByLabel('New antonyms').press('Enter');
   await expect(page.getByLabel('Word for retain')).toBeVisible();
   await expect(page.getByLabel('New word', { exact: true })).toBeFocused();
 });
+

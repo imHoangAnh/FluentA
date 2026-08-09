@@ -185,11 +185,11 @@ describe('TodoPage My Day workspace', () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Repeat: Does not repeat' }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat: Does not repeat' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Monthly' }))
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: 'Monthly' }))
 
-    fireEvent.pointerDown(await screen.findByRole('button', { name: 'Repeat: Monthly' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('button', { name: 'Repeat: Monthly' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Does not repeat' }))
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
   })
@@ -227,14 +227,17 @@ describe('TodoPage My Day workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This task is unavailable or no longer exists.')
   })
 
-  it('moves a task to Trash without a confirmation modal', async () => {
+  it('moves a task to Trash after confirming the delete dialog', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete task' }))
 
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
     await waitFor(() => expect(api.deleteTodo).toHaveBeenCalled())
     expect(api.deleteTodo.mock.calls[0]?.[0]).toBe('todo-1')
-    expect(screen.queryByRole('alertdialog', { name: 'Delete task?' })).not.toBeInTheDocument()
   })
 
   it('keeps completed tasks collapsed and restores them to active from the context menu', async () => {
@@ -266,7 +269,7 @@ describe('TodoPage My Day workspace', () => {
     const dates = weekDates(toDateInput(new Date()))
     renderPage()
 
-    fireEvent.pointerDown(await screen.findByRole('button', { name: 'My Day menu' }), { button: 0, ctrlKey: false })
+    fireEvent.click(await screen.findByRole('button', { name: 'My Day menu' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Week' }))
 
     expect(await screen.findByRole('heading', { name: 'Week' })).toBeInTheDocument()

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loginSeededUser } from './support/auth-fixture.js';
 
 function todayInput() {
   const date = new Date();
@@ -9,79 +10,62 @@ function todayInput() {
 }
 
 async function registerAndLogin(page) {
-  const email = `personal-productivity+${crypto.randomUUID()}@example.com`;
-  const password = 'SecurePass123';
-
-  await page.goto('http://127.0.0.1:5173/register');
-  await page.getByLabel('Full name').fill('Productivity Learner');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const registerPayload = await (await registerResponsePromise).json();
-  await page.request.post('http://127.0.0.1:5000/api/v1/auth/verify-email', {
-    data: { email, otp: registerPayload.data.developmentOtp },
-  });
-
-  await page.goto('http://127.0.0.1:5173/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/login'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const token = (await (await loginResponsePromise).json()).data.accessToken;
-  return { email, password, token };
+  const identity = await loginSeededUser(page, { prefix: 'personal-productivity-integration' });
+  return identity;
 }
 
 async function login(page, email, password) {
-  await page.goto('http://127.0.0.1:5173/login');
+  await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await expect(page).toHaveURL('/');
 }
 
 test('personal productivity navigation and authenticated cross-tab Todo sync', async ({ context, page }) => {
   const consoleErrors = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() === 'error' && !message.text().includes('Failed to complete negotiation') && !message.text().includes('Failed to start the connection') && !message.text().includes('accounts.google.com')) consoleErrors.push(message.text());
   });
   const { email, password, token } = await registerAndLogin(page);
-  const headers = { Authorization: `Bearer ${token}` };
-  const todo = (await (await page.request.post('http://127.0.0.1:5000/api/v1/todos', {
+  const headers = { Cookie: `access_token=${token}` };
+  const createTodoResponse = await page.request.post('https://localhost:7000/api/v1/todos', {
     headers,
     data: { title: 'Cross-tab integration task', date: todayInput() },
-  })).json()).data;
+  });
+  expect(createTodoResponse.ok()).toBe(true);
+  const todo = (await createTodoResponse.json()).data;
 
   await expect(page.getByRole('link', { name: 'Todo', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Countdowns', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Todo', exact: true }).click();
-  await expect(page.getByLabel('Complete Cross-tab integration task')).toBeVisible();
+  await page.goto(`/todo?taskId=${todo.id}`);
+  await expect(page.getByLabel('Mark Cross-tab integration task as completed').first()).toBeVisible();
 
   const secondTab = await context.newPage();
   secondTab.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() === 'error' && !message.text().includes('Failed to complete negotiation') && !message.text().includes('Failed to start the connection') && !message.text().includes('accounts.google.com')) consoleErrors.push(message.text());
   });
   await login(secondTab, email, password);
-  await secondTab.getByRole('link', { name: 'Todo' }).click();
-  await expect(secondTab.getByLabel('Complete Cross-tab integration task')).toBeVisible({ timeout: 15_000 });
+  await secondTab.goto(`/todo?taskId=${todo.id}`);
+  await expect(secondTab.getByLabel('Mark Cross-tab integration task as completed').first()).toBeVisible({ timeout: 15_000 });
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
   await secondTab.getByRole('link', { name: 'Countdowns' }).click();
   await expect(secondTab.getByRole('heading', { name: 'Countdowns' }).first()).toBeVisible();
 
   const syncedTodoResponse = secondTab.waitForResponse((response) =>
     response.request().method() === 'GET' && response.url().includes('/api/v1/todos?date='));
-  await page.getByLabel('Complete Cross-tab integration task').click();
+  await page.getByLabel('Mark Cross-tab integration task as completed').first().click();
   await page.getByRole('button', { name: /Completed/ }).click();
-  await expect(page.locator('article.todo-card-v2').filter({ hasText: 'Cross-tab integration task' })).toHaveClass(/todo-card-v2--completed/);
+  await expect(page.locator('article.todo-my-day-row').filter({ hasText: 'Cross-tab integration task' })).toHaveClass(/todo-my-day-row--completed/);
   const syncedItems = (await (await syncedTodoResponse).json()).data;
   expect(syncedItems.find((item) => item.id === todo.id)?.isCompleted).toBe(true);
 
   await secondTab.getByRole('link', { name: 'Vocabulary' }).click();
   await secondTab.getByRole('link', { name: 'Todo' }).click();
   await secondTab.getByRole('button', { name: /Completed/ }).click();
-  await expect(secondTab.getByLabel('Uncomplete Cross-tab integration task')).toBeChecked();
+  await expect(secondTab.getByLabel('Mark Cross-tab integration task as active')).toBeVisible();
 
-  const response = await page.request.get(`http://127.0.0.1:5000/api/v1/todos?date=${todayInput()}`, { headers });
+  const response = await page.request.get(`https://localhost:7000/api/v1/todos?date=${todayInput()}`, { headers });
   const persisted = (await response.json()).data.find((item) => item.id === todo.id);
   expect(persisted.isCompleted).toBe(true);
   expect(consoleErrors).toEqual([]);

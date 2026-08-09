@@ -17,8 +17,12 @@ public sealed class CountdownEventConfiguration : IEntityTypeConfiguration<Count
         builder.Property(countdownEvent => countdownEvent.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(countdownEvent => countdownEvent.Name).HasColumnName("name").HasMaxLength(180).IsRequired();
         builder.Property(countdownEvent => countdownEvent.TargetDate).HasColumnName("target_date").HasColumnType("date").IsRequired();
+        builder.Property(countdownEvent => countdownEvent.RepeatPattern)
+            .HasColumnName("repeat_pattern")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
         builder.Property(countdownEvent => countdownEvent.CoverAssetId).HasColumnName("cover_asset_id");
-        builder.Property(countdownEvent => countdownEvent.RestoredAtUtc).HasColumnName("restored_at_utc").HasColumnType("timestamp with time zone");
         builder.Property(countdownEvent => countdownEvent.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(countdownEvent => countdownEvent.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(countdownEvent => countdownEvent.DeletedAt).HasColumnName("deleted_at");

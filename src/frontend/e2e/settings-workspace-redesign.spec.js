@@ -53,14 +53,12 @@ async function mockSettingsApis(page) {
 
     if (path.endsWith('/auth/me')) return route.fulfill(json(user))
     if (path.endsWith('/practice/settings')) return route.fulfill(json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] }))
-    if (path.endsWith('/review/settings')) return route.fulfill(json({ dailyLimit: 30, recapAfterAnswer: true }))
     if (path.endsWith('/review/level-five/remove')) return route.fulfill(json(2))
     if (path.endsWith('/review/level-five')) return route.fulfill(json(levelFiveWords))
     if (path.endsWith('/settings')) {
       return route.fulfill(json({
         profile: user,
         practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-        reviewSettings: { dailyLimit: 30, recapAfterAnswer: true },
       }))
     }
 
@@ -79,22 +77,22 @@ for (const viewport of [
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await mockSettingsApis(page)
 
-    await page.goto('http://localhost:5173/profile')
+    await page.goto('/settings')
     await expect(page.getByRole('navigation', { name: 'Settings navigation' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Practice', exact: true })).toBeVisible()
 
     for (const [name, heading] of [
       ['Practice', 'Practice'],
-      ['Review', 'Review'],
       ['Level 5', 'Level 5 words'],
-      ['Profile', 'Profile'],
     ]) {
       await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name, exact: true }).click()
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     }
+    await page.goto('/profile')
+    await expect(page.getByRole('heading', { name: 'Profile', exact: true }).last()).toBeVisible()
 
-    await page.getByRole('navigation', { name: 'Settings navigation' }).getByRole('link', { name: 'Level 5', exact: true }).click()
+    await page.goto('/settings/level5')
     await page.getByRole('button', { name: /Filter Level 5 words/ }).click()
     await expect(page.getByRole('menuitemradio', { name: 'All' })).toBeVisible()
     await expect(page.getByRole('menuitemradio')).toHaveCount(3)
@@ -103,12 +101,7 @@ for (const viewport of [
     await page.getByRole('checkbox', { name: 'Select all visible active words' }).check()
     await expect(page.getByText('2 words selected')).toBeVisible()
     await page.getByRole('button', { name: 'Remove selected' }).click()
-    await expect(page.getByRole('alertdialog')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Remove selected words?' })).toBeVisible()
-    await expect(page.getByText('2 words will become inactive. Review history will be preserved.')).toBeVisible()
-    await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Remove selected' })).toBeFocused()
+    await expect(page.getByText('2 words selected')).toHaveCount(0)
 
     const tableOverflow = await page.locator('table').evaluate((table) => {
       const container = table.parentElement

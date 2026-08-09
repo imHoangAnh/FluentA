@@ -6,7 +6,7 @@ export const notesRoutes: RouteObject[] = [{
   handle: appShellRoute({
     title: 'Notes',
     description: 'Organize boards, pages, and rich-text drafts in one workspace.',
-    contentClassName: 'h-screen max-w-none',
+    contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
   }),
   lazy: async () => ({ Component: (await import('./pages/NotesPage')).NotesPage }),
 }]

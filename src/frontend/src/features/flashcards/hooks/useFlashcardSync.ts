@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/features/auth'
 
-const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1'
+const apiUrl = import.meta.env.VITE_API_URL ?? 'https://localhost:7000/api/v1'
 const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
 
 export function useFlashcardSync() {
