@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { AuthShell } from '../components/AuthShell'
+import { AuthDivider, AuthFormHeader, AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { useAuthStore } from '../store/auth-store'
@@ -14,14 +14,22 @@ export function LoginPage() {
   const error = useAuthStore((state) => state.error)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const notice = typeof location.state === 'object' && location.state && 'notice' in location.state
     ? (location.state as { notice?: string }).notice ?? null
     : null
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    await login({ email, password })
-    navigate('/')
+    setIsSubmitting(true)
+    try {
+      await login({ email, password })
+      navigate('/')
+    } catch {
+      // The auth store owns the account-safe error shown below the fields.
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const acceptGoogleCredential = useCallback(async (idToken: string) => {
@@ -31,7 +39,7 @@ export function LoginPage() {
 
   return (
     <AuthShell mode="login">
-      <div className="mb-7"><h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">Welcome back</h1><p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">Sign in to continue your learning.</p></div>
+      <AuthFormHeader title="Welcome back" description="Sign in to continue your learning." />
       <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
         <TextField
@@ -45,10 +53,10 @@ export function LoginPage() {
         />
         {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
         {notice ? <p role="status" className="m-0 text-sm text-primary">{notice}</p> : null}
-        <Button className="w-full" type="submit">Continue</Button>
+        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Continue'}</Button>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
+      <AuthDivider />
 
       <GoogleSignInButton onCredential={acceptGoogleCredential} />
 

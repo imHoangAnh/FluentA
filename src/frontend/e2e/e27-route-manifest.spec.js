@@ -97,6 +97,11 @@ for (const viewport of [
     await expect(page.locator(':focus-visible')).toBeVisible()
     await page.screenshot({ path: `test-results/e27-login-${viewport.name}.png`, fullPage: true })
 
+    await page.goto('/forgot-password')
+    await page.screenshot({ path: `test-results/e27-forgot-password-${viewport.name}.png`, fullPage: true })
+    await page.goto('/reset-password?token=route-proof-token')
+    await page.screenshot({ path: `test-results/e27-new-password-${viewport.name}.png`, fullPage: true })
+
     authState.enabled = false
     await page.goto('/practice/route-proof?order=shuffle')
     await expect(page).toHaveURL(/\/login$/)

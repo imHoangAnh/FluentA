@@ -1,10 +1,17 @@
-import { type FormEvent, useCallback, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AuthShell } from '../components/AuthShell'
+import { AuthDivider, AuthFormHeader, AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { useAuthStore } from '../store/auth-store'
+import * as authApi from '../api/auth.api'
+import type { RegisterPayload } from '../api/auth.api'
 import { Button } from '@/shared/components/ui/button'
+
+function secondsUntil(timestamp: string | null) {
+  if (!timestamp) return 0
+  return Math.max(0, Math.ceil((new Date(timestamp).getTime() - Date.now()) / 1000))
+}
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -13,9 +20,20 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [otp, setOtp] = useState('')
+  const [verification, setVerification] = useState<RegisterPayload | null>(null)
+  const [secondsRemaining, setSecondsRemaining] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!verification) return
+    const timer = window.setInterval(() => {
+      setSecondsRemaining(secondsUntil(verification.resendAvailableAtUtc))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [verification])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -24,19 +42,33 @@ export function RegisterPage() {
     setIsSubmitting(true)
 
     try {
-      const payload = await register({ email, password, fullName })
-      setMessage(payload.message)
-      navigate(`/verify-email?email=${encodeURIComponent(payload.email)}`, {
-        state: {
-          email: payload.email,
-          resendAvailableAtUtc: payload.resendAvailableAtUtc,
-          verificationExpiresAtUtc: payload.verificationExpiresAtUtc,
-        },
-      })
+      if (verification) {
+        await authApi.verifyOtp({ email: verification.email, otp })
+        navigate('/login', { state: { notice: 'Email verified. You can log in now.' } })
+      } else {
+        const payload = await register({ email, password, fullName })
+        setVerification(payload)
+        setSecondsRemaining(secondsUntil(payload.resendAvailableAtUtc))
+        setMessage('We sent a verification code to your inbox.')
+      }
     } catch (submissionError) {
       setError(authApiError(submissionError))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function resendCode() {
+    if (!verification) return
+    setError(null)
+    setMessage(null)
+    try {
+      const payload = await authApi.resendVerificationOtp({ email: verification.email })
+      setVerification(payload)
+      setSecondsRemaining(secondsUntil(payload.resendAvailableAtUtc))
+      setMessage('A new verification code has been sent.')
+    } catch (resendError) {
+      setError(authApiError(resendError))
     }
   }
 
@@ -47,10 +79,13 @@ export function RegisterPage() {
 
   return (
     <AuthShell mode="register">
-      <div className="mb-7"><h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">Create your account</h1><p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">Start building a vocabulary you will remember.</p></div>
+      <AuthFormHeader
+        title="Create your account"
+        description={verification ? 'Enter the verification code to finish creating your account.' : 'Start building a vocabulary you will remember.'}
+      />
       <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
-        <TextField label="Full name" name="fullName" autoComplete="name" placeholder="Enter your full name" value={fullName} onChange={setFullName} />
-        <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
+        <TextField label="Full name" name="fullName" autoComplete="name" placeholder="Enter your full name" value={fullName} onChange={setFullName} disabled={verification !== null} />
+        <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} disabled={verification !== null} />
         <TextField
           label="Password"
           name="password"
@@ -59,15 +94,24 @@ export function RegisterPage() {
           placeholder="Create a password"
           value={password}
           onChange={setPassword}
+          disabled={verification !== null}
         />
+        {verification ? <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} autoFocus /> : null}
         {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
         {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Continue'}</Button>
+        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? (verification ? 'Verifying...' : 'Creating account...') : (verification ? 'Verify email' : 'Continue')}</Button>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
-
-      <GoogleSignInButton onCredential={acceptGoogleCredential} />
+      {verification ? (
+        <Button className="mt-4 w-full" variant="outline" type="button" onClick={() => void resendCode()} disabled={secondsRemaining > 0}>
+          {secondsRemaining > 0 ? `Resend available in ${secondsRemaining}s` : 'Resend code'}
+        </Button>
+      ) : (
+        <>
+          <AuthDivider />
+          <GoogleSignInButton onCredential={acceptGoogleCredential} />
+        </>
+      )}
     </AuthShell>
   )
 }
