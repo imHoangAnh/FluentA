@@ -1,0 +1,21 @@
+[Unit]
+Description=FluentA production PostgreSQL backup to private S3
+Documentation=file:/opt/fluenta/current/README.md
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+ConditionPathExists=/opt/fluenta/shared/production.env
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/opt/fluenta/bin/backup-postgres.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/fluenta/backups
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+

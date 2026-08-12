@@ -5,21 +5,20 @@ using Protocol = Amazon.S3.Protocol;
 
 namespace FluentA.Infrastructure.Assets;
 
-public sealed class MinioAssetObjectStorage : IAssetObjectStorage
+public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
 {
     private readonly IAmazonS3 _client;
     private readonly AssetStorageOptions _options;
     private readonly Protocol _presignProtocol;
 
-    public MinioAssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
+    public S3CompatibleAssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
     {
         _client = client;
         _options = options;
         _options.Validate();
-        var endpoint = new Uri(_options.Endpoint, UriKind.Absolute);
-        _presignProtocol = string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            ? Protocol.HTTP
-            : Protocol.HTTPS;
+        _presignProtocol = options.Provider == AssetStorageProvider.S3
+            ? Protocol.HTTPS
+            : GetMinioProtocol(options.Endpoint);
     }
 
     public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
@@ -53,7 +52,9 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
         return new AssetPresignedDownload(url, expiresAtUtc);
     }
 
-    public async Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+    public async Task<AssetObjectMetadata?> GetObjectMetadataAsync(
+        string objectKey,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -69,13 +70,16 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
                 response.Headers.ContentType ?? "application/octet-stream",
                 response.ETag);
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }
     }
 
-    public async Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default)
+    public async Task<byte[]?> GetObjectPrefixAsync(
+        string objectKey,
+        int maxBytes,
+        CancellationToken cancellationToken = default)
     {
         if (maxBytes is < 1 or > 4096)
         {
@@ -94,7 +98,7 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
             await response.ResponseStream.CopyToAsync(buffer, cancellationToken);
             return buffer.ToArray();
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }
@@ -104,18 +108,44 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
     {
         try
         {
+            if (_options.Provider == AssetStorageProvider.S3)
+            {
+                var response = await _client.GetPublicAccessBlockAsync(new GetPublicAccessBlockRequest
+                {
+                    BucketName = _options.Bucket
+                }, cancellationToken);
+
+                var block = response.PublicAccessBlockConfiguration;
+                if (block is null
+                    || block.BlockPublicAcls != true
+                    || block.IgnorePublicAcls != true
+                    || block.BlockPublicPolicy != true
+                    || block.RestrictPublicBuckets != true)
+                {
+                    throw new AssetStorageUnavailableException("Required S3 public-access protections are not enabled.");
+                }
+
+                return;
+            }
+
             await _client.DeleteBucketPolicyAsync(new DeleteBucketPolicyRequest
             {
                 BucketName = _options.Bucket
             }, cancellationToken);
         }
-        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AssetStorageUnavailableException)
         {
-            // No bucket policy is the desired private default for MinIO.
+            throw;
         }
-        catch (Exception)
+        catch (AmazonS3Exception exception) when (
+            _options.Provider == AssetStorageProvider.Minio
+            && exception.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            throw new AssetStorageUnavailableException("Could not enforce private bucket policy.");
+            // No bucket policy is the desired private default for local MinIO.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new AssetStorageUnavailableException("Could not verify private asset storage.");
         }
     }
 
@@ -128,4 +158,11 @@ public sealed class MinioAssetObjectStorage : IAssetObjectStorage
         }, cancellationToken);
     }
 
+    private static Protocol GetMinioProtocol(string endpoint)
+    {
+        var endpointUri = new Uri(endpoint, UriKind.Absolute);
+        return string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            ? Protocol.HTTP
+            : Protocol.HTTPS;
+    }
 }

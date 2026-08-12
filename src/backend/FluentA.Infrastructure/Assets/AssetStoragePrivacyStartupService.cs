@@ -24,7 +24,7 @@ public sealed class AssetStoragePrivacyStartupService : IHostedService
         }
         catch (AssetStorageUnavailableException exception)
         {
-            _logger.LogWarning(exception, "Asset storage privacy verification will retry through the scheduled cleanup job.");
+            _logger.LogWarning(exception, "Asset storage privacy verification failed; readiness will remain unhealthy until corrected.");
         }
     }
 

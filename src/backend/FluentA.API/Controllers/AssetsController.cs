@@ -29,7 +29,7 @@ public sealed class AssetsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Finalizes a previously presigned owned asset after MinIO upload verification.</summary>
+    /// <summary>Finalizes a previously presigned owned asset after object-storage verification.</summary>
     [HttpPost("finalize")]
     public async Task<IActionResult> Finalize(FinalizeAssetRequest request, CancellationToken cancellationToken)
     {

@@ -13,7 +13,7 @@ xác thực và thực thi background job định kỳ bằng Hangfire.
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
 challenge OTP/reset của auth, IMemoryCache giữ trạng thái Pomodoro ngắn hạn, còn
-MinIO lưu object phục vụ asset.
+object storage private lưu asset: MinIO ở Development và AWS S3 ở Production.
 
 ## 3. Mục lục
 
@@ -25,6 +25,7 @@ MinIO lưu object phục vụ asset.
 - [API response contract](#6-api-response-contract)
 - [Cấu trúc solution](#7-cấu-trúc-solution)
 - [Kiểm tra backend](#8-kiểm-tra-backend)
+- [Health và production image](#9-health-và-production-image)
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
@@ -139,9 +140,11 @@ src/backend/
   FluentA.API/                    Controller, middleware, SignalR, Hangfire worker và composition root
   FluentA.Application/            Use case, service và port
   FluentA.Domain/                 Entity, value object và business rule
-  FluentA.Infrastructure/         EF Core, PostgreSQL, MinIO và provider
+  FluentA.Infrastructure/         EF Core, PostgreSQL, object storage và provider
+  FluentA.API.UnitTests/          Unit test cho API, production config và health contract
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
+  FluentA.Infrastructure.UnitTests/ Unit test cho provider config, S3 signing và privacy
   FluentA.slnx                    .NET solution
 ```
 
@@ -158,6 +161,66 @@ dotnet test src/backend/FluentA.slnx
 ```powershell
 dotnet build src/backend/FluentA.slnx
 ```
+
+## 9. Health và production image
+
+API công khai hai endpoint vận hành không yêu cầu đăng nhập:
+
+- `/health/live` chỉ kiểm tra process;
+- `/health/ready` kiểm tra PostgreSQL và object storage bắt buộc.
+
+Body chỉ chứa trạng thái tổng hợp và không trả endpoint, connection string hay
+exception của dependency.
+
+Build API image từ root repository:
+
+```powershell
+docker build `
+  --file src/backend/Dockerfile `
+  --build-arg VCS_REF=<commit-sha> `
+  --tag fluenta-backend:<commit-sha> `
+  src/backend
+```
+
+Build one-shot EF migration image từ cùng source revision:
+
+```powershell
+docker build `
+  --file src/backend/Dockerfile `
+  --target migrations `
+  --build-arg VCS_REF=<commit-sha> `
+  --tag fluenta-migrations:<commit-sha> `
+  src/backend
+```
+
+Hai image chạy non-root. API chỉ nghe cổng container 8080; production Caddy sẽ
+terminate TLS và proxy qua private Docker network. Cấu hình production và secret
+được inject khi chạy container, không được truyền bằng Docker build arguments.
+
+Production topology nằm tại `deploy/production`. Trước khi dùng, copy
+`env.example` thành file `.env` chỉ tồn tại trên EC2 và thay toàn bộ placeholder.
+Không điền AWS access key/secret key: API lấy temporary credential từ EC2
+instance role.
+
+```powershell
+docker compose `
+  --env-file deploy/production/env.example `
+  --file deploy/production/compose.yml `
+  config --quiet
+
+# Trên EC2, sau khi thay env.example bằng file owner-only .env:
+docker compose --env-file deploy/production/.env `
+  --file deploy/production/compose.yml `
+  --profile tools run --rm migrations
+
+docker compose --env-file deploy/production/.env `
+  --file deploy/production/compose.yml `
+  up --detach postgres api caddy
+```
+
+Chỉ Caddy publish 80/443. API, PostgreSQL và migration không publish host port;
+production Compose không chạy MinIO. Các lệnh trên là runtime contract, chưa là
+release/rollback automation và không thay thế Group 3 live AWS/EC2 proof.
 
 Xem [README của root project](../../README.md) để chạy toàn bộ hệ thống và
 [Frontend README](../frontend/README.md) để chạy giao diện.

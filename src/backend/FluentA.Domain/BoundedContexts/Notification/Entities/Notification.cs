@@ -46,8 +46,7 @@ public sealed class Notification : BaseEntity, IAggregateRoot
             || actionPath[0] != '/'
             || actionPath.StartsWith("//", StringComparison.Ordinal)
             || actionPath.Contains('\\')
-            || actionPath.Any(char.IsControl)
-            || Uri.TryCreate(actionPath, UriKind.Absolute, out _))
+            || actionPath.Any(char.IsControl))
         {
             throw new ArgumentException("Notification action path must be an application-relative path.", nameof(actionPath));
         }

@@ -2,7 +2,9 @@ using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentA.API.BackgroundJobs;
+using FluentA.API.Configuration;
 using FluentA.API.Contracts;
+using FluentA.API.Health;
 using FluentA.API.Hubs;
 using FluentA.API.Middleware;
 using FluentA.Application.BoundedContexts.Flashcards;
@@ -14,18 +16,33 @@ using FluentA.Infrastructure;
 using FluentA.Infrastructure.Auth;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 var authOptions = AuthSecurityOptions.FromConfiguration(builder.Configuration);
 authOptions.Validate();
+ProductionRuntimeValidator.Validate(builder.Configuration, builder.Environment);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddFluentAInfrastructure(builder.Configuration);
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live", "ready"])
+    .AddCheck<PostgresReadinessCheck>(
+        "postgres",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromSeconds(5))
+    .AddCheck<AssetStorageReadinessCheck>(
+        "asset-storage",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"],
+        timeout: TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<IFlashcardSyncNotifier, SignalRFlashcardSyncNotifier>();
 builder.Services.AddScoped<ITodoSyncNotifier, SignalRTodoSyncNotifier>();
 builder.Services.AddScoped<IHabitSyncNotifier, SignalRHabitSyncNotifier>();
@@ -122,6 +139,16 @@ app.UseMiddleware<RequestLogMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live"),
+    ResponseWriter = HealthResponseWriter.WriteAsync
+}).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = HealthResponseWriter.WriteAsync
+}).AllowAnonymous();
 app.MapControllers();
 app.MapHub<SyncHub>("/hubs/sync");
 RecurringJobRegistration.Register(app.Services.GetRequiredService<IRecurringJobManager>());
