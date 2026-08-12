@@ -1,0 +1,162 @@
+name: Deploy backend production
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-backend
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: "178868337284"
+  AWS_REGION: ap-southeast-1
+  AWS_DEPLOY_ROLE_ARN: arn:aws:iam::178868337284:role/FluentAGitHubProductionDeployRole
+  ECR_API_REPOSITORY: fluenta-production-api
+  ECR_MIGRATIONS_REPOSITORY: fluenta-production-migrations
+  EC2_INSTANCE_ID: i-058f1404876ce5edb
+  SSM_DEPLOY_DOCUMENT: FluentA-DeployBackendRelease
+  PUBLIC_READY_URL: https://api.sophion.io.vn/health/ready
+
+jobs:
+  deploy:
+    name: Build, publish, and deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Validate immutable release identity
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+
+      - name: Check out the release revision
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: fluenta-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+
+      - name: Log in to private ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      - name: Validate ECR registry
+        env:
+          ACTUAL_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          set -Eeuo pipefail
+          expected_registry="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          [[ "$ACTUAL_REGISTRY" == "$expected_registry" ]]
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build and push API image
+        id: api-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: src/backend
+          target: final
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_API_REPOSITORY }}:${{ github.sha }}
+          build-args: VCS_REF=${{ github.sha }}
+
+      - name: Build and push migration image
+        id: migrations-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: src/backend
+          target: migrations
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_MIGRATIONS_REPOSITORY }}:${{ github.sha }}
+          build-args: VCS_REF=${{ github.sha }}
+
+      - name: Verify published digests
+        env:
+          API_DIGEST: ${{ steps.api-image.outputs.digest }}
+          MIGRATIONS_DIGEST: ${{ steps.migrations-image.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$API_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$MIGRATIONS_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+          resolved_api="$(aws ecr describe-images \
+            --repository-name "$ECR_API_REPOSITORY" \
+            --image-ids imageTag="$GITHUB_SHA" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+          resolved_migrations="$(aws ecr describe-images \
+            --repository-name "$ECR_MIGRATIONS_REPOSITORY" \
+            --image-ids imageTag="$GITHUB_SHA" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+
+          [[ "$resolved_api" == "$API_DIGEST" ]]
+          [[ "$resolved_migrations" == "$MIGRATIONS_DIGEST" ]]
+
+      - name: Invoke fixed SSM release document
+        id: ssm
+        run: |
+          set -Eeuo pipefail
+          parameters="$(printf '{\"CommitSha\":[\"%s\"]}' "$GITHUB_SHA")"
+          command_id="$(aws ssm send-command \
+            --document-name "$SSM_DEPLOY_DOCUMENT" \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --parameters "$parameters" \
+            --timeout-seconds 1800 \
+            --comment "FluentA backend release $GITHUB_SHA" \
+            --query 'Command.CommandId' \
+            --output text)"
+          [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]]
+          printf 'command_id=%s\n' "$command_id" >>"$GITHUB_OUTPUT"
+
+      - name: Wait for SSM deployment
+        env:
+          COMMAND_ID: ${{ steps.ssm.outputs.command_id }}
+        run: |
+          set -Eeuo pipefail
+          for _ in $(seq 1 180); do
+            status="$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --query Status \
+              --output text)"
+            case "$status" in
+              Success)
+                printf 'Production release completed successfully.\n'
+                exit 0
+                ;;
+              Pending|InProgress|Delayed)
+                sleep 10
+                ;;
+              *)
+                printf 'Production release failed with SSM status: %s\n' "$status" >&2
+                exit 1
+                ;;
+            esac
+          done
+          printf 'Production release exceeded the workflow wait limit.\n' >&2
+          exit 1
+
+      - name: Verify public readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 12 --retry-delay 5 --retry-all-errors
+          "$PUBLIC_READY_URL"
