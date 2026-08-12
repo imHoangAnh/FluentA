@@ -1,4 +1,4 @@
-name: Deploy backend production
+name: Deploy production
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: production-backend
+  group: production-release
   cancel-in-progress: false
 
 env:
@@ -19,9 +19,12 @@ env:
   AWS_DEPLOY_ROLE_ARN: arn:aws:iam::178868337284:role/FluentAGitHubProductionDeployRole
   ECR_API_REPOSITORY: fluenta-production-api
   ECR_MIGRATIONS_REPOSITORY: fluenta-production-migrations
+  ECR_FRONTEND_REPOSITORY: fluenta-production-web
   EC2_INSTANCE_ID: i-058f1404876ce5edb
   SSM_DEPLOY_DOCUMENT: FluentA-DeployBackendRelease
   PUBLIC_READY_URL: https://api.sophion.io.vn/health/ready
+  PUBLIC_FRONTEND_URL: https://sophion.io.vn/
+  PUBLIC_FRONTEND_DEEP_LINK: https://sophion.io.vn/settings/practice
 
 jobs:
   deploy:
@@ -64,6 +67,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
+      - name: Validate public frontend configuration
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$VITE_GOOGLE_CLIENT_ID" =~ ^[0-9A-Za-z._-]+\.apps\.googleusercontent\.com$ ]]
+
       - name: Build and push API image
         id: api-image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -88,14 +98,31 @@ jobs:
           tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_MIGRATIONS_REPOSITORY }}:${{ github.sha }}
           build-args: VCS_REF=${{ github.sha }}
 
+      - name: Build and push frontend image
+        id: frontend-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: src/frontend
+          target: final
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            VITE_API_URL=https://api.sophion.io.vn/api/v1
+            VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
+
       - name: Verify published digests
         env:
           API_DIGEST: ${{ steps.api-image.outputs.digest }}
           MIGRATIONS_DIGEST: ${{ steps.migrations-image.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend-image.outputs.digest }}
         run: |
           set -Eeuo pipefail
           [[ "$API_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           [[ "$MIGRATIONS_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$FRONTEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
 
           resolved_api="$(aws ecr describe-images \
             --repository-name "$ECR_API_REPOSITORY" \
@@ -107,9 +134,15 @@ jobs:
             --image-ids imageTag="$GITHUB_SHA" \
             --query 'imageDetails[0].imageDigest' \
             --output text)"
+          resolved_frontend="$(aws ecr describe-images \
+            --repository-name "$ECR_FRONTEND_REPOSITORY" \
+            --image-ids imageTag="$GITHUB_SHA" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
 
           [[ "$resolved_api" == "$API_DIGEST" ]]
           [[ "$resolved_migrations" == "$MIGRATIONS_DIGEST" ]]
+          [[ "$resolved_frontend" == "$FRONTEND_DIGEST" ]]
 
       - name: Invoke fixed SSM release document
         id: ssm
@@ -121,7 +154,7 @@ jobs:
             --instance-ids "$EC2_INSTANCE_ID" \
             --parameters "$parameters" \
             --timeout-seconds 1800 \
-            --comment "FluentA backend release $GITHUB_SHA" \
+            --comment "FluentA production release $GITHUB_SHA" \
             --query 'Command.CommandId' \
             --output text)"
           [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]]
@@ -156,7 +189,13 @@ jobs:
           exit 1
 
       - name: Verify public readiness
-        run: >-
-          curl --fail --silent --show-error
-          --retry 12 --retry-delay 5 --retry-all-errors
-          "$PUBLIC_READY_URL"
+        run: |
+          set -Eeuo pipefail
+          for url in \
+            "$PUBLIC_READY_URL" \
+            "$PUBLIC_FRONTEND_URL" \
+            "$PUBLIC_FRONTEND_DEEP_LINK"; do
+            curl --fail --silent --show-error \
+              --retry 12 --retry-delay 5 --retry-all-errors \
+              "$url" >/dev/null
+          done

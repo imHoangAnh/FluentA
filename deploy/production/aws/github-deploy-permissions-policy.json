@@ -21,7 +21,8 @@
       ],
       "Resource": [
         "arn:aws:ecr:ap-southeast-1:178868337284:repository/fluenta-production-api",
-        "arn:aws:ecr:ap-southeast-1:178868337284:repository/fluenta-production-migrations"
+        "arn:aws:ecr:ap-southeast-1:178868337284:repository/fluenta-production-migrations",
+        "arn:aws:ecr:ap-southeast-1:178868337284:repository/fluenta-production-web"
       ]
     },
     {

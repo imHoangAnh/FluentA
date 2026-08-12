@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2.2",
-  "description": "Deploy one immutable FluentA backend release by full Git commit SHA.",
+  "description": "Deploy one immutable FluentA production release by full Git commit SHA.",
   "parameters": {
     "CommitSha": {
       "type": "String",
