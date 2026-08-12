@@ -118,7 +118,20 @@ jobs:
           tags: fluenta-migrations:pr-ci
           build-args: VCS_REF=${{ github.sha }}
 
-      - name: Verify non-root revision-labelled images
+      - name: Build frontend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: src/frontend
+          target: final
+          load: true
+          push: false
+          tags: fluenta-frontend:pr-ci
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            VITE_API_URL=https://api.sophion.io.vn/api/v1
+            VITE_GOOGLE_CLIENT_ID=ci-validation.apps.googleusercontent.com
+
+      - name: Verify image revisions and runtime identities
         env:
           EXPECTED_REVISION: ${{ github.sha }}
         run: |
@@ -129,6 +142,13 @@ jobs:
             [[ "$image_user" =~ ^[1-9][0-9]*$ ]]
             [[ "$image_revision" == "$EXPECTED_REVISION" ]]
           done
+
+          frontend_user="$(docker image inspect fluenta-frontend:pr-ci --format '{{.Config.User}}')"
+          frontend_revision="$(docker image inspect fluenta-frontend:pr-ci --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          [[ -z "$frontend_user" ]]
+          [[ "$frontend_revision" == "$EXPECTED_REVISION" ]]
+          docker run --rm --entrypoint /bin/sh fluenta-frontend:pr-ci \
+            -ec 'test -f /srv/index.html'
 
       - name: Validate production Compose
         run: >-
@@ -150,8 +170,13 @@ jobs:
         run: bash deploy/production/bin/validate-delivery-policy.sh
 
       - name: Test the fixed host release boundary
-        run: >-
-          docker run --rm
-          --volume "$PWD:/repo:ro"
-          mcr.microsoft.com/dotnet/sdk:10.0@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0
-          bash /repo/deploy/production/tests/deploy-release.test.sh
+        run: |
+          set -Eeuo pipefail
+          for test_script in \
+            deploy-release.test.sh \
+            install-deployment-artifacts.test.sh; do
+            docker run --rm \
+              --volume "$PWD:/repo:ro" \
+              mcr.microsoft.com/dotnet/sdk:10.0@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 \
+              bash "/repo/deploy/production/tests/${test_script}"
+          done
