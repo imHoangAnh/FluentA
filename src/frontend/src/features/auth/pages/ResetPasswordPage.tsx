@@ -1,6 +1,6 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AuthShell } from '../components/AuthShell'
+import { AuthFormHeader, AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import * as authApi from '../api/auth.api'
 import { Button } from '@/shared/components/ui/button'
@@ -31,15 +31,9 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell mode="login">
-      <div className="grid gap-5">
-        <div>
-          <h1 className="m-0 text-2xl font-semibold tracking-tight">Choose a new password</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Set a new password for your FluentA account. This link can only be used once.
-          </p>
-        </div>
-        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
+    <AuthShell mode="new-password">
+      <AuthFormHeader title="Choose a new password" description="Set a new password for your FluentA account. This link can only be used once." />
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
           <TextField
             label="New password"
             name="password"
@@ -61,9 +55,8 @@ export function ResetPasswordPage() {
           {missingToken ? <p role="alert" className="m-0 text-sm text-destructive">This password reset link is missing its token.</p> : null}
           {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
           <Button className="w-full" type="submit" disabled={missingToken}>Reset password</Button>
-        </form>
-        <div className="flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/forgot-password" className="text-primary no-underline hover:underline">Request a new link</Link></div>
-      </div>
+      </form>
+      <div className="mt-5 flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/forgot-password" className="text-primary no-underline hover:underline">Request a new link</Link></div>
     </AuthShell>
   )
 }

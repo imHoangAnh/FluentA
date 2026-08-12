@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { type ReactNode } from 'react'
 import { cn } from '@/shared/lib/utils'
 
+type AuthShellMode = 'login' | 'register' | 'forgot-password' | 'new-password'
+
 const orbitCards = [
   { language: 'Vietnamese', phrase: 'Xin chào', position: 'left-1/2 top-1/2 z-10 size-[150px] -translate-x-1/2 -translate-y-1/2', accent: 'bg-slate-400' },
   { language: 'Japanese', phrase: 'こんにちは', position: 'left-1/2 top-1/2 size-[120px] -translate-x-[260px] -translate-y-[170px]', accent: 'bg-purple-400' },
@@ -33,7 +35,46 @@ function FluentABrandHeader() {
   )
 }
 
-export function AuthShell({ children, mode }: { children: ReactNode, mode: 'login' | 'register' }) {
+function AuthContextNavigation({ mode }: { mode: AuthShellMode }) {
+  if (mode === 'login' || mode === 'register') {
+    return (
+      <nav className="mb-8 grid grid-cols-2 border-b border-slate-100" aria-label="Authentication">
+        <Link to="/login" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'login' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Login</Link>
+        <Link to="/register" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'register' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Register</Link>
+      </nav>
+    )
+  }
+
+  const label = mode === 'forgot-password' ? 'Forgot password' : 'New password'
+  return (
+    <div className="mb-8 border-b border-slate-100" aria-label="Authentication context">
+      <p className="mx-auto mb-0 w-1/2 border-b-2 border-teal-600 px-2 pb-4 text-center text-sm font-bold text-teal-600">
+        {label}
+      </p>
+    </div>
+  )
+}
+
+export function AuthFormHeader({ title, description }: { title: string, description: ReactNode }) {
+  return (
+    <div className="mb-7">
+      <h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
+      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+    </div>
+  )
+}
+
+export function AuthDivider() {
+  return (
+    <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+      <span className="h-px flex-1 bg-border" />
+      <span>or</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+export function AuthShell({ children, mode }: { children: ReactNode, mode: AuthShellMode }) {
   return (
     <main className="ds-root grid min-h-screen bg-card lg:grid-cols-[3fr_2fr]">
       <section className="relative hidden min-h-screen overflow-hidden bg-[#f7f9fb] px-12 py-12 lg:flex lg:flex-col lg:items-center lg:justify-center" aria-label="About FluentA">
@@ -42,7 +83,7 @@ export function AuthShell({ children, mode }: { children: ReactNode, mode: 'logi
         <p className="relative z-10 mt-12 font-medium text-slate-700">Learn naturally. Speak confidently.</p>
       </section>
       <section className="flex min-h-screen items-center justify-center bg-white p-6 sm:p-10 lg:p-12">
-        <div className="w-full max-w-sm"><div className="mb-8 flex items-center gap-3 lg:hidden"><FluentABrandHeader /></div><nav className="mb-8 grid grid-cols-2 border-b border-slate-100" aria-label="Authentication"><Link to="/login" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'login' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Login</Link><Link to="/register" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'register' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Register</Link></nav>{children}</div>
+        <div className="w-full max-w-sm"><div className="mb-8 flex items-center gap-3 lg:hidden"><FluentABrandHeader /></div><AuthContextNavigation mode={mode} />{children}</div>
       </section>
     </main>
   )

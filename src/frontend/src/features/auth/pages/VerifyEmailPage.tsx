@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
@@ -25,12 +25,11 @@ export function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
   const state = (location.state ?? {}) as VerifyState
   const initialEmail = state.email ?? searchParams.get('email') ?? ''
-  const [email, setEmail] = useState(initialEmail)
+  const email = initialEmail
   const [otp, setOtp] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [resendAvailableAtUtc, setResendAvailableAtUtc] = useState<string | null>(state.resendAvailableAtUtc ?? null)
-  const [verificationExpiresAtUtc, setVerificationExpiresAtUtc] = useState<string | null>(state.verificationExpiresAtUtc ?? null)
   const [secondsRemaining, setSecondsRemaining] = useState(() => secondsUntil(state.resendAvailableAtUtc ?? null))
 
   useEffect(() => {
@@ -40,14 +39,6 @@ export function VerifyEmailPage() {
 
     return () => window.clearInterval(timer)
   }, [resendAvailableAtUtc])
-
-  const expiryLabel = useMemo(() => {
-    if (!verificationExpiresAtUtc) {
-      return null
-    }
-
-    return new Date(verificationExpiresAtUtc).toLocaleString()
-  }, [verificationExpiresAtUtc])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -71,7 +62,6 @@ export function VerifyEmailPage() {
     try {
       const payload = await authApi.resendVerificationOtp({ email })
       setMessage(payload.message)
-      setVerificationExpiresAtUtc(payload.verificationExpiresAtUtc)
       setResendAvailableAtUtc(payload.resendAvailableAtUtc)
       setSecondsRemaining(secondsUntil(payload.resendAvailableAtUtc))
     } catch (resendError) {
@@ -85,22 +75,21 @@ export function VerifyEmailPage() {
         <div>
           <h1 className="m-0 text-2xl font-semibold tracking-tight">Verify your email</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Enter the six-digit code we sent to your email to finish creating your FluentA account.
+            Enter the six-digit code sent to your inbox to finish creating your FluentA account.
           </p>
         </div>
         <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
-          <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
-          <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} />
-          {expiryLabel ? <p role="status" className="m-0 text-sm text-primary">Code expires at {expiryLabel}.</p> : null}
+          <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} autoFocus />
+          {!email ? <p role="alert" className="m-0 text-sm text-destructive">Start registration again to request a verification code.</p> : null}
           {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
           {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-          <Button className="w-full" type="submit">Verify email</Button>
+          <Button className="w-full" type="submit" disabled={!email}>Verify email</Button>
         </form>
         <Button
           variant="outline"
           type="button"
           onClick={() => void resendCode()}
-          disabled={secondsRemaining > 0}
+          disabled={!email || secondsRemaining > 0}
           className="w-full"
         >
           {secondsRemaining > 0 ? `Resend available in ${secondsRemaining}s` : 'Resend code'}

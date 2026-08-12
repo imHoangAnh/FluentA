@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AuthShell } from '../components/AuthShell'
+import { AuthFormHeader, AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import * as authApi from '../api/auth.api'
 import { Button } from '@/shared/components/ui/button'
@@ -9,37 +9,34 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setMessage(null)
     setError(null)
+    setIsSubmitting(true)
 
     try {
-      const payload = await authApi.forgotPassword({ email })
-      setMessage(payload.message)
+      await authApi.forgotPassword({ email })
+      setMessage('If an eligible account exists, we sent a password reset link. Check your Spam or Junk folder if you do not see it.')
     } catch (submissionError) {
       setError(authApiError(submissionError))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <AuthShell mode="login">
-      <div className="grid gap-5">
-        <div>
-          <h1 className="m-0 text-2xl font-semibold tracking-tight">Reset your password</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Enter your account email and we will send a reset link if password recovery is available for that account.
-          </p>
-        </div>
-        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
-          <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
-          {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
-          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-          <Button className="w-full" type="submit">Send reset link</Button>
-        </form>
-        <div className="flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/register" className="text-primary no-underline hover:underline">Register</Link></div>
-      </div>
+    <AuthShell mode="forgot-password">
+      <AuthFormHeader title="Reset your password" description="Enter your email address and we’ll send you a password reset link if an eligible FluentA account exists." />
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
+        <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} />
+        {message ? <div role="status" className="grid gap-1 text-sm text-primary"><strong>Check your inbox</strong><p className="m-0 leading-5">{message}</p></div> : null}
+        {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending...' : 'Send reset link'}</Button>
+      </form>
+      <div className="mt-5 text-center text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link></div>
     </AuthShell>
   )
 }
