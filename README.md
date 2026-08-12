@@ -19,8 +19,9 @@ and progress tracking into one web application.
 
 The repository contains a React single-page application and an ASP.NET Core
 modular monolith. PostgreSQL is the durable store, in-memory caching manages short-lived
-state, SignalR synchronizes active sessions, MinIO stores assets, and Hangfire
-runs recurring jobs.
+state, SignalR synchronizes active sessions, private object storage holds
+assets, and Hangfire runs recurring jobs. Development uses MinIO while
+production uses AWS S3.
 
 ## Key Features
 
@@ -41,7 +42,7 @@ flowchart LR
     API --> APP["Application and Domain"]
     APP --> INFRA["Infrastructure"]
     INFRA --> PG[("PostgreSQL")]
-    INFRA --> MINIO[("MinIO")]
+    INFRA --> OBJECTS[("MinIO local / AWS S3 production")]
     API --> JOBS["Hangfire jobs"]
 ```
 
@@ -58,7 +59,7 @@ flows.
 | Frontend | React 19, TypeScript, Vite, React Router |
 | Client state and data | TanStack Query, Zustand, Axios |
 | Backend | ASP.NET Core, .NET 10, Entity Framework Core |
-| Data and infrastructure | PostgreSQL 16, MinIO, Docker Compose |
+| Data and infrastructure | PostgreSQL 16, MinIO for local development, AWS S3 for production, Docker Compose |
 | Realtime and jobs | SignalR, Hangfire |
 | Testing | xUnit, Vitest, Playwright |
 

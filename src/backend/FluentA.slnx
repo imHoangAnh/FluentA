@@ -7,7 +7,9 @@
   </Folder>
 
   <Folder Name="/test/">
+    <Project Path="FluentA.API.UnitTests/FluentA.API.UnitTests.csproj" />
     <Project Path="FluentA.Application.UnitTests/FluentA.Application.UnitTests.csproj" />
     <Project Path="FluentA.Domain.UnitTests/FluentA.Domain.UnitTests.csproj" />
+    <Project Path="FluentA.Infrastructure.UnitTests/FluentA.Infrastructure.UnitTests.csproj" />
   </Folder>
 </Solution>

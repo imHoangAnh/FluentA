@@ -1,4 +1,5 @@
 using System.Globalization;
+using Amazon;
 using Amazon.S3;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Auth;
@@ -86,7 +87,8 @@ public static class DependencyInjection
         if (assetStorageOptions.Enabled)
         {
             services.AddSingleton<IAmazonS3>(_ => CreateAssetStorageClient(assetStorageOptions));
-            services.AddSingleton<IAssetObjectStorage, MinioAssetObjectStorage>();
+            services.AddSingleton<IAssetObjectStorage, S3CompatibleAssetObjectStorage>();
+            services.AddSingleton<IAssetStorageReadinessProbe, AssetStorageReadinessProbe>();
         }
         else
         {
@@ -170,6 +172,15 @@ public static class DependencyInjection
     private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)
     {
         options.Validate();
+
+        if (options.Provider == AssetStorageProvider.S3)
+        {
+            return new AmazonS3Client(new AmazonS3Config
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region),
+                ForcePathStyle = false
+            });
+        }
 
         var endpoint = new Uri(options.Endpoint, UriKind.Absolute);
         return new AmazonS3Client(
