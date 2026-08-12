@@ -48,6 +48,8 @@ test-results/
 
 # .NET build output
 bin/
+!deploy/production/bin/
+!deploy/production/bin/*.sh
 obj/
 TestResults/
 *.user

@@ -1,0 +1,9 @@
+{
+	admin localhost:2019
+	email {$CADDY_ACME_EMAIL}
+}
+
+api.sophion.io.vn {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

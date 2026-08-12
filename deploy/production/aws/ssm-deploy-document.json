@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Deploy one immutable FluentA backend release by full Git commit SHA.",
+  "parameters": {
+    "CommitSha": {
+      "type": "String",
+      "description": "Lowercase full Git commit SHA.",
+      "allowedPattern": "^[0-9a-f]{40}$",
+      "interpolationType": "ENV_VAR"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "deployRelease",
+      "precondition": {
+        "StringEquals": [
+          "platformType",
+          "Linux"
+        ]
+      },
+      "inputs": {
+        "timeoutSeconds": "1800",
+        "runCommand": [
+          "if [ -z \"${SSM_CommitSha+x}\" ]; then export SSM_CommitSha=\"{{CommitSha}}\"; fi",
+          "exec /opt/fluenta/bin/deploy-release.sh \"$SSM_CommitSha\""
+        ]
+      }
+    }
+  ]
+}
