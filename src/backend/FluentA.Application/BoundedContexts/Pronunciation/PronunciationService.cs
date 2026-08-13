@@ -52,9 +52,36 @@ public sealed class PronunciationService : IPronunciationService
 
         try
         {
-            var accuracyScore = await _provider.AssessAsync(target.Word, locale, wavAudio, cancellationToken);
+            var assessment = await _provider.AssessAsync(target.Word, locale, wavAudio, cancellationToken);
+            var expectedWordCount = target.Word.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+            var isPhrase = expectedWordCount > 1;
+            var hasCompletePhrase = !isPhrase
+                || assessment.CompletenessScore is not null
+                && assessment.CompletenessScore >= _options.CompletenessThreshold
+                && assessment.Words.Count >= expectedWordCount
+                && assessment.Words.All(word => word.AccuracyScore >= _options.WordAccuracyThreshold)
+                && assessment.Words.All(word => !IsMiscue(word.ErrorType));
+            var correct = assessment.AccuracyScore >= _options.AccuracyThreshold && hasCompletePhrase;
+            var feedbackMode = string.Equals(target.Language, "en", StringComparison.OrdinalIgnoreCase)
+                && assessment.Words.All(word => word.Units.Count > 0)
+                ? "phoneme"
+                : "word";
+            var words = assessment.Words
+                .Select(word => new PronunciationWordFeedbackDto(
+                    word.Text,
+                    word.AccuracyScore,
+                    word.ErrorType,
+                    feedbackMode == "phoneme"
+                        ? word.Units.Select(unit => new PronunciationUnitFeedbackDto(unit.Text, unit.AccuracyScore >= _options.WordAccuracyThreshold)).ToArray()
+                        : new[] { new PronunciationUnitFeedbackDto(word.Text, word.AccuracyScore >= _options.WordAccuracyThreshold && !IsMiscue(word.ErrorType)) }))
+                .ToArray();
             return OperationResult<PronunciationAssessmentDto>.Success(
-                new PronunciationAssessmentDto(accuracyScore >= _options.AccuracyThreshold));
+                new PronunciationAssessmentDto(
+                    correct,
+                    assessment.AccuracyScore,
+                    assessment.CompletenessScore,
+                    feedbackMode,
+                    words));
         }
         catch (PronunciationProviderException)
         {
@@ -65,4 +92,8 @@ public sealed class PronunciationService : IPronunciationService
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.ProviderUnavailable());
         }
     }
+
+    private static bool IsMiscue(string? errorType) =>
+        !string.IsNullOrWhiteSpace(errorType)
+        && !string.Equals(errorType, "None", StringComparison.OrdinalIgnoreCase);
 }

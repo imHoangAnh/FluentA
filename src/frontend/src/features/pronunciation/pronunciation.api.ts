@@ -1,7 +1,20 @@
 import { apiClient } from '@/shared/lib/http/client'
 import type { ApiEnvelope } from '@/shared/types/api'
 
-export type PronunciationAssessment = { correct: boolean }
+export type PronunciationUnitFeedback = { text: string; correct: boolean }
+export type PronunciationWordFeedback = {
+  text: string
+  accuracyScore: number
+  errorType?: string | null
+  units: PronunciationUnitFeedback[]
+}
+export type PronunciationAssessment = {
+  correct: boolean
+  accuracyScore: number
+  completenessScore?: number | null
+  feedbackMode: 'phoneme' | 'word'
+  words: PronunciationWordFeedback[]
+}
 
 export async function assessPronunciation(wordId: string, audio: Blob) {
   const response = await apiClient.post<ApiEnvelope<PronunciationAssessment>>(

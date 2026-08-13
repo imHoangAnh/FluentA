@@ -46,9 +46,16 @@ async function recordOnce(page) {
   await page.getByRole('button', { name: /^(Stop recording|Stop)$/ }).click()
 }
 
-test('Practice pronunciation preserves attempts on 503 and offers one fresh two-attempt retry pair', async ({ page }) => {
+test('Practice pronunciation preserves retries on 503 and shows transient IPA feedback', async ({ page }) => {
   await installFakeMicrophone(page)
   const outcomes = [503, false, false, true]
+  const assessment = (correct) => ({
+    correct,
+    accuracyScore: correct ? 91 : 76,
+    completenessScore: 100,
+    feedbackMode: 'phoneme',
+    words: [{ text: 'go', accuracyScore: correct ? 91 : 76, errorType: correct ? 'None' : 'Mispronunciation', units: [{ text: 'ɡ', correct }, { text: 'oʊ', correct: true }] }],
+  })
   const audioBodies = []
 
   await page.route('**/api/v1/**', async (route) => {
@@ -63,27 +70,23 @@ test('Practice pronunciation preserves attempts on 503 and offers one fresh two-
       audioBodies.push(request.postDataBuffer())
       const outcome = outcomes.shift()
       if (outcome === 503) return json({ code: 'PRONUNCIATION_UNAVAILABLE', message: 'Unavailable' }, 503, false)
-      return json({ correct: outcome })
+      return json(assessment(outcome))
     }
     return json({ code: 'UNEXPECTED', message: path }, 503, false)
   })
 
   await page.goto('/practice/page-1?order=sequential')
   await expect(page.getByTestId('active-practice-card')).toBeVisible()
-  await expect(page.getByText(/Attempt 1 of 2/)).toBeVisible()
+  await expect(page.getByText('[R]')).toBeVisible()
 
   await recordOnce(page)
   await expect(page.getByText(/did not use an attempt/)).toBeVisible()
-  await expect(page.getByText(/Attempt 1 of 2/)).toBeVisible()
 
   await recordOnce(page)
-  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Attempt 2 of 2/)).toBeVisible()
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('pronunciation-feedback')).toContainText('/ɡ/')
   await recordOnce(page)
-  await expect(page.getByRole('button', { name: /Retry · 2 more attempts/ })).toBeVisible()
-
-  await page.getByRole('button', { name: /Retry · 2 more attempts/ }).click()
-  await expect(page.getByText(/Attempt 1 of 2 · retry pair/)).toBeVisible()
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
   await recordOnce(page)
   const recap = page.getByTestId('practice-answer-reveal')
   await expect(recap).toContainText('go (verb)')
@@ -121,7 +124,7 @@ test('Review pronunciation submits after the second failed assessment and always
     if (path.endsWith('/review/sessions')) return json(reviewSession)
     if (path.endsWith('/pronunciation/words/word-1/assessment')) {
       assessmentCount += 1
-      return json({ correct: false })
+      return json({ correct: false, accuracyScore: 76, completenessScore: 100, feedbackMode: 'phoneme', words: [{ text: 'go', accuracyScore: 76, errorType: 'Mispronunciation', units: [{ text: 'ɡ', correct: false }, { text: 'oʊ', correct: true }] }] })
     }
     if (path.endsWith('/review') && request.method() === 'POST') {
       reviewBodies.push(request.postDataJSON())
@@ -138,6 +141,8 @@ test('Review pronunciation submits after the second failed assessment and always
   await recordOnce(page)
   expect(reviewBodies).toHaveLength(0)
   await expect(page.getByText(/attempt 2 of 2/i)).toBeVisible()
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Skip' })).toBeVisible()
 
   await recordOnce(page)
   const recap = page.getByTestId('review-answer')
