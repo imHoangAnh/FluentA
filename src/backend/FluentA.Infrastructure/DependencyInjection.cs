@@ -160,13 +160,29 @@ public static class DependencyInjection
             out var configuredThreshold)
             ? configuredThreshold
             : 70d;
+        var completenessThreshold = double.TryParse(
+            configuration["AzureSpeech:CompletenessThreshold"],
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var configuredCompletenessThreshold)
+            ? configuredCompletenessThreshold
+            : 90d;
+        var wordAccuracyThreshold = double.TryParse(
+            configuration["AzureSpeech:WordAccuracyThreshold"],
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var configuredWordAccuracyThreshold)
+            ? configuredWordAccuracyThreshold
+            : 70d;
 
         return new PronunciationAssessmentOptions(
             configuration.GetValue<bool>("AzureSpeech:Enabled"),
             configuration["AzureSpeech:Region"]?.Trim() ?? string.Empty,
             configuration["AzureSpeech:SubscriptionKey"] ?? string.Empty,
             GetPositiveInt(configuration, "AzureSpeech:TimeoutSeconds", 10),
-            threshold);
+            threshold,
+            completenessThreshold,
+            wordAccuracyThreshold);
     }
 
     private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)

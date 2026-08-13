@@ -1,11 +1,11 @@
-import { Mic, RotateCcw, Square, TriangleAlert, Volume2 } from 'lucide-react'
+import { Mic, Square, TriangleAlert, Volume2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
-import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
+import { assessPronunciation, PronunciationFeedback, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 
 
@@ -57,9 +57,7 @@ export function PracticeSessionPage() {
   const [wordHasMistake, setWordHasMistake] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [pronunciationError, setPronunciationError] = useState<string | null>(null)
-  const [pronunciationAttempts, setPronunciationAttempts] = useState(0)
-  const [pronunciationRetryUsed, setPronunciationRetryUsed] = useState(false)
-  const [pronunciationPairExhausted, setPronunciationPairExhausted] = useState(false)
+  const [pronunciationFeedback, setPronunciationFeedback] = useState<PronunciationAssessment | null>(null)
   const [correctWords, setCorrectWords] = useState(0)
   const [wrongWords, setWrongWords] = useState(0)
   const [sessionCards, setSessionCards] = useState<FlashcardCard[]>([])
@@ -114,9 +112,7 @@ export function PracticeSessionPage() {
     setResolvedOutcome(null)
     setWordHasMistake(false)
     setPronunciationError(null)
-    setPronunciationAttempts(0)
-    setPronunciationRetryUsed(false)
-    setPronunciationPairExhausted(false)
+    setPronunciationFeedback(null)
     setIsRecording(false)
     setCorrectWords(0)
     setWrongWords(0)
@@ -131,9 +127,7 @@ export function PracticeSessionPage() {
     setFeedback(null)
     setResolvedOutcome(null)
     setPronunciationError(null)
-    setPronunciationAttempts(0)
-    setPronunciationRetryUsed(false)
-    setPronunciationPairExhausted(false)
+    setPronunciationFeedback(null)
     void recordingRef.current?.cancel()
     recordingRef.current = null
     setIsRecording(false)
@@ -202,8 +196,7 @@ export function PracticeSessionPage() {
 
     try {
       const result = await pronunciationMutation.mutateAsync({ wordId: currentCard.wordId, audio })
-      const nextAttempt = pronunciationAttempts + 1
-      setPronunciationAttempts(nextAttempt)
+      setPronunciationFeedback(result)
       if (result.correct) {
         continueResolvedStep()
         return
@@ -211,11 +204,10 @@ export function PracticeSessionPage() {
 
       setFeedback('wrong')
       setWordHasMistake(true)
-      if (nextAttempt >= 2) setPronunciationPairExhausted(true)
     } catch {
       setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
     }
-  }, [continueResolvedStep, currentCard, pronunciationAttempts, pronunciationMutation])
+  }, [continueResolvedStep, currentCard, pronunciationMutation])
 
   const startRecording = useCallback(async () => {
     setPronunciationError(null)
@@ -227,15 +219,6 @@ export function PracticeSessionPage() {
       setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
   }, [handlePronunciationAudio, pronunciationMutation])
-
-  function retryPronunciationPair() {
-    setPronunciationRetryUsed(true)
-    setPronunciationAttempts(0)
-    setPronunciationPairExhausted(false)
-    setFeedback(null)
-    setPronunciationError(null)
-    pronunciationMutation.reset()
-  }
 
   async function addCurrentWordToReview() {
     if (!sessionQuery.data || !currentCard) return
@@ -265,7 +248,7 @@ export function PracticeSessionPage() {
     if (!sessionStarted || !currentCard) return
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Tab') {
+      if (event.key === 'Tab' && currentStep !== 'meaningToWord' && currentStep !== 'recap') {
         event.preventDefault()
         speakWord(currentCard.word, language)
         return
@@ -302,7 +285,7 @@ export function PracticeSessionPage() {
       if ((event.key === 'r' || event.key === 'R') && currentStep === 'pronunciation') {
         const target = event.target as HTMLElement | null
         const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !pronunciationPairExhausted && !resolvedOutcome) {
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !resolvedOutcome) {
           event.preventDefault()
           void startRecording()
         }
@@ -317,7 +300,7 @@ export function PracticeSessionPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [advanceAfterRecap, continueResolvedStep, currentCard, currentIndex, currentStep, finishPractice, isRecording, language, pronunciationMutation.isPending, pronunciationPairExhausted, recordingSupported, revealAndSkip, resolvedOutcome, sessionCards.length, sessionStarted, startRecording, submitTypedAnswer, typedAnswer, wordHasMistake])
+  }, [advanceAfterRecap, continueResolvedStep, currentCard, currentIndex, currentStep, finishPractice, isRecording, language, pronunciationMutation.isPending, recordingSupported, revealAndSkip, resolvedOutcome, sessionCards.length, sessionStarted, startRecording, submitTypedAnswer, typedAnswer, wordHasMistake])
 
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
@@ -401,19 +384,20 @@ export function PracticeSessionPage() {
                     <div className="review-pronunciation-target">
                       <strong>{currentCard.word}</strong>
                       {hasText(currentCard.ipaPronunciation) ? <span>{formatIpa(currentCard.ipaPronunciation)}</span> : null}
-                      <button type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentCard.word, language)}><Volume2 size={20} /></button>
                     </div>
+                    <PronunciationFeedback assessment={pronunciationFeedback} />
                     {!recordingSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
                     <div className="review-pronunciation-controls">
-                      <button className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`} type="button" aria-label="Start recording" title="Record (R)" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || pronunciationPairExhausted || !recordingSupported}>
+                      <button className="review-pronunciation-play-button" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={() => speakWord(currentCard.word, language)}>
+                        <Volume2 size={20} />
+                      </button>
+                      <button className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`} type="button" aria-label="Start recording" aria-keyshortcuts="R" title="Record (R)" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || !recordingSupported}>
                         <Mic size={22} />
                       </button>
-                      <button className="review-stop-button" type="button" aria-label="Stop recording" title="Stop (Space)" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
+                      <button className="review-stop-button" type="button" aria-label="Stop recording" aria-keyshortcuts="Space" title="Stop (Space)" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
                         <Square size={18} fill="currentColor" />
                       </button>
                     </div>
-                    <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2{pronunciationRetryUsed ? ' · retry pair' : ''}</span>
-                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
                     {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
                   </div>
                 )}
@@ -447,7 +431,7 @@ export function PracticeSessionPage() {
                   </div>
                 ) : (
                   <div className="review-exercise__actions">
-                    {pronunciationPairExhausted && !resolvedOutcome && !pronunciationRetryUsed ? <button className="practice-dictation-skip" type="button" onClick={retryPronunciationPair}><RotateCcw size={16} /> Retry · 2 more attempts</button> : null}
+                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong</p> : null}
                     {!resolvedOutcome ? <button className="practice-dictation-skip" type="button" onClick={revealAndSkip}>Skip</button> : null}
                     {resolvedOutcome ? <button className="practice-dictation-submit" type="button" onClick={continueResolvedStep}>Continue</button> : null}
                   </div>
@@ -455,7 +439,7 @@ export function PracticeSessionPage() {
               </div>
             )}
           </article>
-          {isDictationStep ? <p className="practice-session__shortcut">Shortcut: Tab to replay · Enter to submit · Esc to skip.</p> : null}
+          <ShortcutGuide mode={currentStep} />
         </section>
       ) : null}
     </>

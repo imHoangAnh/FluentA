@@ -2,12 +2,27 @@ namespace FluentA.Application.BoundedContexts.Pronunciation;
 
 public interface IPronunciationAssessmentProvider
 {
-    Task<double> AssessAsync(
+    Task<PronunciationAssessment> AssessAsync(
         string referenceText,
         string locale,
         ReadOnlyMemory<byte> wavAudio,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record PronunciationAssessment(
+    double AccuracyScore,
+    double? CompletenessScore,
+    IReadOnlyList<PronunciationWordAssessment> Words);
+
+public sealed record PronunciationWordAssessment(
+    string Text,
+    double AccuracyScore,
+    string? ErrorType,
+    IReadOnlyList<PronunciationUnitAssessment> Units);
+
+public sealed record PronunciationUnitAssessment(
+    string Text,
+    double AccuracyScore);
 
 public sealed class PronunciationProviderException : Exception
 {

@@ -66,7 +66,7 @@ test('E29 uses one shared surface rhythm across Dictation, Meaning, Pronunciatio
   await expect(page.getByText('/ˈmɪt.ɪ.ɡeɪt/')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip' }).click()
-  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
+  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Continue' }).click()
 
   const recap = page.getByTestId('practice-answer-reveal')

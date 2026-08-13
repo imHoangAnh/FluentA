@@ -8892,6 +8892,93 @@
   text-align: center;
 }
 
+.practice-session__shortcut kbd {
+  display: inline-flex;
+  min-width: 1.5rem;
+  min-height: 1.25rem;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+  border: 1px solid #d5dfe7;
+  border-bottom-width: 2px;
+  border-radius: 0.3rem;
+  background: #ffffff;
+  color: #52677b;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.review-pronunciation-play-button {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--review-mode-accent) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #ffffff 68%, transparent);
+  color: var(--review-mode-accent);
+  cursor: pointer;
+}
+
+.review-pronunciation-play-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--review-mode-accent) 28%, transparent);
+  outline-offset: 3px;
+}
+
+.pronunciation-feedback-row {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--ds-foreground);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 650;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.pronunciation-feedback-word {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.12rem;
+  justify-content: center;
+}
+
+.pronunciation-feedback-unit {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.pronunciation-feedback-unit--correct {
+  color: #16836b;
+}
+
+.pronunciation-feedback-unit--wrong {
+  color: #c0392b;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12rem;
+  text-underline-offset: 0.18rem;
+}
+
+@media (max-width: 40rem) {
+  .review-pronunciation-play-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .practice-session__shortcut {
+    padding-inline: 0.5rem;
+    line-height: 1.8;
+  }
+}
+
 .practice-wrong-message {
   width: fit-content;
   max-width: 100%;

@@ -22,12 +22,15 @@ public sealed class PronunciationServiceTests
     }
 
     [Theory]
-    [InlineData(69.99, false)]
-    [InlineData(70, true)]
+    [InlineData(79.99, false)]
+    [InlineData(80, true)]
     public async Task Service_ClassifiesOnlyAtConfiguredAccuracyThreshold(double score, bool expectedCorrect)
     {
         var repository = new StubWordRepository(new PronunciationTarget("go", "en"));
-        var provider = new StubProvider(score);
+        var provider = new StubProvider(new PronunciationAssessment(
+            score,
+            100,
+            [new PronunciationWordAssessment("go", score, "None", [new PronunciationUnitAssessment("go", score)])]));
         var service = new PronunciationService(repository, provider, EnabledOptions());
 
         var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
@@ -36,6 +39,37 @@ public sealed class PronunciationServiceTests
         Assert.Equal(expectedCorrect, result.Value!.Correct);
         Assert.Equal("go", provider.ReferenceText);
         Assert.Equal("en-US", provider.Locale);
+    }
+
+    [Theory]
+    [InlineData(80, 90, 70, "None", true)]
+    [InlineData(79.99, 100, 95, "None", false)]
+    [InlineData(86, 89.99, 95, "None", false)]
+    [InlineData(86, 100, 69.99, "None", false)]
+    [InlineData(86, 100, 95, "Omission", false)]
+    [InlineData(86, 100, 95, "Insertion", false)]
+    public async Task Service_AppliesPhraseAccuracyCompletenessWordAndMiscueRules(
+        double accuracy,
+        double completeness,
+        double weakWordScore,
+        string errorType,
+        bool expectedCorrect)
+    {
+        var words = new[]
+        {
+            new PronunciationWordAssessment("take", 95, "None", []),
+            new PronunciationWordAssessment("care", weakWordScore, errorType, []),
+            new PronunciationWordAssessment("of", 95, "None", []),
+        };
+        var service = new PronunciationService(
+            new StubWordRepository(new PronunciationTarget("take care of", "en")),
+            new StubProvider(new PronunciationAssessment(accuracy, completeness, words)),
+            EnabledOptions());
+
+        var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expectedCorrect, result.Value!.Correct);
     }
 
     [Fact]
@@ -56,7 +90,7 @@ public sealed class PronunciationServiceTests
     [Fact]
     public async Task Service_RejectsForeignWordBeforeCallingProvider()
     {
-        var provider = new StubProvider(100);
+        var provider = new StubProvider(new PronunciationAssessment(100, 100, []));
         var service = new PronunciationService(new StubWordRepository(null), provider, EnabledOptions());
 
         var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
@@ -70,7 +104,7 @@ public sealed class PronunciationServiceTests
     {
         var handler = new RecordingHandler(
             """
-            {"RecognitionStatus":"Success","NBest":[{"AccuracyScore":82.5}]}
+            {"RecognitionStatus":"Success","NBest":[{"PronunciationAssessment":{"AccuracyScore":82.5,"CompletenessScore":100},"Words":[{"Word":"go","PronunciationAssessment":{"AccuracyScore":82.5,"ErrorType":"None"},"Syllables":[{"Phonemes":[{"Phoneme":"ɡ","PronunciationAssessment":{"AccuracyScore":90}},{"Phoneme":"oʊ","PronunciationAssessment":{"AccuracyScore":80}}]}]}]}]}
             """);
         var provider = new AzurePronunciationAssessmentProvider(
             new HttpClient(handler),
@@ -78,19 +112,24 @@ public sealed class PronunciationServiceTests
             NullLogger<AzurePronunciationAssessmentProvider>.Instance);
         var audio = CreatePcmWav(500);
 
-        var score = await provider.AssessAsync("go", "en-US", audio);
+        var assessment = await provider.AssessAsync("go", "en-US", audio);
 
-        Assert.Equal(82.5, score);
+        Assert.Equal(82.5, assessment.AccuracyScore);
+        Assert.Equal("go", assessment.Words[0].Text);
+        Assert.Equal("oʊ", assessment.Words[0].Units[1].Text);
         Assert.Equal("centralus.stt.speech.microsoft.com", handler.Host);
         Assert.Equal("test-key", handler.SubscriptionKey);
         Assert.Equal("audio/wav; codecs=audio/pcm; samplerate=16000", handler.ContentType);
         Assert.Equal(audio, handler.Body);
         Assert.Contains("\"ReferenceText\":\"go\"", handler.AssessmentJson, StringComparison.Ordinal);
         Assert.Contains("\"EnableProsodyAssessment\":false", handler.AssessmentJson, StringComparison.Ordinal);
+        Assert.Contains("\"Granularity\":\"Phoneme\"", handler.AssessmentJson, StringComparison.Ordinal);
+        Assert.Contains("\"Dimension\":\"Comprehensive\"", handler.AssessmentJson, StringComparison.Ordinal);
+        Assert.Contains("\"EnableMiscue\":true", handler.AssessmentJson, StringComparison.Ordinal);
     }
 
     private static PronunciationAssessmentOptions EnabledOptions() =>
-        new(true, "centralus", "test-key", 10, 70);
+        new(true, "centralus", "test-key", 10, 80, 90, 70);
 
     private static byte[] CreatePcmWav(int durationMilliseconds)
     {
@@ -122,12 +161,12 @@ public sealed class PronunciationServiceTests
 
     private sealed class StubProvider : IPronunciationAssessmentProvider
     {
-        private readonly double _score;
+        private readonly PronunciationAssessment? _assessment;
         private readonly Exception? _exception;
 
-        public StubProvider(double score)
+        public StubProvider(PronunciationAssessment assessment)
         {
-            _score = score;
+            _assessment = assessment;
         }
 
         public StubProvider(Exception exception)
@@ -138,7 +177,7 @@ public sealed class PronunciationServiceTests
         public string? ReferenceText { get; private set; }
         public string? Locale { get; private set; }
 
-        public Task<double> AssessAsync(string referenceText, string locale, ReadOnlyMemory<byte> wavAudio, CancellationToken cancellationToken = default)
+        public Task<PronunciationAssessment> AssessAsync(string referenceText, string locale, ReadOnlyMemory<byte> wavAudio, CancellationToken cancellationToken = default)
         {
             ReferenceText = referenceText;
             Locale = locale;
@@ -147,7 +186,7 @@ public sealed class PronunciationServiceTests
                 throw _exception;
             }
 
-            return Task.FromResult(_score);
+            return Task.FromResult(_assessment!);
         }
     }
 
