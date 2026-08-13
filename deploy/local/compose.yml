@@ -1,0 +1,214 @@
+name: fluenta-local
+
+x-logging: &bounded-json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-common-security: &common-security
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    logging: *bounded-json-logging
+    <<: *common-security
+
+  migrations:
+    build:
+      context: ../../src/backend
+      dockerfile: Dockerfile
+      target: migrations
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    environment:
+      DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp/bundle
+      FLUENTA_POSTGRES: Host=postgres;Port=5432;Database=${POSTGRES_DB:?POSTGRES_DB is required};Username=${POSTGRES_USER:?POSTGRES_USER is required};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};SSL Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    logging: *bounded-json-logging
+    <<: *common-security
+
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    command: server /data --address ":59000" --console-address ":59001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_API_CORS_ALLOW_ORIGIN: https://localhost:${FLUENTA_HTTPS_PORT:-7443}
+    ports:
+      - "${MINIO_API_PORT:-59000}:59000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-59001}:59001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - assets
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:59000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    logging: *bounded-json-logging
+    <<: *common-security
+
+  minio-bootstrap:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-fluenta-assets-local}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://minio:59000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - assets
+    logging: *bounded-json-logging
+    <<: *common-security
+
+  api:
+    build:
+      context: ../../src/backend
+      dockerfile: Dockerfile
+      target: final
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB:?POSTGRES_DB is required};Username=${POSTGRES_USER:?POSTGRES_USER is required};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};SSL Mode=Disable
+      Database__Postgres__ApplicationName: FluentA.Api.LocalDocker
+      Database__Postgres__MinPoolSize: "0"
+      Database__Postgres__MaxPoolSize: "15"
+      Database__Postgres__ConnectionTimeoutSeconds: "15"
+      Database__Postgres__CommandTimeoutSeconds: "30"
+      Hangfire__WorkerCount: "2"
+      AssetStorage__Enabled: "true"
+      AssetStorage__Provider: Minio
+      AssetStorage__Endpoint: http://host.docker.internal:${MINIO_API_PORT:-59000}
+      AssetStorage__Bucket: ${MINIO_BUCKET:-fluenta-assets-local}
+      AssetStorage__AccessKey: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      AssetStorage__SecretKey: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      AssetStorage__Region: us-east-1
+      AssetStorage__UsePathStyle: "true"
+      Frontend__BaseUrl: https://localhost:${FLUENTA_HTTPS_PORT:-7443}
+      Frontend__Origins__0: https://localhost:${FLUENTA_HTTPS_PORT:-7443}
+      Jwt__Key: ${JWT_KEY:?JWT_KEY is required}
+      Jwt__Issuer: FluentA
+      Jwt__Audience: FluentA.Web
+      Authentication__OtpHashKey: ${OTP_HASH_KEY:?OTP_HASH_KEY is required}
+      Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      Resend__ApiKey: ${RESEND_API_KEY:?RESEND_API_KEY is required}
+      Resend__From: ${RESEND_FROM:?RESEND_FROM is required}
+      AzureSpeech__Enabled: "true"
+      AzureSpeech__Region: ${AZURE_SPEECH_REGION:?AZURE_SPEECH_REGION is required}
+      AzureSpeech__SubscriptionKey: ${AZURE_SPEECH_SUBSCRIPTION_KEY:?AZURE_SPEECH_SUBSCRIPTION_KEY is required}
+      AzureSpeech__TimeoutSeconds: "10"
+      AzureSpeech__AccuracyThreshold: "70"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      minio-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - edge
+      - data
+      - assets
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080;
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          grep -q '200 OK' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    logging: *bounded-json-logging
+    <<: *common-security
+
+  web:
+    build:
+      context: ../../src/frontend
+      dockerfile: Dockerfile.local-runtime
+      args:
+        VITE_API_URL: https://localhost:${FLUENTA_HTTPS_PORT:-7443}/api/v1
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    ports:
+      - "127.0.0.1:${FLUENTA_HTTPS_PORT:-7443}:7443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--no-check-certificate", "--output-document=-", "https://localhost:7443/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *bounded-json-logging
+    <<: *common-security
+
+networks:
+  edge:
+  data:
+    internal: true
+  assets:
+
+volumes:
+  postgres_data:
+  minio_data:
+  caddy_data:
+  caddy_config:

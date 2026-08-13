@@ -80,11 +80,37 @@ flows.
 
 ### Prerequisites
 
-- .NET 10 SDK
-- Node.js and npm
 - Docker with Docker Compose
+- A Google Identity Services Web client ID for Google login
+- A Resend API key and verified sender for registration OTP/password reset
+- An Azure Speech region and subscription key for pronunciation assessment
 
-### 1. Install dependencies
+### Full local Docker stack
+
+The packaged local runtime builds and starts the frontend, API/Hangfire,
+automatic EF migration, a new PostgreSQL database, and private MinIO storage.
+It does not use AWS services.
+
+From the repository root:
+
+```powershell
+.\deploy\local\start.ps1 -Detach
+```
+
+On first run, enter the Google web client ID, Resend key/sender, and Azure
+Speech region/key directly in the terminal. The script generates the remaining
+local secrets in ignored
+`deploy/local/.env`. Open `https://localhost:7443`; accept the local Caddy
+certificate warning only for `localhost`. See
+[the local Docker runbook](deploy/local/README.md) for status, logs, stop, and
+database-reset commands.
+
+### Host development workflow
+
+Use this workflow when running the API and Vite directly for source-level
+development. It additionally requires the .NET 10 SDK, Node.js, and npm.
+
+#### 1. Install dependencies
 
 Run from the repository root:
 
@@ -94,7 +120,7 @@ npm --prefix src/frontend install
 Copy-Item src/frontend/.env.example src/frontend/.env.local
 ```
 
-### 2. Start local infrastructure
+#### 2. Start local infrastructure
 
 ```powershell
 docker compose -f docker-compose.dev.yml up -d
@@ -105,7 +131,7 @@ The FluentA development database is `fluenta_dev`, exposed on
 `localhost:5432`, and persisted in the Docker volume
 `fluenta-postgres-dev-data`.
 
-### 3. Apply database migrations
+#### 3. Apply database migrations
 
 ```powershell
 dotnet tool restore
@@ -114,7 +140,7 @@ dotnet tool run dotnet-ef database update `
   --startup-project src/backend/FluentA.API
 ```
 
-### 4. Start the API
+#### 4. Start the API
 
 ```powershell
 dotnet run --project src/backend/FluentA.API --launch-profile https
@@ -123,7 +149,7 @@ dotnet run --project src/backend/FluentA.API --launch-profile https
 The API is available at `https://localhost:7000`; its development OpenAPI
 document is at `https://localhost:7000/openapi/v1.json`.
 
-### 5. Start the frontend
+#### 5. Start the frontend
 
 Open another terminal at the repository root:
 

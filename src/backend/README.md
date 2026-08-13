@@ -29,6 +29,11 @@ object storage private lưu asset: MinIO ở Development và AWS S3 ở Producti
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
+Để chạy toàn bộ frontend, API/Hangfire, migration, PostgreSQL mới và MinIO chỉ
+bằng Docker, dùng `deploy/local/start.ps1` theo
+[local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
+chạy backend trực tiếp trên host khi phát triển source.
+
 ### 4.1. Yêu cầu
 
 - .NET 10 SDK.
