@@ -31,15 +31,15 @@ export function NotificationsPage() {
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <Button type="button" variant="outline" size="sm" disabled={unreadCount === 0 || readAll.isPending} onClick={() => readAll.mutate()}>
-          <CheckCheck /> {readAll.isPending ? 'Marking read…' : 'Mark all read'}
-        </Button>
-      </div>
       <Card>
-        <CardHeader className="border-b border-border">
-          <CardTitle>Inbox</CardTitle>
-          <CardDescription>{unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.` : 'Your inbox is up to date.'}</CardDescription>
+        <CardHeader className="border-b border-border sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <CardTitle>Inbox</CardTitle>
+            <CardDescription>{unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.` : 'Your inbox is up to date.'}</CardDescription>
+          </div>
+          <Button className="shrink-0 self-start" type="button" variant="outline" size="sm" disabled={unreadCount === 0 || readAll.isPending} onClick={() => readAll.mutate()}>
+            <CheckCheck /> {readAll.isPending ? 'Marking read…' : 'Mark all read'}
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {query.isLoading ? <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground" aria-busy="true"><LoaderCircle className="size-4 animate-spin" /> Loading notifications…</div> : null}
