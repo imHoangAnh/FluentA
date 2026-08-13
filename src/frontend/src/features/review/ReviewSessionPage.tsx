@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
-import { assessPronunciation, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
+import { assessPronunciation, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 
@@ -68,6 +68,7 @@ export function ReviewSessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
+  const [pronunciationFailed, setPronunciationFailed] = useState(false)
   const [pronunciationError, setPronunciationError] = useState<string | null>(null)
   const [correctCount, setCorrectCount] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
@@ -107,6 +108,7 @@ export function ReviewSessionPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTypedAnswer('')
     setFeedback(null)
+    setPronunciationFailed(false)
     setPronunciationError(null)
     setPronunciationAttempts(0)
     setShowRecap(false)
@@ -134,6 +136,7 @@ export function ReviewSessionPage() {
     setCurrentIndex(0)
     setTypedAnswer('')
     setFeedback(null)
+    setPronunciationFailed(false)
     setPronunciationError(null)
     setCorrectCount(0)
     setWrongCount(0)
@@ -151,6 +154,7 @@ export function ReviewSessionPage() {
     setRecapEnabled(true)
     setTypedAnswer('')
     setFeedback(null)
+    setPronunciationFailed(false)
     setPronunciationError(null)
     setCorrectCount(0)
     setWrongCount(0)
@@ -227,6 +231,8 @@ export function ReviewSessionPage() {
         await submitOutcome(true)
       } else if (attempts >= 2) {
         await submitOutcome(false)
+      } else {
+        setPronunciationFailed(true)
       }
     } catch {
       setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
@@ -265,7 +271,7 @@ export function ReviewSessionPage() {
     if (!session || !currentWord || completed) return
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Tab') {
+      if (event.key === 'Tab' && currentWord.mode !== 'meaningToWord' && !showRecap) {
         event.preventDefault()
         speakWord(currentWord.word, currentLanguage)
         return
@@ -285,7 +291,7 @@ export function ReviewSessionPage() {
         return
       }
 
-      if (event.key === 'Escape' && currentWord.mode === 'dictation' && !showRecap && !feedback && !isAutoAdvancing) {
+      if (event.key === 'Escape' && !showRecap && !isAutoAdvancing && !isRecording && !submitReviewMutation.isPending) {
         event.preventDefault()
         void submitOutcome(false)
         return
@@ -294,7 +300,7 @@ export function ReviewSessionPage() {
       if ((event.key === 'r' || event.key === 'R') && currentWord.mode === 'pronunciation') {
         const target = event.target as HTMLElement | null
         const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && pronunciationAttempts < 2) {
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !isAutoAdvancing && pronunciationAttempts < 2) {
           event.preventDefault()
           void startRecording()
         }
@@ -309,7 +315,7 @@ export function ReviewSessionPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [checkTypedAnswer, completed, currentLanguage, currentWord, feedback, isAutoAdvancing, isRecording, moveToNextWord, pronunciationAttempts, pronunciationMutation.isPending, recordingSupported, session, showRecap, startRecording, submitOutcome, typedAnswer])
+  }, [checkTypedAnswer, completed, currentLanguage, currentWord, feedback, isAutoAdvancing, isRecording, moveToNextWord, pronunciationAttempts, pronunciationMutation.isPending, recordingSupported, session, showRecap, startRecording, submitOutcome, submitReviewMutation.isPending, typedAnswer])
 
   const noBoardSelected = !boardId
   const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0
@@ -540,12 +546,12 @@ export function ReviewSessionPage() {
                       <div className="review-pronunciation-target">
                         <strong>{currentWord.word}</strong>
                         {hasText(currentWord.ipaPronunciation) ? <span>{formatIpa(currentWord.ipaPronunciation)}</span> : null}
-                        <button type="button" aria-label="Play pronunciation" title="Play audio (Tab)" onClick={() => speakWord(currentWord.word, currentLanguage)}>
-                          <Volume2 size={20} />
-                        </button>
                       </div>
 
                       <div className="review-pronunciation-controls">
+                        <button className="review-pronunciation-play-button" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={() => speakWord(currentWord.word, currentLanguage)}>
+                          <Volume2 size={20} />
+                        </button>
                         <button
                           className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`}
                           type="button"
@@ -601,6 +607,7 @@ export function ReviewSessionPage() {
                     </div>
                   ) : (
                     <div className="review-exercise__actions">
+                      {pronunciationFailed ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong</p> : null}
                       <button className="practice-dictation-skip" type="button" onClick={() => void submitOutcome(false)} disabled={isAutoAdvancing || isRecording || pronunciationMutation.isPending || submitReviewMutation.isPending}>
                         Skip
                       </button>
@@ -610,9 +617,7 @@ export function ReviewSessionPage() {
               )}
             </article>
 
-            {currentWord.mode === 'dictation' && !feedback && !showRecap ? (
-              <p className="practice-session__shortcut">Shortcut: Tab to replay · Enter to submit · Esc to skip.</p>
-            ) : null}
+            {!feedback ? <ShortcutGuide mode={showRecap ? 'recap' : currentWord.mode === 'random' ? 'dictation' : currentWord.mode} /> : null}
 
             {submitReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to record this answer. Try again.</p> : null}
           </section>
