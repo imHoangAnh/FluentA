@@ -20,7 +20,6 @@ export const settingsRoutes: RouteObject[] = [
     path: 'settings',
     handle: appShellRoute({
       title: 'Settings',
-      description: 'Manage your learning preferences.',
     }),
     Component: SettingsLayout,
     children: [
