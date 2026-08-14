@@ -1,12 +1,13 @@
 using FluentA.Domain.BoundedContexts.Notification.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NotificationEntity = FluentA.Domain.BoundedContexts.Notification.Entities.Notification;
 
 namespace FluentA.Infrastructure.Persistence.Configurations;
 
-public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>
+public sealed class NotificationConfiguration : IEntityTypeConfiguration<NotificationEntity>
 {
-    public void Configure(EntityTypeBuilder<Notification> builder)
+    public void Configure(EntityTypeBuilder<NotificationEntity> builder)
     {
         builder.ToTable("notifications");
         builder.HasKey(x => x.Id);
