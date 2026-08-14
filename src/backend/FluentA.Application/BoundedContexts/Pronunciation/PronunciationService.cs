@@ -83,6 +83,10 @@ public sealed class PronunciationService : IPronunciationService
                     feedbackMode,
                     words));
         }
+        catch (PronunciationNotRecognizedException)
+        {
+            return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.NotRecognized());
+        }
         catch (PronunciationProviderException)
         {
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.ProviderUnavailable());

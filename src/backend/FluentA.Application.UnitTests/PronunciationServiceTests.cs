@@ -88,6 +88,21 @@ public sealed class PronunciationServiceTests
     }
 
     [Fact]
+    public async Task Service_MapsUnrecognizedSpeechToRetryableClientError()
+    {
+        var service = new PronunciationService(
+            new StubWordRepository(new PronunciationTarget("go", "en")),
+            new StubProvider(new PronunciationNotRecognizedException(PronunciationNotRecognizedReason.NoMatch)),
+            EnabledOptions());
+
+        var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
+
+        var error = Assert.IsType<PronunciationError>(result.Error);
+        Assert.Equal(422, error.StatusCode);
+        Assert.Equal("PRONUNCIATION_NOT_RECOGNIZED", error.Code);
+    }
+
+    [Fact]
     public async Task Service_RejectsForeignWordBeforeCallingProvider()
     {
         var provider = new StubProvider(new PronunciationAssessment(100, 100, []));
@@ -100,11 +115,11 @@ public sealed class PronunciationServiceTests
     }
 
     [Fact]
-    public async Task AzureProvider_SendsServerOwnedAssessmentContractAndReadsAccuracyScore()
+    public async Task AzureProvider_SendsServerOwnedAssessmentContractAndReadsFlatRestResponse()
     {
         var handler = new RecordingHandler(
             """
-            {"RecognitionStatus":"Success","NBest":[{"PronunciationAssessment":{"AccuracyScore":82.5,"CompletenessScore":100},"Words":[{"Word":"go","PronunciationAssessment":{"AccuracyScore":82.5,"ErrorType":"None"},"Syllables":[{"Phonemes":[{"Phoneme":"ɡ","PronunciationAssessment":{"AccuracyScore":90}},{"Phoneme":"oʊ","PronunciationAssessment":{"AccuracyScore":80}}]}]}]}]}
+            {"RecognitionStatus":"Success","NBest":[{"AccuracyScore":82.5,"CompletenessScore":100,"Words":[{"Word":"go","AccuracyScore":82.5,"ErrorType":"None","Phonemes":[{"Phoneme":"ɡ","AccuracyScore":90},{"Phoneme":"oʊ","AccuracyScore":80}]}]}]}
             """);
         var provider = new AzurePronunciationAssessmentProvider(
             new HttpClient(handler),
@@ -119,6 +134,7 @@ public sealed class PronunciationServiceTests
         Assert.Equal("oʊ", assessment.Words[0].Units[1].Text);
         Assert.Equal("centralus.stt.speech.microsoft.com", handler.Host);
         Assert.Equal("test-key", handler.SubscriptionKey);
+        Assert.Equal("application/json", handler.Accept);
         Assert.Equal("audio/wav; codecs=audio/pcm; samplerate=16000", handler.ContentType);
         Assert.Equal(audio, handler.Body);
         Assert.Contains("\"ReferenceText\":\"go\"", handler.AssessmentJson, StringComparison.Ordinal);
@@ -126,6 +142,46 @@ public sealed class PronunciationServiceTests
         Assert.Contains("\"Granularity\":\"Phoneme\"", handler.AssessmentJson, StringComparison.Ordinal);
         Assert.Contains("\"Dimension\":\"Comprehensive\"", handler.AssessmentJson, StringComparison.Ordinal);
         Assert.Contains("\"EnableMiscue\":true", handler.AssessmentJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AzureProvider_RetainsNestedAssessmentCompatibility()
+    {
+        var handler = new RecordingHandler(
+            """
+            {"RecognitionStatus":0,"NBest":[{"PronunciationAssessment":{"AccuracyScore":82.5,"CompletenessScore":100},"Words":[{"Word":"go","PronunciationAssessment":{"AccuracyScore":82.5,"ErrorType":"None"},"Syllables":[{"Phonemes":[{"Phoneme":"ɡ","PronunciationAssessment":{"AccuracyScore":90}},{"Phoneme":"oʊ","PronunciationAssessment":{"AccuracyScore":80}}]}]}]}]}
+            """);
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler),
+            EnabledOptions(),
+            NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+
+        var assessment = await provider.AssessAsync("go", "en-US", CreatePcmWav(500));
+
+        Assert.Equal(82.5, assessment.AccuracyScore);
+        Assert.Equal("oʊ", assessment.Words[0].Units[1].Text);
+    }
+
+    [Theory]
+    [InlineData("NoMatch", PronunciationNotRecognizedReason.NoMatch)]
+    [InlineData("InitialSilenceTimeout", PronunciationNotRecognizedReason.InitialSilenceTimeout)]
+    [InlineData("BabbleTimeout", PronunciationNotRecognizedReason.BabbleTimeout)]
+    public async Task AzureProvider_MapsUnrecognizedSpeechWithoutTreatingItAsProviderFailure(
+        string recognitionStatus,
+        PronunciationNotRecognizedReason expectedReason)
+    {
+        var handler = new RecordingHandler($$"""
+            {"RecognitionStatus":"{{recognitionStatus}}"}
+            """);
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler),
+            EnabledOptions(),
+            NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+
+        var exception = await Assert.ThrowsAsync<PronunciationNotRecognizedException>(
+            () => provider.AssessAsync("go", "en-US", CreatePcmWav(500)));
+
+        Assert.Equal(expectedReason, exception.Reason);
     }
 
     private static PronunciationAssessmentOptions EnabledOptions() =>
@@ -195,6 +251,7 @@ public sealed class PronunciationServiceTests
         public string? Host { get; private set; }
         public string? SubscriptionKey { get; private set; }
         public string? ContentType { get; private set; }
+        public string? Accept { get; private set; }
         public byte[]? Body { get; private set; }
         public string? AssessmentJson { get; private set; }
 
@@ -203,6 +260,7 @@ public sealed class PronunciationServiceTests
             Host = request.RequestUri?.Host;
             SubscriptionKey = request.Headers.GetValues("Ocp-Apim-Subscription-Key").Single();
             ContentType = request.Content?.Headers.GetValues("Content-Type").Single();
+            Accept = request.Headers.Accept.Single().MediaType;
             Body = request.Content is null ? null : await request.Content.ReadAsByteArrayAsync(cancellationToken);
             var encodedAssessment = request.Headers.GetValues("Pronunciation-Assessment").Single();
             AssessmentJson = Encoding.UTF8.GetString(Convert.FromBase64String(encodedAssessment));

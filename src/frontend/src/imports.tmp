@@ -1,1 +1,0 @@
-import { Calendar, GraduationCap, BrainCircuit, Book, TrendingUp, NotebookPen, User, Settings, CalendarDays, ChevronLeft, ChevronRight, FilePlus2, Loader2, Save, Search, Trash2, X, Bell, Edit3, Type } from 'lucide-react'
