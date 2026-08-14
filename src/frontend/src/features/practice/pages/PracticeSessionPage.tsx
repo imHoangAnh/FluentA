@@ -1,12 +1,14 @@
-import { Mic, Square, TriangleAlert, Volume2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
-import { assessPronunciation, getPronunciationAssessmentErrorMessage, PronunciationFeedback, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
+import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
+import { PracticeModeSurface } from '../components/session/PracticeModeSurface'
+import { PracticeProgress } from '../components/session/PracticeProgress'
+import { PracticeRecap } from '../components/session/PracticeRecap'
 
 
 type PracticeOutcome = 'correct' | 'wrong'
@@ -15,19 +17,6 @@ type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
 function normalizeAnswer(value: string) {
   return value.trim().toLowerCase()
-}
-
-function formatIpa(value: string) {
-  const cleaned = value.trim().replace(/^\/+|\/+$/g, '')
-  return `/${cleaned}/`
-}
-
-function formatWordClass(value: string) {
-  return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
-}
-
-function hasText(value: string | null | undefined) {
-  return Boolean(value?.trim())
 }
 
 function speakWord(word: string, language: string) {
@@ -312,131 +301,43 @@ export function PracticeSessionPage() {
 
       {sessionStarted && currentCard ? (
         <section className={`review-session practice-session practice-session--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-session--focused' : ''}`}>
-          <div className="review-progress">
-            <div className="review-progress-header">
-              <span className="review-progress-order">{orderType === 'shuffle' ? 'Shuffle' : 'Sequential'}</span>
-              <strong className="review-progress-count">{currentIndex + 1} of {sessionCards.length}</strong>
-            </div>
-            <progress value={currentIndex + 1} max={sessionCards.length} />
-          </div>
-
+          <PracticeProgress orderLabel={orderType === 'shuffle' ? 'Shuffle' : 'Sequential'} currentIndex={currentIndex} totalCards={sessionCards.length} />
           <article className={`review-card review-card--${currentSurfaceMode} ${usesLargeSessionLayout ? 'learning-card--focused' : ''}`} data-testid="active-practice-card">
             {currentStep === 'recap' ? (
-              <div className="review-recap practice-recap" data-testid="practice-answer-reveal">
-                <header className="review-recap__header">
-                  <h2>
-                    {currentCard.word}
-                    {hasText(currentCard.wordClass) ? <span> ({formatWordClass(currentCard.wordClass)})</span> : null}
-                  </h2>
-                  {hasText(currentCard.ipaPronunciation) ? <p>{formatIpa(currentCard.ipaPronunciation)}</p> : null}
-                </header>
-
-                {hasText(currentCard.meaningEn) || hasText(currentCard.meaningVn) || hasText(currentCard.example) || hasText(currentCard.synonyms) || hasText(currentCard.antonyms) ? (
-                  <div className="review-recap__details practice-recap__details">
-                    {hasText(currentCard.meaningEn) ? <p><strong><em>Definition:</em></strong> {currentCard.meaningEn}</p> : null}
-                    {hasText(currentCard.meaningVn) ? <p><strong><em>Meaning:</em></strong> {currentCard.meaningVn}</p> : null}
-                    {hasText(currentCard.example) ? <p><strong><em>Example:</em></strong> {currentCard.example}</p> : null}
-                    {hasText(currentCard.synonyms) ? <p><strong><em>Synonyms:</em></strong> {currentCard.synonyms}</p> : null}
-                    {hasText(currentCard.antonyms) ? <p><strong><em>Antonyms:</em></strong> {currentCard.antonyms}</p> : null}
-                  </div>
-                ) : null}
-
-                <div className="practice-recap-actions">
-                  <button className="practice-recap__nav-button" type="button" onClick={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}>Previous</button>
-                  {currentReviewStatus === 'alreadyInReview' ? <button className="practice-recap__add-button" type="button" disabled>Already in Review</button>
-                    : currentReviewStatus === 'added' ? <button className="practice-recap__add-button" type="button" disabled>Added</button>
-                      : <button className="practice-recap__add-button" type="button" onClick={() => void addCurrentWordToReview()} disabled={addToReviewMutation.isPending}>Add to Review</button>}
-                  {currentIndex + 1 >= sessionCards.length ? (
-                    <button className="practice-recap__finish-button" type="button" onClick={() => void finishPractice()} disabled={saveSummaryMutation.isPending} data-testid="practice-next-card">Finish</button>
-                  ) : (
-                    <button className="practice-recap__nav-button" type="button" onClick={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')} data-testid="practice-next-card">Next</button>
-                  )}
-                </div>
-                {addToReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to add this word to Review. Try again.</p> : null}
-                {saveSummaryMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to save this practice result. Try again.</p> : null}
-              </div>
+              <PracticeRecap
+                card={currentCard}
+                reviewStatus={currentReviewStatus}
+                isAddingToReview={addToReviewMutation.isPending}
+                isSaving={saveSummaryMutation.isPending}
+                addError={addToReviewMutation.isError}
+                saveError={saveSummaryMutation.isError}
+                isLastCard={currentIndex + 1 >= sessionCards.length}
+                onPrevious={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}
+                onAddToReview={() => void addCurrentWordToReview()}
+                onNext={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')}
+                onFinish={() => void finishPractice()}
+              />
             ) : (
-              <div className="review-exercise">
-                <h2 className="review-exercise__prompt">
-                  {currentStep === 'dictation'
-                    ? 'Listen carefully, then type the word you hear'
-                    : currentStep === 'meaningToWord'
-                      ? 'What word matches this meaning?'
-                      : 'Say the word naturally'}
-                </h2>
-
-                {currentStep === 'dictation' ? (
-                  <div className="review-exercise__stage review-exercise__stage--dictation">
-                    <div className="practice-dictation-audio-control">
-                      <button className="review-audio-action" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" onClick={() => speakWord(currentCard.word, language)}>
-                        <Volume2 size={28} />
-                      </button>
-                      <span>Play</span>
-                    </div>
-                  </div>
-                ) : currentStep === 'meaningToWord' ? (
-                  <div className="review-exercise__stage review-meaning-card">
-                    {hasText(currentCard.meaningVn) ? <strong>{currentCard.meaningVn}</strong> : null}
-                    {hasText(currentCard.meaningEn) ? <p>{currentCard.meaningEn}</p> : null}
-                  </div>
-                ) : (
-                  <div className="review-exercise__stage review-pronunciation-stage">
-                    <div className="review-pronunciation-target">
-                      <strong>{currentCard.word}</strong>
-                      {hasText(currentCard.ipaPronunciation) ? <span>{formatIpa(currentCard.ipaPronunciation)}</span> : null}
-                    </div>
-                    <PronunciationFeedback assessment={pronunciationFeedback} />
-                    {!recordingSupported ? <p className="practice-mode-warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
-                    <div className="review-pronunciation-controls">
-                      <button className="review-pronunciation-play-button" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={() => speakWord(currentCard.word, language)}>
-                        <Volume2 size={20} />
-                      </button>
-                      <button className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`} type="button" aria-label="Start recording" aria-keyshortcuts="R" title="Record (R)" onClick={() => void startRecording()} disabled={isRecording || pronunciationMutation.isPending || !recordingSupported}>
-                        <Mic size={22} />
-                      </button>
-                      <button className="review-stop-button" type="button" aria-label="Stop recording" aria-keyshortcuts="Space" title="Stop (Space)" onClick={() => void recordingRef.current?.stop()} disabled={!isRecording}>
-                        <Square size={18} fill="currentColor" />
-                      </button>
-                    </div>
-                    {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
-                  </div>
-                )}
-
-                {currentStep !== 'pronunciation' ? (
-                  <div className="review-answer-form">
-                    {currentStep === 'meaningToWord' || null}
-                    <input
-                      id="practice-answer-input"
-                      value={typedAnswer}
-                      onChange={(event) => setTypedAnswer(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && normalizeAnswer(typedAnswer).length > 0) {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          submitTypedAnswer()
-                        }
-                      }}
-                      data-testid="practice-answer-input"
-                      placeholder={currentStep === 'meaningToWord' ? 'Type the word...' : 'Type your answer...'}
-                      disabled={Boolean(resolvedOutcome)}
-                    />
-                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong, please try again</p> : null}
-                    <div className="review-exercise__actions">
-                      <button className={usesLargeAnswerLayout ? 'practice-dictation-submit' : 'review-skip-button review-submit-button'} type="button" title="Submit answer (Enter)" onClick={submitTypedAnswer} disabled={normalizeAnswer(typedAnswer).length === 0 || Boolean(resolvedOutcome)}>
-                        {isDictationStep ? 'Submit Answer' : 'Submit'}
-                      </button>
-                      {!resolvedOutcome ? <button className={usesLargeAnswerLayout ? 'practice-dictation-skip' : 'review-skip-button'} type="button" onClick={revealAndSkip}>Skip</button> : null}
-                      {resolvedOutcome ? <button className="primary-button review-submit-button" type="button" onClick={continueResolvedStep}>Continue</button> : null}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="review-exercise__actions">
-                    {feedback === 'wrong' ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong</p> : null}
-                    {!resolvedOutcome ? <button className="practice-dictation-skip" type="button" onClick={revealAndSkip}>Skip</button> : null}
-                    {resolvedOutcome ? <button className="practice-dictation-submit" type="button" onClick={continueResolvedStep}>Continue</button> : null}
-                  </div>
-                )}
-              </div>
+              <PracticeModeSurface
+                mode={currentStep}
+                card={currentCard}
+                typedAnswer={typedAnswer}
+                feedback={feedback}
+                isResolved={Boolean(resolvedOutcome)}
+                usesLargeAnswerLayout={usesLargeAnswerLayout}
+                pronunciationFeedback={pronunciationFeedback}
+                recordingSupported={recordingSupported}
+                isRecording={isRecording}
+                isAssessmentPending={pronunciationMutation.isPending}
+                pronunciationError={pronunciationError}
+                onPlayAudio={() => speakWord(currentCard.word, language)}
+                onAnswerChange={setTypedAnswer}
+                onSubmit={submitTypedAnswer}
+                onSkip={revealAndSkip}
+                onContinue={continueResolvedStep}
+                onStartRecording={() => void startRecording()}
+                onStopRecording={() => void recordingRef.current?.stop()}
+              />
             )}
           </article>
           <ShortcutGuide mode={currentStep} />
