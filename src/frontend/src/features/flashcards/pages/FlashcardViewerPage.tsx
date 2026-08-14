@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import * as flashcardApi from '../api/flashcard.api'
+import { flashcardKeys } from '../api/flashcard.queries'
 import type { FlashcardCard } from '../api/flashcard.api'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { Button } from '@/shared/components/ui/button'
@@ -93,7 +94,7 @@ function FlashcardViewerPageContent({ pageId }: { pageId: string }) {
   const [shuffledOrder, setShuffledOrder] = useState<number[]>([])
 
   const sessionQuery = useQuery({
-    queryKey: ['flashcard', 'page-session', pageId],
+    queryKey: flashcardKeys.pageSession(pageId),
     queryFn: () => flashcardApi.getPageSession(pageId),
     enabled: Boolean(pageId),
   })

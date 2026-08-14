@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bell, Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
-import { createBrowserReminder } from '../todo-reminder'
+import { createBrowserReminder } from '../lib/todo-reminder'
 
 const repeatOptions: Array<{ value: TodoRepeatPattern | null; label: string }> = [
   { value: null, label: 'Does not repeat' },

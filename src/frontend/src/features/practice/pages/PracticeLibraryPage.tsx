@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
-import { LearningDeckLibrary, listBoards, type FlashcardBoard, type FlashcardPage, useFlashcardSync } from '@/features/flashcards'
+import { flashcardKeys, LearningDeckLibrary, listBoards, type FlashcardBoard, type FlashcardPage, useFlashcardSync } from '@/features/flashcards'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { PracticeLaunchDialog } from '../components/PracticeLaunchDialog'
@@ -11,7 +11,7 @@ export function PracticeLibraryPage() {
   useFlashcardSync()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: listBoards, refetchInterval: 1500 })
+  const decksQuery = useQuery({ queryKey: flashcardKeys.boards, queryFn: listBoards, refetchInterval: 1500 })
   const boardGroups = useMemo<FlashcardBoard[]>(() => decksQuery.data ?? [], [decksQuery.data])
   const requestedDeckId = searchParams.get('deck')
   const selectedPracticeDeck = useMemo<FlashcardPage | null>(() => {

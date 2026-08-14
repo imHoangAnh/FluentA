@@ -1,7 +1,7 @@
 import type { PracticeSettings } from '@/features/practice'
 import type { UserProfile } from '@/features/auth'
-import { apiClient } from '@/shared/lib/http/client'
-import type { ApiEnvelope } from '@/shared/types/api'
+import { apiClient } from '@/shared/api/client'
+import type { ApiEnvelope } from '@/shared/api/contracts'
 
 export type SettingsPayload = {
   profile: UserProfile

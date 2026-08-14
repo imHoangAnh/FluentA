@@ -1,6 +1,6 @@
 import { CalendarClock, CheckCircle2, Circle, Flame } from 'lucide-react'
 import type { Habit } from '../api/habit.api'
-import { canToggleHabit, formatShortDate, isScheduled } from '../habit-date'
+import { canToggleHabit, formatShortDate, isScheduled } from '../model/habit-date'
 import { HabitIconGlyph } from './habit-icons'
 
 type HabitListProps = {

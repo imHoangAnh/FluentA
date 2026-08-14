@@ -1,16 +1,17 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import * as todoApi from '../api/todo.api'
+import { todoKeys } from '../api/todo.queries'
 import { restoreTrashEntry } from '@/features/trash'
 import { MyDayView } from '../components/MyDayView'
 import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
 import { TodoSortMenu } from '../components/TodoSortMenu'
-import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../todo-date'
-import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../todo-sort'
+import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../model/todo-date'
+import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../model/todo-sort'
 import { TodoWeekView } from './TodoWeekView'
 import '../todo.css'
 
@@ -35,8 +36,8 @@ export function TodoPage() {
   const orderQueue = useRef<Promise<void>>(Promise.resolve())
 
   const dates = useMemo(() => weekDates(weekAnchor), [weekAnchor])
-  const dayKey = ['todo', 'items', today] as const
-  const weekKey = ['todo', 'range', dates[0], dates[6]] as const
+  const dayKey = todoKeys.day(today)
+  const weekKey = todoKeys.range(dates[0], dates[6])
 
   const todosQuery = useQuery({
     queryKey: dayKey,
@@ -51,7 +52,7 @@ export function TodoPage() {
   })
 
   const requestedTaskQuery = useQuery({
-    queryKey: ['todo-item', requestedTaskId],
+    queryKey: todoKeys.item(requestedTaskId),
     queryFn: () => todoApi.getTodo(requestedTaskId!),
     enabled: Boolean(requestedTaskId),
     retry: false,
@@ -66,8 +67,8 @@ export function TodoPage() {
 
   const refresh = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['todo'] }),
-      queryClient.invalidateQueries({ queryKey: ['todo-item'] }),
+      queryClient.invalidateQueries({ queryKey: todoKeys.all }),
+      queryClient.invalidateQueries({ queryKey: todoKeys.items }),
     ])
   }, [queryClient])
 
@@ -87,18 +88,18 @@ export function TodoPage() {
   const updateTodo = useMutation({
     mutationFn: (variables: { id: string; patch: todoApi.UpdateTodoInput }) => todoApi.updateTodo(variables.id, variables.patch),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ['todo'] })
-      const previous = queryClient.getQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] })
-      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
+      await queryClient.cancelQueries({ queryKey: todoKeys.all })
+      const previous = queryClient.getQueriesData<todoApi.TodoItem[]>({ queryKey: todoKeys.all })
+      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: todoKeys.all }, (items = []) =>
         items.map((item) => item.id === variables.id ? { ...item, ...variables.patch } : item),
       )
       return { previous }
     },
     onSuccess: (updated) => {
-      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
+      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: todoKeys.all }, (items = []) =>
         items.map((item) => item.id === updated.id ? updated : item),
       )
-      queryClient.setQueryData(['todo-item', updated.id], updated)
+      queryClient.setQueryData(todoKeys.item(updated.id), updated)
       if (updated.warningCode === 'recurrence-next-retained') {
         toast.warning('The edited next occurrence was kept. Both tasks now exist.')
       } else if (updated.warningCode === 'reminder-cleared-after-date-change') {
@@ -127,11 +128,11 @@ export function TodoPage() {
   const deleteTodo = useMutation({
     mutationFn: todoApi.deleteTodo,
     onSuccess: async (entry, deletedId) => {
-      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: ['todo'] }, (items = []) =>
+      queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: todoKeys.all }, (items = []) =>
         items.filter((item) => item.id !== deletedId),
       )
       if (selectedTaskId === deletedId) setSelectedTaskId(null)
-      queryClient.removeQueries({ queryKey: ['todo-item', deletedId] })
+      queryClient.removeQueries({ queryKey: todoKeys.item(deletedId) })
       setDeletingTask(null)
       await refresh()
       toast.success('Moved to Trash.', {

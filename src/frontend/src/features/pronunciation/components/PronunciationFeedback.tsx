@@ -1,4 +1,4 @@
-import type { PronunciationAssessment } from '../pronunciation.api'
+import type { PronunciationAssessment } from '../api/pronunciation.api'
 
 function cleanUnitText(value: string) {
   return value.trim().replace(/^\/+|\/+$/g, '')

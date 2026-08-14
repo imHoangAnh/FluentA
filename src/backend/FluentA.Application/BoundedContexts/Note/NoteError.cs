@@ -1,6 +1,6 @@
 namespace FluentA.Application.BoundedContexts.Note;
 
-public sealed record NoteError(string Code, string Message, int StatusCode, object? Details = null)
+public sealed record NoteError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static NoteError Validation(object details) =>
         new("VALIDATION_ERROR", "The request did not pass validation.", 422, details);

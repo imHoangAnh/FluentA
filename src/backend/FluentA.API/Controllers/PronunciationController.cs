@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
@@ -10,7 +11,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/pronunciation")]
-public sealed class PronunciationController : ControllerBase
+public sealed class PronunciationController : ApiControllerBase
 {
     private readonly IPronunciationService _pronunciation;
 
@@ -55,26 +56,4 @@ public sealed class PronunciationController : ControllerBase
         return buffer[..totalRead];
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToErrorResult(FluentA.Application.Common.OperationResult<PronunciationAssessmentDto> result)
-    {
-        if (result.Error is not PronunciationError error)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-
-        return StatusCode(
-            error.StatusCode,
-            ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message)));
-    }
 }

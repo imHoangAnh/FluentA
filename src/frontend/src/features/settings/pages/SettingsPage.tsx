@@ -1,8 +1,9 @@
 import { ImageMinus, Save, Upload } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as assetsApi from '../api/avatar-assets.api'
+import { uploadAsset } from '@/features/assets'
 import * as settingsApi from '../api/settings.api'
+import { settingsKeys } from '../api/settings.queries'
 import { SettingsErrorPanel, SettingsLoadingPanel } from '../components/SettingsPanel'
 import { SettingsSaveStatus } from '../components/SettingsSaveStatus'
 import { useAuthStore } from '@/features/auth'
@@ -28,7 +29,7 @@ export function SettingsPage() {
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
 
-  const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: settingsApi.getSettings })
+  const settingsQuery = useQuery({ queryKey: settingsKeys.all, queryFn: settingsApi.getSettings })
   const updateProfile = useMutation({
     mutationFn: async (profile: ProfileDraft) => {
       const validationError = validateProfileDraft(profile)
@@ -36,7 +37,7 @@ export function SettingsPage() {
 
       let avatarAssetId = profile.removeAvatar ? null : profile.avatarAssetId
       if (!profile.removeAvatar && profile.avatarFile && !avatarAssetId) {
-        const finalizedAsset = await assetsApi.uploadAvatarAsset(profile.avatarFile)
+        const finalizedAsset = await uploadAsset(profile.avatarFile, 'avatar')
         avatarAssetId = finalizedAsset.id
         setProfileDraft((current) => current?.avatarFile === profile.avatarFile
           ? { ...current, avatarAssetId: finalizedAsset.id }
@@ -52,7 +53,7 @@ export function SettingsPage() {
     },
     onSuccess: (profile) => {
       setUser(profile)
-      queryClient.setQueryData(['settings'], (current: settingsApi.SettingsPayload | undefined) => current
+      queryClient.setQueryData(settingsKeys.all, (current: settingsApi.SettingsPayload | undefined) => current
         ? { ...current, profile }
         : current)
       setProfileDraft({

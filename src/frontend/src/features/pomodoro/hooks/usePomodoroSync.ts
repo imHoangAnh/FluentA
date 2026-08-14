@@ -2,6 +2,7 @@ import type { HubConnection } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/features/auth'
+import { pomodoroKeys } from '../api/pomodoro.queries'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'https://localhost:7000/api/v1'
 const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
@@ -25,7 +26,7 @@ export function usePomodoroSync() {
         .build()
 
       connection.on('PomodoroSync', () => {
-        void queryClient.invalidateQueries({ queryKey: ['pomodoro', 'current'], refetchType: 'all' })
+        void queryClient.invalidateQueries({ queryKey: pomodoroKeys.current, refetchType: 'all' })
       })
 
       await connection.start()

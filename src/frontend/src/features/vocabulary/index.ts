@@ -1,2 +1,2 @@
 export { vocabularyRoutes } from './vocabulary.routes'
-export * from './api/vocabulary.api'
+export { vocabularyKeys } from './api/vocabulary.queries'

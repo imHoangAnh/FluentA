@@ -29,6 +29,7 @@ vi.mock('@/features/todo', () => ({
 vi.mock('@/features/project', () => ({
   getBoard: vi.fn(),
   listBoards: vi.fn().mockResolvedValue([]),
+  projectKeys: { boards: ['project', 'boards'], pomodoroCards: (boardIds?: string) => ['project', 'pomodoro-cards', boardIds] },
 }))
 
 const config = {

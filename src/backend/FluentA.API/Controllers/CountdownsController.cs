@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
@@ -12,7 +13,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/countdowns")]
-public sealed class CountdownsController : ControllerBase
+public sealed class CountdownsController : ApiControllerBase
 {
     private readonly ICountdownService _countdowns;
 
@@ -51,35 +52,4 @@ public sealed class CountdownsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToErrorResult<T>(OperationResult<T> result)
-    {
-        var error = result.Error switch
-        {
-            CountdownError countdownError => new ApiErrorEnvelope(countdownError.Code, countdownError.Message, countdownError.Details),
-            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
-            _ => null,
-        };
-        var statusCode = result.Error switch
-        {
-            CountdownError countdownError => countdownError.StatusCode,
-            TrashError trashError => trashError.StatusCode,
-            _ => 500,
-        };
-        if (error is null)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
-    }
 }

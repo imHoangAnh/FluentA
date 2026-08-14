@@ -1,2 +1,3 @@
 export { trashRoutes } from './trash.routes'
-export { listTrash, permanentlyDeleteTrashEntry, restoreTrashEntry, type TrashEntry } from './api/trash.api'
+export { listTrash, permanentlyDeleteTrashEntry, restoreTrashEntry } from './api/trash.api'
+export { trashKeys } from './api/trash.queries'

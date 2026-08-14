@@ -1,6 +1,6 @@
 namespace FluentA.Application.BoundedContexts.Pronunciation;
 
-public sealed record PronunciationError(string Code, string Message, int StatusCode)
+public sealed record PronunciationError(string Code, string Message, int StatusCode) : IApplicationError
 {
     public static PronunciationError InvalidAudio() =>
         new("INVALID_PRONUNCIATION_AUDIO", "The pronunciation audio must be 16-kHz, 16-bit, mono PCM WAV and no longer than 10 seconds.", 400);

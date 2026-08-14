@@ -32,7 +32,7 @@ public sealed class NoteService : INoteService
     {
         var boards = await _repository.ListBoardsAsync(userId, cancellationToken);
         return OperationResult<IReadOnlyList<NoteBoardSummaryDto>>.Success(
-            boards.Select(ToBoardSummaryDto).ToList());
+            boards.Select(NoteDtoMapper.ToBoardSummaryDto).ToList());
     }
 
     public async Task<OperationResult<NoteBoardSummaryDto>> CreateBoardAsync(
@@ -40,7 +40,7 @@ public sealed class NoteService : INoteService
         CreateNoteBoardRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validation = ValidateBoardName(request.Name);
+        var validation = NoteRequestValidator.ValidateBoardName(request.Name);
         if (validation is not null)
         {
             return OperationResult<NoteBoardSummaryDto>.Failure(validation);
@@ -50,7 +50,7 @@ public sealed class NoteService : INoteService
         await _repository.AddBoardAsync(board, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<NoteBoardSummaryDto>.Success(ToBoardSummaryDto(board));
+        return OperationResult<NoteBoardSummaryDto>.Success(NoteDtoMapper.ToBoardSummaryDto(board));
     }
 
     public async Task<OperationResult<NoteBoardSummaryDto>> UpdateBoardAsync(
@@ -65,7 +65,7 @@ public sealed class NoteService : INoteService
             return OperationResult<NoteBoardSummaryDto>.Failure(NoteError.BoardNotFound());
         }
 
-        var validation = ValidateBoardName(request.Name);
+        var validation = NoteRequestValidator.ValidateBoardName(request.Name);
         if (validation is not null)
         {
             return OperationResult<NoteBoardSummaryDto>.Failure(validation);
@@ -75,7 +75,7 @@ public sealed class NoteService : INoteService
         await _repository.UpdateBoardAsync(board, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<NoteBoardSummaryDto>.Success(ToBoardSummaryDto(board));
+        return OperationResult<NoteBoardSummaryDto>.Success(NoteDtoMapper.ToBoardSummaryDto(board));
     }
 
     public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(
@@ -113,7 +113,7 @@ public sealed class NoteService : INoteService
             return OperationResult<NotePageDto>.Failure(NoteError.BoardNotFound());
         }
 
-        var validation = ValidatePageFields(request.Name, null);
+        var validation = NoteRequestValidator.ValidatePageFields(request.Name, null);
         if (validation is not null)
         {
             return OperationResult<NotePageDto>.Failure(validation);
@@ -150,7 +150,7 @@ public sealed class NoteService : INoteService
             return OperationResult<NotePageDto>.Failure(NoteError.PageNotFound());
         }
 
-        var validation = ValidatePageFields(request.Name, request.Content);
+        var validation = NoteRequestValidator.ValidatePageFields(request.Name, request.Content);
         if (validation is not null)
         {
             return OperationResult<NotePageDto>.Failure(validation);
@@ -221,69 +221,6 @@ public sealed class NoteService : INoteService
         await _repository.SaveChangesAsync(cancellationToken);
 
         return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Note", page.Id, page.Name, "Notes", nowUtc, nowUtc.AddDays(30)));
-    }
-
-    private static NoteError? ValidateBoardName(string name)
-    {
-        var cleaned = name.Trim();
-        if (cleaned.Length is < 1 or > 120)
-        {
-            return NoteError.Validation(new Dictionary<string, string[]>
-            {
-                ["name"] = ["Board name must be between 1 and 120 characters."]
-            });
-        }
-
-        return null;
-    }
-
-    private static NoteError? ValidatePageFields(string? name, string? content)
-    {
-        var errors = new Dictionary<string, string[]>();
-
-        if (name is not null)
-        {
-            var cleanedName = name.Trim();
-            if (cleanedName.Length is < 1 or > 240)
-            {
-                errors["name"] = ["Page name must be between 1 and 240 characters."];
-            }
-        }
-
-        if (content is not null && content.Length > 100_000)
-        {
-            errors["content"] = ["Content must be at most 100000 characters."];
-        }
-
-        return errors.Count > 0 ? NoteError.Validation(errors) : null;
-    }
-
-    private static NoteBoardSummaryDto ToBoardSummaryDto(NoteBoard board)
-    {
-        var pages = board.Pages
-            .Where(page => page.DeletedAt is null)
-            .OrderByDescending(page => page.CreatedAt)
-            .ThenByDescending(page => page.Id)
-            .Select(ToPageSummaryDto)
-            .ToList();
-
-        return new NoteBoardSummaryDto(
-            board.Id,
-            board.Name,
-            pages,
-            board.CreatedAt,
-            board.UpdatedAt);
-    }
-
-    private static NotePageSummaryDto ToPageSummaryDto(NotePage page)
-    {
-        return new NotePageSummaryDto(
-            page.Id,
-            page.BoardId,
-            page.Name,
-            page.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
-            page.CreatedAt,
-            page.UpdatedAt);
     }
 
     private async Task<NotePageDto> ToPageDtoAsync(Guid userId, NotePage page, CancellationToken cancellationToken)

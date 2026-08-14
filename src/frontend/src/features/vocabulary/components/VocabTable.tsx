@@ -5,7 +5,8 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities'
 import { CheckCircle2, GripVertical, Trash2 } from 'lucide-react'
 import * as vocabularyApi from '../api/vocabulary.api'
-import { toast } from '@/lib/toast'
+import { vocabularyKeys } from '../api/vocabulary.queries'
+import { toast } from '@/shared/lib/toast'
 import { restoreTrashEntry } from '@/features/trash'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 
@@ -242,7 +243,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
   const tableFocusRef = useRef<HTMLDivElement>(null)
 
-  const wordsKey = ['vocab', 'words', page.id]
+  const wordsKey = vocabularyKeys.words(page.id)
   const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
   const sensors = useSensors(useSensor(PointerSensor))
   const hidden = new Set(preferences.hiddenColumns)
