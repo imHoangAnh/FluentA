@@ -1,4 +1,4 @@
-export { assessPronunciation } from './pronunciation.api'
+export { assessPronunciation, getPronunciationAssessmentErrorMessage } from './pronunciation.api'
 export { PronunciationFeedback } from './components/PronunciationFeedback'
 export { ShortcutGuide } from './components/ShortcutGuide'
 export type { PronunciationAssessment, PronunciationUnitFeedback, PronunciationWordFeedback } from './pronunciation.api'

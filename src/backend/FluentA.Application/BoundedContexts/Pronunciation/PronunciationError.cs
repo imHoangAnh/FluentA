@@ -8,6 +8,9 @@ public sealed record PronunciationError(string Code, string Message, int StatusC
     public static PronunciationError WordNotFound() =>
         new("PRONUNCIATION_WORD_NOT_FOUND", "The requested word could not be found.", 404);
 
+    public static PronunciationError NotRecognized() =>
+        new("PRONUNCIATION_NOT_RECOGNIZED", "No speech was recognized. Try recording again; this did not use an attempt.", 422);
+
     public static PronunciationError ProviderUnavailable() =>
         new("PRONUNCIATION_UNAVAILABLE", "Pronunciation assessment is temporarily unavailable. Try again without losing an attempt.", 503);
 }

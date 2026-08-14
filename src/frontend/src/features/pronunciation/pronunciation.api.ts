@@ -24,3 +24,12 @@ export async function assessPronunciation(wordId: string, audio: Blob) {
   )
   return response.data.data!
 }
+
+export function getPronunciationAssessmentErrorMessage(error: unknown) {
+  const code = (error as { response?: { data?: ApiEnvelope<never> } }).response?.data?.error?.code
+  if (code === 'PRONUNCIATION_NOT_RECOGNIZED') {
+    return 'No speech was recognized. Try recording again; this did not use an attempt.'
+  }
+
+  return 'Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.'
+}

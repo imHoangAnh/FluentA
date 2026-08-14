@@ -5,7 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
 import { getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
-import { assessPronunciation, PronunciationFeedback, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
+import { assessPronunciation, getPronunciationAssessmentErrorMessage, PronunciationFeedback, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 
 
@@ -204,8 +204,8 @@ export function PracticeSessionPage() {
 
       setFeedback('wrong')
       setWordHasMistake(true)
-    } catch {
-      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
+    } catch (error) {
+      setPronunciationError(getPronunciationAssessmentErrorMessage(error))
     }
   }, [continueResolvedStep, currentCard, pronunciationMutation])
 

@@ -159,7 +159,7 @@ public static class DependencyInjection
             CultureInfo.InvariantCulture,
             out var configuredThreshold)
             ? configuredThreshold
-            : 70d;
+            : 80d;
         var completenessThreshold = double.TryParse(
             configuration["AzureSpeech:CompletenessThreshold"],
             NumberStyles.Float,

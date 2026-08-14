@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as reviewApi from './api/review.api'
 import { listBoards, type FlashcardBoard } from '@/features/flashcards'
-import { assessPronunciation, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
+import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 
@@ -234,8 +234,8 @@ export function ReviewSessionPage() {
       } else {
         setPronunciationFailed(true)
       }
-    } catch {
-      setPronunciationError('Pronunciation assessment is unavailable. Try recording again; this did not use an attempt.')
+    } catch (error) {
+      setPronunciationError(getPronunciationAssessmentErrorMessage(error))
     }
   }, [currentWord, pronunciationAttempts, pronunciationMutation, submitOutcome])
 

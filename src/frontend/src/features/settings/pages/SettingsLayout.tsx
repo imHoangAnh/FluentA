@@ -14,7 +14,6 @@ export function SettingsLayout() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Settings</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your learning preferences.</p>
         </div>
       </header>
 

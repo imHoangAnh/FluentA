@@ -141,7 +141,9 @@ services:
       AzureSpeech__Region: ${AZURE_SPEECH_REGION:?AZURE_SPEECH_REGION is required}
       AzureSpeech__SubscriptionKey: ${AZURE_SPEECH_SUBSCRIPTION_KEY:?AZURE_SPEECH_SUBSCRIPTION_KEY is required}
       AzureSpeech__TimeoutSeconds: "10"
-      AzureSpeech__AccuracyThreshold: "70"
+      AzureSpeech__AccuracyThreshold: "80"
+      AzureSpeech__CompletenessThreshold: "90"
+      AzureSpeech__WordAccuracyThreshold: "70"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
