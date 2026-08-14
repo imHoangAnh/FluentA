@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import type { CreateHabitInput, Habit, HabitFrequency, HabitIcon } from '../api/habit.api'
-import { weekdays } from '../habit-date'
+import { weekdays } from '../model/habit-date'
 import { habitIconOptions } from './habit-icon-options'
 import { HabitIconGlyph } from './habit-icons'
 import { SelectMenu } from '@/shared/components/ui/select-menu'

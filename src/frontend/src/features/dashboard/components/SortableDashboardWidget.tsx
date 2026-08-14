@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
-import { dashboardWidgetSlotClass, type DashboardWidgetId } from '../dashboard-widgets'
+import { dashboardWidgetSlotClass, type DashboardWidgetId } from '../model/dashboard-widgets'
 
 type SortableDashboardWidgetProps = {
   id: DashboardWidgetId

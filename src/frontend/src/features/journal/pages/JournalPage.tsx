@@ -2,11 +2,12 @@ import { BookOpen, ChevronLeft, ChevronRight, Loader2, Plus, Save, Search, Trash
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
+import { journalKeys } from '../api/journal.queries'
 import { restoreTrashEntry } from '@/features/trash'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 
 const JournalRichTextEditor = lazy(() =>
-  import('../components/JournalRichTextEditor').then((module) => ({ default: module.JournalRichTextEditor })),
+  import('@/shared/components/rich-text/RichTextEditor').then((module) => ({ default: module.RichTextEditor })),
 )
 
 function formatDate(value: string) {
@@ -91,7 +92,7 @@ export function JournalPage() {
   const draftVersionRef = useRef(0)
 
   const entriesQuery = useQuery({
-    queryKey: ['journal', 'entries'],
+    queryKey: journalKeys.entries,
     queryFn: journalApi.listJournalEntries,
   })
 
@@ -101,13 +102,13 @@ export function JournalPage() {
   }, [searchQuery])
 
   const searchQueryResult = useQuery({
-    queryKey: ['journal', 'search', debouncedSearchQuery],
+    queryKey: journalKeys.search(debouncedSearchQuery),
     queryFn: () => journalApi.searchJournalEntries(debouncedSearchQuery),
     enabled: debouncedSearchQuery.length > 0,
   })
 
   const calendarQuery = useQuery({
-    queryKey: ['journal', 'calendar', calendarMonth],
+    queryKey: journalKeys.calendar(calendarMonth),
     queryFn: () => journalApi.getJournalCalendar(calendarMonth),
   })
 
@@ -170,7 +171,7 @@ export function JournalPage() {
     setSelectedId(entry.id)
     try {
       const fullEntry = await queryClient.fetchQuery({
-        queryKey: ['journal', 'entry', entry.id],
+        queryKey: journalKeys.entry(entry.id),
         queryFn: () => journalApi.getJournalEntry(entry.id),
       })
       if (openRequestRef.current === requestId) selectEntry(fullEntry)
@@ -192,13 +193,13 @@ export function JournalPage() {
   }
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['journal'] })
+    await queryClient.invalidateQueries({ queryKey: journalKeys.all })
   }
 
   const createEntry = useMutation({
     mutationFn: journalApi.createJournalEntry,
     onSuccess: async (entry) => {
-      queryClient.setQueryData(['journal', 'entry', entry.id], entry)
+      queryClient.setQueryData(journalKeys.entry(entry.id), entry)
       selectEntry(entry)
       await refresh()
     },
@@ -209,7 +210,7 @@ export function JournalPage() {
       journalApi.updateJournalEntry(input.id, input.patch),
     onMutate: () => setSaveStatus('saving'),
     onSuccess: async (entry, input) => {
-      queryClient.setQueryData(['journal', 'entry', entry.id], entry)
+      queryClient.setQueryData(journalKeys.entry(entry.id), entry)
       if (draftVersionRef.current === input.version) {
         setIsDirty(false)
         setSaveStatus('saved')
@@ -224,7 +225,7 @@ export function JournalPage() {
   const deleteEntry = useMutation({
     mutationFn: journalApi.deleteJournalEntry,
     onSuccess: async (entry, id) => {
-      queryClient.removeQueries({ queryKey: ['journal', 'entry', id] })
+      queryClient.removeQueries({ queryKey: journalKeys.entry(id) })
       clearEditor()
       await refresh()
       toast.success('Journal entry moved to Trash.', {

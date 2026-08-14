@@ -2,8 +2,9 @@ import { CalendarClock, Plus } from 'lucide-react'
 import { type MouseEvent, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as habitApi from '../api/habit.api'
+import { habitKeys } from '../api/habit.queries'
 import { restoreTrashEntry } from '@/features/trash'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 import { HabitDetailsPanel } from '../components/HabitDetailsPanel'
 import { HabitFormDialog } from '../components/HabitFormDialog'
 import { HabitList } from '../components/HabitList'
@@ -19,7 +20,7 @@ import {
   toDateInput,
   toMonthInput,
   weekdays,
-} from '../habit-date'
+} from '../model/habit-date'
 
 export function HabitPage() {
   const queryClient = useQueryClient()
@@ -48,7 +49,7 @@ export function HabitPage() {
   }, [selectedWeekStart, today])
 
   const habitsQuery = useQuery({
-    queryKey: ['habit', 'list', timeZoneId, selectedMonth],
+    queryKey: habitKeys.list(timeZoneId, selectedMonth),
     queryFn: () => habitApi.listHabits(timeZoneId, selectedMonth),
   })
   const habits = useMemo(
@@ -69,7 +70,7 @@ export function HabitPage() {
 
   const entryQueries = useQueries({
     queries: entryQueryKeys.map(({ habitId, month }) => ({
-      queryKey: ['habit', 'entries', habitId, month, timeZoneId],
+      queryKey: habitKeys.entries(habitId, month, timeZoneId),
       queryFn: () => habitApi.listHabitEntries(habitId, month, timeZoneId),
     })),
   })
@@ -94,7 +95,7 @@ export function HabitPage() {
   }, [entriesByHabit, habits, weekDates])
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['habit'] })
+    await queryClient.invalidateQueries({ queryKey: habitKeys.all })
   }
   const closeForm = () => {
     setFormHabitId(null)

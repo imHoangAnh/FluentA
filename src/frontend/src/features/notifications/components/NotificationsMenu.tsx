@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button'
 import { dropdownContentClassName, dropdownItemClassName, dropdownSeparatorClassName } from '@/shared/components/ui/dropdown-styles'
 import { cn } from '@/shared/lib/utils'
 import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
+import { notificationKeys } from '../api/notification.queries'
 
 type NotificationsMenuProps = {
   notificationsPath: string
@@ -15,7 +16,7 @@ type NotificationsMenuProps = {
 export function NotificationsMenu({ notificationsPath, active = false }: NotificationsMenuProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list })
+  const query = useQuery({ queryKey: notificationKeys.all, queryFn: notificationApi.list })
   const unreadCount = query.data?.filter((item) => !item.readAt).length ?? 0
 
   async function activate(item: NotificationItem) {
@@ -23,8 +24,8 @@ export function NotificationsMenu({ notificationsPath, active = false }: Notific
       if (!item.readAt) {
         await notificationApi.markRead(item.id)
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-          queryClient.invalidateQueries({ queryKey: ['notifications-unread'] }),
+          queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+          queryClient.invalidateQueries({ queryKey: notificationKeys.unread }),
         ])
       }
 

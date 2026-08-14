@@ -1,4 +1,6 @@
-export * from './api/habit.api'
+export { listHabits, toggleHabitEntry } from './api/habit.api'
+export type { Habit } from './api/habit.api'
 export { useHabitSync } from './hooks/useHabitSync'
 export { HabitIconGlyph } from './components/habit-icons'
 export { habitsRoutes } from './habits.routes'
+export { habitKeys } from './api/habit.queries'

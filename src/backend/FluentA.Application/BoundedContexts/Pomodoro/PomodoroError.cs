@@ -1,6 +1,6 @@
 namespace FluentA.Application.BoundedContexts.Pomodoro;
 
-public sealed record PomodoroError(string Code, string Message, int StatusCode, object? Details = null)
+public sealed record PomodoroError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static PomodoroError Validation(object details) =>
         new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);

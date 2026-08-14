@@ -12,10 +12,12 @@ namespace FluentA.Infrastructure.Review;
 public sealed class EfReviewRepository : IReviewRepository
 {
     private readonly AppDbContext _dbContext;
+    private readonly EfReviewDashboardQueries _dashboardQueries;
 
     public EfReviewRepository(AppDbContext dbContext)
     {
         _dbContext = dbContext;
+        _dashboardQueries = new EfReviewDashboardQueries(dbContext);
     }
 
     public async Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
@@ -221,9 +223,9 @@ public sealed class EfReviewRepository : IReviewRepository
         }
 
         var localToday = ReviewTime.LocalDate(utcNow, timeZone);
-        var activeWords = QueryActiveBoardWords(userId, boardId);
-        var reviewStates = QueryActiveReviewStates(userId, boardId);
-        var reviews = QueryActiveReviewHistories(userId, boardId);
+        var activeWords = _dashboardQueries.QueryActiveBoardWords(userId, boardId);
+        var reviewStates = _dashboardQueries.QueryActiveReviewStates(userId, boardId);
+        var reviews = _dashboardQueries.QueryActiveReviewHistories(userId, boardId);
 
         var totalCards = await activeWords.CountAsync(cancellationToken);
         var reviewStateCount = await reviewStates.CountAsync(cancellationToken);
@@ -243,7 +245,7 @@ public sealed class EfReviewRepository : IReviewRepository
         var retentionRate = totalReviews == 0
             ? 0
             : (int)Math.Round((double)retained / totalReviews * 100, MidpointRounding.AwayFromZero);
-        var streak = await CountCurrentStreakAsync(
+        var streak = await _dashboardQueries.CountCurrentStreakAsync(
             reviews,
             localToday.ToDateTime(TimeOnly.MinValue),
             timeZone,
@@ -444,82 +446,5 @@ public sealed class EfReviewRepository : IReviewRepository
         };
     }
 
-    private IQueryable<Guid> QueryActiveBoardWords(Guid userId, Guid? boardId) =>
-        from word in _dbContext.Words.AsNoTracking()
-        join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
-        join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
-        where board.UserId == userId
-            && word.DeletedAt == null
-            && page.DeletedAt == null
-            && board.DeletedAt == null
-            && (!boardId.HasValue || board.Id == boardId.Value)
-        select word.Id;
-
-    private IQueryable<WordReviewState> QueryActiveReviewStates(Guid userId, Guid? boardId) =>
-        from state in _dbContext.WordReviewStates.AsNoTracking()
-        join word in _dbContext.Words.AsNoTracking() on state.WordId equals word.Id
-        join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
-        join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
-        where board.UserId == userId
-            && state.UserId == userId
-            && state.DeletedAt == null
-            && state.Status == WordReviewStatus.Active
-            && word.DeletedAt == null
-            && page.DeletedAt == null
-            && board.DeletedAt == null
-            && (!boardId.HasValue || board.Id == boardId.Value)
-        select state;
-
-    private IQueryable<WordReviewHistory> QueryActiveReviewHistories(Guid userId, Guid? boardId) =>
-        from review in _dbContext.WordReviewHistories.AsNoTracking()
-        join word in _dbContext.Words.AsNoTracking() on review.WordId equals word.Id
-        join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
-        join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
-        where review.UserId == userId
-            && review.DeletedAt == null
-            && word.DeletedAt == null
-            && page.DeletedAt == null
-            && board.DeletedAt == null
-            && (!boardId.HasValue || board.Id == boardId.Value)
-        select review;
-
-    private static async Task<int> CountCurrentStreakAsync(
-        IQueryable<WordReviewHistory> reviews,
-        DateTime localToday,
-        TimeZoneInfo timeZone,
-        CancellationToken cancellationToken)
-    {
-        var todayHasReview = await HasReviewOnLocalDateAsync(reviews, localToday, timeZone, cancellationToken);
-        var cursor = todayHasReview
-            ? localToday
-            : await HasReviewOnLocalDateAsync(reviews, localToday.AddDays(-1), timeZone, cancellationToken)
-                ? localToday.AddDays(-1)
-                : (DateTime?)null;
-
-        var streak = 0;
-        while (cursor.HasValue)
-        {
-            streak++;
-            var previous = cursor.Value.AddDays(-1);
-            if (!await HasReviewOnLocalDateAsync(reviews, previous, timeZone, cancellationToken))
-            {
-                break;
-            }
-
-            cursor = previous;
-        }
-
-        return streak;
-    }
-
-    private static Task<bool> HasReviewOnLocalDateAsync(
-        IQueryable<WordReviewHistory> reviews,
-        DateTime localDate,
-        TimeZoneInfo timeZone,
-        CancellationToken cancellationToken)
-    {
-        var (startUtc, endUtc) = ReviewTime.LocalDateBoundsUtc(localDate, timeZone);
-        return reviews.AnyAsync(review => review.ReviewedAt >= startUtc && review.ReviewedAt < endUtc, cancellationToken);
-    }
 
 }

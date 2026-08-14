@@ -4,9 +4,10 @@ import { forwardRef, type ButtonHTMLAttributes, useEffect, useMemo, useRef, useS
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
 import * as reviewApi from '@/features/review'
+import { reviewKeys } from '@/features/review'
 import { restoreTrashEntry } from '@/features/trash'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -39,12 +40,12 @@ export function LevelFiveSettingsPage() {
   const [selected, setSelected] = useState<string[]>([])
   const [removeError, setRemoveError] = useState<string | null>(null)
 
-  const levelFiveQuery = useQuery({ queryKey: ['review', 'level-five'], queryFn: reviewApi.listLevelFiveWords })
+  const levelFiveQuery = useQuery({ queryKey: reviewKeys.levelFive, queryFn: reviewApi.listLevelFiveWords })
   const removeMutation = useMutation({
     mutationFn: reviewApi.removeLevelFiveWords,
     onMutate: () => setRemoveError(null),
     onSuccess: (entries, wordIds) => {
-      queryClient.setQueryData(['review', 'level-five'], (current: reviewApi.LevelFiveReviewItem[] | undefined) =>
+      queryClient.setQueryData(reviewKeys.levelFive, (current: reviewApi.LevelFiveReviewItem[] | undefined) =>
         current?.filter((item) => !wordIds.includes(item.wordId)) ?? current)
       setSelected([])
       setRemoveError(null)
@@ -53,7 +54,7 @@ export function LevelFiveSettingsPage() {
           label: 'Undo',
           onClick: () => {
             void Promise.all(entries.map((entry) => restoreTrashEntry(entry.id)))
-              .then(() => queryClient.invalidateQueries({ queryKey: ['review', 'level-five'] }))
+              .then(() => queryClient.invalidateQueries({ queryKey: reviewKeys.levelFive }))
               .then(() => toast.success('Words restored at Level 0 for the next local day.'))
               .catch(() => toast.error('Could not restore all selected words.'))
           },

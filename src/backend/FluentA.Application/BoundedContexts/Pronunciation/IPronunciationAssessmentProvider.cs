@@ -24,6 +24,24 @@ public sealed record PronunciationUnitAssessment(
     string Text,
     double AccuracyScore);
 
+public enum PronunciationNotRecognizedReason
+{
+    NoMatch,
+    InitialSilenceTimeout,
+    BabbleTimeout,
+}
+
+public sealed class PronunciationNotRecognizedException : Exception
+{
+    public PronunciationNotRecognizedException(PronunciationNotRecognizedReason reason)
+        : base($"Azure Speech did not recognize assessable speech: {reason}.")
+    {
+        Reason = reason;
+    }
+
+    public PronunciationNotRecognizedReason Reason { get; }
+}
+
 public sealed class PronunciationProviderException : Exception
 {
     public PronunciationProviderException(string message)

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { SettingsErrorPanel, SettingsLoadingPanel, SettingsPanel } from '../components/SettingsPanel'
 import { SettingsSaveStatus, type SettingsSaveState } from '../components/SettingsSaveStatus'
 import * as practiceApi from '@/features/practice'
+import { practiceKeys } from '@/features/practice'
+import { settingsKeys } from '../api/settings.queries'
 import { Button } from '@/shared/components/ui/button'
 
 const practiceModes: practiceApi.PracticeMode[] = ['dictation', 'meaningToWord', 'pronunciation']
@@ -23,15 +25,15 @@ export function SettingsPracticePage() {
   const [practiceState, setPracticeState] = useState<SettingsSaveState>('idle')
 
   const practiceSettingsQuery = useQuery({
-    queryKey: ['practice', 'settings'],
+    queryKey: practiceKeys.settings,
     queryFn: practiceApi.getPracticeSettings,
   })
   const updatePracticeSettings = useMutation({
     mutationFn: practiceApi.updatePracticeSettings,
     onMutate: () => setPracticeState('saving'),
     onSuccess: (settings) => {
-      queryClient.setQueryData(['practice', 'settings'], settings)
-      queryClient.setQueryData(['settings'], (current: { practiceSettings?: practiceApi.PracticeSettings } | undefined) =>
+      queryClient.setQueryData(practiceKeys.settings, settings)
+      queryClient.setQueryData(settingsKeys.all, (current: { practiceSettings?: practiceApi.PracticeSettings } | undefined) =>
         current ? { ...current, practiceSettings: settings } : current)
       setPracticeDraft(null)
       setPracticeState('saved')

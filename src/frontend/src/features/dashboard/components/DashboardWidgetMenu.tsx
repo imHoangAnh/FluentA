@@ -2,7 +2,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { Check, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
-import { DASHBOARD_WIDGET_CATALOG, type DashboardWidgetId } from '../dashboard-widgets'
+import { DASHBOARD_WIDGET_CATALOG, type DashboardWidgetId } from '../model/dashboard-widgets'
 
 type DashboardWidgetMenuProps = {
   visibleWidgets: readonly DashboardWidgetId[]

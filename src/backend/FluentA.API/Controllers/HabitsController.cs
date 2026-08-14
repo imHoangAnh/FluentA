@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
@@ -12,7 +13,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/habits")]
-public sealed class HabitsController : ControllerBase
+public sealed class HabitsController : ApiControllerBase
 {
     private readonly IHabitService _habits;
 
@@ -88,35 +89,4 @@ public sealed class HabitsController : ControllerBase
             : ToErrorResult(result);
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToErrorResult<T>(OperationResult<T> result)
-    {
-        var error = result.Error switch
-        {
-            HabitError habitError => new ApiErrorEnvelope(habitError.Code, habitError.Message, habitError.Details),
-            TrashError trashError => new ApiErrorEnvelope(trashError.Code, trashError.Message),
-            _ => null,
-        };
-        var statusCode = result.Error switch
-        {
-            HabitError habitError => habitError.StatusCode,
-            TrashError trashError => trashError.StatusCode,
-            _ => 500,
-        };
-        if (error is null)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-        return StatusCode(statusCode, ApiEnvelope<object>.Fail(error));
-    }
 }

@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { dropdownContentClassName, dropdownDestructiveItemClassName } from '@/shared/components/ui/dropdown-styles'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
-import * as assetsApi from '@/lib/api/assets.api'
+import { uploadAsset } from '@/features/assets'
 import { restoreTrashEntry } from '@/features/trash'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 import * as countdownApi from '../api/countdown.api'
+import { countdownKeys } from '../api/countdown.queries'
 
 const alertDayOptions = ['OnTargetDay', '1DayBefore', '3DaysBefore', '7DaysBefore'] as const
 const repeatOptions = [
@@ -59,14 +60,14 @@ export function CountdownPage() {
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const countdownsQuery = useQuery({
-    queryKey: ['countdown', 'events'],
+    queryKey: countdownKeys.events,
     queryFn: countdownApi.listCountdowns,
   })
 
   const countdowns = useMemo(() => countdownsQuery.data ?? [], [countdownsQuery.data])
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['countdown', 'events'] })
+    await queryClient.invalidateQueries({ queryKey: countdownKeys.events })
   }
 
   const resetForm = useCallback(() => {
@@ -93,7 +94,7 @@ export function CountdownPage() {
     mutationFn: async () => {
       let coverAssetId: string | null = null
       if (coverFile) {
-        const asset = await assetsApi.uploadCountdownCoverAsset(coverFile)
+        const asset = await uploadAsset(coverFile, 'countdown-cover')
         coverAssetId = asset.id
       }
 

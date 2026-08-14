@@ -1,6 +1,6 @@
-import { apiClient } from '@/shared/lib/http/client'
-import type { ApiEnvelope } from '@/shared/types/api'
-import type { TrashEntry } from '@/features/trash'
+import { apiClient } from '@/shared/api/client'
+import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 export type JournalEntry = {
   id: string

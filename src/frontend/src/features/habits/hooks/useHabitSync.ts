@@ -2,6 +2,8 @@ import type { HubConnection } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/features/auth'
+import { dashboardKeys } from '@/shared/api/dashboard.queries'
+import { habitKeys } from '../api/habit.queries'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'https://localhost:7000/api/v1'
 const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
@@ -25,8 +27,8 @@ export function useHabitSync() {
         .build()
 
       connection.on('HabitChecked', () => {
-        void queryClient.invalidateQueries({ queryKey: ['habit'], refetchType: 'all' })
-        void queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+        void queryClient.invalidateQueries({ queryKey: habitKeys.all, refetchType: 'all' })
+        void queryClient.invalidateQueries({ queryKey: dashboardKeys.all, refetchType: 'all' })
       })
 
       await connection.start()

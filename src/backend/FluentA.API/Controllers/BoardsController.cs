@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
@@ -12,7 +13,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/boards")]
-public sealed class BoardsController : ControllerBase
+public sealed class BoardsController : ApiControllerBase
 {
     private readonly IVocabularyService _vocabulary;
 
@@ -131,30 +132,4 @@ public sealed class BoardsController : ControllerBase
         return result.IsSuccess ? Ok(ApiEnvelope<BoardPreferencesDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToErrorResult<T>(OperationResult<T> result)
-    {
-        if (result.Error is VocabularyError vocabularyError)
-        {
-            var vocabularyEnvelope = ApiEnvelope<object>.Fail(new ApiErrorEnvelope(vocabularyError.Code, vocabularyError.Message, vocabularyError.Details));
-            return StatusCode(vocabularyError.StatusCode, vocabularyEnvelope);
-        }
-
-        if (result.Error is TrashError trashError)
-        {
-            return StatusCode(trashError.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(trashError.Code, trashError.Message)));
-        }
-
-        return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-    }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { FlashcardPage } from '@/features/flashcards'
 import { getPracticeSettings, type PracticeMode } from '../api/practice.api'
+import { practiceKeys } from '../api/practice.queries'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/shared/components/ui/dialog'
@@ -16,7 +17,7 @@ const modeLabels: Record<PracticeMode, string> = {
 
 export function PracticeLaunchDialog({ page, onClose, onStart }: { page: FlashcardPage | null; onClose: () => void; onStart: (pageId: string, order: PracticeOrder) => void }) {
   const [order, setOrder] = useState<PracticeOrder>('sequential')
-  const settingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: getPracticeSettings, enabled: Boolean(page) })
+  const settingsQuery = useQuery({ queryKey: practiceKeys.settings, queryFn: getPracticeSettings, enabled: Boolean(page) })
 
   return (
     <Dialog open={Boolean(page)} onOpenChange={(open) => { if (!open) onClose() }}>

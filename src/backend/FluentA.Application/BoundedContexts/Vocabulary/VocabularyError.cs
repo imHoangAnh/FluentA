@@ -1,6 +1,6 @@
 namespace FluentA.Application.BoundedContexts.Vocabulary;
 
-public sealed record VocabularyError(string Code, string Message, int StatusCode, object? Details = null)
+public sealed record VocabularyError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static VocabularyError Validation(object details) =>
         new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);

@@ -15,6 +15,14 @@ Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp v�
 challenge OTP/reset của auth, IMemoryCache giữ trạng thái Pomodoro ngắn hạn, còn
 object storage private lưu asset: MinIO ở Development và AWS S3 ở Production.
 
+Mỗi bounded context trong Application giữ một service facade và các port/DTO
+của nó. Những phần dễ phình to được tách thành collaborator nội bộ theo trách
+nhiệm, chẳng hạn validator, DTO mapper, statistics calculator và query/provider
+parser. API dùng `ApiControllerBase` cho identity và error mapping dùng chung;
+Infrastructure giữ EF adapter, provider, job facade và composition extension.
+Thiết kế này giữ nguyên bốn project, route, payload, Hangfire và SignalR contract;
+không dùng CQRS, MediatR hoặc một handler cho từng endpoint.
+
 ## 3. Mục lục
 
 - [Tên dự án](#1-tên-dự-án)
@@ -28,6 +36,11 @@ object storage private lưu asset: MinIO ở Development và AWS S3 ở Producti
 - [Health và production image](#9-health-và-production-image)
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
+
+Để chạy toàn bộ frontend, API/Hangfire, migration, PostgreSQL mới và MinIO chỉ
+bằng Docker, dùng `deploy/local/start.ps1` theo
+[local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
+chạy backend trực tiếp trên host khi phát triển source.
 
 ### 4.1. Yêu cầu
 
@@ -138,9 +151,9 @@ frontend nằm tại `../frontend/src/shared/types/api.ts`.
 ```text
 src/backend/
   FluentA.API/                    Controller, middleware, SignalR, Hangfire worker và composition root
-  FluentA.Application/            Use case, service và port
+  FluentA.Application/            Bounded context, service facade, DTO, port và collaborator nội bộ
   FluentA.Domain/                 Entity, value object và business rule
-  FluentA.Infrastructure/         EF Core, PostgreSQL, object storage và provider
+  FluentA.Infrastructure/         EF Core, PostgreSQL, object storage, provider, job và DI composition
   FluentA.API.UnitTests/          Unit test cho API, production config và health contract
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
@@ -153,13 +166,22 @@ src/backend/
 Từ thư mục root của repository:
 
 ```powershell
-dotnet test src/backend/FluentA.slnx
+dotnet test src/backend/FluentA.slnx --configuration Release
 ```
 
 Để chỉ build solution:
 
 ```powershell
-dotnet build src/backend/FluentA.slnx
+dotnet build src/backend/FluentA.slnx --configuration Release
+```
+
+Kiểm tra model EF không bị lệch so với migration hiện tại:
+
+```powershell
+dotnet tool run dotnet-ef migrations has-pending-model-changes `
+  --project src/backend/FluentA.Infrastructure `
+  --startup-project src/backend/FluentA.API `
+  --configuration Release
 ```
 
 ## 9. Health và production image

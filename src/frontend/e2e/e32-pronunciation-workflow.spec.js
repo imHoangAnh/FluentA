@@ -46,9 +46,9 @@ async function recordOnce(page) {
   await page.getByRole('button', { name: /^(Stop recording|Stop)$/ }).click()
 }
 
-test('Practice pronunciation preserves retries on 503 and shows transient IPA feedback', async ({ page }) => {
+test('Practice pronunciation preserves retries on no-match and 503 and shows transient IPA feedback', async ({ page }) => {
   await installFakeMicrophone(page)
-  const outcomes = [503, false, false, true]
+  const outcomes = [422, 503, false, false, true]
   const assessment = (correct) => ({
     correct,
     accuracyScore: correct ? 91 : 76,
@@ -69,6 +69,7 @@ test('Practice pronunciation preserves retries on 503 and shows transient IPA fe
     if (path.endsWith('/pronunciation/words/word-1/assessment')) {
       audioBodies.push(request.postDataBuffer())
       const outcome = outcomes.shift()
+      if (outcome === 422) return json({ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }, 422, false)
       if (outcome === 503) return json({ code: 'PRONUNCIATION_UNAVAILABLE', message: 'Unavailable' }, 503, false)
       return json(assessment(outcome))
     }
@@ -78,6 +79,9 @@ test('Practice pronunciation preserves retries on 503 and shows transient IPA fe
   await page.goto('/practice/page-1?order=sequential')
   await expect(page.getByTestId('active-practice-card')).toBeVisible()
   await expect(page.getByText('[R]')).toBeVisible()
+
+  await recordOnce(page)
+  await expect(page.getByText(/No speech was recognized/)).toBeVisible()
 
   await recordOnce(page)
   await expect(page.getByText(/did not use an attempt/)).toBeVisible()
@@ -100,7 +104,7 @@ test('Practice pronunciation preserves retries on 503 and shows transient IPA fe
   await page.setViewportSize({ width: 320, height: 900 })
   expect(await recap.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  expect(audioBodies).toHaveLength(4)
+  expect(audioBodies).toHaveLength(5)
   expect(audioBodies.every((body) => body && body.length >= 44)).toBe(true)
   await recap.getByRole('button', { name: 'Finish' }).click()
   await expect(page).toHaveURL(/\/practice$/)
@@ -109,6 +113,7 @@ test('Practice pronunciation preserves retries on 503 and shows transient IPA fe
 test('Review pronunciation submits after the second failed assessment and always shows recap', async ({ page }) => {
   await installFakeMicrophone(page)
   let assessmentCount = 0
+  const outcomes = [422, false, false]
   const reviewBodies = []
   const reviewSession = {
     sessionId: 'session-1', boardId: 'board-1', boardName: 'Review board', orderType: 'sequential', mode: 'random', startedAt: '2026-07-20T00:00:00Z', totalWords: 1,
@@ -118,12 +123,18 @@ test('Review pronunciation submits after the second failed assessment and always
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
-    const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ success: status < 400, data }) })
+    const json = (data, status = 200) => route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify(status < 400 ? { success: true, data } : { success: false, error: data }),
+    })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Review board', boardLanguage: 'en', pages: [{ pageId: 'page-1', pageName: 'Deck', isPracticed: false, words: [word] }] }])
     if (path.endsWith('/review/sessions')) return json(reviewSession)
     if (path.endsWith('/pronunciation/words/word-1/assessment')) {
       assessmentCount += 1
+      const outcome = outcomes.shift()
+      if (outcome === 422) return json({ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }, 422)
       return json({ correct: false, accuracyScore: 76, completenessScore: 100, feedbackMode: 'phoneme', words: [{ text: 'go', accuracyScore: 76, errorType: 'Mispronunciation', units: [{ text: 'ɡ', correct: false }, { text: 'oʊ', correct: true }] }] })
     }
     if (path.endsWith('/review') && request.method() === 'POST') {
@@ -139,6 +150,11 @@ test('Review pronunciation submits after the second failed assessment and always
   await page.getByRole('button', { name: 'Start review' }).click()
 
   await recordOnce(page)
+  await expect(page.getByText(/No speech was recognized/)).toBeVisible()
+  await expect(page.getByText(/attempt 1 of 2/i)).toBeVisible()
+  expect(reviewBodies).toHaveLength(0)
+
+  await recordOnce(page)
   expect(reviewBodies).toHaveLength(0)
   await expect(page.getByText(/attempt 2 of 2/i)).toBeVisible()
   await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
@@ -149,6 +165,6 @@ test('Review pronunciation submits after the second failed assessment and always
   await expect(recap).toContainText('go (verb)')
   await expect(recap).toContainText('/ɡəʊ/')
   await expect(recap).toContainText('Definition: move from one place to another')
-  expect(assessmentCount).toBe(2)
+  expect(assessmentCount).toBe(3)
   expect(reviewBodies).toEqual([expect.objectContaining({ correct: false, wordId: 'word-1' })])
 })
