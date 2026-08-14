@@ -1,27 +1,24 @@
 using FluentA.Application.BackgroundJobs;
-using FluentA.Application.BoundedContexts.Assets;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
+using NotificationEntity = FluentA.Domain.BoundedContexts.Notification.Entities.Notification;
 
 namespace FluentA.Infrastructure.BackgroundJobs;
 
 public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 {
-    private static readonly TimeZoneInfo VietnamTimeZone = ResolveVietnamTimeZone();
+    private static readonly TimeZoneInfo VietnamTimeZone = ScheduledProductivityJobKeys.ResolveVietnamTimeZone();
     private readonly ILogger<ScheduledProductivityJobs> _logger;
     private readonly AppDbContext _dbContext;
-    private readonly IAssetService _assetService;
-    private readonly ITrashService _trashService;
+    private readonly ScheduledMaintenanceJobs _maintenanceJobs;
 
-    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, IAssetService assetService, ITrashService trashService)
+    public ScheduledProductivityJobs(AppDbContext dbContext, ILogger<ScheduledProductivityJobs> logger, ScheduledMaintenanceJobs maintenanceJobs)
     {
         _dbContext = dbContext;
         _logger = logger;
-        _assetService = assetService;
-        _trashService = trashService;
+        _maintenanceJobs = maintenanceJobs;
     }
 
     public async Task CarryOverTodosAsync(CancellationToken cancellationToken = default)
@@ -47,7 +44,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
         var deduplicationKeys = dueItems.ToDictionary(
             item => item.Id,
-            item => TodoReminderDeduplicationKey(item.Id, item.ReminderScheduledAtUtc!.Value));
+            item => ScheduledProductivityJobKeys.TodoReminder(item.Id, item.ReminderScheduledAtUtc!.Value));
         var keys = deduplicationKeys.Values.ToArray();
         var existingKeys = await _dbContext.Notifications
             .Where(notification => keys.Contains(notification.DeduplicationKey))
@@ -60,7 +57,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
             var deduplicationKey = deduplicationKeys[item.Id];
             if (!existingKeys.Contains(deduplicationKey))
             {
-                _dbContext.Notifications.Add(Notification.Create(
+                _dbContext.Notifications.Add(NotificationEntity.Create(
                     item.UserId,
                     "TodoReminder",
                     "Todo reminder",
@@ -105,7 +102,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         var queued = 0;
         foreach (var habit in habits.Where(habit => habit.IsEligibleOn(today)))
         {
-            _dbContext.Notifications.Add(Notification.Create(habit.UserId, "HabitReminder", "Habit reminder",
+            _dbContext.Notifications.Add(NotificationEntity.Create(habit.UserId, "HabitReminder", "Habit reminder",
                 $"You have not checked off {habit.Name} today.", $"habit:{habit.Id}:{today:yyyy-MM-dd}"));
             habit.MarkReminderSent(today);
             queued++;
@@ -141,7 +138,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         var activeAlerts = alerts.Where(alert => countdowns.ContainsKey(alert.CountdownId)).ToList();
         var deduplicationKeys = activeAlerts.ToDictionary(
             alert => alert.Id,
-            alert => CountdownAlertDeduplicationKey(countdowns[alert.CountdownId].Id, countdowns[alert.CountdownId].TargetDate, alert.Id));
+            alert => ScheduledProductivityJobKeys.CountdownAlert(countdowns[alert.CountdownId].Id, countdowns[alert.CountdownId].TargetDate, alert.Id));
         var existingKeys = await _dbContext.Notifications
             .Where(notification => deduplicationKeys.Values.Contains(notification.DeduplicationKey))
             .Select(notification => notification.DeduplicationKey)
@@ -157,7 +154,7 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
             var deduplicationKey = deduplicationKeys[alert.Id];
             if (!existingKeys.Contains(deduplicationKey))
             {
-                _dbContext.Notifications.Add(Notification.Create(countdown.UserId, "CountdownAlert", "Countdown reminder",
+                _dbContext.Notifications.Add(NotificationEntity.Create(countdown.UserId, "CountdownAlert", "Countdown reminder",
                     $"{countdown.Name} - {alert.AlertDay} at {alert.AlertTime}.", deduplicationKey));
             }
 
@@ -198,20 +195,17 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
 
     public async Task CleanupExpiredPendingAssetsAsync(CancellationToken cancellationToken = default)
     {
-        var cleaned = await _assetService.CleanupExpiredPendingAsync(cancellationToken);
-        _logger.LogInformation("PendingAssetCleanupJob retired {Count} expired pending assets.", cleaned);
+        await _maintenanceJobs.CleanupExpiredPendingAssetsAsync(cancellationToken);
     }
 
     public async Task PurgeExpiredArchivedAssetsAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _assetService.PurgeExpiredArchivedAsync(cancellationToken);
-        _logger.LogInformation("ArchivedAssetPurgeJob claimed {Claimed} assets, deleted {Deleted}, failed {Failed}.", result.Claimed, result.Deleted, result.Failed);
+        await _maintenanceJobs.PurgeExpiredArchivedAssetsAsync(cancellationToken);
     }
 
     public async Task PurgeExpiredTrashAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _trashService.PurgeDueAsync(cancellationToken);
-        _logger.LogInformation("TrashPurgeJob claimed {Claimed}, deleted {Deleted}, skipped {Skipped}, failed {Failed}.", result.Claimed, result.Deleted, result.Skipped, result.Failed);
+        await _maintenanceJobs.PurgeExpiredTrashAsync(cancellationToken);
     }
 
     public async Task CleanupDeletedRecordsAsync(CancellationToken cancellationToken = default)
@@ -226,32 +220,4 @@ public sealed class ScheduledProductivityJobs : IScheduledProductivityJobs
         _logger.LogInformation("DatabaseCleanupJob permanently deleted {Count} product records older than {Cutoff}.", deleted, cutoff);
     }
 
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var id in new[] { "Asia/Ho_Chi_Minh", "SE Asia Standard Time" })
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(id);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-            }
-            catch (InvalidTimeZoneException)
-            {
-            }
-        }
-
-        throw new InvalidOperationException("The Vietnam timezone is not available on this host.");
-    }
-
-    private static string TodoReminderDeduplicationKey(Guid todoId, DateTime scheduledAtUtc)
-    {
-        return $"todo:{todoId}:reminder:{scheduledAtUtc.ToUniversalTime():yyyyMMddTHHmmssfffffffZ}";
-    }
-
-    private static string CountdownAlertDeduplicationKey(Guid countdownId, DateTime targetDate, Guid alertId)
-    {
-        return $"countdown:{countdownId}:target:{targetDate:yyyy-MM-dd}:alert:{alertId}";
-    }
 }

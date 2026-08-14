@@ -141,19 +141,19 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
             || nBest.GetArrayLength() == 0)
         {
             throw new InvalidAssessmentResponseException(
-                $"NBest was missing or empty; root keys: {GetPropertyNames(payload.RootElement)}.");
+                $"NBest was missing or empty; root keys: {AzurePronunciationResponseParser.GetPropertyNames(payload.RootElement)}.");
         }
 
         var candidate = nBest[0];
-        var pronunciationAssessment = GetAssessmentElement(candidate);
-        if (!TryReadScore(pronunciationAssessment, "AccuracyScore", out var accuracyScore))
+        var pronunciationAssessment = AzurePronunciationResponseParser.GetAssessmentElement(candidate);
+        if (!AzurePronunciationResponseParser.TryReadScore(pronunciationAssessment, "AccuracyScore", out var accuracyScore))
         {
             throw new InvalidAssessmentResponseException(
-                $"full-text AccuracyScore was missing; candidate keys: {GetPropertyNames(candidate)}; assessment keys: {GetPropertyNames(pronunciationAssessment)}; NBest count: {nBest.GetArrayLength().ToString(CultureInfo.InvariantCulture)}.");
+                $"full-text AccuracyScore was missing; candidate keys: {AzurePronunciationResponseParser.GetPropertyNames(candidate)}; assessment keys: {AzurePronunciationResponseParser.GetPropertyNames(pronunciationAssessment)}; NBest count: {nBest.GetArrayLength().ToString(CultureInfo.InvariantCulture)}.");
         }
 
         double? completenessScore = null;
-        if (TryReadScore(pronunciationAssessment, "CompletenessScore", out var parsedCompleteness))
+        if (AzurePronunciationResponseParser.TryReadScore(pronunciationAssessment, "CompletenessScore", out var parsedCompleteness))
         {
             completenessScore = parsedCompleteness;
         }
@@ -175,8 +175,8 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
                 throw new InvalidAssessmentResponseException("a word assessment had no word text.");
             }
 
-            var wordAssessment = GetAssessmentElement(wordElement);
-            if (!TryReadScore(wordAssessment, "AccuracyScore", out var wordScore))
+            var wordAssessment = AzurePronunciationResponseParser.GetAssessmentElement(wordElement);
+            if (!AzurePronunciationResponseParser.TryReadScore(wordAssessment, "AccuracyScore", out var wordScore))
             {
                 throw new InvalidAssessmentResponseException("a word assessment had no AccuracyScore.");
             }
@@ -195,7 +195,7 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
                         || phonemes.ValueKind != JsonValueKind.Array) continue;
                     foreach (var phoneme in phonemes.EnumerateArray())
                     {
-                        if (!TryReadUnit(phoneme, out var unit))
+                        if (!AzurePronunciationResponseParser.TryReadUnit(phoneme, out var unit))
                         {
                             throw new InvalidAssessmentResponseException("a phoneme assessment was invalid.");
                         }
@@ -208,7 +208,7 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
             {
                 foreach (var phoneme in directPhonemes.EnumerateArray())
                 {
-                    if (!TryReadUnit(phoneme, out var unit))
+                    if (!AzurePronunciationResponseParser.TryReadUnit(phoneme, out var unit))
                     {
                         throw new InvalidAssessmentResponseException("a phoneme assessment was invalid.");
                     }
@@ -223,26 +223,6 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
             "Azure pronunciation assessment completed after {ElapsedMilliseconds} ms.",
             stopwatch.ElapsedMilliseconds);
         return new PronunciationAssessment(accuracyScore, completenessScore, words);
-    }
-
-    private static bool TryReadUnit(JsonElement element, out PronunciationUnitAssessment unit)
-    {
-        unit = default!;
-        if (!element.TryGetProperty("Phoneme", out var phonemeText)
-            || phonemeText.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(phonemeText.GetString()))
-        {
-            return false;
-        }
-
-        var assessment = GetAssessmentElement(element);
-        if (!TryReadScore(assessment, "AccuracyScore", out var score))
-        {
-            return false;
-        }
-
-        unit = new PronunciationUnitAssessment(phonemeText.GetString()!, score);
-        return true;
     }
 
     private void EnsureRecognitionSucceeded(JsonElement root, long elapsedMilliseconds)
@@ -280,26 +260,6 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
         }
 
         throw new PronunciationProviderException("Azure Speech returned an unsuccessful recognition status.");
-    }
-
-    private static JsonElement GetAssessmentElement(JsonElement element) =>
-        element.TryGetProperty("PronunciationAssessment", out var nested)
-        && nested.ValueKind == JsonValueKind.Object
-            ? nested
-            : element;
-
-    private static string GetPropertyNames(JsonElement element) =>
-        element.ValueKind == JsonValueKind.Object
-            ? string.Join(',', element.EnumerateObject().Select(property => property.Name))
-            : $"<{element.ValueKind}>";
-
-    private static bool TryReadScore(JsonElement parent, string propertyName, out double score)
-    {
-        score = 0;
-        return parent.TryGetProperty(propertyName, out var property)
-            && property.TryGetDouble(out score)
-            && double.IsFinite(score)
-            && score is >= 0 and <= 100;
     }
 
     private sealed class InvalidAssessmentResponseException : Exception
