@@ -30,13 +30,13 @@ public sealed class TodoService : ITodoService
         string date,
         CancellationToken cancellationToken = default)
     {
-        if (!TryParseDate(date, "date", out var parsedDate, out var errors))
+        if (!TodoRequestValidator.TryParseDate(date, "date", out var parsedDate, out var errors))
         {
             return OperationResult<IReadOnlyList<TodoItemDto>>.Failure(TodoError.Validation(errors));
         }
 
         var items = await _repository.ListByDateAsync(userId, parsedDate, cancellationToken);
-        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => ToDto(item)).ToList());
+        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => TodoDtoMapper.ToDto(item)).ToList());
     }
 
     public async Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByRangeAsync(
@@ -46,12 +46,12 @@ public sealed class TodoService : ITodoService
         CancellationToken cancellationToken = default)
     {
         var validation = new Dictionary<string, string[]>();
-        if (!TryParseDate(startDate, "startDate", out var parsedStart, out var startErrors))
+        if (!TodoRequestValidator.TryParseDate(startDate, "startDate", out var parsedStart, out var startErrors))
         {
             validation["startDate"] = startErrors["startDate"];
         }
 
-        if (!TryParseDate(endDate, "endDate", out var parsedEnd, out var endErrors))
+        if (!TodoRequestValidator.TryParseDate(endDate, "endDate", out var parsedEnd, out var endErrors))
         {
             validation["endDate"] = endErrors["endDate"];
         }
@@ -67,7 +67,7 @@ public sealed class TodoService : ITodoService
         }
 
         var items = await _repository.ListByRangeAsync(userId, parsedStart, parsedEnd, cancellationToken);
-        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => ToDto(item)).ToList());
+        return OperationResult<IReadOnlyList<TodoItemDto>>.Success(items.Select(item => TodoDtoMapper.ToDto(item)).ToList());
     }
 
     public async Task<OperationResult<TodoItemDto>> GetAsync(
@@ -78,7 +78,7 @@ public sealed class TodoService : ITodoService
         var item = await _repository.GetAsync(userId, todoId, cancellationToken);
         return item is null
             ? OperationResult<TodoItemDto>.Failure(TodoError.NotFound())
-            : OperationResult<TodoItemDto>.Success(ToDto(item));
+            : OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(item));
     }
 
     public async Task<OperationResult<TodoItemDto>> CreateAsync(
@@ -86,7 +86,7 @@ public sealed class TodoService : ITodoService
         CreateTodoItemRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validation = ValidateCreate(request);
+        var validation = TodoRequestValidator.ValidateCreate(request);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
@@ -105,7 +105,7 @@ public sealed class TodoService : ITodoService
             validation.Reminder?.ScheduledAtUtc,
             sortOrder);
         await _repository.AddAsync(item, cancellationToken);
-        return OperationResult<TodoItemDto>.Success(ToDto(item));
+        return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(item));
     }
 
     public async Task<OperationResult<TodoItemDto>> UpdateAsync(
@@ -121,7 +121,7 @@ public sealed class TodoService : ITodoService
         }
 
         var nowUtc = DateTime.UtcNow;
-        var validation = ValidateUpdate(request, item.Date, item.IsCompleted, nowUtc);
+        var validation = TodoRequestValidator.ValidateUpdate(request, item.Date, item.IsCompleted, nowUtc);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
@@ -275,7 +275,7 @@ public sealed class TodoService : ITodoService
             warningCode = RecurrenceNextRetainedWarning;
         }
 
-        return OperationResult<TodoItemDto>.Success(ToDto(item, warningCode));
+        return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(item, warningCode));
     }
 
     public async Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
@@ -298,7 +298,7 @@ public sealed class TodoService : ITodoService
             "Todo",
             item.Id,
             item.Title,
-            FormatDate(item.Date),
+            TodoDtoMapper.FormatDate(item.Date),
             item.DeletedAt!.Value,
             item.DeletedAt!.Value.AddDays(30)));
     }
@@ -327,200 +327,7 @@ public sealed class TodoService : ITodoService
             source.ReminderScheduledAtUtc,
             sortOrder);
         await _repository.AddAsync(duplicate, cancellationToken);
-        return OperationResult<TodoItemDto>.Success(ToDto(duplicate));
-    }
-
-    private static (
-        Dictionary<string, string[]> Errors,
-        DateTime Date,
-        TodoRepeatPattern? RepeatPattern,
-        ValidatedReminder? Reminder) ValidateCreate(CreateTodoItemRequest request)
-    {
-        var errors = ValidateTitleAndNote(request.Title, request.Note);
-        if (!TryParseDate(request.Date, "date", out var date, out var dateErrors))
-        {
-            errors["date"] = dateErrors["date"];
-        }
-
-        var repeatPattern = ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors);
-        var reminder = errors.ContainsKey("date")
-            ? null
-            : ValidateReminder(request.Reminder, date, DateTime.UtcNow, errors);
-
-        return (errors, date, repeatPattern, reminder);
-    }
-
-    private static (
-        Dictionary<string, string[]> Errors,
-        DateTime? Date,
-        TodoRepeatPattern? RepeatPattern,
-        ValidatedReminder? Reminder) ValidateUpdate(
-            UpdateTodoItemRequest request,
-            DateTime currentDate,
-            bool currentIsCompleted,
-            DateTime nowUtc)
-    {
-        var errors = new Dictionary<string, string[]>();
-        if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
-        {
-            errors["title"] = ["Title is required."];
-        }
-        else if (request.Title?.Trim().Length > 240)
-        {
-            errors["title"] = ["Title must be at most 240 characters."];
-        }
-
-        if (request.Note is not null && request.Note.Trim().Length > 4000)
-        {
-            errors["note"] = ["Note must be at most 4000 characters."];
-        }
-
-        DateTime? parsedDate = null;
-        if (request.Date is not null)
-        {
-            if (!TryParseDate(request.Date, "date", out var candidateDate, out var dateErrors))
-            {
-                errors["date"] = dateErrors["date"];
-            }
-            else
-            {
-                parsedDate = candidateDate;
-            }
-        }
-
-        if (request.SortOrder is < 0)
-        {
-            errors["sortOrder"] = ["sortOrder cannot be negative."];
-        }
-
-        var repeatPattern = request.IsRepeatPatternSpecified
-            ? ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors)
-            : null;
-        var reminder = request.IsReminderSpecified && !errors.ContainsKey("date")
-            ? ValidateReminder(request.Reminder, parsedDate ?? currentDate, nowUtc, errors)
-            : null;
-        if (request.IsReminderSpecified
-            && request.Reminder is not null
-            && (request.IsCompleted ?? currentIsCompleted))
-        {
-            errors["reminder"] = ["Reopen the task before setting a reminder."];
-            reminder = null;
-        }
-
-        return (errors, parsedDate, repeatPattern, reminder);
-    }
-
-    private static ValidatedReminder? ValidateReminder(
-        TodoReminderRequest? request,
-        DateTime taskDate,
-        DateTime nowUtc,
-        Dictionary<string, string[]> errors)
-    {
-        if (request is null)
-        {
-            return null;
-        }
-
-        if (!TimeOnly.TryParseExact(request.Time, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
-        {
-            errors["reminder.time"] = ["Reminder time must use HH:mm format."];
-        }
-
-        TimeZoneInfo? timeZone = null;
-        var timeZoneId = request.TimeZoneId?.Trim() ?? string.Empty;
-        if (timeZoneId.Length is < 1 or > 100)
-        {
-            errors["reminder.timeZoneId"] = ["Reminder timezone id is required and must be at most 100 characters."];
-        }
-        else
-        {
-            try
-            {
-                timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
-            }
-            catch (InvalidTimeZoneException)
-            {
-                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
-            }
-        }
-
-        if (request.ScheduledAtUtc.Kind != DateTimeKind.Utc)
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder scheduled instant must be UTC."];
-        }
-        else if (request.ScheduledAtUtc <= nowUtc)
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder must be scheduled in the future."];
-        }
-        else if (!errors.ContainsKey("reminder.time")
-            && timeZone is not null
-            && !TodoReminderSchedule.Matches(taskDate, time, request.ScheduledAtUtc, timeZone))
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder date, time, timezone, and UTC instant do not match."];
-        }
-
-        return errors.Keys.Any(key => key.StartsWith("reminder.", StringComparison.Ordinal))
-            ? null
-            : new ValidatedReminder(time, timeZoneId, request.ScheduledAtUtc);
-    }
-
-    private static Dictionary<string, string[]> ValidateTitleAndNote(string title, string? note)
-    {
-        var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            errors["title"] = ["Title is required."];
-        }
-        else if (title.Trim().Length > 240)
-        {
-            errors["title"] = ["Title must be at most 240 characters."];
-        }
-
-        if (note is not null && note.Trim().Length > 4000)
-        {
-            errors["note"] = ["Note must be at most 4000 characters."];
-        }
-
-        return errors;
-    }
-
-    private static bool TryParseDate(string? value, string field, out DateTime date, out Dictionary<string, string[]> errors)
-    {
-        errors = [];
-        if (!DateTime.TryParseExact(value, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-        {
-            date = default;
-            errors[field] = [$"{field} must be a date in YYYY-MM-DD format."];
-            return false;
-        }
-
-        date = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
-        return true;
-    }
-
-    private static TodoRepeatPattern? ParseRepeatPattern(
-        string? value,
-        string field,
-        Dictionary<string, string[]> errors)
-    {
-        if (value is null)
-        {
-            return null;
-        }
-
-        if (!Enum.TryParse<TodoRepeatPattern>(value, ignoreCase: false, out var parsed)
-            || !Enum.IsDefined(parsed)
-            || !string.Equals(value, parsed.ToString(), StringComparison.Ordinal))
-        {
-            errors[field] = ["repeatPattern must be Daily, Weekdays, Weekly, Monthly, Yearly, or null."];
-            return null;
-        }
-
-        return parsed;
+        return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(duplicate));
     }
 
     private static void MarkGeneratedOccurrenceEditedWhenChanged(
@@ -551,36 +358,4 @@ public sealed class TodoService : ITodoService
         }
     }
 
-    private static TodoItemDto ToDto(TodoItem item, string? warningCode = null)
-    {
-        return new TodoItemDto(
-            item.Id,
-            item.Title,
-            item.Note,
-            FormatDate(item.Date),
-            item.SortOrder,
-            item.IsCompleted,
-            item.IsImportant,
-            item.RepeatPattern?.ToString(),
-            item.ReminderTime is not null
-                && item.ReminderTimeZoneId is not null
-                && item.ReminderScheduledAtUtc is not null
-                ? new TodoReminderDto(
-                    item.ReminderTime.Value.ToString(TimeFormat, CultureInfo.InvariantCulture),
-                    item.ReminderTimeZoneId,
-                    item.ReminderScheduledAtUtc.Value,
-                    item.ReminderSentAtUtc)
-                : null,
-            item.CompletedAt,
-            item.CreatedAt,
-            item.UpdatedAt,
-            warningCode);
-    }
-
-    private static string FormatDate(DateTime date)
-    {
-        return date.ToString(DateFormat, CultureInfo.InvariantCulture);
-    }
-
-    private sealed record ValidatedReminder(TimeOnly Time, string TimeZoneId, DateTime ScheduledAtUtc);
 }
