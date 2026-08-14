@@ -73,6 +73,17 @@ The one-shot `migrations` and `minio-bootstrap` services should show exit code
 `0`. The long-running `postgres`, `minio`, `api`, and `web` services should be
 healthy.
 
+Runtime probes are available through the local HTTPS origin:
+
+```text
+https://localhost:7443/health/live
+https://localhost:7443/health/ready
+```
+
+The live probe checks the API process. The ready probe also checks PostgreSQL
+and enabled object storage. The browser and command-line client may need to
+allow the locally generated Caddy certificate.
+
 ## Stop Or Reset
 
 Stop containers while retaining the new local database and MinIO objects:

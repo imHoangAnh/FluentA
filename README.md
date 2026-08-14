@@ -18,9 +18,9 @@ learning. It brings learning tools, personal planning, focus sessions, notes,
 and progress tracking into one web application.
 
 The repository contains a React single-page application and an ASP.NET Core
-modular monolith. PostgreSQL is the durable store, in-memory caching manages short-lived
-state, SignalR synchronizes active sessions, private object storage holds
-assets, and Hangfire runs recurring jobs. Development uses MinIO while
+modular monolith. PostgreSQL is the durable store, process-local memory holds
+short-lived state, SignalR synchronizes active sessions, private object storage
+holds assets, and Hangfire runs recurring jobs. Development uses MinIO while
 production uses AWS S3.
 
 ## Key Features
@@ -46,9 +46,12 @@ flowchart LR
     API --> JOBS["Hangfire jobs"]
 ```
 
-The backend keeps HTTP and realtime concerns in `FluentA.API`, use cases in
-`FluentA.Application`, business rules in `FluentA.Domain`, and external service
-implementations in `FluentA.Infrastructure`. See
+The backend keeps HTTP and realtime concerns in `FluentA.API`, use cases and
+ports in `FluentA.Application`, business rules in `FluentA.Domain`, and
+external service implementations in `FluentA.Infrastructure`. Controllers
+share the API identity/error boundary, while bounded-context services keep
+orchestration and delegate validation, mapping, statistics, and provider/query
+hotspots to focused internal collaborators. See
 [Architecture](docs/ARCHITECTURE.md) for boundaries, ownership, and runtime
 flows.
 
@@ -67,6 +70,8 @@ flows.
 
 - Modular-monolith boundaries separate domain rules from delivery and
   infrastructure concerns.
+- Internal decomposition keeps the existing four projects and public contracts;
+  it does not introduce CQRS, MediatR, or one handler per endpoint.
 - A consistent `ApiEnvelope<T>` contract keeps frontend and backend error
   handling predictable.
 - SignalR events and query invalidation synchronize changes across active
@@ -173,13 +178,21 @@ Open `https://localhost:5173`.
 ## Testing
 
 ```powershell
-# Backend unit tests
-dotnet test src/backend/FluentA.slnx
+# Backend tests
+dotnet test src/backend/FluentA.slnx --configuration Release --no-restore
 
 # Frontend checks
+npm --prefix src/frontend run check:architecture
 npm --prefix src/frontend run lint
 npm --prefix src/frontend run test:run
 npm --prefix src/frontend run build
+
+# Backend release checks
+dotnet build src/backend/FluentA.slnx --configuration Release --no-restore
+dotnet tool run dotnet-ef migrations has-pending-model-changes `
+  --project src/backend/FluentA.Infrastructure `
+  --startup-project src/backend/FluentA.API `
+  --configuration Release
 
 # Browser tests require the local stack to be running
 npm --prefix src/frontend run test:e2e
@@ -201,6 +214,7 @@ src/
     e2e/                         Playwright scenarios
 docs/
   product/                       Current product contracts
+  plans/                         Active and completed execution plans
   stories/                       Story scope and validation evidence
   decisions/                     Architecture decision records
 ```
@@ -208,5 +222,9 @@ docs/
 ## Documentation
 
 - [Frontend development guide](src/frontend/README.md)
+- [Frontend architecture guide](src/frontend/ARCHITECTURE.md)
 - [Backend and API guide](src/backend/README.md)
+- [Local Docker runbook](deploy/local/README.md)
+- [Production operations runbook](deploy/production/README.md)
 - [System architecture](docs/ARCHITECTURE.md)
+- [Documentation map](docs/README.md)

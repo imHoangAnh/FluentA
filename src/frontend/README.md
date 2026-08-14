@@ -85,6 +85,7 @@ Output production được tạo trong thư mục `dist/`.
    - `/journal`, `/notes`: lưu nhật ký và ghi chú.
    - `/notifications`: xem thông báo.
    - `/settings`: cập nhật hồ sơ và thiết lập học tập.
+   - `/trash`: khôi phục hoặc xoá vĩnh viễn dữ liệu đã đưa vào Trash.
 4. Khi phát triển giao diện, đặt code theo feature trong `src/features` và chỉ
    đặt thành phần dùng chung thực sự trong `src/shared`.
 
