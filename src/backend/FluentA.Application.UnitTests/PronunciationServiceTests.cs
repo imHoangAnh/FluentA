@@ -162,6 +162,27 @@ public sealed class PronunciationServiceTests
         Assert.Equal("oʊ", assessment.Words[0].Units[1].Text);
     }
 
+    [Fact]
+    public async Task AzureProvider_RetriesOnceWhenSuccessfulRecognitionOmitsAssessmentScores()
+    {
+        var handler = new RecordingHandler(
+            """
+            {"RecognitionStatus":"Success","NBest":[{"Confidence":0.9,"Display":"Go."}]}
+            """,
+            """
+            {"RecognitionStatus":"Success","NBest":[{"AccuracyScore":92,"CompletenessScore":100,"Words":[{"Word":"go","AccuracyScore":92,"ErrorType":"None","Phonemes":[{"Phoneme":"ɡ","AccuracyScore":92}]}]}]}
+            """);
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler),
+            EnabledOptions(),
+            NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+
+        var assessment = await provider.AssessAsync("go", "en-US", CreatePcmWav(500));
+
+        Assert.Equal(92, assessment.AccuracyScore);
+        Assert.Equal(2, handler.RequestCount);
+    }
+
     [Theory]
     [InlineData("NoMatch", PronunciationNotRecognizedReason.NoMatch)]
     [InlineData("InitialSilenceTimeout", PronunciationNotRecognizedReason.InitialSilenceTimeout)]
@@ -246,17 +267,21 @@ public sealed class PronunciationServiceTests
         }
     }
 
-    private sealed class RecordingHandler(string responseJson) : HttpMessageHandler
+    private sealed class RecordingHandler(params string[] responseJsons) : HttpMessageHandler
     {
+        private readonly Queue<string> _responses = new(responseJsons);
+
         public string? Host { get; private set; }
         public string? SubscriptionKey { get; private set; }
         public string? ContentType { get; private set; }
         public string? Accept { get; private set; }
         public byte[]? Body { get; private set; }
         public string? AssessmentJson { get; private set; }
+        public int RequestCount { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount += 1;
             Host = request.RequestUri?.Host;
             SubscriptionKey = request.Headers.GetValues("Ocp-Apim-Subscription-Key").Single();
             ContentType = request.Content?.Headers.GetValues("Content-Type").Single();
@@ -264,6 +289,7 @@ public sealed class PronunciationServiceTests
             Body = request.Content is null ? null : await request.Content.ReadAsByteArrayAsync(cancellationToken);
             var encodedAssessment = request.Headers.GetValues("Pronunciation-Assessment").Single();
             AssessmentJson = Encoding.UTF8.GetString(Convert.FromBase64String(encodedAssessment));
+            var responseJson = _responses.Count > 1 ? _responses.Dequeue() : _responses.Peek();
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
