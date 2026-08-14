@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as assetsApi from '@/lib/api/assets.api'
+import * as assetsApi from '@/features/assets'
 import * as noteApi from '../api/note.api'
 import { useAuthStore } from '@/features/auth'
 import { AppProviders } from '@/app/providers'
@@ -25,11 +25,11 @@ vi.mock('../api/note.api', async () => {
   }
 })
 
-vi.mock('@/lib/api/assets.api', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/api/assets.api')>('@/lib/api/assets.api')
+vi.mock('@/features/assets', async () => {
+  const actual = await vi.importActual<typeof import('@/features/assets')>('@/features/assets')
   return {
     ...actual,
-    uploadNoteImageAsset: vi.fn(),
+    uploadAsset: vi.fn(),
   }
 })
 
@@ -82,7 +82,7 @@ describe('NotesPage', () => {
       createdAt: '2026-07-09T09:05:00Z',
       updatedAt: '2026-07-09T09:05:00Z',
     })
-    vi.mocked(assetsApi.uploadNoteImageAsset).mockResolvedValue({
+    vi.mocked(assetsApi.uploadAsset).mockResolvedValue({
       id: 'asset-1',
       assetType: 'note-image',
       status: 'finalized',
@@ -433,7 +433,7 @@ describe('NotesPage', () => {
       },
     })
 
-    await waitFor(() => expect(assetsApi.uploadNoteImageAsset).toHaveBeenCalledWith(file))
+    await waitFor(() => expect(assetsApi.uploadAsset).toHaveBeenCalledWith(file, 'note-image'))
     expect(screen.getByTestId('note-save-status')).toHaveTextContent('Unsaved changes')
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -469,7 +469,7 @@ describe('NotesPage', () => {
       createdAt: '2026-07-09T09:00:00Z',
       updatedAt: '2026-07-09T09:00:00Z',
     })
-    vi.mocked(assetsApi.uploadNoteImageAsset).mockRejectedValueOnce(new Error('Note image upload could not be completed.'))
+    vi.mocked(assetsApi.uploadAsset).mockRejectedValueOnce(new Error('Note image upload could not be completed.'))
 
     renderPage()
 

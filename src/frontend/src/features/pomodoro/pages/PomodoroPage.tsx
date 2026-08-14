@@ -2,8 +2,10 @@ import { CheckCircle2, Clock3, Pause, Play, RotateCcw, Settings, TimerReset } fr
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as pomodoroApi from '../api/pomodoro.api'
+import { pomodoroKeys } from '../api/pomodoro.queries'
 import * as todoApi from '@/features/todo'
 import * as projectApi from '@/features/project'
+import { projectKeys } from '@/features/project'
 import { PomodoroConfigurationDialog, type PomodoroConfigFormValues } from '../components/PomodoroConfigurationDialog'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 
@@ -33,26 +35,26 @@ export function PomodoroPage() {
   const autoCompletedKey = useRef<string | null>(null)
 
   const configQuery = useQuery({
-    queryKey: ['pomodoro', 'config'],
+    queryKey: pomodoroKeys.config,
     queryFn: pomodoroApi.getPomodoroConfig,
   })
 
   const currentQuery = useQuery({
-    queryKey: ['pomodoro', 'current'],
+    queryKey: pomodoroKeys.current,
     queryFn: pomodoroApi.getPomodoroCurrent,
   })
 
   const todayQuery = useQuery({
-    queryKey: ['pomodoro', 'today'],
+    queryKey: pomodoroKeys.today,
     queryFn: pomodoroApi.getPomodoroToday,
   })
   const todosQuery = useQuery({
-    queryKey: ['todos', 'pomodoro-today'],
+    queryKey: pomodoroKeys.todoToday,
     queryFn: () => todoApi.listByDate(new Date().toISOString().slice(0, 10)),
   })
-  const boardsQuery = useQuery({ queryKey: ['project', 'boards'], queryFn: projectApi.listBoards })
+  const boardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards })
   const boardDetailsQuery = useQuery({
-    queryKey: ['project', 'pomodoro-cards', boardsQuery.data?.map((board) => board.id).join(',')],
+    queryKey: projectKeys.pomodoroCards(boardsQuery.data?.map((board) => board.id).join(',')),
     queryFn: () => Promise.all((boardsQuery.data ?? []).map((board) => projectApi.getBoard(board.id))),
     enabled: Boolean(boardsQuery.data?.length),
   })
@@ -60,10 +62,10 @@ export function PomodoroPage() {
   const updateConfig = useMutation({
     mutationFn: pomodoroApi.updatePomodoroConfig,
     onSuccess: async (saved) => {
-      queryClient.setQueryData(['pomodoro', 'config'], saved)
+      queryClient.setQueryData(pomodoroKeys.config, saved)
       setMessage(null)
       setConfigOpen(false)
-      await queryClient.invalidateQueries({ queryKey: ['pomodoro'] })
+      await queryClient.invalidateQueries({ queryKey: pomodoroKeys.all })
     },
     onError: () => setMessage('Could not save settings.'),
   })
@@ -77,8 +79,8 @@ export function PomodoroPage() {
       complete: pomodoroApi.completePomodoro,
     })[command](),
     onSuccess: (state) => {
-      queryClient.setQueryData(['pomodoro', 'current'], state)
-      void queryClient.invalidateQueries({ queryKey: ['pomodoro', 'today'] })
+      queryClient.setQueryData(pomodoroKeys.current, state)
+      void queryClient.invalidateQueries({ queryKey: pomodoroKeys.today })
       setMessage(null)
     },
     onError: () => setMessage('Error updating timer.'),

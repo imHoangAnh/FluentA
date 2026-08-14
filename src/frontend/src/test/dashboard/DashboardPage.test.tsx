@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
 import { useAuthStore } from '@/features/auth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
-import { DASHBOARD_WIDGET_STORAGE_KEY } from '@/features/dashboard/dashboard-widget-preferences'
+import { DASHBOARD_WIDGET_STORAGE_KEY } from '@/features/dashboard/model/dashboard-widget-preferences'
 
 const adapters = vi.hoisted(() => ({
   listByDate: vi.fn(),
@@ -19,13 +19,34 @@ const adapters = vi.hoisted(() => ({
   getPomodoroToday: vi.fn(),
 }))
 
-vi.mock('@/features/todo', () => ({ listByDate: adapters.listByDate, updateTodo: adapters.updateTodo }))
-vi.mock('@/features/habits', () => ({ listHabits: adapters.listHabits, toggleHabitEntry: adapters.toggleHabitEntry, HabitIconGlyph: () => null }))
-vi.mock('@/features/countdown', () => ({ listCountdowns: adapters.listCountdowns }))
-vi.mock('@/features/review', () => ({ getReviewDashboard: adapters.getReviewDashboard }))
-vi.mock('@/features/project', () => ({ listBoards: adapters.listBoards }))
-vi.mock('@/features/pomodoro', () => ({ getPomodoroCurrent: adapters.getPomodoroCurrent, getPomodoroToday: adapters.getPomodoroToday }))
-vi.mock('@/features/journal', () => ({ JournalRichTextEditor: () => null }))
+vi.mock('@/features/todo', () => ({
+  listByDate: adapters.listByDate,
+  updateTodo: adapters.updateTodo,
+  todoKeys: { all: ['todo'], day: (date: string) => ['todo', 'items', date] },
+}))
+vi.mock('@/features/habits', () => ({
+  listHabits: adapters.listHabits,
+  toggleHabitEntry: adapters.toggleHabitEntry,
+  HabitIconGlyph: () => null,
+  habitKeys: { all: ['habit'], list: (timeZoneId: string) => ['habit', 'list', timeZoneId] },
+}))
+vi.mock('@/features/countdown', () => ({
+  listCountdowns: adapters.listCountdowns,
+  countdownKeys: { events: ['countdown', 'events'] },
+}))
+vi.mock('@/features/review', () => ({
+  getReviewDashboard: adapters.getReviewDashboard,
+  reviewKeys: { dashboard: ['review', 'dashboard'] },
+}))
+vi.mock('@/features/project', () => ({
+  listBoards: adapters.listBoards,
+  projectKeys: { boards: ['project', 'boards'] },
+}))
+vi.mock('@/features/pomodoro', () => ({
+  getPomodoroCurrent: adapters.getPomodoroCurrent,
+  getPomodoroToday: adapters.getPomodoroToday,
+  pomodoroKeys: { current: ['pomodoro', 'current'], today: ['pomodoro', 'today'] },
+}))
 
 function renderDashboard(order = ['review', 'todo', 'countdown']) {
   window.localStorage.setItem(DASHBOARD_WIDGET_STORAGE_KEY, JSON.stringify({ version: 1, order }))

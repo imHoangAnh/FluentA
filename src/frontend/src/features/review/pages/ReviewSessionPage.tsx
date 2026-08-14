@@ -1,15 +1,15 @@
 import { CheckCircle2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import * as reviewApi from './api/review.api'
-import { listBoards, type FlashcardBoard } from '@/features/flashcards'
+import * as reviewApi from '../api/review.api'
+import { flashcardKeys, listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { ReviewCompletion } from './components/session/ReviewCompletion'
-import { ReviewModeSurface } from './components/session/ReviewModeSurface'
-import { ReviewProgress } from './components/session/ReviewProgress'
-import { ReviewRecap } from './components/session/ReviewRecap'
-import { ReviewSetup, type ReviewBoardOption } from './components/session/ReviewSetup'
+import { ReviewCompletion } from '../components/session/ReviewCompletion'
+import { ReviewModeSurface } from '../components/session/ReviewModeSurface'
+import { ReviewProgress } from '../components/session/ReviewProgress'
+import { ReviewRecap } from '../components/session/ReviewRecap'
+import { ReviewSetup, type ReviewBoardOption } from '../components/session/ReviewSetup'
 
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
@@ -74,7 +74,7 @@ export function ReviewSessionPage() {
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const feedbackTimerRef = useRef<number | null>(null)
 
-  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: listBoards })
+  const decksQuery = useQuery({ queryKey: flashcardKeys.boards, queryFn: listBoards })
   const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? []), [decksQuery.data])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []

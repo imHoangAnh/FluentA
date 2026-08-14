@@ -1,6 +1,6 @@
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it, vi } from 'vitest'
-import { apiClient } from '@/shared/lib/http/client'
+import { apiClient } from '@/shared/api/client'
 
 function ok(config: InternalAxiosRequestConfig) {
   return Promise.resolve({ data: {}, status: 200, statusText: 'OK', headers: {}, config })

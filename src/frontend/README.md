@@ -20,6 +20,7 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 - [Cách sử dụng dự án](#5-cách-sử-dụng-dự-án)
 - [Các lệnh thường dùng](#6-các-lệnh-thường-dùng)
 - [Cấu trúc thư mục](#7-cấu-trúc-thư-mục)
+- [Quy ước kiến trúc](#8-quy-ước-kiến-trúc)
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
@@ -97,6 +98,7 @@ cookie, không dùng access token trong JavaScript.
 | --- | --- |
 | `npm run dev` | Chạy Vite development server |
 | `npm run build` | Type-check và tạo production build |
+| `npm run check:architecture` | Kiểm tra orphan module, import cycle và frontend boundaries |
 | `npm run preview` | Preview production build |
 | `npm run lint` | Kiểm tra ESLint |
 | `npm run test` | Chạy Vitest ở watch mode |
@@ -113,7 +115,9 @@ src/frontend/
     app/              Application shell, provider và router
     features/         Module theo tính năng
     shared/           Component, hook, type và utility dùng chung
+    styles/           Design-system entrypoint và global foundation
     test/             Test setup và test dùng chung
+  tools/              Kiểm tra kiến trúc chạy từ npm scripts
   e2e/                Playwright scenario
   public/             Static asset
   package.json        Dependency và npm script
@@ -122,3 +126,22 @@ src/frontend/
 
 Xem [README của root project](../../README.md) để chạy toàn bộ hệ thống và
 [Backend README](../backend/README.md) để cấu hình API.
+
+## 8. Quy ước kiến trúc
+
+Frontend dùng dependency direction `app -> features -> shared`. Feature khác
+chỉ được import qua public `index.ts`; `shared` không được import `app` hoặc
+`features`. Không thêm module mới vào root `src/lib`.
+
+Trước khi hoàn tất thay đổi frontend, chạy:
+
+```powershell
+npm run check:architecture
+npm run lint
+npm run test:run
+npm run build
+```
+
+Xem [Frontend Architecture](ARCHITECTURE.md) để biết ownership của route, API,
+query key, page, component, realtime, CSS và test cũng như quy trình thêm code
+mới.

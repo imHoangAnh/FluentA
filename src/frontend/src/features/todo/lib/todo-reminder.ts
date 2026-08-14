@@ -1,4 +1,4 @@
-import type { TodoReminderInput } from './api/todo.api'
+import type { TodoReminderInput } from '../api/todo.api'
 
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/
 const timePattern = /^(\d{2}):(\d{2})$/

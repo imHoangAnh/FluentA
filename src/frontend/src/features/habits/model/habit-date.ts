@@ -1,4 +1,4 @@
-import type { Habit } from './api/habit.api'
+import type { Habit } from '../api/habit.api'
 
 export const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 

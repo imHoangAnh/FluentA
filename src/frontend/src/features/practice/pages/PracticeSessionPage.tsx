@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
-import { getPageSession, type FlashcardCard } from '@/features/flashcards'
+import { flashcardKeys, getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
+import { practiceKeys } from '../api/practice.queries'
 import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { PracticeModeSurface } from '../components/session/PracticeModeSurface'
@@ -54,8 +55,8 @@ export function PracticeSessionPage() {
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const initializedSessionKeyRef = useRef<string | null>(null)
 
-  const sessionQuery = useQuery({ queryKey: ['flashcard', 'page-session', pageId], queryFn: () => getPageSession(pageId), enabled: Boolean(pageId) })
-  const practiceSettingsQuery = useQuery({ queryKey: ['practice', 'settings'], queryFn: getPracticeSettings })
+  const sessionQuery = useQuery({ queryKey: flashcardKeys.pageSession(pageId), queryFn: () => getPageSession(pageId), enabled: Boolean(pageId) })
+  const practiceSettingsQuery = useQuery({ queryKey: practiceKeys.settings, queryFn: getPracticeSettings })
   const saveSummaryMutation = useMutation({ mutationFn: practiceApi.createPracticeSessionSummary })
   const addToReviewMutation = useMutation({ mutationFn: practiceApi.addPracticeWordsToReview })
   const pronunciationMutation = useMutation({ mutationFn: ({ wordId, audio }: { wordId: string; audio: Blob }) => assessPronunciation(wordId, audio) })

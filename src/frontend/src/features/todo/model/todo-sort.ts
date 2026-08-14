@@ -1,4 +1,4 @@
-import type { TodoItem } from './api/todo.api'
+import type { TodoItem } from '../api/todo.api'
 
 export type TodoSortMode = 'importance' | 'alphabetical' | 'creation'
 

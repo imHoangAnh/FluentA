@@ -1,6 +1,6 @@
-import { apiClient } from '@/shared/lib/http/client'
-import type { ApiEnvelope } from '@/shared/types/api'
-import type { TrashEntry } from '@/features/trash'
+import { apiClient } from '@/shared/api/client'
+import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 export const DEFAULT_VOCAB_COLUMN_ORDER = [
   'word',
@@ -152,11 +152,6 @@ export async function listWords(boardId: string, pageId: string) {
 
 export async function createWord(boardId: string, pageId: string, input: WordInput) {
   const response = await apiClient.post<ApiEnvelope<Word>>(`/boards/${boardId}/pages/${pageId}/words`, input)
-  return response.data.data!
-}
-
-export async function updateWord(boardId: string, wordId: string, input: WordInput) {
-  const response = await apiClient.patch<ApiEnvelope<Word>>(`/boards/${boardId}/words/${wordId}`, input)
   return response.data.data!
 }
 

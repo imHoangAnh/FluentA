@@ -5,18 +5,24 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth'
 import * as countdownApi from '@/features/countdown'
+import { countdownKeys } from '@/features/countdown'
 import * as habitApi from '@/features/habits'
+import { habitKeys } from '@/features/habits'
 import * as pomodoroApi from '@/features/pomodoro'
+import { pomodoroKeys } from '@/features/pomodoro'
 import * as projectApi from '@/features/project'
+import { projectKeys } from '@/features/project'
 import { getReviewDashboard } from '@/features/review'
+import { reviewKeys } from '@/features/review'
 import * as todoApi from '@/features/todo'
+import { todoKeys } from '@/features/todo'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { cn } from '@/shared/lib/utils'
 import { DashboardWidgetMenu } from '../components/DashboardWidgetMenu'
 import { CountdownAction, CountdownWidget, HabitWidget, PomodoroAction, PomodoroWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
 import { SortableDashboardWidget } from '../components/SortableDashboardWidget'
-import { dashboardWidgetLabel, dashboardWidgetRows, dashboardWidgetSlotClass, type DashboardWidgetId } from '../dashboard-widgets'
-import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../dashboard-widget-preferences'
+import { dashboardWidgetLabel, dashboardWidgetRows, dashboardWidgetSlotClass, type DashboardWidgetId } from '../model/dashboard-widgets'
+import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../model/dashboard-widget-preferences'
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -76,22 +82,22 @@ export function DashboardPage() {
     return () => window.clearInterval(intervalId)
   }, [])
 
-  const todosQuery = useQuery({ queryKey: ['todo', 'items', today], queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
-  const habitsQuery = useQuery({ queryKey: ['habit', 'list', timeZoneId], queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
-  const countdownsQuery = useQuery({ queryKey: ['countdown', 'events'], queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
-  const flashcardDashboardQuery = useQuery({ queryKey: ['review', 'dashboard'], queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
-  const projectBoardsQuery = useQuery({ queryKey: ['project', 'boards'], queryFn: projectApi.listBoards, enabled: visible('project') })
-  const pomodoroCurrentQuery = useQuery({ queryKey: ['pomodoro', 'current'], queryFn: pomodoroApi.getPomodoroCurrent, enabled: visible('pomodoro') })
-  const pomodoroTodayQuery = useQuery({ queryKey: ['pomodoro', 'today'], queryFn: pomodoroApi.getPomodoroToday, enabled: visible('pomodoro') })
+  const todosQuery = useQuery({ queryKey: todoKeys.day(today), queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
+  const habitsQuery = useQuery({ queryKey: habitKeys.list(timeZoneId), queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
+  const countdownsQuery = useQuery({ queryKey: countdownKeys.events, queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
+  const flashcardDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
+  const projectBoardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards, enabled: visible('project') })
+  const pomodoroCurrentQuery = useQuery({ queryKey: pomodoroKeys.current, queryFn: pomodoroApi.getPomodoroCurrent, enabled: visible('pomodoro') })
+  const pomodoroTodayQuery = useQuery({ queryKey: pomodoroKeys.today, queryFn: pomodoroApi.getPomodoroToday, enabled: visible('pomodoro') })
 
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['todo'] }) },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: todoKeys.all }) },
   })
 
   const habitToggle = useMutation({
     mutationFn: (habit: habitApi.Habit) => habitApi.toggleHabitEntry(habit.id, today, timeZoneId),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['habit'] }) },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: habitKeys.all }) },
   })
 
   const todos = useMemo(

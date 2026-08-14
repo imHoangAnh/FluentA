@@ -6,8 +6,8 @@ import {
   readDashboardWidgetOrder,
   reorderDashboardWidgets,
   toggleDashboardWidget,
-} from '@/features/dashboard/dashboard-widget-preferences'
-import { dashboardWidgetRows, dashboardWidgetSlotClass } from '@/features/dashboard/dashboard-widgets'
+} from './dashboard-widget-preferences'
+import { dashboardWidgetRows, dashboardWidgetSlotClass } from './dashboard-widgets'
 
 afterEach(() => window.localStorage.clear())
 

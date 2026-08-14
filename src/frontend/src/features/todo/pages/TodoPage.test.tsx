@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
-import { formatWeekRange, toDateInput, weekDates } from '../todo-date'
+import { formatWeekRange, toDateInput, weekDates } from '../model/todo-date'
 import { TodoPage } from './TodoPage'
 
 const api = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ vi.mock('../api/todo.api', async (importOriginal) => ({
   ...api,
 }))
 
-vi.mock('../todo-reminder', () => ({
+vi.mock('../lib/todo-reminder', () => ({
   createBrowserReminder: vi.fn((_date: string, time: string) => ({
     reminder: {
       time,

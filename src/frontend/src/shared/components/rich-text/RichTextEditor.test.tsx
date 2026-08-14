@@ -1,15 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { JournalRichTextEditor } from './JournalRichTextEditor'
+import { RichTextEditor } from './RichTextEditor'
 
-describe('JournalRichTextEditor', () => {
+describe('RichTextEditor', () => {
   it('wires heading and list toolbar actions to semantic editor commands', async () => {
     const execCommand = vi.fn().mockReturnValue(true)
     Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
     const onChange = vi.fn()
     const { getByRole } = render(
-      <JournalRichTextEditor content="<p>Journal entry</p>" onChange={onChange} />,
+      <RichTextEditor content="<p>Journal entry</p>" onChange={onChange} />,
     )
 
     await userEvent.click(getByRole('button', { name: 'Heading 1' }))
@@ -25,7 +25,7 @@ describe('JournalRichTextEditor', () => {
 
   it('keeps the Journal formatting toolbar inline by default', () => {
     const { container } = render(
-      <JournalRichTextEditor content="<p>Journal entry</p>" onChange={vi.fn()} />,
+      <RichTextEditor content="<p>Journal entry</p>" onChange={vi.fn()} />,
     )
 
     const shell = container.querySelector('.journal-rich-text-shell')

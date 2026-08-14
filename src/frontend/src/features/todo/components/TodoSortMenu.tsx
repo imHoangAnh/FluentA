@@ -1,7 +1,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { ArrowUpDown, Check } from 'lucide-react'
 import { dropdownContentClassName, dropdownItemClassName, dropdownLabelClassName } from '@/shared/components/ui/dropdown-styles'
-import { TODO_SORT_OPTIONS, type TodoSortMode } from '../todo-sort'
+import { TODO_SORT_OPTIONS, type TodoSortMode } from '../model/todo-sort'
 
 type TodoSortMenuProps = {
   sortMode: TodoSortMode | null

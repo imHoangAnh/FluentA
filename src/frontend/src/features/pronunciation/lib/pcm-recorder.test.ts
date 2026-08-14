@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodePcmWav } from '@/features/pronunciation/pcm-recorder'
+import { encodePcmWav } from './pcm-recorder'
 
 describe('PCM pronunciation recorder', () => {
   it('encodes browser samples as 16-kHz 16-bit mono PCM WAV', async () => {

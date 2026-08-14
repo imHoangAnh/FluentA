@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/shared/lib/utils'
 
-type JournalRichTextEditorProps = {
+type RichTextEditorProps = {
   contentClassName?: string
   disabled?: boolean
   content: string
@@ -44,7 +44,7 @@ function runCommand(command: string, value?: string) {
   return document.execCommand(command, false, value)
 }
 
-export function JournalRichTextEditor({
+export function RichTextEditor({
   contentClassName,
   disabled = false,
   content,
@@ -56,7 +56,7 @@ export function JournalRichTextEditor({
   toolbarAriaLabel = 'Journal formatting tools',
   toolbarClassName,
   toolbarHost,
-}: JournalRichTextEditorProps) {
+}: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(100)
   const [isUploadingImage, setIsUploadingImage] = useState(false)

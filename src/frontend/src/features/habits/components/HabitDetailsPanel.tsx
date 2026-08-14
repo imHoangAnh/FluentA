@@ -1,7 +1,7 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, Edit3, Flame, Percent, Trash2, Trophy } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Habit } from '../api/habit.api'
-import { canToggleHabit, formatMonth, formatShortDate, parseMonth, scheduleText } from '../habit-date'
+import { canToggleHabit, formatMonth, formatShortDate, parseMonth, scheduleText } from '../model/habit-date'
 import { HabitIconGlyph } from './habit-icons'
 
 type HabitDetailsPanelProps = {

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TrashPage } from '@/features/trash/pages/TrashPage'
 import * as trashApi from '@/features/trash/api/trash.api'
+import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 vi.mock('@/features/trash/api/trash.api', async () => {
   const actual = await vi.importActual<typeof import('@/features/trash/api/trash.api')>('@/features/trash/api/trash.api')
@@ -18,7 +19,7 @@ vi.mock('@/features/trash/api/trash.api', async () => {
   }
 })
 
-const items: trashApi.TrashEntry[] = Array.from({ length: 21 }, (_, index) => ({
+const items: TrashEntry[] = Array.from({ length: 21 }, (_, index) => ({
   id: `trash-${index + 1}`,
   entityKind: 'Todo',
   entityId: `todo-${index + 1}`,

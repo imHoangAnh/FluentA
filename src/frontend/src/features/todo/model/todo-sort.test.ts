@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { TodoItem } from './api/todo.api'
+import type { TodoItem } from '../api/todo.api'
 import { readTodoSortMode, sortTodoItems, TODO_SORT_STORAGE_KEY, writeTodoSortMode } from './todo-sort'
 
 function todo(id: string, overrides: Partial<TodoItem> = {}): TodoItem {

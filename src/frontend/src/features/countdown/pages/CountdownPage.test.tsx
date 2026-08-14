@@ -16,8 +16,8 @@ vi.mock('../api/countdown.api', async (importOriginal) => ({
   ...countdownApi,
 }))
 
-vi.mock('@/lib/api/assets.api', () => ({
-  uploadCountdownCoverAsset: vi.fn(),
+vi.mock('@/features/assets', () => ({
+  uploadAsset: vi.fn(),
 }))
 
 function renderPage() {

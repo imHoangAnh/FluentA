@@ -18,8 +18,9 @@ import { SelectMenu } from '@/shared/components/ui/select-menu'
 import { ProjectCardDetailPanel } from '../components/ProjectCardDetailPanel'
 import { type ProjectCardForm, projectPriorities } from '../components/project-card-editor'
 import * as projectApi from '../api/project.api'
+import { projectKeys } from '../api/project.queries'
 import { restoreTrashEntry } from '@/features/trash'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 
 const today = new Date()
 const todayInput = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
@@ -112,7 +113,7 @@ export function ProjectPage() {
   }, [])
 
   const boardsQuery = useQuery({
-    queryKey: ['project', 'boards'],
+    queryKey: projectKeys.boards,
     queryFn: projectApi.listBoards,
   })
 
@@ -120,7 +121,7 @@ export function ProjectPage() {
   const selectedBoardId = activeBoardId ?? boards[0]?.id ?? null
 
   const boardQuery = useQuery({
-    queryKey: ['project', 'board', selectedBoardId],
+    queryKey: projectKeys.board(selectedBoardId),
     queryFn: () => projectApi.getBoard(selectedBoardId!),
     enabled: Boolean(selectedBoardId),
   })
@@ -149,9 +150,9 @@ export function ProjectPage() {
   }, [editingBoardId])
 
   const refresh = async (boardId: string | null = selectedBoardId) => {
-    await queryClient.invalidateQueries({ queryKey: ['project', 'boards'] })
+    await queryClient.invalidateQueries({ queryKey: projectKeys.boards })
     if (boardId) {
-      await queryClient.invalidateQueries({ queryKey: ['project', 'board', boardId] })
+      await queryClient.invalidateQueries({ queryKey: projectKeys.board(boardId) })
     }
   }
 

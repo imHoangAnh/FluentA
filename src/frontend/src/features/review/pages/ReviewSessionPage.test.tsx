@@ -2,11 +2,15 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { ReviewSessionPage } from './ReviewSessionPage'
-import * as reviewApi from './api/review.api'
+import * as reviewApi from '../api/review.api'
 import * as flashcardsApi from '@/features/flashcards'
 
-vi.mock('./api/review.api')
-vi.mock('@/features/flashcards')
+vi.mock('../api/review.api')
+vi.mock('@/features/flashcards', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/features/flashcards')>(),
+  listBoards: vi.fn(),
+  flashcardKeys: { boards: ['flashcard', 'boards'] },
+}))
 
 describe('ReviewSessionPage keyboard shortcuts', () => {
   beforeEach(() => {

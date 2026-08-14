@@ -20,13 +20,31 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/{app,features,shared}/**/*.{ts,tsx}'],
+    files: ['src/app/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [
           {
             regex: '^@/features/[^/]+/.+',
             message: 'Import a feature through its public index.',
+          },
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/features/**/*.{ts,tsx}'],
+    ignores: ['src/features/**/*.test.{ts,tsx}', 'src/features/**/*.spec.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            regex: '^@/features/[^/]+/.+',
+            message: 'Import a feature through its public index.',
+          },
+          {
+            regex: '^@/app(?:/|$)',
+            message: 'Features must not depend on application composition.',
           },
         ],
       }],
@@ -42,6 +60,15 @@ export default defineConfig([
             message: 'Shared modules must remain domain-neutral.',
           },
         ],
+      }],
+    },
+  },
+  {
+    files: ['src/features/*/index.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'ExportAllDeclaration',
+        message: 'Feature public APIs must use explicit exports.',
       }],
     },
   },
