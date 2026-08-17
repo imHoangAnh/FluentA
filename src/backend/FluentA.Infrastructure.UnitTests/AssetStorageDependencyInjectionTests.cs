@@ -1,7 +1,7 @@
 using Amazon;
 using Amazon.S3;
 using FluentA.Application.BoundedContexts.Assets;
-using FluentA.Infrastructure.Assets;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
-using FluentA.Infrastructure.Auth;
+using FluentA.Infrastructure.Identity;
 
 namespace FluentA.Application.UnitTests;
 

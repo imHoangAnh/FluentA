@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using Amazon.S3;
 using Amazon.S3.Model;
 using FluentA.Application.BoundedContexts.Assets;
-using FluentA.Infrastructure.Assets;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 
 namespace FluentA.Infrastructure.UnitTests;
 
