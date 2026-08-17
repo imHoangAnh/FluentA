@@ -1,5 +1,6 @@
 using System.Globalization;
 using Amazon;
+using Amazon.Runtime;
 using Amazon.S3;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using Hangfire;
@@ -84,30 +85,48 @@ public static class DependencyInjection
             wordAccuracyThreshold);
     }
 
-    internal static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)
+    internal static AssetStorageClients CreateAssetStorageClients(AssetStorageOptions options)
     {
         options.Validate();
 
-        if (options.Provider == AssetStorageProvider.S3)
+        var operations = CreateAssetStorageClient(options, options.Endpoint);
+        if (string.IsNullOrWhiteSpace(options.PublicEndpoint)
+            || string.Equals(options.PublicEndpoint, options.Endpoint, StringComparison.OrdinalIgnoreCase))
         {
-            return new AmazonS3Client(new AmazonS3Config
-            {
-                RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region),
-                ForcePathStyle = false
-            });
+            return new AssetStorageClients(operations, operations);
         }
 
-        var endpoint = new Uri(options.Endpoint, UriKind.Absolute);
-        return new AmazonS3Client(
-            options.AccessKey,
-            options.SecretKey,
-            new AmazonS3Config
-            {
-                ServiceURL = options.Endpoint,
-                ForcePathStyle = options.UsePathStyle,
-                AuthenticationRegion = options.Region,
-                UseHttp = string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            });
+        var presigning = CreateAssetStorageClient(options, options.PublicEndpoint);
+        return new AssetStorageClients(operations, presigning);
+    }
+
+    private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options, string endpoint)
+    {
+        var config = new AmazonS3Config
+        {
+            ForcePathStyle = options.UsePathStyle
+        };
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region);
+        }
+        else
+        {
+            var endpointUri = new Uri(endpoint, UriKind.Absolute);
+            config.ServiceURL = endpoint;
+            config.AuthenticationRegion = options.Region;
+            config.UseHttp = string.Equals(
+                endpointUri.Scheme,
+                Uri.UriSchemeHttp,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return options.HasStaticCredentials
+            ? new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKey, options.SecretKey),
+                config)
+            : new AmazonS3Client(config);
     }
 
     private static string BuildPostgresConnectionString(string connectionString, IConfiguration configuration)

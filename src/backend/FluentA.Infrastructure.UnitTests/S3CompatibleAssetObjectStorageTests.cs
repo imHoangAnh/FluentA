@@ -10,12 +10,12 @@ namespace FluentA.Infrastructure.UnitTests;
 public sealed class S3CompatibleAssetObjectStorageTests
 {
     [Fact]
-    public void S3_presigned_urls_are_regional_https_and_support_temporary_credentials()
+    public void Regional_presigned_urls_are_https_and_support_temporary_credentials()
     {
         using var client = new AmazonS3Client(
             new SessionAWSCredentials("TESTACCESSKEY", "test-secret-key", "test-session-token"),
             RegionEndpoint.APSoutheast1);
-        var storage = new S3CompatibleAssetObjectStorage(client, S3Options());
+        var storage = new S3CompatibleAssetObjectStorage(client, RegionalOptions());
 
         var upload = storage.CreatePresignedUpload(new AssetUploadRequest(
             "users/test/avatar.png",
@@ -36,77 +36,63 @@ public sealed class S3CompatibleAssetObjectStorageTests
     }
 
     [Fact]
-    public async Task S3_privacy_check_reads_public_access_block_without_deleting_policy()
+    public async Task Custom_presigning_endpoint_is_independent_from_operations_endpoint()
     {
-        using var client = new RecordingS3Client
-        {
-            PublicAccessBlock = new PublicAccessBlockConfiguration
+        using var operations = new RecordingS3Client();
+        using var presigning = new AmazonS3Client(
+            new BasicAWSCredentials("TESTACCESSKEY", "test-secret-key"),
+            new AmazonS3Config
             {
-                BlockPublicAcls = true,
-                IgnorePublicAcls = true,
-                BlockPublicPolicy = true,
-                RestrictPublicBuckets = true
-            }
-        };
-        var storage = new S3CompatibleAssetObjectStorage(client, S3Options());
-
-        await storage.EnsurePrivateBucketAsync();
-
-        Assert.Equal(1, client.PublicAccessBlockReads);
-        Assert.Equal(0, client.BucketPolicyDeletes);
-    }
-
-    [Fact]
-    public async Task S3_privacy_check_fails_closed_when_any_public_access_block_is_missing()
-    {
-        using var client = new RecordingS3Client
-        {
-            PublicAccessBlock = new PublicAccessBlockConfiguration
-            {
-                BlockPublicAcls = true,
-                IgnorePublicAcls = true,
-                BlockPublicPolicy = true,
-                RestrictPublicBuckets = false
-            }
-        };
-        var storage = new S3CompatibleAssetObjectStorage(client, S3Options());
-
-        var exception = await Assert.ThrowsAsync<AssetStorageUnavailableException>(
-            () => storage.EnsurePrivateBucketAsync());
-
-        Assert.Equal("Required S3 public-access protections are not enabled.", exception.Message);
-        Assert.Equal(0, client.BucketPolicyDeletes);
-    }
-
-    [Fact]
-    public async Task Minio_privacy_enforcement_retains_the_existing_policy_delete_behavior()
-    {
-        using var client = new RecordingS3Client();
-        var storage = new S3CompatibleAssetObjectStorage(client, new AssetStorageOptions
+                ServiceURL = "https://localhost:7443",
+                ForcePathStyle = true,
+                AuthenticationRegion = "us-east-1"
+            });
+        var options = new AssetStorageOptions
         {
             Enabled = true,
-            Provider = AssetStorageProvider.Minio,
-            Endpoint = "http://127.0.0.1:9000",
+            Endpoint = "http://minio:59000",
+            PublicEndpoint = "https://localhost:7443",
             Bucket = "fluenta-assets-test",
-            AccessKey = "test-access-key",
+            AccessKey = "TESTACCESSKEY",
             SecretKey = "test-secret-key",
             Region = "us-east-1",
             UsePathStyle = true
-        });
+        };
+        var storage = new S3CompatibleAssetObjectStorage(
+            new AssetStorageClients(operations, presigning, ownsClients: false),
+            options);
 
-        await storage.EnsurePrivateBucketAsync();
+        var upload = storage.CreatePresignedUpload(new AssetUploadRequest(
+            "users/test/avatar.png",
+            "image/png",
+            TimeSpan.FromMinutes(5)));
+        await storage.VerifyBucketAccessAsync();
 
-        Assert.Equal(1, client.BucketPolicyDeletes);
-        Assert.Equal(0, client.PublicAccessBlockReads);
+        var uploadUri = new Uri(upload.Url);
+        Assert.Equal("https", uploadUri.Scheme);
+        Assert.Equal("localhost", uploadUri.Host);
+        Assert.Equal(7443, uploadUri.Port);
+        Assert.StartsWith("/fluenta-assets-test/", uploadUri.AbsolutePath, StringComparison.Ordinal);
+        Assert.Equal(1, operations.BucketLocationReads);
     }
 
-    private static AssetStorageOptions S3Options() => new()
+    [Fact]
+    public async Task Bucket_access_failure_is_translated_to_the_storage_contract()
+    {
+        using var client = new RecordingS3Client { FailBucketLocation = true };
+        var storage = new S3CompatibleAssetObjectStorage(client, RegionalOptions());
+
+        var exception = await Assert.ThrowsAsync<AssetStorageUnavailableException>(
+            () => storage.VerifyBucketAccessAsync());
+
+        Assert.Equal("Could not access asset storage.", exception.Message);
+    }
+
+    private static AssetStorageOptions RegionalOptions() => new()
     {
         Enabled = true,
-        Provider = AssetStorageProvider.S3,
         Bucket = "fluenta-assets-test",
-        Region = "ap-southeast-1",
-        UsePathStyle = false
+        Region = "ap-southeast-1"
     };
 
     private sealed class RecordingS3Client : AmazonS3Client
@@ -118,27 +104,17 @@ public sealed class S3CompatibleAssetObjectStorageTests
         {
         }
 
-        public int PublicAccessBlockReads { get; private set; }
-        public int BucketPolicyDeletes { get; private set; }
-        public PublicAccessBlockConfiguration? PublicAccessBlock { get; init; }
+        public int BucketLocationReads { get; private set; }
+        public bool FailBucketLocation { get; init; }
 
-        public override Task<GetPublicAccessBlockResponse> GetPublicAccessBlockAsync(
-            GetPublicAccessBlockRequest request,
+        public override Task<GetBucketLocationResponse> GetBucketLocationAsync(
+            GetBucketLocationRequest request,
             CancellationToken cancellationToken = default)
         {
-            PublicAccessBlockReads++;
-            return Task.FromResult(new GetPublicAccessBlockResponse
-            {
-                PublicAccessBlockConfiguration = PublicAccessBlock
-            });
-        }
-
-        public override Task<DeleteBucketPolicyResponse> DeleteBucketPolicyAsync(
-            DeleteBucketPolicyRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            BucketPolicyDeletes++;
-            return Task.FromResult(new DeleteBucketPolicyResponse());
+            BucketLocationReads++;
+            return FailBucketLocation
+                ? Task.FromException<GetBucketLocationResponse>(new AmazonS3Exception("unavailable"))
+                : Task.FromResult(new GetBucketLocationResponse());
         }
     }
 }

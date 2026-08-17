@@ -14,7 +14,8 @@ Backend được tổ chức theo modular monolith với bốn lớp chính: API
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
 challenge OTP/reset của auth, process-local runtime state giữ trạng thái
 Pomodoro ngắn hạn, còn
-object storage private lưu asset: MinIO ở Development và AWS S3 ở Production.
+object storage private lưu asset qua một adapter S3-compatible: Development cấu
+hình MinIO, còn Production dùng AWS S3.
 
 Mỗi bounded context trong Application giữ một service facade và các port/DTO
 của nó. Những phần dễ phình to được tách thành collaborator nội bộ theo trách
@@ -83,6 +84,23 @@ Các secret `Jwt:Key`, `Authentication:OtpHashKey`, `Resend:ApiKey` và cấu h�
 Google/Resend phải được cung cấp bằng .NET user-secrets hoặc biến môi trường.
 Không ghi secret vào file được theo dõi bởi Git. Xem cấu hình mẫu và lệnh cụ
 thể tại `docs/product/authentication.md`.
+
+Object storage không có trường `Provider` và không branch theo MinIO/AWS trong
+asset code. Cấu hình `AssetStorage` gồm:
+
+- `Endpoint`: S3-compatible URL dùng cho backend operations; bỏ trống để AWS
+  SDK dùng regional endpoint;
+- `PublicEndpoint`: URL browser-reachable dùng để ký PUT/GET; bỏ trống để dùng
+  cùng client với operations;
+- `Bucket`, `Region`, `UsePathStyle`;
+- `AccessKey` và `SecretKey`: cặp optional, phải cùng có hoặc cùng vắng mặt.
+
+Host Development dùng `http://127.0.0.1:9000` cho operations và
+`https://localhost:5173` cho presigned URL; Vite proxy giữ nguyên signed host và
+path tới object storage. `ASSET_STORAGE_BUCKET` và
+`ASSET_STORAGE_PROXY_TARGET` trong frontend `.env.local` phải khớp với backend.
+Production bỏ cả hai endpoint và static credential để dùng EC2 role/default AWS
+credential chain.
 
 ## 5. Cách sử dụng dự án
 
@@ -159,13 +177,13 @@ src/backend/
   FluentA.Domain/                 Entity, enum, domain service và business rule theo bounded context
   FluentA.Infrastructure/         Persistence, identity, email, object storage, provider, job và DI composition
     Persistence/Repositories/     EF adapters theo bounded context
-    ObjectStorage/                 MinIO/S3-compatible asset storage
+    ObjectStorage/                 Provider-neutral S3-compatible asset storage
     ExternalServices/              Provider tích hợp như Azure pronunciation
     RuntimeState/                  Process-local runtime state
   FluentA.API.UnitTests/          Unit test cho API, production config và health contract
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer
-  FluentA.Infrastructure.UnitTests/ Unit test cho provider config, S3 signing và privacy
+  FluentA.Infrastructure.UnitTests/ Unit test cho S3-compatible config, signing và access
   FluentA.slnx                    .NET solution
 ```
 

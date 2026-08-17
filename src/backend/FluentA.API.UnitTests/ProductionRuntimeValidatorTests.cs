@@ -26,11 +26,9 @@ public sealed class ProductionRuntimeValidatorTests
     [Theory]
     [InlineData("ConnectionStrings:Postgres", "")]
     [InlineData("AssetStorage:Enabled", "false")]
-    [InlineData("AssetStorage:Provider", "Minio")]
-    [InlineData("AssetStorage:Provider", "unknown-provider")]
     [InlineData("AssetStorage:Endpoint", "https://storage.example.test")]
+    [InlineData("AssetStorage:PublicEndpoint", "https://storage.example.test")]
     [InlineData("AssetStorage:AccessKey", "test-access-key")]
-    [InlineData("AssetStorage:SecretKey", "test-only-secret")]
     [InlineData("AssetStorage:UsePathStyle", "true")]
     [InlineData("AssetStorage:Region", "us-east-1")]
     [InlineData("Frontend:BaseUrl", "http://sophion.io.vn")]
@@ -68,7 +66,6 @@ public sealed class ProductionRuntimeValidatorTests
         {
             ["ConnectionStrings:Postgres"] = "Host=postgres;Database=fluenta;Username=fluenta;Password=test-only-secret",
             ["AssetStorage:Enabled"] = "true",
-            ["AssetStorage:Provider"] = "S3",
             ["AssetStorage:Bucket"] = "fluenta-assets",
             ["AssetStorage:Region"] = "ap-southeast-1",
             ["AssetStorage:UsePathStyle"] = "false",

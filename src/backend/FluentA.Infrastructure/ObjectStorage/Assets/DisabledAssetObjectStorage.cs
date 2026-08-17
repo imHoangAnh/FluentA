@@ -24,7 +24,7 @@ public sealed class DisabledAssetObjectStorage : IAssetObjectStorage
         throw new AssetStorageUnavailableException("Asset storage is not enabled.");
     }
 
-    public Task EnsurePrivateBucketAsync(CancellationToken cancellationToken = default)
+    public Task VerifyBucketAccessAsync(CancellationToken cancellationToken = default)
     {
         throw new AssetStorageUnavailableException("Asset storage is not enabled.");
     }

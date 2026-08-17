@@ -71,7 +71,6 @@ services:
       Database__Postgres__CommandTimeoutSeconds: "30"
       Hangfire__WorkerCount: "2"
       AssetStorage__Enabled: "true"
-      AssetStorage__Provider: S3
       AssetStorage__Bucket: ${S3_BUCKET:?S3_BUCKET is required}
       AssetStorage__Region: ${AWS_REGION:-ap-southeast-1}
       AssetStorage__UsePathStyle: "false"
