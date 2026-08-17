@@ -174,6 +174,14 @@ public sealed class NoteService : INoteService
                 return OperationResult<NotePageDto>.Failure(NoteError.Validation(exception.Errors));
             }
 
+            if (processedContent.Html.Length > NotePage.ContentMaxLength)
+            {
+                return OperationResult<NotePageDto>.Failure(NoteError.Validation(new Dictionary<string, string[]>
+                {
+                    ["content"] = [$"Content must be at most {NotePage.ContentMaxLength} characters after formatting cleanup."]
+                }));
+            }
+
             var attachedPages = await _repository.GetAttachedAssetPageIdsAsync(processedContent.ReferencedAssetIds.ToArray(), cancellationToken);
             if (attachedPages.Any(link => link.Value != page.Id))
             {

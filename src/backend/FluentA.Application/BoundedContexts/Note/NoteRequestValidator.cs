@@ -4,6 +4,8 @@ namespace FluentA.Application.BoundedContexts.Note;
 
 internal static class NoteRequestValidator
 {
+    public const int RawContentMaxLength = 1_000_000;
+
     public static NoteError? ValidateBoardName(string name)
     {
         var cleaned = name.Trim();
@@ -31,9 +33,9 @@ internal static class NoteRequestValidator
             }
         }
 
-        if (content is not null && content.Length > 100_000)
+        if (content is not null && content.Length > RawContentMaxLength)
         {
-            errors["content"] = ["Content must be at most 100000 characters."];
+            errors["content"] = [$"Content payload must be at most {RawContentMaxLength} characters before formatting cleanup."];
         }
 
         return errors.Count > 0 ? NoteError.Validation(errors) : null;
