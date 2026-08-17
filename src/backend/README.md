@@ -12,7 +12,8 @@ xác thực và thực thi background job định kỳ bằng Hangfire.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
-challenge OTP/reset của auth, IMemoryCache giữ trạng thái Pomodoro ngắn hạn, còn
+challenge OTP/reset của auth, process-local runtime state giữ trạng thái
+Pomodoro ngắn hạn, còn
 object storage private lưu asset: MinIO ở Development và AWS S3 ở Production.
 
 Mỗi bounded context trong Application giữ một service facade và các port/DTO
@@ -150,10 +151,17 @@ frontend nằm tại `../frontend/src/shared/types/api.ts`.
 
 ```text
 src/backend/
-  FluentA.API/                    Controller, middleware, SignalR, Hangfire worker và composition root
+  FluentA.API/                    Controller, middleware, health checks, SignalR và composition root
+    Extensions/                   Auth, CORS, rate limiting, OpenAPI, health và realtime composition
+    HealthChecks/                  PostgreSQL, object storage và health response contract
   FluentA.Application/            Bounded context, service facade, DTO, port và collaborator nội bộ
-  FluentA.Domain/                 Entity, value object và business rule
-  FluentA.Infrastructure/         EF Core, PostgreSQL, object storage, provider, job và DI composition
+    Common/Results/                OperationResult và application error contract
+  FluentA.Domain/                 Entity, enum, domain service và business rule theo bounded context
+  FluentA.Infrastructure/         Persistence, identity, email, object storage, provider, job và DI composition
+    Persistence/Repositories/     EF adapters theo bounded context
+    ObjectStorage/                 MinIO/S3-compatible asset storage
+    ExternalServices/              Provider tích hợp như Azure pronunciation
+    RuntimeState/                  Process-local runtime state
   FluentA.API.UnitTests/          Unit test cho API, production config và health contract
   FluentA.Application.UnitTests/  Unit test cho application layer
   FluentA.Domain.UnitTests/       Unit test cho domain layer

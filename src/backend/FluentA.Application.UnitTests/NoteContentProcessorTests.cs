@@ -2,7 +2,7 @@ using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
-using FluentA.Infrastructure.Note;
+using FluentA.Infrastructure.ContentProcessing.Note;
 
 namespace FluentA.Application.UnitTests;
 

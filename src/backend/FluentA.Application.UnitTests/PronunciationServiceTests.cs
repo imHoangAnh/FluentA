@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
-using FluentA.Infrastructure.Pronunciation;
+using FluentA.Infrastructure.ExternalServices.Pronunciation;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FluentA.Application.UnitTests;

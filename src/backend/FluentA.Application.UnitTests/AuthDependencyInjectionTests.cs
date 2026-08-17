@@ -1,6 +1,7 @@
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Infrastructure;
-using FluentA.Infrastructure.Auth;
+using FluentA.Infrastructure.Email;
+using FluentA.Infrastructure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

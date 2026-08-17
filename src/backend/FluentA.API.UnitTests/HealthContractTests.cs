@@ -1,5 +1,5 @@
-using FluentA.API.Health;
-using FluentA.Infrastructure.Assets;
+using FluentA.API.HealthChecks;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

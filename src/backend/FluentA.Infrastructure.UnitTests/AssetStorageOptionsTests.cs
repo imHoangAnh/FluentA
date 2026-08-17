@@ -1,4 +1,4 @@
-using FluentA.Infrastructure.Assets;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using Microsoft.Extensions.Configuration;
 
 namespace FluentA.Infrastructure.UnitTests;

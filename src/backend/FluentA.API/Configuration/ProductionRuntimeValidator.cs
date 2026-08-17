@@ -1,5 +1,5 @@
 using System.Net;
-using FluentA.Infrastructure.Assets;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using Microsoft.Extensions.Hosting;
 
 namespace FluentA.API.Configuration;

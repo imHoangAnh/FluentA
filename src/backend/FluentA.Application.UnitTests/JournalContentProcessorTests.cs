@@ -1,4 +1,4 @@
-using FluentA.Infrastructure.Journal;
+using FluentA.Infrastructure.ContentProcessing.Journal;
 
 namespace FluentA.Application.UnitTests;
 
