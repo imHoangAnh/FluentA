@@ -46,6 +46,7 @@ dist-ssr/
 .vite/
 coverage/
 test-results/
+docs/decisions
 
 # .NET build output
 bin/
@@ -54,13 +55,9 @@ bin/
 obj/
 TestResults/
 *.user
-*.suo
 
 # Rust / generic build output
 target/
-
-# Scripts and Harness CLI
-scripts/
 
 # Harness durable layer
 scripts/bin/harness-cli
@@ -69,3 +66,9 @@ scripts/bin/harness-cli.exe
 # Harness core maintenance binary
 scripts/bin/harness
 scripts/bin/harness.exe
+
+# Harness core maintenance binary
+scripts/bin/harness
+scripts/bin/harness.exe
+
+AGENTS.md
