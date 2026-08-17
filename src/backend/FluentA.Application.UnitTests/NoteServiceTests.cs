@@ -8,7 +8,7 @@ using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
 using FluentA.Domain.BoundedContexts.Trash.Entities;
 using FluentA.Domain.BoundedContexts.Trash.Enums;
-using FluentA.Infrastructure.Note;
+using FluentA.Infrastructure.ContentProcessing.Note;
 
 namespace FluentA.Application.UnitTests;
 

@@ -18,6 +18,11 @@ https://localhost:7443 {
 		reverse_proxy api:8080
 	}
 
+	@object_storage path /{$MINIO_BUCKET}/*
+	handle @object_storage {
+		reverse_proxy minio:59000
+	}
+
 	@immutable_assets path /assets/*
 	handle @immutable_assets {
 		root * /srv

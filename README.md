@@ -20,8 +20,9 @@ and progress tracking into one web application.
 The repository contains a React single-page application and an ASP.NET Core
 modular monolith. PostgreSQL is the durable store, process-local memory holds
 short-lived state, SignalR synchronizes active sessions, private object storage
-holds assets, and Hangfire runs recurring jobs. Development uses MinIO while
-production uses AWS S3.
+holds assets through one S3-compatible adapter, and Hangfire runs recurring
+jobs. Development configures MinIO while production uses AWS S3 through the
+default AWS credential chain.
 
 ## Key Features
 

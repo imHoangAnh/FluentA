@@ -50,6 +50,8 @@ File `.env.local` sử dụng các biến sau:
 | Biến | Mục đích |
 | --- | --- |
 | `VITE_API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
+| `ASSET_STORAGE_BUCKET` | Bucket path mà Vite proxy tới S3-compatible local storage |
+| `ASSET_STORAGE_PROXY_TARGET` | Internal target của Vite proxy, mặc định `http://127.0.0.1:9000` |
 | `VITE_GOOGLE_CLIENT_ID` | Google Identity Services web client ID; có thể để trống nếu không dùng Google login |
 
 Không commit thông tin cấu hình bí mật của môi trường vào Git.

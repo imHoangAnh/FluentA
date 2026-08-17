@@ -1,5 +1,5 @@
-using FluentA.API.Health;
-using FluentA.Infrastructure.Assets;
+using FluentA.API.HealthChecks;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -136,10 +136,8 @@ public sealed class HealthContractTests
     private static AssetStorageOptions ValidS3Options() => new()
     {
         Enabled = true,
-        Provider = AssetStorageProvider.S3,
         Bucket = "fluenta-assets-test",
-        Region = "ap-southeast-1",
-        UsePathStyle = false
+        Region = "ap-southeast-1"
     };
 
     private sealed class FakeReadinessProbe(Exception? failure = null) : IAssetStorageReadinessProbe

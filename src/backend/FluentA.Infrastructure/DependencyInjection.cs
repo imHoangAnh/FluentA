@@ -1,44 +1,13 @@
 using System.Globalization;
 using Amazon;
+using Amazon.Runtime;
 using Amazon.S3;
-using FluentA.Application.BoundedContexts.Assets;
-using FluentA.Application.BoundedContexts.Auth;
-using FluentA.Application.BoundedContexts.Countdown;
-using FluentA.Application.BoundedContexts.Flashcards;
-using FluentA.Application.BoundedContexts.Habit;
-using FluentA.Application.BoundedContexts.Journal;
-using FluentA.Application.BoundedContexts.Project;
-using FluentA.Application.BoundedContexts.Note;
-using FluentA.Application.BoundedContexts.Notification;
-using FluentA.Application.BoundedContexts.Pomodoro;
-using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Pronunciation;
-using FluentA.Application.BoundedContexts.Review;
-using FluentA.Application.BoundedContexts.Todo;
-using FluentA.Application.BoundedContexts.Trash;
-using FluentA.Application.BoundedContexts.Vocabulary;
-using FluentA.Application.Common.Interfaces;
-using FluentA.Infrastructure.Assets;
-using FluentA.Application.BackgroundJobs;
-using FluentA.Infrastructure.BackgroundJobs;
 using Hangfire;
 using Hangfire.PostgreSql;
-using FluentA.Infrastructure.Auth;
-using FluentA.Infrastructure.Countdown;
-using FluentA.Infrastructure.Flashcards;
-using FluentA.Infrastructure.Habit;
-using FluentA.Infrastructure.Journal;
-using FluentA.Infrastructure.Project;
-using FluentA.Infrastructure.Note;
-using FluentA.Infrastructure.Notification;
+using FluentA.Infrastructure.Identity;
+using FluentA.Infrastructure.ObjectStorage.Assets;
 using FluentA.Infrastructure.Persistence;
-using FluentA.Infrastructure.Pomodoro;
-using FluentA.Infrastructure.Practice;
-using FluentA.Infrastructure.Pronunciation;
-using FluentA.Infrastructure.Review;
-using FluentA.Infrastructure.Todo;
-using FluentA.Infrastructure.Trash;
-using FluentA.Infrastructure.Vocabulary;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -116,30 +85,48 @@ public static class DependencyInjection
             wordAccuracyThreshold);
     }
 
-    internal static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options)
+    internal static AssetStorageClients CreateAssetStorageClients(AssetStorageOptions options)
     {
         options.Validate();
 
-        if (options.Provider == AssetStorageProvider.S3)
+        var operations = CreateAssetStorageClient(options, options.Endpoint);
+        if (string.IsNullOrWhiteSpace(options.PublicEndpoint)
+            || string.Equals(options.PublicEndpoint, options.Endpoint, StringComparison.OrdinalIgnoreCase))
         {
-            return new AmazonS3Client(new AmazonS3Config
-            {
-                RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region),
-                ForcePathStyle = false
-            });
+            return new AssetStorageClients(operations, operations);
         }
 
-        var endpoint = new Uri(options.Endpoint, UriKind.Absolute);
-        return new AmazonS3Client(
-            options.AccessKey,
-            options.SecretKey,
-            new AmazonS3Config
-            {
-                ServiceURL = options.Endpoint,
-                ForcePathStyle = options.UsePathStyle,
-                AuthenticationRegion = options.Region,
-                UseHttp = string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            });
+        var presigning = CreateAssetStorageClient(options, options.PublicEndpoint);
+        return new AssetStorageClients(operations, presigning);
+    }
+
+    private static IAmazonS3 CreateAssetStorageClient(AssetStorageOptions options, string endpoint)
+    {
+        var config = new AmazonS3Config
+        {
+            ForcePathStyle = options.UsePathStyle
+        };
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region);
+        }
+        else
+        {
+            var endpointUri = new Uri(endpoint, UriKind.Absolute);
+            config.ServiceURL = endpoint;
+            config.AuthenticationRegion = options.Region;
+            config.UseHttp = string.Equals(
+                endpointUri.Scheme,
+                Uri.UriSchemeHttp,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return options.HasStaticCredentials
+            ? new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKey, options.SecretKey),
+                config)
+            : new AmazonS3Client(config);
     }
 
     private static string BuildPostgresConnectionString(string connectionString, IConfiguration configuration)
