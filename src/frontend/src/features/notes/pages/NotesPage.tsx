@@ -7,6 +7,7 @@ import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
 import { cn } from '@/shared/lib/utils'
 import { uploadAsset } from '@/features/assets'
+import type { ApiEnvelope } from '@/shared/api/contracts'
 import { toast } from '@/shared/lib/toast'
 import { restoreTrashEntry } from '@/features/trash'
 import { CreateNoteDialog } from '../components/CreateNoteDialog'
@@ -38,6 +39,11 @@ function toPageSummary(page: noteApi.NotePage): noteApi.NotePageSummary {
     createdAt: page.createdAt,
     updatedAt: page.updatedAt,
   }
+}
+
+function getNoteSaveErrorMessage(error: unknown) {
+  const response = (error as { response?: { data?: ApiEnvelope<never> } }).response
+  return response?.data?.error?.details?.content?.[0] ?? 'Could not save note page right now.'
 }
 
 type NoteEntityTarget =
@@ -262,7 +268,8 @@ export function NotesPage() {
       setIsDirty(false)
       setSaveStatus('saved')
       return true
-    }).catch(() => {
+    }).catch((error: unknown) => {
+      setEditorError(getNoteSaveErrorMessage(error))
       setSaveStatus('error')
       return false
     }).finally(() => {

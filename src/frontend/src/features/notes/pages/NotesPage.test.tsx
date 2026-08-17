@@ -355,7 +355,20 @@ describe('NotesPage', () => {
       updatedAt: '2026-07-10T09:00:00Z',
     }))
     vi.mocked(noteApi.updatePage)
-      .mockRejectedValueOnce(new Error('save failed'))
+      .mockRejectedValueOnce({
+        response: {
+          data: {
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'The request did not pass validation.',
+              details: {
+                content: ['Content must be at most 100000 characters after formatting cleanup.'],
+              },
+            },
+          },
+        },
+      })
       .mockResolvedValueOnce({
         id: 'page-1',
         boardId: 'board-1',
@@ -379,12 +392,14 @@ describe('NotesPage', () => {
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledTimes(1))
     expect(screen.getByLabelText('Note title')).toHaveValue('Edited page one')
     expect(screen.getByTestId('note-save-status')).toHaveTextContent('Save failed')
+    expect(screen.getByText('Content must be at most 100000 characters after formatting cleanup.')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('Practice recap')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Practice recap' }))
 
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledTimes(2))
     expect(await screen.findByDisplayValue('Practice recap')).toBeInTheDocument()
+    expect(screen.queryByText('Content must be at most 100000 characters after formatting cleanup.')).not.toBeInTheDocument()
   })
 
   it('uploads a dropped note image and persists a durable asset reference on save', async () => {

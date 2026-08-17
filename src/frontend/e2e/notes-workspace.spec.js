@@ -57,6 +57,30 @@ test('Note Workspace release smoke covers CRUD, persistence, sanitization, and c
   expect(pageDetailResponse.ok()).toBe(true);
   const persistedPage = (await pageDetailResponse.json()).data;
   expect(persistedPage.name).toBe('Release Proof Page Updated');
+
+  const verbosePastedHtml = `<p>${'<span style="color:red">word</span>'.repeat(5_000)}</p>`;
+  expect(verbosePastedHtml.length).toBeGreaterThan(100_000);
+  const verboseSaveResponse = await page.request.patch(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, {
+    headers,
+    data: { content: verbosePastedHtml },
+  });
+  expect(verboseSaveResponse.ok()).toBe(true);
+
+  const sanitizedPageResponse = await page.request.get(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, { headers });
+  const sanitizedPage = (await sanitizedPageResponse.json()).data;
+  expect(sanitizedPage.content.length).toBeLessThanOrEqual(100_000);
+  expect(sanitizedPage.content).not.toContain('style=');
+
+  const oversizedSanitizedResponse = await page.request.patch(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, {
+    headers,
+    data: { content: 'a'.repeat(100_001) },
+  });
+  expect(oversizedSanitizedResponse.status()).toBe(422);
+  const oversizedSanitizedPayload = await oversizedSanitizedResponse.json();
+  expect(oversizedSanitizedPayload.error.details.content).toContain(
+    'Content must be at most 100000 characters after formatting cleanup.',
+  );
+
   await page.goto('/journal');
   await expect(page).toHaveURL('/journal');
   await page.goto('/notes');
