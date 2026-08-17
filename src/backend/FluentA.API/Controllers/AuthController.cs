@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
@@ -11,7 +12,7 @@ namespace FluentA.API.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
-public sealed class AuthController : ControllerBase
+public sealed class AuthController : ApiControllerBase
 {
     private const string AccessCookieName = "access_token";
     private readonly IAuthService _auth;
@@ -126,13 +127,4 @@ public sealed class AuthController : ControllerBase
         return Guid.TryParse(claim, out userId);
     }
 
-    private IActionResult ToErrorResult<T>(OperationResult<T> result)
-    {
-        if (result.Error is not AuthError error)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
-    }
 }

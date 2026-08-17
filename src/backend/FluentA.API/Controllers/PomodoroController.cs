@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Pomodoro.DTOs;
@@ -11,7 +12,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/pomodoro")]
-public sealed class PomodoroController : ControllerBase
+public sealed class PomodoroController : ApiControllerBase
 {
     private readonly IPomodoroService _pomodoro;
 
@@ -92,24 +93,4 @@ public sealed class PomodoroController : ControllerBase
             : ToErrorResult(result);
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToErrorResult<T>(OperationResult<T> result)
-    {
-        if (result.Error is not PomodoroError error)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
-    }
 }

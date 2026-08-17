@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen } from 'lucide-react'
 import * as flashcardApi from '../api/flashcard.api'
+import { flashcardKeys } from '../api/flashcard.queries'
 import { LearningDeckLibrary } from '../components/LearningDeckLibrary'
 import { useFlashcardSync } from '../hooks/useFlashcardSync'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -9,7 +10,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 
 export function FlashcardsPage() {
   useFlashcardSync()
-  const decksQuery = useQuery({ queryKey: ['flashcard', 'boards'], queryFn: flashcardApi.listBoards, refetchInterval: 1500 })
+  const decksQuery = useQuery({ queryKey: flashcardKeys.boards, queryFn: flashcardApi.listBoards, refetchInterval: 1500 })
   const boardGroups = useMemo(() => decksQuery.data ?? [], [decksQuery.data])
 
   return (

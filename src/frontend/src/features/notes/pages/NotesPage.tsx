@@ -6,14 +6,15 @@ import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
 import { cn } from '@/shared/lib/utils'
-import * as assetsApi from '@/lib/api/assets.api'
-import { toast } from '@/lib/toast'
+import { uploadAsset } from '@/features/assets'
+import { toast } from '@/shared/lib/toast'
 import { restoreTrashEntry } from '@/features/trash'
 import { CreateNoteDialog } from '../components/CreateNoteDialog'
 import * as noteApi from '../api/note.api'
+import { noteKeys } from '../api/note.queries'
 
 const JournalRichTextEditor = lazy(() =>
-  import('@/features/journal').then((module) => ({ default: module.JournalRichTextEditor })),
+  import('@/shared/components/rich-text/RichTextEditor').then((module) => ({ default: module.RichTextEditor })),
 )
 
 function formatDate(value: string) {
@@ -64,7 +65,7 @@ export function NotesPage() {
   const entityActionReturnFocusRef = useRef<HTMLElement | null>(null)
 
   const boardsQuery = useQuery({
-    queryKey: ['note', 'boards'],
+    queryKey: noteKeys.boards,
     queryFn: noteApi.listBoards,
   })
 
@@ -81,7 +82,7 @@ export function NotesPage() {
   const activePageSummary = pages.find((page) => page.id === selectedPageId) ?? pages[0] ?? null
 
   const pageQuery = useQuery({
-    queryKey: ['note', 'page', activePageSummary?.id],
+    queryKey: noteKeys.page(activePageSummary?.id),
     queryFn: () => noteApi.getPage(activePageSummary!.id),
     enabled: Boolean(activePageSummary?.id),
   })
@@ -90,7 +91,7 @@ export function NotesPage() {
   const createBoard = useMutation({
     mutationFn: noteApi.createBoard,
     onSuccess: async (board) => {
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) => {
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) => {
         const next = [board, ...current.filter((item) => item.id !== board.id)]
         return next.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
       })
@@ -98,19 +99,19 @@ export function NotesPage() {
       setSelectedPageId(null)
       setIsCreatingBoard(false)
       toast.success('Board created successfully')
-      await queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+      await queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
 
   const createPage = useMutation({
     mutationFn: (input: { boardId: string; name: string }) => noteApi.createPage(input.boardId, { name: input.name }),
     onSuccess: async (page) => {
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) =>
         current.map((board) => board.id === page.boardId
           ? { ...board, pages: [toPageSummary(page), ...board.pages.filter((item) => item.id !== page.id)] }
           : board),
       )
-      queryClient.setQueryData(['note', 'page', page.id], page)
+      queryClient.setQueryData(noteKeys.page(page.id), page)
       setSelectedBoardId(page.boardId)
       setSelectedPageId(page.id)
       setDraftPageId(page.id)
@@ -120,13 +121,13 @@ export function NotesPage() {
       setSaveStatus('saved')
       setIsCreatingPage(false)
       toast.success('Page created successfully')
-      await queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+      await queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
   const renameBoard = useMutation({
     mutationFn: (input: { target: Extract<NoteEntityTarget, { kind: 'board' }>; name: string }) => noteApi.updateBoard(input.target.boardId, { name: input.name }),
     onSuccess: (renamedBoard) => {
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) =>
         current.map((board) => board.id === renamedBoard.id ? { ...board, name: renamedBoard.name, updatedAt: renamedBoard.updatedAt } : board),
       )
       setRenameTarget(null)
@@ -136,8 +137,8 @@ export function NotesPage() {
   const renamePage = useMutation({
     mutationFn: (input: { target: Extract<NoteEntityTarget, { kind: 'page' }>; name: string }) => noteApi.updatePage(input.target.pageId, { name: input.name }),
     onSuccess: (page) => {
-      queryClient.setQueryData(['note', 'page', page.id], page)
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+      queryClient.setQueryData(noteKeys.page(page.id), page)
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) =>
         current.map((board) => board.id === page.boardId
           ? { ...board, updatedAt: page.updatedAt, pages: board.pages.map((item) => item.id === page.id ? toPageSummary(page) : item) }
           : board),
@@ -160,11 +161,11 @@ export function NotesPage() {
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'board' }>) => noteApi.deleteBoard(target.boardId),
     onSuccess: (entry, target) => {
-      const current = queryClient.getQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards']) ?? []
+      const current = queryClient.getQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards) ?? []
       const deletedBoard = current.find((board) => board.id === target.boardId)
       const remainingBoards = newestFirst(current.filter((board) => board.id !== target.boardId))
-      queryClient.setQueryData(['note', 'boards'], remainingBoards)
-      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: ['note', 'page', page.id], exact: true })
+      queryClient.setQueryData(noteKeys.boards, remainingBoards)
+      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: noteKeys.page(page.id), exact: true })
       setSelectedBoardId(remainingBoards[0]?.id ?? null)
       setSelectedPageId(null)
       setDraftPageId(null)
@@ -177,26 +178,26 @@ export function NotesPage() {
           label: 'Undo',
           onClick: () => {
             void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: ['note', 'boards'] }))
+              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
               .then(() => toast.success('Board restored.'))
               .catch(() => toast.error('Could not restore the board.'))
           },
         },
       })
-      void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+      void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
   const deletePage = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'page' }>) => noteApi.deletePage(target.pageId),
     onSuccess: (entry, target) => {
       let nextPageId: string | null = null
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) => current.map((board) => {
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) => current.map((board) => {
         if (board.id !== target.boardId) return board
         const remainingPages = newestFirst(board.pages.filter((page) => page.id !== target.pageId))
         nextPageId = remainingPages[0]?.id ?? null
         return { ...board, pages: remainingPages }
       }))
-      queryClient.removeQueries({ queryKey: ['note', 'page', target.pageId], exact: true })
+      queryClient.removeQueries({ queryKey: noteKeys.page(target.pageId), exact: true })
       setSelectedPageId(nextPageId)
       setDraftPageId(null)
       setTitle('')
@@ -208,13 +209,13 @@ export function NotesPage() {
           label: 'Undo',
           onClick: () => {
             void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: ['note', 'boards'] }))
+              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
               .then(() => toast.success('Page restored.'))
               .catch(() => toast.error('Could not restore the page.'))
           },
         },
       })
-      void queryClient.invalidateQueries({ queryKey: ['note', 'boards'] })
+      void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
 
@@ -245,8 +246,8 @@ export function NotesPage() {
         content: draftContent,
       },
     }).then((page) => {
-      queryClient.setQueryData(['note', 'page', page.id], page)
-      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(['note', 'boards'], (current = []) =>
+      queryClient.setQueryData(noteKeys.page(page.id), page)
+      queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) =>
         current.map((board) => board.id === page.boardId
           ? {
               ...board,
@@ -280,7 +281,7 @@ export function NotesPage() {
 
   async function uploadNoteImages(files: File[]) {
     const uploads = await Promise.all(files.map(async (file) => {
-      const asset = await assetsApi.uploadNoteImageAsset(file)
+      const asset = await uploadAsset(file, 'note-image')
       return {
         id: asset.id,
         displayUrl: URL.createObjectURL(file),

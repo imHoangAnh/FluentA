@@ -11,7 +11,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CheckCircle2, ChevronRight, Plus } from 'lucide-react'
 import type { TodoItem } from '../api/todo.api'
-import { sortTodoItems, type TodoSortMode } from '../todo-sort'
+import { sortTodoItems, type TodoSortMode } from '../model/todo-sort'
 import { TodoTaskRow } from './TodoTaskRow'
 
 type MyDayViewProps = {

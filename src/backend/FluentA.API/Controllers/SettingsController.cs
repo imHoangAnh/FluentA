@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
@@ -11,7 +12,7 @@ namespace FluentA.API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1")]
-public sealed class SettingsController : ControllerBase
+public sealed class SettingsController : ApiControllerBase
 {
     private readonly IAuthService _auth;
     private readonly IPracticeService _practice;
@@ -28,31 +29,11 @@ public sealed class SettingsController : ControllerBase
         var profileResult = await _auth.GetMeAsync(userId, cancellationToken);
         if (!profileResult.IsSuccess)
         {
-            return ToAuthError(profileResult);
+            return ToErrorResult(profileResult);
         }
 
         var practiceSettings = await _practice.GetPracticeSettingsAsync(userId, cancellationToken);
         return Ok(ApiEnvelope<SettingsDto>.Ok(new SettingsDto(profileResult.Value!, practiceSettings)));
     }
 
-    private Guid CurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (!Guid.TryParse(userId, out var id))
-        {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
-        }
-
-        return id;
-    }
-
-    private IActionResult ToAuthError<T>(FluentA.Application.Common.OperationResult<T> result)
-    {
-        if (result.Error is not AuthError error)
-        {
-            return StatusCode(500, ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
-        }
-
-        return StatusCode(error.StatusCode, ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
-    }
 }

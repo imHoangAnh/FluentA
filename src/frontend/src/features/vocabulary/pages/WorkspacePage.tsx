@@ -9,8 +9,9 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
 import * as vocabularyApi from '../api/vocabulary.api'
+import { vocabularyKeys } from '../api/vocabulary.queries'
 import { cn } from '@/shared/lib/utils'
 import { restoreTrashEntry } from '@/features/trash'
 
@@ -35,7 +36,7 @@ export function WorkspacePage() {
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const railFocusRef = useRef<HTMLDivElement>(null)
 
-  const boardsQuery = useQuery({ queryKey: ['vocab', 'boards'], queryFn: vocabularyApi.listBoards })
+  const boardsQuery = useQuery({ queryKey: vocabularyKeys.boards, queryFn: vocabularyApi.listBoards })
   const boards = useMemo(() => boardsQuery.data ?? [], [boardsQuery.data])
   const sortedBoards = useMemo(
     () => newestFirst(boards),
@@ -44,7 +45,7 @@ export function WorkspacePage() {
   const activeBoardId = sortedBoards.some((board) => board.id === selectedBoardId) ? selectedBoardId : sortedBoards[0]?.id ?? null
 
   const boardQuery = useQuery({
-    queryKey: ['vocab', 'boards', activeBoardId],
+    queryKey: vocabularyKeys.board(activeBoardId),
     queryFn: () => vocabularyApi.getBoard(activeBoardId!),
     enabled: Boolean(activeBoardId),
   })
@@ -63,7 +64,7 @@ export function WorkspacePage() {
       setSelectedPageId(null)
       setIsCreatingBoard(false)
       toast.success('Board created successfully')
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
+      await queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
     },
   })
 
@@ -73,8 +74,8 @@ export function WorkspacePage() {
       setSelectedPageId(page.id)
       setIsCreatingPage(false)
       toast.success('Page created successfully')
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
-      await queryClient.invalidateQueries({ queryKey: ['vocab', 'boards', activeBoardId] })
+      await queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
+      await queryClient.invalidateQueries({ queryKey: vocabularyKeys.board(activeBoardId) })
     },
   })
 
@@ -85,7 +86,7 @@ export function WorkspacePage() {
       columnWidths: input.columnWidths,
     }),
     onSuccess: (preferences) => {
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(['vocab', 'boards', activeBoardId], (current) => current ? { ...current, preferences } : current)
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(activeBoardId), (current) => current ? { ...current, preferences } : current)
     },
   })
 
@@ -93,10 +94,10 @@ export function WorkspacePage() {
     mutationFn: (input: { target: Extract<RenameTarget, { kind: 'board' }>; name: string }) =>
       vocabularyApi.updateBoard(input.target.boardId, { name: input.name, language: input.target.language }),
     onSuccess: (board) => {
-      queryClient.setQueryData<vocabularyApi.BoardSummary[]>(['vocab', 'boards'], (current = []) =>
+      queryClient.setQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards, (current = []) =>
         current.map((item) => item.id === board.id ? { ...item, name: board.name, updatedAt: board.updatedAt } : item),
       )
-      queryClient.setQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', board.id], board)
+      queryClient.setQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(board.id), board)
       setRenameTarget(null)
       toast.success('Board renamed successfully')
     },
@@ -106,7 +107,7 @@ export function WorkspacePage() {
     mutationFn: (input: { target: Extract<RenameTarget, { kind: 'page' }>; name: string }) =>
       vocabularyApi.updatePage(input.target.boardId, input.target.pageId, { name: input.name }),
     onSuccess: (page, input) => {
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(['vocab', 'boards', input.target.boardId], (board) => board
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(input.target.boardId), (board) => board
         ? { ...board, pages: board.pages.map((item) => item.id === page.id ? page : item) }
         : board)
       setRenameTarget(null)
@@ -117,31 +118,31 @@ export function WorkspacePage() {
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'board' }>) => vocabularyApi.deleteBoard(target.boardId),
     onSuccess: (entry, target) => {
-      const remainingBoards = newestFirst((queryClient.getQueryData<vocabularyApi.BoardSummary[]>(['vocab', 'boards']) ?? []).filter((board) => board.id !== target.boardId))
-      const deletedBoard = queryClient.getQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', target.boardId])
-      queryClient.setQueryData(['vocab', 'boards'], remainingBoards)
-      queryClient.removeQueries({ queryKey: ['vocab', 'boards', target.boardId], exact: true })
-      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: ['vocab', 'words', page.id], exact: true })
+      const remainingBoards = newestFirst((queryClient.getQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards) ?? []).filter((board) => board.id !== target.boardId))
+      const deletedBoard = queryClient.getQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(target.boardId))
+      queryClient.setQueryData(vocabularyKeys.boards, remainingBoards)
+      queryClient.removeQueries({ queryKey: vocabularyKeys.board(target.boardId), exact: true })
+      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: vocabularyKeys.words(page.id), exact: true })
       setSelectedBoardId(remainingBoards[0]?.id ?? null)
       setSelectedPageId(null)
       requestAnimationFrame(() => railFocusRef.current?.focus())
       toast.success('Board moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id) } })
-      void queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
+      void queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
     },
   })
 
   const deletePage = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'page' }>) => vocabularyApi.deletePage(target.boardId, target.pageId),
     onSuccess: (entry, target) => {
-      const boardKey = ['vocab', 'boards', target.boardId] as const
+      const boardKey = vocabularyKeys.board(target.boardId)
       const current = queryClient.getQueryData<vocabularyApi.BoardDetail>(boardKey)
       const remainingPages = newestFirst((current?.pages ?? []).filter((page) => page.id !== target.pageId))
       queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(boardKey, (board) => board ? { ...board, pages: remainingPages } : board)
-      queryClient.removeQueries({ queryKey: ['vocab', 'words', target.pageId], exact: true })
+      queryClient.removeQueries({ queryKey: vocabularyKeys.words(target.pageId), exact: true })
       setSelectedPageId(remainingPages[0]?.id ?? null)
       requestAnimationFrame(() => railFocusRef.current?.focus())
       toast.success('Page moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id) } })
-      void queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] })
+      void queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
       void queryClient.invalidateQueries({ queryKey: boardKey })
     },
   })
@@ -164,7 +165,7 @@ export function WorkspacePage() {
 
   function undo(entryId: string) {
     void restoreTrashEntry(entryId)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['vocab', 'boards'] }))
+      .then(() => queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards }))
       .then(() => toast.success('Vocabulary item restored.'))
       .catch(() => toast.error('Could not restore the vocabulary item.'))
   }

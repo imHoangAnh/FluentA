@@ -11,7 +11,7 @@ import {
   ContextMenuTrigger,
 } from '@/shared/components/ui/context-menu'
 import type { TodoItem } from '../api/todo.api'
-import { formatWeekday } from '../todo-date'
+import { formatWeekday } from '../model/todo-date'
 
 type TodoWeekViewProps = {
   dates: string[]

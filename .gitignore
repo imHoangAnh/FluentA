@@ -25,6 +25,7 @@ docs/
 .agents/
 .harness-backup/
 .harness-core/
+AGENTS.md
 
 # Logs / temp runtime files
 logs/

@@ -1,6 +1,6 @@
 namespace FluentA.Application.BoundedContexts.Practice;
 
-public sealed record PracticeError(string Code, string Message, int StatusCode, object? Details = null)
+public sealed record PracticeError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static PracticeError Validation(object details) =>
         new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);

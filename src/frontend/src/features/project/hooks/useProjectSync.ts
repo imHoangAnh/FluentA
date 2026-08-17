@@ -2,6 +2,7 @@ import type { HubConnection } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/features/auth'
+import { projectKeys } from '../api/project.queries'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'https://localhost:7000/api/v1'
 const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
@@ -25,7 +26,7 @@ export function useProjectSync() {
         .build()
 
       connection.on('ProjectCardMoved', () => {
-        void queryClient.invalidateQueries({ queryKey: ['project'], refetchType: 'all' })
+        void queryClient.invalidateQueries({ queryKey: projectKeys.all, refetchType: 'all' })
       })
 
       await connection.start()

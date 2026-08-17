@@ -6,14 +6,15 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
+import { notificationKeys } from '../api/notification.queries'
 
 export function NotificationsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list })
+  const query = useQuery({ queryKey: notificationKeys.all, queryFn: notificationApi.list })
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    void queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.all })
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.unread })
   }
   const read = useMutation({ mutationFn: notificationApi.markRead, onSuccess: refresh })
   const readAll = useMutation({ mutationFn: notificationApi.markAllRead, onSuccess: refresh })

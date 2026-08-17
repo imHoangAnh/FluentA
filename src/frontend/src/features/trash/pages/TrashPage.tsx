@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, CircleAlert, Inbox, LoaderCircle, RotateCcw, Search, Trash2 } from 'lucide-react'
-import { toast } from '@/lib/toast'
+import { toast } from '@/shared/lib/toast'
+import type { TrashEntry } from '@/shared/api/deletion.contracts'
 import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { Alert } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
-import { bulkPermanentlyDeleteTrashEntries, bulkRestoreTrashEntries, emptyTrash, listTrash, permanentlyDeleteTrashEntry, restoreTrashEntry, type TrashEntry } from '../api/trash.api'
+import { bulkPermanentlyDeleteTrashEntries, bulkRestoreTrashEntries, emptyTrash, listTrash, permanentlyDeleteTrashEntry, restoreTrashEntry } from '../api/trash.api'
+import { trashKeys } from '../api/trash.queries'
 
 function displayDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -72,14 +74,14 @@ export function TrashPage() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<string[]>([])
   const [deleteIntent, setDeleteIntent] = useState<DeleteIntent | null>(null)
-  const query = useQuery({ queryKey: ['trash', type, search], queryFn: () => listTrash(type || undefined, search || undefined) })
+  const query = useQuery({ queryKey: trashKeys.list(type, search), queryFn: () => listTrash(type || undefined, search || undefined) })
   const items = useMemo(() => query.data ?? [], [query.data])
   const totalPages = Math.ceil(items.length / PAGE_SIZE)
   const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1
   const visibleItems = useMemo(() => items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [currentPage, items])
   const selectedIds = useMemo(() => selected.filter((id) => items.some((item) => item.id === id)), [items, selected])
   const allVisibleSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedIds.includes(item.id))
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['trash'] })
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: trashKeys.all })
   const restore = useMutation({ mutationFn: restoreTrashEntry, onSuccess: () => { refresh(); toast.success('Item restored. Reminders are not restored.') }, onError: () => toast.error('Could not restore this item.') })
   const permanentlyDelete = useMutation({ mutationFn: permanentlyDeleteTrashEntry, onSuccess: () => { setDeleteIntent(null); refresh(); toast.success('Item permanently deleted.') }, onError: () => toast.error('Could not permanently delete this item.') })
   const bulkRestore = useMutation({ mutationFn: bulkRestoreTrashEntries, onSuccess: () => { setSelected([]); refresh(); toast.success('Selected items restored.') }, onError: () => toast.error('Could not restore every selected item.') })

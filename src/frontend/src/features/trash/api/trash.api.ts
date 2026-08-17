@@ -1,15 +1,6 @@
-import { apiClient } from '@/shared/lib/http/client'
-import type { ApiEnvelope } from '@/shared/types/api'
-
-export type TrashEntry = {
-  id: string
-  entityKind: string
-  entityId: string
-  displayName: string
-  originalLocation: string
-  trashedAt: string
-  purgeAfterAt: string
-}
+import { apiClient } from '@/shared/api/client'
+import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 export async function listTrash(type?: string, query?: string) {
   const response = await apiClient.get<ApiEnvelope<{ items: TrashEntry[] }>>('/trash', { params: { type, query, limit: 50 } })
