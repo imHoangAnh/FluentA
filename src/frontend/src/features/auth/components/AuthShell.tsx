@@ -17,13 +17,13 @@ const orbitCards = [
 
 function FluentABrandHeader() {
   return (
-    <div className="mb-4 flex items-end justify-center gap-3">
+    <div className="mb-4 flex items-center justify-center gap-3">
       <img
         alt="FluentA Logo Icon"
         src={logoUrl}
         className="size-14 object-contain"
       />
-      <span className="pb-0.5 text-3xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">
+      <span className="text-3xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">
         FluentA
       </span>
     </div>

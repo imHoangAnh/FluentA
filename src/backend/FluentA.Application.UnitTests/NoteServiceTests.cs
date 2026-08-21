@@ -151,6 +151,57 @@ public sealed class NoteServiceTests
     }
 
     [Fact]
+    public async Task UpdatePage_AcceptsVerbosePastedHtmlWhenSanitizedContentFits()
+    {
+        var repository = new FakeNoteRepository();
+        var assets = new FakeAssetRepository();
+        var service = new NoteService(repository, new NoteContentProcessor(assets), assets, new FakeAssetObjectStorage());
+        var userId = Guid.NewGuid();
+        var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
+        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("Page"));
+        var rawContent = $"<p>{string.Concat(Enumerable.Repeat("<span style=\"color:red\">word</span>", 5_000))}</p>";
+
+        var updated = await service.UpdatePageAsync(userId, page.Value!.Id, new UpdateNotePageRequest(Content: rawContent));
+        var stored = repository.GetStoredPage(page.Value.Id);
+
+        Assert.True(rawContent.Length > NotePage.ContentMaxLength);
+        Assert.True(updated.IsSuccess);
+        Assert.True(stored.Content.Length <= NotePage.ContentMaxLength);
+        Assert.DoesNotContain("style=", stored.Content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdatePage_EnforcesSanitizedAndRawContentLimits()
+    {
+        var repository = new FakeNoteRepository();
+        var assets = new FakeAssetRepository();
+        var service = new NoteService(repository, new NoteContentProcessor(assets), assets, new FakeAssetObjectStorage());
+        var userId = Guid.NewGuid();
+        var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
+        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("Page"));
+
+        var atPersistedLimit = await service.UpdatePageAsync(
+            userId,
+            page.Value!.Id,
+            new UpdateNotePageRequest(Content: new string('a', NotePage.ContentMaxLength)));
+        var abovePersistedLimit = await service.UpdatePageAsync(
+            userId,
+            page.Value.Id,
+            new UpdateNotePageRequest(Content: new string('a', NotePage.ContentMaxLength + 1)));
+        var aboveRawLimit = await service.UpdatePageAsync(
+            userId,
+            page.Value.Id,
+            new UpdateNotePageRequest(Content: new string('a', 1_000_001)));
+
+        Assert.True(atPersistedLimit.IsSuccess);
+        Assert.Equal(NotePage.ContentMaxLength, repository.GetStoredPage(page.Value.Id).Content.Length);
+        Assert.Equal("Content must be at most 100000 characters after formatting cleanup.",
+            Assert.IsType<Dictionary<string, string[]>>(((NoteError)abovePersistedLimit.Error!).Details)["content"].Single());
+        Assert.Equal("Content payload must be at most 1000000 characters before formatting cleanup.",
+            Assert.IsType<Dictionary<string, string[]>>(((NoteError)aboveRawLimit.Error!).Details)["content"].Single());
+    }
+
+    [Fact]
     public async Task UpdatePage_ArchivesRemovedNoteImages()
     {
         var repository = new FakeNoteRepository();

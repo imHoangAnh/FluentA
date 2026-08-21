@@ -4,6 +4,8 @@ namespace FluentA.Domain.BoundedContexts.Note.Entities;
 
 public sealed class NotePage : BaseEntity
 {
+    public const int ContentMaxLength = 100_000;
+
     private NotePage()
     {
         Name = string.Empty;
@@ -77,9 +79,9 @@ public sealed class NotePage : BaseEntity
     private static string CleanContent(string? content)
     {
         var cleaned = content ?? string.Empty;
-        if (cleaned.Length > 100_000)
+        if (cleaned.Length > ContentMaxLength)
         {
-            throw new ArgumentException("Note content must be at most 100000 characters.", nameof(content));
+            throw new ArgumentException($"Note content must be at most {ContentMaxLength} characters.", nameof(content));
         }
 
         return cleaned;
