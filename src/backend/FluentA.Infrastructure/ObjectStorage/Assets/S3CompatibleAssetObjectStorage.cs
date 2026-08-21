@@ -7,24 +7,29 @@ namespace FluentA.Infrastructure.ObjectStorage.Assets;
 
 public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
 {
-    private readonly IAmazonS3 _client;
+    private readonly IAmazonS3 _operations;
+    private readonly IAmazonS3 _presigning;
     private readonly AssetStorageOptions _options;
     private readonly Protocol _presignProtocol;
 
-    public S3CompatibleAssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
+    public S3CompatibleAssetObjectStorage(AssetStorageClients clients, AssetStorageOptions options)
     {
-        _client = client;
+        _operations = clients.Operations;
+        _presigning = clients.Presigning;
         _options = options;
         _options.Validate();
-        _presignProtocol = options.Provider == AssetStorageProvider.S3
-            ? Protocol.HTTPS
-            : GetMinioProtocol(options.Endpoint);
+        _presignProtocol = GetProtocol(options.PresigningEndpoint);
+    }
+
+    public S3CompatibleAssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
+        : this(new AssetStorageClients(client, client, ownsClients: false), options)
+    {
     }
 
     public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request)
     {
         var expiresAtUtc = DateTime.UtcNow.Add(request.Lifetime);
-        var url = _client.GetPreSignedURL(new GetPreSignedUrlRequest
+        var url = _presigning.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = _options.Bucket,
             Key = request.ObjectKey,
@@ -40,7 +45,7 @@ public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
     public AssetPresignedDownload CreatePresignedDownload(AssetDownloadRequest request)
     {
         var expiresAtUtc = DateTime.UtcNow.Add(request.Lifetime);
-        var url = _client.GetPreSignedURL(new GetPreSignedUrlRequest
+        var url = _presigning.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = _options.Bucket,
             Key = request.ObjectKey,
@@ -58,7 +63,7 @@ public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
     {
         try
         {
-            var response = await _client.GetObjectMetadataAsync(new GetObjectMetadataRequest
+            var response = await _operations.GetObjectMetadataAsync(new GetObjectMetadataRequest
             {
                 BucketName = _options.Bucket,
                 Key = objectKey
@@ -88,7 +93,7 @@ public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
 
         try
         {
-            using var response = await _client.GetObjectAsync(new GetObjectRequest
+            using var response = await _operations.GetObjectAsync(new GetObjectRequest
             {
                 BucketName = _options.Bucket,
                 Key = objectKey,
@@ -104,62 +109,37 @@ public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
         }
     }
 
-    public async Task EnsurePrivateBucketAsync(CancellationToken cancellationToken = default)
+    public async Task VerifyBucketAccessAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            if (_options.Provider == AssetStorageProvider.S3)
-            {
-                var response = await _client.GetPublicAccessBlockAsync(new GetPublicAccessBlockRequest
-                {
-                    BucketName = _options.Bucket
-                }, cancellationToken);
-
-                var block = response.PublicAccessBlockConfiguration;
-                if (block is null
-                    || block.BlockPublicAcls != true
-                    || block.IgnorePublicAcls != true
-                    || block.BlockPublicPolicy != true
-                    || block.RestrictPublicBuckets != true)
-                {
-                    throw new AssetStorageUnavailableException("Required S3 public-access protections are not enabled.");
-                }
-
-                return;
-            }
-
-            await _client.DeleteBucketPolicyAsync(new DeleteBucketPolicyRequest
+            await _operations.GetBucketLocationAsync(new GetBucketLocationRequest
             {
                 BucketName = _options.Bucket
             }, cancellationToken);
         }
-        catch (AssetStorageUnavailableException)
-        {
-            throw;
-        }
-        catch (AmazonS3Exception exception) when (
-            _options.Provider == AssetStorageProvider.Minio
-            && exception.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            // No bucket policy is the desired private default for local MinIO.
-        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            throw new AssetStorageUnavailableException("Could not verify private asset storage.");
+            throw new AssetStorageUnavailableException("Could not access asset storage.");
         }
     }
 
     public async Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
     {
-        await _client.DeleteObjectAsync(new DeleteObjectRequest
+        await _operations.DeleteObjectAsync(new DeleteObjectRequest
         {
             BucketName = _options.Bucket,
             Key = objectKey
         }, cancellationToken);
     }
 
-    private static Protocol GetMinioProtocol(string endpoint)
+    private static Protocol GetProtocol(string endpoint)
     {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return Protocol.HTTPS;
+        }
+
         var endpointUri = new Uri(endpoint, UriKind.Absolute);
         return string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
             ? Protocol.HTTP

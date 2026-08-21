@@ -26,7 +26,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'sticky top-0 z-30 flex h-screen w-[184px] shrink-0 flex-col border-r border-border bg-card px-2 py-4',
+        'brand-font sticky top-0 z-30 flex h-screen w-[184px] shrink-0 flex-col border-r border-border bg-card px-2 py-4',
         'max-[1100px]:w-[84px] max-[1100px]:px-1',
       )}
       aria-label="Primary navigation"

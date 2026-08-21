@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from '@/app/App'
 import { AppProviders } from '@/app/providers'
 import '@fontsource-variable/geist/wght.css'
+import '@fontsource-variable/nunito/wght.css'
 import './styles/design-system.css'
 
 createRoot(document.getElementById('root')!).render(

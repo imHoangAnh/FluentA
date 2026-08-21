@@ -18,6 +18,20 @@ API container, and is released together with the API and migration images.
 The real environment file is never copied into the repository, images, command
 arguments, or logs.
 
+## Asset Storage
+
+The asset adapter is configured as S3-compatible storage and has no provider
+selector. Production supplies only `AssetStorage__Bucket` and
+`AssetStorage__Region`; it does not set a custom endpoint, browser endpoint,
+static access key, static secret key, or path-style addressing. The AWS SDK
+therefore uses the regional S3 endpoint and the EC2 instance role/default
+credential chain.
+
+The production asset bucket must be provisioned privately with Public Access
+Block, exact frontend CORS, versioning/lifecycle as approved, and least-
+privilege IAM. Application startup verifies bucket access but does not mutate
+provider-specific bucket policies.
+
 Initialize it once from the installed template:
 
 ```bash

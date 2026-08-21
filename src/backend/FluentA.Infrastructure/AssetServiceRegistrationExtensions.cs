@@ -1,5 +1,3 @@
-using Amazon;
-using Amazon.S3;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Infrastructure.ObjectStorage.Assets;
 using FluentA.Infrastructure.Persistence.Repositories.Assets;
@@ -17,10 +15,10 @@ internal static class AssetServiceRegistrationExtensions
         services.AddScoped<IAssetService, AssetService>();
         services.AddMemoryCache();
         services.AddSingleton(assetStorageOptions);
-        services.AddHostedService<AssetStoragePrivacyStartupService>();
+        services.AddHostedService<AssetStorageStartupService>();
         if (assetStorageOptions.Enabled)
         {
-            services.AddSingleton<IAmazonS3>(_ => DependencyInjection.CreateAssetStorageClient(assetStorageOptions));
+            services.AddSingleton(_ => DependencyInjection.CreateAssetStorageClients(assetStorageOptions));
             services.AddSingleton<IAssetObjectStorage, S3CompatibleAssetObjectStorage>();
             services.AddSingleton<IAssetStorageReadinessProbe, AssetStorageReadinessProbe>();
         }

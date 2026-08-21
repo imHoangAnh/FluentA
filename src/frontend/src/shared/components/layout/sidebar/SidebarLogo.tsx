@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import logoUrl from '@/shared/assets/fluenta-logo.webp'
 
 export function SidebarLogo() {
   return (
@@ -9,18 +10,12 @@ export function SidebarLogo() {
         className="flex min-w-0 flex-1 items-end gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 max-[1100px]:flex-none"
       >
         <img
-          src="http://localhost:9000/fluenta-assets-dev/public/logo.png"
-          onError={(e) => {
-            const target = e.currentTarget
-            if (target.src !== `${window.location.origin}/logo.png`) {
-              target.src = '/logo.png'
-            }
-          }}
           alt="FluentA Logo Icon"
+          src={logoUrl}
           className="size-14 shrink-0 object-contain"
         />
         <span className="min-w-0 flex-1 max-[1100px]:hidden pb-1">
-          <span className="block truncate text-xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">FluentA</span>
+          <span className="block truncate text-xl font-bold tracking-[-0.04em] text-[#2e6a64] dark:text-teal-400">FluentA</span>
         </span>
       </Link>
     </div>

@@ -25,9 +25,13 @@ public static class ProductionRuntimeValidator
         }
 
         assetStorage.Validate();
-        if (assetStorage.Provider != AssetStorageProvider.S3)
+        if (!string.IsNullOrWhiteSpace(assetStorage.Endpoint)
+            || !string.IsNullOrWhiteSpace(assetStorage.PublicEndpoint)
+            || assetStorage.HasStaticCredentials
+            || assetStorage.UsePathStyle)
         {
-            throw new InvalidOperationException("Production asset storage provider must be S3.");
+            throw new InvalidOperationException(
+                "Production asset storage must use the AWS regional endpoint, default credential chain, and virtual-hosted addressing.");
         }
 
         if (!string.Equals(assetStorage.Region, "ap-southeast-1", StringComparison.Ordinal))

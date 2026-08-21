@@ -63,7 +63,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
       MINIO_API_CORS_ALLOW_ORIGIN: https://localhost:${FLUENTA_HTTPS_PORT:-7443}
     ports:
-      - "${MINIO_API_PORT:-59000}:59000"
+      - "127.0.0.1:${MINIO_API_PORT:-59000}:59000"
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-59001}:59001"
     volumes:
       - minio_data:/data
@@ -121,8 +121,8 @@ services:
       Database__Postgres__CommandTimeoutSeconds: "30"
       Hangfire__WorkerCount: "2"
       AssetStorage__Enabled: "true"
-      AssetStorage__Provider: Minio
-      AssetStorage__Endpoint: http://host.docker.internal:${MINIO_API_PORT:-59000}
+      AssetStorage__Endpoint: http://minio:59000
+      AssetStorage__PublicEndpoint: https://localhost:${FLUENTA_HTTPS_PORT:-7443}
       AssetStorage__Bucket: ${MINIO_BUCKET:-fluenta-assets-local}
       AssetStorage__AccessKey: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       AssetStorage__SecretKey: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
@@ -144,8 +144,6 @@ services:
       AzureSpeech__AccuracyThreshold: "80"
       AzureSpeech__CompletenessThreshold: "90"
       AzureSpeech__WordAccuracyThreshold: "70"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -181,6 +179,8 @@ services:
     restart: unless-stopped
     init: true
     read_only: true
+    environment:
+      MINIO_BUCKET: ${MINIO_BUCKET:-fluenta-assets-local}
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
     ports:
@@ -194,6 +194,7 @@ services:
         condition: service_healthy
     networks:
       - edge
+      - assets
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--no-check-certificate", "--output-document=-", "https://localhost:7443/health/live"]
       interval: 10s

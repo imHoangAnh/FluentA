@@ -47,10 +47,16 @@ Open:
 Caddy creates a local TLS certificate. The browser may show a certificate
 warning the first time; continue only for `localhost`.
 
-MinIO API port `59000` is published on the host because the API container and
-the host browser must use the same authority in presigned upload/download
-URLs. The bucket is private and anonymous access is denied, but do not forward
-this port through a router or allow it through an untrusted network firewall.
+MinIO API port `59000` is published on loopback for local inspection. The API
+uses `http://minio:59000` for object operations, while presigned browser PUT/GET
+URLs use the existing `https://localhost:7443` Caddy origin. Caddy preserves the
+signed bucket path and proxies it to MinIO, so the browser never makes an HTTP
+mixed-content request. The bucket is private and anonymous access is denied.
+
+The asset adapter has no MinIO-specific branch. This runtime supplies a custom
+S3-compatible `Endpoint`, `PublicEndpoint`, static credential pair, region,
+bucket, and path-style addressing. Other S3-compatible local services can use
+the same contract by changing those values.
 
 ## Direct Compose Command
 
