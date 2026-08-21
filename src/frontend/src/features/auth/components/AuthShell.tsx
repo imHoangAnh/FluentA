@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { type ReactNode } from 'react'
 import { cn } from '@/shared/lib/utils'
+import logoUrl from '@/shared/assets/fluenta-logo.webp'
 
 type AuthShellMode = 'login' | 'register' | 'forgot-password' | 'new-password'
 
@@ -18,14 +19,8 @@ function FluentABrandHeader() {
   return (
     <div className="mb-4 flex items-end justify-center gap-3">
       <img
-        src="http://localhost:9000/fluenta-assets-dev/public/logo.png"
-        onError={(e) => {
-          const target = e.currentTarget
-          if (target.src !== `${window.location.origin}/logo.png`) {
-            target.src = '/logo.png'
-          }
-        }}
         alt="FluentA Logo Icon"
+        src={logoUrl}
         className="size-14 object-contain"
       />
       <span className="pb-0.5 text-3xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">
@@ -76,7 +71,7 @@ export function AuthDivider() {
 
 export function AuthShell({ children, mode }: { children: ReactNode, mode: AuthShellMode }) {
   return (
-    <main className="ds-root grid min-h-screen bg-card lg:grid-cols-[3fr_2fr]">
+    <main className="ds-root brand-font grid min-h-screen bg-card lg:grid-cols-[3fr_2fr]">
       <section className="relative hidden min-h-screen overflow-hidden bg-[#f7f9fb] px-12 py-12 lg:flex lg:flex-col lg:items-center lg:justify-center" aria-label="About FluentA">
         <div className="relative z-10 mb-16 text-center"><FluentABrandHeader /><h1 className="m-0 max-w-sm text-xl font-normal leading-8 text-slate-600">Learn languages. Remember more.<br />Use it in real life.</h1></div>
         <div className="relative h-[450px] w-full max-w-[560px]" aria-hidden="true"><div className="absolute left-1/2 top-1/2 size-80 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" /><div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" />{orbitCards.map(({ language, phrase, position, accent }, index) => <div key={language} className={cn('absolute grid place-items-center rounded-lg bg-white px-3 py-2 text-center shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-300', position, index === 0 && 'shadow-[0_10px_25px_rgba(0,0,0,0.08)]')}><span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400">{language}</span><strong className={cn('text-sm text-slate-800', index === 0 && 'text-2xl text-teal-600')}>{phrase}</strong>{index > 0 ? <span className={cn('absolute right-2 top-2 size-2 rounded-full', accent)} /> : null}</div>)}</div>
