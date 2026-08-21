@@ -5,6 +5,7 @@
 
 @theme inline {
   --font-sans: "Geist Variable", "Segoe UI", sans-serif;
+  --font-brand: "Nunito Variable", "Nunito", "Segoe UI", sans-serif;
   --color-background: var(--ds-background);
   --color-foreground: var(--ds-foreground);
   --color-card: var(--ds-card);
@@ -62,6 +63,10 @@
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+.brand-font {
+  font-family: var(--font-brand);
 }
 
 .ds-root *,
