@@ -181,16 +181,17 @@ describe('FluentA app routes', async () => {
   it('renders the login route with auth controls', async () => {
     await renderApp('/login')
 
-    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign up now' })).toBeInTheDocument()
   })
 
   it('protects the home route when anonymous', async () => {
     await renderApp('/')
 
-    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
@@ -224,7 +225,7 @@ describe('FluentA app routes', async () => {
   it('protects the notes route when anonymous', async () => {
     await renderApp('/notes')
 
-    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
@@ -242,7 +243,8 @@ describe('FluentA app routes', async () => {
   it('protects practice sessions when anonymous', async () => {
     await renderApp('/practice/page-1')
 
-    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
   it('opens the modal-first Practice flow and starts the selected deck directly', async () => {

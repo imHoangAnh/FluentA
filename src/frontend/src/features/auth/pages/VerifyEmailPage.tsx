@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import * as authApi from '../api/auth.api'
 import { Button } from '@/shared/components/ui/button'
@@ -70,33 +69,31 @@ export function VerifyEmailPage() {
   }
 
   return (
-    <AuthShell mode="register">
-      <div className="grid gap-5">
-        <div>
-          <h1 className="m-0 text-2xl font-semibold tracking-tight">Verify your email</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Enter the six-digit code sent to your inbox to finish creating your FluentA account.
-          </p>
-        </div>
-        <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
-          <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} autoFocus />
-          {!email ? <p role="alert" className="m-0 text-sm text-destructive">Start registration again to request a verification code.</p> : null}
-          {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
-          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-          <Button className="w-full" type="submit" disabled={!email}>Verify email</Button>
-        </form>
-        <Button
-          variant="outline"
-          type="button"
-          onClick={() => void resendCode()}
-          disabled={!email || secondsRemaining > 0}
-          className="w-full"
-        >
-          {secondsRemaining > 0 ? `Resend available in ${secondsRemaining}s` : 'Resend code'}
-        </Button>
-        <div className="flex justify-between text-sm font-semibold"><Link to="/register" className="text-primary no-underline hover:underline">Back to register</Link><Link to="/login" className="text-primary no-underline hover:underline">Go to login</Link></div>
+    <div className="grid gap-5">
+      <div>
+        <h1 className="m-0 text-2xl font-semibold tracking-tight">Verify your email</h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Enter the six-digit code sent to your inbox to finish creating your FluentA account.
+        </p>
       </div>
-    </AuthShell>
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
+        <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} autoFocus />
+        {!email ? <p role="alert" className="m-0 text-sm text-destructive">Start registration again to request a verification code.</p> : null}
+        {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
+        {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
+        <Button className="w-full" type="submit" disabled={!email}>Verify email</Button>
+      </form>
+      <Button
+        variant="outline"
+        type="button"
+        onClick={() => void resendCode()}
+        disabled={!email || secondsRemaining > 0}
+        className="w-full"
+      >
+        {secondsRemaining > 0 ? `Resend code (${secondsRemaining}s)` : 'Resend code'}
+      </Button>
+      <div className="flex justify-between text-sm font-semibold"><Link to="/register" className="text-primary no-underline hover:underline">Back to register</Link><Link to="/login" className="text-primary no-underline hover:underline">Go to login</Link></div>
+    </div>
   )
 }
 

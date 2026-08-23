@@ -1,6 +1,5 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AuthFormHeader, AuthShell } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import * as authApi from '../api/auth.api'
 import { Button } from '@/shared/components/ui/button'
@@ -31,33 +30,53 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell mode="new-password">
-      <AuthFormHeader title="Choose a new password" description="Set a new password for your FluentA account. This link can only be used once." />
-      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
-          <TextField
-            label="New password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Create a new password"
-            value={password}
-            onChange={setPassword}
-          />
-          <TextField
-            label="Confirm password"
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Confirm your new password"
-            value={confirmPassword}
-            onChange={setConfirmPassword}
-          />
-          {missingToken ? <p role="alert" className="m-0 text-sm text-destructive">This password reset link is missing its token.</p> : null}
-          {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-          <Button className="w-full" type="submit" disabled={missingToken}>Reset password</Button>
+    <>
+      <div className="mb-4 sm:mb-5 xl:mb-6">
+        <h1 className="m-0 text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+          Choose a new password
+        </h1>
+        <p className="m-0 mt-1 text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
+          Set a new password for your FluentA account. This link can only be used once.
+        </p>
+      </div>
+      <form className="grid gap-4 sm:gap-5 xl:gap-6" onSubmit={(event) => void submit(event)}>
+        <TextField
+          label="New password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Create a new password"
+          value={password}
+          onChange={setPassword}
+        />
+        <TextField
+          label="Confirm password"
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Confirm your new password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+        />
+        {missingToken ? <p role="alert" className="m-0 text-sm font-medium text-destructive">This password reset link is missing its token.</p> : null}
+        {error ? <p role="alert" className="m-0 text-sm font-medium text-destructive">{error}</p> : null}
+        <Button
+          className="h-10 w-full rounded-lg bg-[#2e6a64] text-sm font-semibold text-white shadow-sm hover:bg-[#265a55] active:bg-[#1f4844] sm:h-11 sm:text-base xl:h-12 dark:bg-teal-600 dark:hover:bg-teal-700"
+          type="submit"
+          disabled={missingToken}
+        >
+          Reset password
+        </Button>
       </form>
-      <div className="mt-5 flex justify-between text-sm font-semibold"><Link to="/login" className="text-primary no-underline hover:underline">Back to login</Link><Link to="/forgot-password" className="text-primary no-underline hover:underline">Request a new link</Link></div>
-    </AuthShell>
+      <div className="mt-4 flex items-center justify-between text-sm sm:mt-5 sm:text-base xl:mt-6">
+        <Link to="/login" className="font-semibold text-[#2e6a64] dark:text-teal-400">
+          Back to login
+        </Link>
+        <Link to="/forgot-password" className="font-semibold text-[#2e6a64] dark:text-teal-400">
+          Request a new link
+        </Link>
+      </div>
+    </>
   )
 }
 

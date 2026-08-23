@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as authApi from '@/features/auth/api/auth.api'
+import { AuthLayout, AuthShell } from '@/features/auth'
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage'
+import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { RegisterPage } from '@/features/auth/pages/RegisterPage'
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage'
 import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage'
@@ -26,7 +28,11 @@ vi.mock('@/features/auth/components/GoogleSignInButton', () => ({
 }))
 
 function renderRoute(element: React.ReactNode, initialEntry: string) {
-  return render(<MemoryRouter initialEntries={[initialEntry]}>{element}</MemoryRouter>)
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <AuthShell>{element}</AuthShell>
+    </MemoryRouter>,
+  )
 }
 
 describe('approved authentication form refinement', () => {
@@ -70,7 +76,8 @@ describe('approved authentication form refinement', () => {
     }))
 
     renderRoute(<ForgotPasswordPage />, '/forgot-password')
-    expect(screen.getByLabelText('Authentication context')).toHaveTextContent('Forgot password')
+    expect(screen.getByRole('heading', { name: 'Reset your password' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Register' })).not.toBeInTheDocument()
 
@@ -84,9 +91,9 @@ describe('approved authentication form refinement', () => {
     expect(screen.queryByText(/Send again in \d+s/i)).not.toBeInTheDocument()
   })
 
-  it('uses a dedicated New password context', () => {
+  it('renders Choose a new password heading on reset-password', () => {
     renderRoute(<ResetPasswordPage />, '/reset-password?token=reset-token')
-    expect(screen.getByLabelText('Authentication context')).toHaveTextContent('New password')
+    expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
   })
@@ -96,5 +103,37 @@ describe('approved authentication form refinement', () => {
     expect(screen.getByLabelText('Verification code')).toBeInTheDocument()
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
     expect(screen.queryByText(/Code expires at/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps AuthLayout and its banner mounted when switching between login and register', async () => {
+    const user = userEvent.setup()
+    const router = createMemoryRouter(
+      [
+        {
+          element: <AuthLayout />,
+          children: [
+            { path: '/login', element: <LoginPage /> },
+            { path: '/register', element: <RegisterPage /> },
+          ],
+        },
+      ],
+      { initialEntries: ['/login'] },
+    )
+
+    render(<RouterProvider router={router} />)
+
+    const banner = screen.getByRole('region', { name: 'About FluentA' })
+    expect(banner).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Sign up now' }))
+
+    expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'About FluentA' })).toBe(banner)
+
+    await user.click(screen.getByRole('link', { name: 'Sign in' }))
+
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'About FluentA' })).toBe(banner)
   })
 })

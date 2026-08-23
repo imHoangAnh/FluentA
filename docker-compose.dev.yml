@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: fluenta-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: fluenta_dev
       POSTGRES_USER: fluenta
@@ -19,6 +20,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: fluenta-minio
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: fluenta_minio_local
       MINIO_ROOT_PASSWORD: fluenta_minio_local_secret
@@ -29,12 +31,19 @@ services:
       - "9001:9001"
     volumes:
       - fluenta_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
   minio-bootstrap:
     image: minio/mc:latest
     container_name: fluenta-minio-bootstrap
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     environment:
       MINIO_ROOT_USER: fluenta_minio_local
       MINIO_ROOT_PASSWORD: fluenta_minio_local_secret

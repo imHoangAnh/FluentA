@@ -93,7 +93,7 @@
   box-shadow: none !important;
 }
 
-.ds-root a {
+.ds-root :where(a) {
   font-weight: inherit;
   text-decoration: none;
 }
