@@ -1,9 +1,9 @@
-import { Link } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { type ReactNode } from 'react'
 import { cn } from '@/shared/lib/utils'
 import logoUrl from '@/shared/assets/fluenta-logo.webp'
 
-type AuthShellMode = 'login' | 'register' | 'forgot-password' | 'new-password'
+export type AuthShellMode = 'login' | 'register' | 'forgot-password' | 'new-password'
 
 const orbitCards = [
   { language: 'Vietnamese', phrase: 'Xin chào', position: 'left-1/2 top-1/2 z-10 size-[150px] -translate-x-1/2 -translate-y-1/2', accent: 'bg-slate-400' },
@@ -15,37 +15,32 @@ const orbitCards = [
   { language: 'French', phrase: 'Bonjour', position: 'left-1/2 top-1/2 size-[120px] -translate-x-1/2 -translate-y-[240px]', accent: 'bg-blue-400' },
 ]
 
-function FluentABrandHeader() {
+function FluentABrandHeader({ size = 'default' }: { size?: 'default' | 'large' }) {
+  if (size === 'large') {
+    return (
+      <div className="mb-4 flex items-center justify-center gap-4">
+        <img
+          alt="FluentA Logo Icon"
+          src={logoUrl}
+          className="size-20 object-contain xl:size-24"
+        />
+        <span className="text-4xl font-extrabold tracking-[-0.03em] text-[#2e6a64] xl:text-5xl dark:text-teal-400">
+          FluentA
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="mb-4 flex items-center justify-center gap-3">
       <img
         alt="FluentA Logo Icon"
         src={logoUrl}
-        className="size-14 object-contain"
+        className="size-12 object-contain sm:size-14"
       />
-      <span className="text-3xl font-bold tracking-[-0.03em] text-[#2e6a64] dark:text-teal-400">
+      <span className="text-2xl font-bold tracking-[-0.03em] text-[#2e6a64] sm:text-3xl dark:text-teal-400">
         FluentA
       </span>
-    </div>
-  )
-}
-
-function AuthContextNavigation({ mode }: { mode: AuthShellMode }) {
-  if (mode === 'login' || mode === 'register') {
-    return (
-      <nav className="mb-8 grid grid-cols-2 border-b border-slate-100" aria-label="Authentication">
-        <Link to="/login" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'login' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Login</Link>
-        <Link to="/register" className={cn('border-b-2 px-2 pb-4 text-center text-sm font-bold no-underline transition-colors', mode === 'register' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-700')}>Register</Link>
-      </nav>
-    )
-  }
-
-  const label = mode === 'forgot-password' ? 'Forgot password' : 'New password'
-  return (
-    <div className="mb-8 border-b border-slate-100" aria-label="Authentication context">
-      <p className="mx-auto mb-0 w-1/2 border-b-2 border-teal-600 px-2 pb-4 text-center text-sm font-bold text-teal-600">
-        {label}
-      </p>
     </div>
   )
 }
@@ -61,7 +56,7 @@ export function AuthFormHeader({ title, description }: { title: string, descript
 
 export function AuthDivider() {
   return (
-    <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+    <div className="my-3.5 flex items-center gap-4 text-sm text-muted-foreground sm:my-4 xl:my-5">
       <span className="h-px flex-1 bg-border" />
       <span>or</span>
       <span className="h-px flex-1 bg-border" />
@@ -69,17 +64,51 @@ export function AuthDivider() {
   )
 }
 
-export function AuthShell({ children, mode }: { children: ReactNode, mode: AuthShellMode }) {
+export function AuthShell({ children }: { children: ReactNode, mode?: AuthShellMode }) {
   return (
-    <main className="ds-root brand-font grid min-h-screen bg-card lg:grid-cols-[3fr_2fr]">
-      <section className="relative hidden min-h-screen overflow-hidden bg-[#f7f9fb] px-12 py-12 lg:flex lg:flex-col lg:items-center lg:justify-center" aria-label="About FluentA">
-        <div className="relative z-10 mb-16 text-center"><FluentABrandHeader /><h1 className="m-0 max-w-sm text-xl font-normal leading-8 text-slate-600">Learn languages. Remember more.<br />Use it in real life.</h1></div>
-        <div className="relative h-[450px] w-full max-w-[560px]" aria-hidden="true"><div className="absolute left-1/2 top-1/2 size-80 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" /><div className="absolute left-1/2 top-1/2 size-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200" />{orbitCards.map(({ language, phrase, position, accent }, index) => <div key={language} className={cn('absolute grid place-items-center rounded-lg bg-white px-3 py-2 text-center shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-300', position, index === 0 && 'shadow-[0_10px_25px_rgba(0,0,0,0.08)]')}><span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400">{language}</span><strong className={cn('text-sm text-slate-800', index === 0 && 'text-2xl text-teal-600')}>{phrase}</strong>{index > 0 ? <span className={cn('absolute right-2 top-2 size-2 rounded-full', accent)} /> : null}</div>)}</div>
-        <p className="relative z-10 mt-12 font-medium text-slate-700">Learn naturally. Speak confidently.</p>
+    <main className="ds-root brand-font grid min-h-screen bg-card lg:grid-cols-2 xl:grid-cols-[1.15fr_0.85fr] 2xl:grid-cols-[3fr_2fr]">
+      <section className="relative hidden min-h-screen overflow-hidden bg-[#f7f9fb] px-6 py-8 lg:flex lg:flex-col lg:items-center lg:justify-between xl:px-12 xl:py-12" aria-label="About FluentA">
+        <div className="relative z-10 text-center">
+          <FluentABrandHeader size="large" />
+        </div>
+        <div className="relative my-auto h-[340px] w-full max-w-[480px] sm:h-[380px] sm:max-w-[520px] xl:h-[450px] xl:max-w-[560px]" aria-hidden="true">
+          <div className="absolute left-1/2 top-1/2 size-64 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200 sm:size-72 xl:size-80" />
+          <div className="absolute left-1/2 top-1/2 size-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-slate-200 sm:size-[380px] xl:size-[440px]" />
+          {orbitCards.map(({ language, phrase, position, accent }, index) => (
+            <div
+              key={language}
+              className={cn(
+                'absolute grid place-items-center rounded-lg bg-white px-3 py-2 text-center shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-transform duration-300',
+                position,
+                index === 0 && 'shadow-[0_10px_25px_rgba(0,0,0,0.08)]',
+              )}
+            >
+              <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400">{language}</span>
+              <strong className={cn('text-sm text-slate-800', index === 0 && 'text-2xl text-teal-600')}>{phrase}</strong>
+              {index > 0 ? <span className={cn('absolute right-2 top-2 size-2 rounded-full', accent)} /> : null}
+            </div>
+          ))}
+        </div>
+        <p className="relative z-10 mt-4 font-medium text-slate-700 sm:mt-6 xl:mt-8">
+          Start building your second brain with FluentA
+        </p>
       </section>
-      <section className="flex min-h-screen items-center justify-center bg-white p-6 sm:p-10 lg:p-12">
-        <div className="w-full max-w-sm"><div className="mb-8 flex items-center gap-3 lg:hidden"><FluentABrandHeader /></div><AuthContextNavigation mode={mode} />{children}</div>
+      <section className="flex min-h-screen items-center justify-center bg-white px-6 py-6 sm:px-8 sm:py-8 lg:px-8 lg:py-6 xl:px-12 xl:py-10">
+        <div className="w-full max-w-[420px] sm:max-w-[450px] xl:max-w-[480px]">
+          <div className="mb-4 flex items-center gap-3 lg:hidden sm:mb-5">
+            <FluentABrandHeader />
+          </div>
+          {children}
+        </div>
       </section>
     </main>
+  )
+}
+
+export function AuthLayout() {
+  return (
+    <AuthShell>
+      <Outlet />
+    </AuthShell>
   )
 }

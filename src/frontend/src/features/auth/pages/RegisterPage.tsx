@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AuthDivider, AuthFormHeader, AuthShell } from '../components/AuthShell'
+import { Link, useNavigate } from 'react-router-dom'
+import { AuthDivider } from '../components/AuthShell'
 import { TextField } from '../components/TextField'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { useAuthStore } from '../store/auth-store'
@@ -78,12 +78,16 @@ export function RegisterPage() {
   }, [googleLogin, navigate])
 
   return (
-    <AuthShell mode="register">
-      <AuthFormHeader
-        title="Create your account"
-        description={verification ? 'Enter the verification code to finish creating your account.' : 'Start building a vocabulary you will remember.'}
-      />
-      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
+    <>
+      <div className="mb-4 sm:mb-5 xl:mb-6">
+        <h1 className="m-0 text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+          Create your account
+        </h1>
+        <p className="m-0 mt-1 text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
+          Start building a vocabulary you will remember.
+        </p>
+      </div>
+      <form className="grid gap-3.5 sm:gap-4.5 xl:gap-6" onSubmit={(event) => void submit(event)}>
         <TextField label="Full name" name="fullName" autoComplete="name" placeholder="Enter your full name" value={fullName} onChange={setFullName} disabled={verification !== null} />
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="Enter your email" value={email} onChange={setEmail} disabled={verification !== null} />
         <TextField
@@ -97,22 +101,31 @@ export function RegisterPage() {
           disabled={verification !== null}
         />
         {verification ? <TextField label="Verification code" name="otp" inputMode="numeric" autoComplete="one-time-code" placeholder="Enter the 6-digit code" value={otp} onChange={setOtp} autoFocus /> : null}
-        {message ? <p role="status" className="m-0 text-sm text-primary">{message}</p> : null}
-        {error ? <p role="alert" className="m-0 text-sm text-destructive">{error}</p> : null}
-        <Button className="w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? (verification ? 'Verifying...' : 'Creating account...') : (verification ? 'Verify email' : 'Continue')}</Button>
+        {message ? <p role="status" className="m-0 text-sm font-medium text-primary">{message}</p> : null}
+        {error ? <p role="alert" className="m-0 text-sm font-medium text-destructive">{error}</p> : null}
+        <Button className="h-10 w-full rounded-lg bg-[#2e6a64] text-sm font-semibold text-white shadow-sm hover:bg-[#265a55] active:bg-[#1f4844] sm:h-11 sm:text-base xl:h-12 dark:bg-teal-600 dark:hover:bg-teal-700" type="submit" disabled={isSubmitting}>{isSubmitting ? (verification ? 'Verifying...' : 'Creating account...') : (verification ? 'Verify email' : 'Continue')}</Button>
       </form>
 
       {verification ? (
-        <Button className="mt-4 w-full" variant="outline" type="button" onClick={() => void resendCode()} disabled={secondsRemaining > 0}>
-          {secondsRemaining > 0 ? `Resend available in ${secondsRemaining}s` : 'Resend code'}
+        <Button className="mt-2.5 h-10 w-full rounded-lg text-sm sm:mt-3 sm:h-11 sm:text-base xl:h-12" variant="outline" type="button" onClick={() => void resendCode()} disabled={secondsRemaining > 0}>
+          {secondsRemaining > 0 ? `Resend code (${secondsRemaining}s)` : 'Resend code'}
         </Button>
       ) : (
         <>
           <AuthDivider />
           <GoogleSignInButton onCredential={acceptGoogleCredential} />
+          <div className="mt-4 text-center text-sm text-slate-600 sm:mt-5 sm:text-base xl:mt-6">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-[#2e6a64] dark:text-teal-400"
+            >
+              Sign in
+            </Link>
+          </div>
         </>
       )}
-    </AuthShell>
+    </>
   )
 }
 
