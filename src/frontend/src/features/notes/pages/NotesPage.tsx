@@ -339,9 +339,24 @@ export function NotesPage() {
 
   return (
     <>
-      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[220px_minmax(0,1fr)] min-[900px]:grid-rows-1 min-[1200px]:grid-cols-[248px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,5fr)] min-[900px]:grid-rows-1">
         <Card className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={(event) => openCreateBoardDialog(event.currentTarget)}><FolderPlus /></Button></div>
+          <div className="flex items-center justify-between border-b border-border px-3.5 py-2">
+            <h2 className="m-0 text-sm font-semibold">Boards</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted-foreground">{boards.length}</span>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                className="size-7"
+                aria-label="Create new board"
+                onClick={(event) => openCreateBoardDialog(event.currentTarget)}
+              >
+                <FolderPlus className="size-4" />
+              </Button>
+            </div>
+          </div>
           <div ref={railFocusRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2 outline-none" data-testid="notes-rail-scroll">
             {boards.map((board) => {
               const isActiveBoard = activeBoard?.id === board.id
@@ -416,13 +431,13 @@ export function NotesPage() {
                   {activePage ? (
                     <>
                       <div
-                        className="grid shrink-0 gap-3 border-b border-border px-4 py-3 xl:grid-cols-[minmax(12rem,1fr)_minmax(0,2fr)_auto] xl:items-center xl:px-5"
+                        className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2 xl:px-5"
                         data-testid="note-editor-header"
                       >
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <input
                             aria-label="Note title"
-                            className="w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-[-0.02em] text-foreground outline-none placeholder:text-muted-foreground"
+                            className="w-full border-0 bg-transparent p-0 text-2xl font-bold leading-none tracking-[-0.02em] text-foreground outline-none placeholder:text-muted-foreground"
                             data-testid="note-title-input"
                             disabled={isOpeningPage}
                             maxLength={240}
@@ -430,23 +445,23 @@ export function NotesPage() {
                             onBlur={() => { void persistDraft() }}
                             onChange={(event) => { setContent(draftContent); setTitle(event.target.value); markChanged() }}
                           />
-                          <p className="m-0 mt-1 text-sm text-muted-foreground">{formatDate(activePage.date)}</p>
+                          <p className="m-0 mt-0.5 text-[11px] text-muted-foreground">{formatDate(activePage.date)}</p>
                         </div>
-                        <div
-                          ref={setToolbarHost}
-                          className="min-h-8 min-w-0 [&_.journal-toolbar]:flex-wrap [&_.journal-toolbar]:justify-start xl:[&_.journal-toolbar]:justify-center"
-                          data-testid="note-toolbar-host"
-                        />
-                        <div className="flex shrink-0 items-center justify-end gap-3">
-                          <small data-testid="note-save-status" className="text-xs text-muted-foreground">
+                        <div className="flex shrink-0 items-center justify-end gap-2.5">
+                          <small data-testid="note-save-status" className="text-[10px] text-muted-foreground">
                             {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : isDirty ? 'Unsaved changes' : 'Saved'}
                           </small>
-                          <Button type="button" size="sm" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>
-                            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                          <Button type="button" size="sm" className="h-[30px] min-h-[30px] px-3.5 text-xs gap-1.5" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>
+                            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
                             {saveStatus === 'error' ? 'Retry save' : 'Save'}
                           </Button>
                         </div>
                       </div>
+                      <div
+                        ref={setToolbarHost}
+                        className="border-b border-border bg-card px-4 py-1.5 min-h-[38px] flex items-center [&_.journal-toolbar]:justify-start"
+                        data-testid="note-toolbar-host"
+                      />
                       {pageError ? <p className="m-0 border-b border-border px-5 py-3 text-sm text-destructive">{pageError}</p> : null}
                       <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
