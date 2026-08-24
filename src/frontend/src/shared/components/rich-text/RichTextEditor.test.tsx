@@ -23,6 +23,23 @@ describe('RichTextEditor', () => {
     Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
   })
 
+  it('applies text color command when selecting from color dropdown', async () => {
+    const execCommand = vi.fn().mockReturnValue(true)
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+    const onChange = vi.fn()
+    const { getByRole } = render(
+      <RichTextEditor content="<p>Colored text</p>" onChange={onChange} />,
+    )
+
+    await userEvent.click(getByRole('button', { name: 'Text color' }))
+    const redButton = getByRole('button', { name: 'Color Red' })
+    await userEvent.click(redButton)
+
+    expect(execCommand).toHaveBeenCalledWith('foreColor', false, '#ef4444')
+
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
+  })
+
   it('keeps the Journal formatting toolbar inline by default', () => {
     const { container } = render(
       <RichTextEditor content="<p>Journal entry</p>" onChange={vi.fn()} />,
