@@ -11,7 +11,7 @@ type AppShellProps = {
 
 export function AppShell({ children, title, description, contentClassName }: AppShellProps) {
   return (
-    <div className="ds-root flex min-h-screen bg-background">
+    <div className="ds-root grid grid-cols-[1fr_8fr] min-h-screen bg-background">
       <AppSidebar />
       <AppShellMain title={title} description={description} contentClassName={contentClassName}>
         {children}
