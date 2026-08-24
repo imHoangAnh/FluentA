@@ -104,7 +104,7 @@ describe('JournalPage workspace redesign', () => {
     expect(within(actions).getByTestId('journal-save-status')).toHaveTextContent('Saved')
 
     const editorBody = screen.getByTestId('journal-editor-body')
-    const toolbar = await within(editorHeader).findByRole('toolbar', { name: 'Journal formatting tools' })
+    const toolbar = await screen.findByRole('toolbar', { name: 'Journal formatting tools' })
     const writingSurface = within(editorBody).getByLabelText('Journal rich text editor')
     expect(editorHeader.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(toolbar.compareDocumentPosition(writingSurface) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -113,6 +113,9 @@ describe('JournalPage workspace redesign', () => {
 
   it('uses Save for a new entry while keeping the date read-only', async () => {
     renderPage()
+
+    const createButton = await screen.findByTestId('create-journal-button')
+    await userEvent.click(createButton)
 
     const saveButton = await screen.findByTestId('save-journal-button')
     expect(saveButton).toHaveTextContent('Save')
@@ -154,6 +157,41 @@ describe('JournalPage workspace redesign', () => {
       title: 'A focused study day, updated',
       content: journalEntry.content,
       date: journalEntry.date,
+    })
+  })
+
+  it('interacts with the shadcn UI calendar to open populated and prepare empty dates', async () => {
+    renderPage()
+
+    const prevMonthButton = await screen.findByRole('button', { name: /previous month/i })
+    fireEvent.click(prevMonthButton)
+
+    await waitFor(async () => {
+      const populatedButton = screen.getByTestId(`journal-calendar-day-${journalEntry.date}`)
+      expect(populatedButton).toHaveAccessibleName(`${journalEntry.date}, 1 journal entry`)
+      expect(within(populatedButton).getByText('1')).toBeInTheDocument()
+    })
+
+    const populatedButton = screen.getByTestId(`journal-calendar-day-${journalEntry.date}`)
+    fireEvent.click(populatedButton)
+    await waitFor(() => {
+      expect(screen.getByTestId('journal-title-input')).toHaveValue(journalEntry.title)
+    })
+
+    const emptyDate = '2026-07-15'
+    const emptyButton = screen.getByTestId(`journal-calendar-day-${emptyDate}`)
+    fireEvent.click(emptyButton)
+    await waitFor(() => {
+      expect(screen.getByTestId('journal-editor-empty-state')).toBeInTheDocument()
+      expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate)
+    })
+
+    const createButton = screen.getByTestId('create-journal-button')
+    fireEvent.click(createButton)
+    await waitFor(() => {
+      expect(screen.queryByTestId('journal-editor-empty-state')).not.toBeInTheDocument()
+      expect(screen.getByTestId('journal-title-input')).toHaveValue('New Journal')
+      expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate)
     })
   })
 })

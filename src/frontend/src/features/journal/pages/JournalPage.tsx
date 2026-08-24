@@ -1,10 +1,12 @@
-import { BookOpen, ChevronLeft, ChevronRight, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
+import { BookOpen, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
 import { journalKeys } from '../api/journal.queries'
 import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/shared/lib/toast'
+import { Calendar } from '@/shared/components/ui/calendar'
+import { cn } from '@/shared/lib/utils'
 
 const JournalRichTextEditor = lazy(() =>
   import('@/shared/components/rich-text/RichTextEditor').then((module) => ({ default: module.RichTextEditor })),
@@ -24,33 +26,6 @@ function toMonthInput(date: Date) {
 
 function toDateInput(date: Date) {
   return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
-}
-
-function shiftMonth(month: string, offset: number) {
-  const [year, monthNumber] = month.split('-').map(Number)
-  const date = new Date(year, monthNumber - 1 + offset, 1)
-  return toMonthInput(date)
-}
-
-function monthLabel(month: string) {
-  const [year, monthNumber] = month.split('-').map(Number)
-  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(new Date(year, monthNumber - 1, 1))
-}
-
-function buildCalendarDates(month: string) {
-  const [year, monthNumber] = month.split('-').map(Number)
-  const first = new Date(year, monthNumber - 1, 1)
-  const start = new Date(first)
-  start.setDate(first.getDate() - first.getDay())
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index)
-    return {
-      date,
-      value: toDateInput(date),
-      isCurrentMonth: date.getMonth() === first.getMonth(),
-    }
-  })
 }
 
 function HighlightedPreview({ entry }: { entry: journalApi.JournalEntrySummary | journalApi.JournalSearchResult }) {
@@ -77,6 +52,7 @@ export function JournalPage() {
   const queryClient = useQueryClient()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [isEditorActive, setIsEditorActive] = useState(false)
   const [title, setTitle] = useState('New Journal')
   const [content, setContent] = useState('')
   const [entryDate, setEntryDate] = useState(() => toDateInput(new Date()))
@@ -122,13 +98,22 @@ export function JournalPage() {
     : entriesQuery.isLoading
   const isListError = isSearching ? searchQueryResult.isError : entriesQuery.isError
   const calendarCounts = useMemo(() => new Map((calendarQuery.data ?? []).map((day) => [day.date, day.count])), [calendarQuery.data])
-  const calendarDates = useMemo(() => buildCalendarDates(calendarMonth), [calendarMonth])
+  const selectedDate = useMemo(() => {
+    if (!entryDate) return undefined
+    const [year, month, day] = entryDate.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }, [entryDate])
+  const calendarMonthDate = useMemo(() => {
+    const [year, month] = calendarMonth.split('-').map(Number)
+    return new Date(year, month - 1, 1)
+  }, [calendarMonth])
 
   const clearEditor = () => {
     openRequestRef.current += 1
     setOpeningId(null)
     setOpenFailed(false)
     setSelectedId(null)
+    setIsEditorActive(false)
     setTitle('New Journal')
     setContent('')
     setEntryDate(toDateInput(new Date()))
@@ -141,7 +126,8 @@ export function JournalPage() {
     setOpeningId(null)
     setOpenFailed(false)
     setSelectedId(null)
-    setTitle(`Learning notes for ${date}`)
+    setIsEditorActive(false)
+    setTitle('New Journal')
     setContent('')
     setEntryDate(date)
     setIsDirty(false)
@@ -150,6 +136,7 @@ export function JournalPage() {
 
   const selectEntry = (entry: journalApi.JournalEntry) => {
     setSelectedId(entry.id)
+    setIsEditorActive(true)
     setTitle(entry.title)
     setContent(entry.content)
     setEntryDate(entry.date)
@@ -183,6 +170,12 @@ export function JournalPage() {
   }
 
   const openCalendarDate = (date: string) => {
+    const [year, month] = date.split('-')
+    const dateMonth = `${year}-${month}`
+    if (dateMonth !== calendarMonth) {
+      setCalendarMonth(dateMonth)
+    }
+
     const matchingEntry = (entriesQuery.data ?? []).find((entry) => entry.date === date)
     if (matchingEntry) {
       void openEntry(matchingEntry)
@@ -273,63 +266,83 @@ export function JournalPage() {
       <div className="journal-content" data-testid="journal-workspace">
         <div className="journal-sidebar">
           <section className="journal-calendar-card" aria-label="Journal date calendar">
-            <header>
-              <strong>{monthLabel(calendarMonth)}</strong>
-              <div className="flex gap-1">
-                <button aria-label="Previous calendar month" type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, -1))}>
-                  <ChevronLeft size={16} />
-                </button>
-                <button aria-label="Next calendar month" type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, 1))}>
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </header>
-            <div className="journal-calendar-weekdays" aria-hidden="true">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => <span key={i}>{day}</span>)}
-            </div>
-            <div className="journal-calendar-grid">
-              {calendarDates.map((day) => {
-                const count = calendarCounts.get(day.value) ?? 0
-                const isSelected = entryDate === day.value
-                return (
-                  <button
-                    aria-label={`${day.value}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
-                    className={[
-                      'journal-calendar-day',
-                      day.isCurrentMonth ? '' : 'journal-calendar-day--muted',
-                      count > 0 ? 'journal-calendar-day--has-entry' : '',
-                      isSelected ? 'journal-calendar-day--selected' : '',
-                    ].filter(Boolean).join(' ')}
-                    data-testid={`journal-calendar-day-${day.value}`}
-                    key={day.value}
-                    type="button"
-                    onClick={() => openCalendarDate(day.value)}
-                  >
-                    {day.date.getDate()}
-                    {count > 0 ? <small>{count}</small> : null}
-                  </button>
-                )
-              })}
-            </div>
+            <Calendar
+              mode="single"
+              month={calendarMonthDate}
+              onMonthChange={(month) => setCalendarMonth(toMonthInput(month))}
+              selected={selectedDate}
+              onSelect={(date) => {
+                if (date) {
+                  openCalendarDate(toDateInput(date))
+                }
+              }}
+              className="p-0 w-full"
+              classNames={{
+                months: 'relative flex flex-col gap-2',
+                month: 'flex flex-col gap-1',
+                month_caption: 'flex justify-start items-center h-6 pr-14',
+                caption_label: 'text-xs font-semibold text-foreground',
+                nav: 'flex items-center gap-0.5 absolute right-0 top-0 z-20',
+                button_previous: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
+                button_next: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
+                month_grid: 'w-full border-collapse space-y-0.5',
+                weekdays: 'flex w-full justify-between',
+                weekday: 'text-muted-foreground font-semibold text-[10px] text-center w-7 flex items-center justify-center',
+                weeks: 'w-full flex flex-col gap-0.5',
+                week: 'flex w-full justify-between',
+                day: 'relative p-0 text-center text-xs flex items-center justify-center w-7 h-7 bg-transparent border-0 outline-none shadow-none ring-0',
+              }}
+              components={{
+                DayButton: ({ day, className, ...buttonProps }) => {
+                  const dateStr = day.isoDate
+                  const count = calendarCounts.get(dateStr) ?? 0
+                  const isSelected = entryDate === dateStr
+                  const hasEntry = count > 0
+
+                  return (
+                    <button
+                      {...buttonProps}
+                      type="button"
+                      aria-label={`${dateStr}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
+                      data-testid={`journal-calendar-day-${dateStr}`}
+                      className={cn(
+                        'journal-calendar-day rounded-full',
+                        day.outside ? 'journal-calendar-day--muted' : '',
+                        hasEntry ? 'journal-calendar-day--has-entry' : '',
+                        isSelected ? 'journal-calendar-day--selected' : '',
+                        className,
+                      )}
+                      onClick={(e) => {
+                        buttonProps.onClick?.(e)
+                        openCalendarDate(dateStr)
+                      }}
+                    >
+                      {day.date.getDate()}
+                      {count > 0 ? <small>{count}</small> : null}
+                    </button>
+                  )
+                },
+              }}
+            />
             {calendarQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load calendar dates.</p> : null}
           </section>
 
           <div className="journal-sidebar-search">
             <label className="journal-search">
-              <Search size={15} />
-              <span className="sr-only">Search journal title</span>
+              <Search size={14} />
+              <span className="sr-only">Search journals </span>
               <input
-                aria-label="Search journal title"
+                aria-label="Search journals"
                 data-testid="journal-search-input"
                 maxLength={100}
-                placeholder="Search journal..."
-                type="search"
+                placeholder="Search journals..."
+                type="text"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
               {searchQuery ? (
                 <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               ) : null}
             </label>
@@ -338,12 +351,9 @@ export function JournalPage() {
           <section className="journal-entries-card">
             <div className="journal-entries-card-header">
               <h3>Recent journals</h3>
-              <button type="button" aria-label="New journal entry" onClick={clearEditor}>
-                New Journal
-              </button>
             </div>
 
-            {isListLoading ? <p className="flashcard-status">{isSearching ? 'Searching journal entries...' : 'Loading journal entries...'}</p> : null}
+            {isListLoading ? <p className="flashcard-status">{isSearching ? 'Searching journal...' : 'Loading journal...'}</p> : null}
             {isListError ? <p className="flashcard-status flashcard-status--error">Could not load journal entries.</p> : null}
             {!isListLoading && !isListError && entries.length === 0 ? (
               <div className="journal-empty-state" role="status">
@@ -355,7 +365,15 @@ export function JournalPage() {
                   {isSearching ? `No journals match "${debouncedSearchQuery}".` : 'Start writing your first journal and keep your thoughts organized.'}
                 </p>
                 {!isSearching ? (
-                  <button className="journal-empty-create-button" type="button" onClick={clearEditor}>
+                  <button
+                    className="journal-empty-create-button"
+                    type="button"
+                    onClick={() => {
+                      setIsEditorActive(true)
+                      setTitle('New Journal')
+                      markChanged()
+                    }}
+                  >
                     <Plus size={15} aria-hidden="true" />
                     <span>New Journal</span>
                   </button>
@@ -383,83 +401,111 @@ export function JournalPage() {
           </section>
         </div>
 
-        <form className="journal-editor-card" onSubmit={submitEntry}>
-          <div className="journal-editor-header" data-testid="journal-editor-header">
-            <div className="journal-editor-heading">
-              <input
-                aria-label="Journal title"
-                className="journal-title-input"
-                data-testid="journal-title-input"
-                disabled={isOpening}
-                value={title}
-                maxLength={240}
-                onChange={(event) => {
-                  setTitle(event.target.value)
+        <div className="journal-editor-card relative">
+          {!isEditorActive && !selectedId && (
+            <div className="journal-editor-empty-overlay" data-testid="journal-editor-empty-state">
+              <button
+                type="button"
+                className="primary-button m-0 min-h-9 w-auto px-5 gap-2 shadow-sm"
+                onClick={() => {
+                  setIsEditorActive(true)
+                  setTitle('New Journal')
                   markChanged()
                 }}
-                placeholder="New Journal"
-              />
-              <p className="journal-date-display" data-date={entryDate} data-testid="journal-date-display">
-                {formatDate(entryDate)}
-              </p>
-            </div>
-
-            <div className="journal-editor-toolbar-host" ref={setToolbarHost} data-testid="journal-toolbar-host" />
-
-            <div className="journal-editor-actions" data-testid="journal-editor-actions">
-              <small data-testid="journal-save-status">
-                {selectedId
-                  ? saveStatus === 'saving'
-                    ? 'Saving...'
-                    : saveStatus === 'saved'
-                      ? 'Saved'
-                      : saveStatus === 'error'
-                        ? 'Save failed'
-                        : isDirty
-                          ? 'Unsaved changes'
-                          : 'Saved'
-                  : isDirty ? 'Unsaved changes' : 'Draft'}
-              </small>
-              <button className="primary-button m-0 min-h-9 w-auto px-4" type="submit" disabled={isSaving || isOpening || !title.trim()} data-testid="save-journal-button">
-                {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId && saveStatus === 'error' ? 'Retry' : 'Save'}
+                data-testid="create-journal-button"
+              >
+                <Plus size={16} aria-hidden="true" />
+                <span>Create</span>
               </button>
-              {selectedId ? (
-                <button
-                  className="journal-delete-button"
-                  type="button"
-                  aria-label={`Delete journal ${title}`}
-                  disabled={deleteEntry.isPending}
-                  onClick={() => selectedId && deleteEntry.mutate(selectedId)}
-                  title="Delete entry"
-                >
-                  <Trash2 size={18} />
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="journal-editor-body" data-testid="journal-editor-body">
-            <div className="journal-editor-inner">
-              <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
-                <JournalRichTextEditor
-                  disabled={isOpening}
-                  content={content}
-                  toolbarHost={toolbarHost}
-                  onChange={(html) => {
-                    setContent(html)
-                    markChanged()
-                  }}
-                />
-              </Suspense>
-            </div>
-          </div>
-
-          {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
-            <div className="journal-editor-error" role="alert">
-              The journal entry could not be saved.
             </div>
           )}
-        </form>
+
+          <form
+            className={cn('flex flex-col h-full min-h-0 min-w-0', !isEditorActive && !selectedId && 'journal-editor-blurred')}
+            onSubmit={submitEntry}
+          >
+            <div className="journal-editor-header" data-testid="journal-editor-header">
+              <div className="journal-editor-heading">
+                <input
+                  aria-label="Journal title"
+                  className="journal-title-input"
+                  data-testid="journal-title-input"
+                  disabled={isOpening || (!isEditorActive && !selectedId)}
+                  value={title}
+                  maxLength={240}
+                  onChange={(event) => {
+                    setTitle(event.target.value)
+                    markChanged()
+                  }}
+                  placeholder="New Journal"
+                />
+                <p className="journal-date-display" data-date={entryDate} data-testid="journal-date-display">
+                  {formatDate(entryDate)}
+                </p>
+              </div>
+
+              <div className="journal-editor-actions" data-testid="journal-editor-actions">
+                <small data-testid="journal-save-status">
+                  {selectedId
+                    ? saveStatus === 'saving'
+                      ? 'Saving...'
+                      : saveStatus === 'saved'
+                        ? 'Saved'
+                        : saveStatus === 'error'
+                          ? 'Save failed'
+                          : isDirty
+                            ? 'Unsaved changes'
+                            : 'Saved'
+                    : isDirty ? 'Unsaved changes' : 'Draft'}
+                </small>
+                <button
+                  className="primary-button m-0 min-h-9 w-auto px-4"
+                  type="submit"
+                  disabled={isSaving || isOpening || !title.trim() || (!isEditorActive && !selectedId)}
+                  data-testid="save-journal-button"
+                >
+                  {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId && saveStatus === 'error' ? 'Retry' : 'Save'}
+                </button>
+                {selectedId ? (
+                  <button
+                    className="journal-delete-button"
+                    type="button"
+                    aria-label={`Delete journal ${title}`}
+                    disabled={deleteEntry.isPending}
+                    onClick={() => selectedId && deleteEntry.mutate(selectedId)}
+                    title="Delete entry"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="journal-editor-toolbar-bar" ref={setToolbarHost} data-testid="journal-toolbar-host" />
+
+            <div className="journal-editor-body" data-testid="journal-editor-body">
+              <div className="journal-editor-inner">
+                <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
+                  <JournalRichTextEditor
+                    disabled={isOpening || (!isEditorActive && !selectedId)}
+                    content={content}
+                    toolbarHost={toolbarHost}
+                    onChange={(html) => {
+                      setContent(html)
+                      markChanged()
+                    }}
+                  />
+                </Suspense>
+              </div>
+            </div>
+
+            {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
+              <div className="journal-editor-error" role="alert">
+                The journal entry could not be saved.
+              </div>
+            )}
+          </form>
+        </div>
       </div>
     </div>
   )
