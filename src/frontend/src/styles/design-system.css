@@ -2205,8 +2205,8 @@
 }
 
 .habit-tracker-header {
-  height: 64px;
-  padding: 0 32px;
+  height: 56px;
+  padding: 0 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2241,15 +2241,24 @@
 }
 
 .habit-tracker-week {
-  padding: 16px 32px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--ds-border);
-  background: #ffffff;
+  background: var(--ds-card, #ffffff);
+}
+
+.habit-week-strip-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .habit-tracker-week-grid {
   display: grid;
+  flex: 1;
+  min-width: 0;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: 6px;
   text-align: center;
 }
 
@@ -5124,36 +5133,28 @@
   white-space: pre-wrap;
 }
 
-.habit-week-navigation {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.habit-week-navigation strong {
-  color: var(--ds-foreground);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.habit-week-navigation button {
+.habit-week-nav-btn {
   align-items: center;
   background: transparent;
-  border: 0;
+  border: 1px solid var(--ds-border);
   border-radius: 8px;
   color: var(--ds-muted-foreground);
   cursor: pointer;
   display: inline-flex;
   justify-content: center;
-  min-height: 32px;
-  min-width: 32px;
+  height: 32px;
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.habit-week-navigation button:hover,
-.habit-week-navigation button:focus-visible {
+.habit-week-nav-btn:hover,
+.habit-week-nav-btn:focus-visible {
   background: var(--surface-soft);
   color: var(--ds-primary);
+  border-color: var(--ds-primary);
 }
 
 
