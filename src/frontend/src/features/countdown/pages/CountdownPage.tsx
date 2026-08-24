@@ -1,12 +1,15 @@
-import { Bell, CalendarClock, ChevronDown, ImagePlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
+import { Bell, CalendarClock, ChevronDown, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
-import { dropdownContentClassName, dropdownDestructiveItemClassName } from '@/shared/components/ui/dropdown-styles'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 import { uploadAsset } from '@/features/assets'
 import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/shared/lib/toast'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Input } from '@/shared/components/ui/input'
+import { cn } from '@/shared/lib/utils'
 import * as countdownApi from '../api/countdown.api'
 import { countdownKeys } from '../api/countdown.queries'
 
@@ -38,7 +41,7 @@ function formatTargetDate(value: string) {
 
 function statusText(item: countdownApi.CountdownEvent) {
   if (item.isCompleted) {
-    return `Complete at ${formatTargetDate(item.targetDate)}`
+    return ''
   }
 
   const diff = Math.ceil((new Date(`${item.targetDate}T00:00:00`).getTime() - new Date().getTime()) / 86_400_000)
@@ -171,116 +174,122 @@ export function CountdownPage() {
   function renderBoard(board: 'active' | 'complete', title: string, items: countdownApi.CountdownEvent[]) {
     const isOpen = openBoard === board
     return (
-      <section className={`countdown-board countdown-board--${board}`}>
+      <Card className={cn('countdown-board flex flex-col overflow-hidden', `countdown-board--${board}`)}>
         <button
-          className="countdown-board-header"
+          className="flex w-full items-center justify-between border-b border-border/60 bg-transparent px-4 py-3 text-left transition-colors hover:bg-secondary/40 sm:px-5 sm:py-3.5"
           type="button"
           aria-label={`${title} board, ${items.length} countdown${items.length === 1 ? '' : 's'}`}
           aria-expanded={isOpen}
           aria-controls={`countdown-board-${board}`}
-          onClick={() => setOpenBoard(board)}
+          onClick={() => setOpenBoard(isOpen ? (board === 'active' ? 'complete' : 'active') : board)}
         >
-          <span>
-            <h2>{title}</h2>
-            <small>{items.length} countdown{items.length === 1 ? '' : 's'}</small>
+          <span className="flex items-baseline gap-2">
+            <h2 className="m-0 text-sm font-semibold text-foreground sm:text-base">{title}</h2>
+            <small className="text-xs text-muted-foreground">{items.length} countdown{items.length === 1 ? '' : 's'}</small>
           </span>
-          <ChevronDown className={isOpen ? 'countdown-board-chevron countdown-board-chevron--open' : 'countdown-board-chevron'} size={18} aria-hidden="true" />
+          <ChevronDown className={cn('size-4 text-muted-foreground transition-transform duration-200', isOpen && 'rotate-180')} size={18} aria-hidden="true" />
         </button>
         {isOpen ? (
-          <div className="countdown-board-content" id={`countdown-board-${board}`}>
+          <CardContent className="min-h-0 p-4 sm:p-5" id={`countdown-board-${board}`}>
             {items.length > 0 ? (
               <div className="countdown-board-grid">
                 {items.map((item) => (
-                  <article key={item.id} className={`countdown-card${item.isCompleted ? ' countdown-card--completed' : ''}${item.coverDownloadUrl ? ' countdown-card--covered' : ''}`}>
-                    <div className="countdown-card-visual" aria-hidden={!item.coverDownloadUrl}>
-                      {item.coverDownloadUrl ? (
-                        <img className="countdown-cover-image" src={item.coverDownloadUrl} alt={item.name} />
-                      ) : (
-                        <div className="countdown-card-fallback" aria-hidden="true"><CalendarClock size={34} /></div>
-                      )}
-                      {item.coverDownloadUrl ? <div className="countdown-card-scrim" aria-hidden="true" /> : null}
-                    </div>
-                    <div className="countdown-card-content">
-                      <div className="countdown-card-topline">
-                        <h2 title={item.name}>{item.name}</h2>
-                        <Menu as="div" className="relative inline-block">
-                          <MenuButton className="countdown-card-menu-trigger" type="button" aria-label={`Open actions for ${item.name}`} title="Countdown actions"><MoreHorizontal size={18} /></MenuButton>
-                          <MenuItems anchor={{ to: 'bottom end', gap: '6px' }} transition className={dropdownContentClassName}>
-                            <MenuItem as="button" type="button" className={`${dropdownDestructiveItemClassName} countdown-card-delete-menu-item`} onClick={() => deleteCountdown.mutate(item.id)}>
-                              <span className="countdown-card-delete-menu-item__icon" aria-hidden="true"><Trash2 size={15} /></span>
-                              <span>Delete</span>
-                            </MenuItem>
-                          </MenuItems>
-                        </Menu>
-                      </div>
-                      <div className="countdown-card-count">
-                        <strong className={item.isCompleted ? 'countdown-card-count--completed' : undefined}>{statusText(item)}</strong>
-                      </div>
-                      <div className="countdown-card-footer">
-                        <span>{item.isCompleted ? 'Target' : 'Until'} {formatTargetDate(item.targetDate)}</span>
-                        <span>{item.alerts.length} alert{item.alerts.length === 1 ? '' : 's'}</span>
-                      </div>
-                    </div>
-                  </article>
+                  <ContextMenu key={item.id}>
+                    <ContextMenuTrigger asChild>
+                      <article className={`countdown-card${item.isCompleted ? ' countdown-card--completed' : ''}${item.coverDownloadUrl ? ' countdown-card--covered' : ''}`}>
+                        {item.coverDownloadUrl ? (
+                          <div className="countdown-card-visual" aria-hidden="true">
+                            <img className="countdown-cover-image" src={item.coverDownloadUrl} alt={item.name} />
+                            <div className="countdown-card-scrim" aria-hidden="true" />
+                          </div>
+                        ) : null}
+                        <div className="countdown-card-content">
+                          <div className="countdown-card-topline">
+                            <h2 title={item.name}>{item.name}</h2>
+                          </div>
+                          <div className="countdown-card-count">
+                            {!item.isCompleted ? <strong>{statusText(item)}</strong> : null}
+                          </div>
+                          <div className="countdown-card-footer">
+                            {item.isCompleted ? (
+                              <span>Complete at {formatTargetDate(item.targetDate)}</span>
+                            ) : (
+                              <>
+                                <span>Until {formatTargetDate(item.targetDate)}</span>
+                                <span>{item.alerts.length} alert{item.alerts.length === 1 ? '' : 's'}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        className="gap-2 text-destructive focus:text-destructive"
+                        onSelect={() => deleteCountdown.mutate(item.id)}
+                      >
+                        <Trash2 className="size-4" />
+                        <span>Delete</span>
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
               </div>
             ) : (
-              <p className="countdown-board-empty" role="status">No {board === 'active' ? 'active' : 'completed'} countdowns.</p>
+              <p className="m-0 py-6 text-center text-sm text-muted-foreground" role="status">No {board === 'active' ? 'active' : 'completed'} countdowns.</p>
             )}
-          </div>
+          </CardContent>
         ) : null}
-      </section>
+      </Card>
     )
   }
 
   return (
     <>
-      <main className="countdown-main">
-        <header className="countdown-header">
-          <div className="countdown-header-title">
-            <CalendarClock size={22} aria-hidden="true" />
-            <h1>Countdown</h1>
+      <main className="countdown-main flex h-full min-h-0 flex-col gap-3 lg:gap-4">
+        <Card className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2.5">
+            <CalendarClock className="size-5 text-primary" aria-hidden="true" />
+            <h1 className="m-0 text-base font-semibold tracking-tight text-foreground sm:text-lg">Countdown</h1>
           </div>
-          <button
+          <Button
             ref={createTriggerRef}
-            className="countdown-create-button"
             type="button"
             aria-label="New Countdown"
             title="New Countdown"
             onClick={() => setShowFormModal(true)}
+            className="gap-1.5"
           >
-            <Plus size={19} />
-            <span>New Countdown</span>
-          </button>
-        </header>
+            <Plus className="size-4" />
+            <span>New</span>
+          </Button>
+        </Card>
 
-        <div className="countdown-canvas">
-          <section className={`countdown-list-area${!countdownsQuery.isLoading && countdowns.length === 0 ? ' countdown-list-area--empty' : ''}`}>
-            <div className="countdown-list-container">
-              {countdowns.length > 0 ? <div className="countdown-board-stack">
-                {renderBoard('active', 'Active', activeCountdowns)}
-                {renderBoard('complete', 'Complete', completedCountdowns)}
-              </div> : null}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:gap-4">
+          {countdowns.length > 0 ? (
+            <div className="flex flex-col gap-3 lg:gap-4">
+              {renderBoard('active', 'Active', activeCountdowns)}
+              {renderBoard('complete', 'Complete', completedCountdowns)}
+            </div>
+          ) : null}
 
-                {!countdownsQuery.isLoading && countdowns.length === 0 ? (
-                  <div className="countdown-empty-state" role="status">
-                    <div className="countdown-empty-illustration" aria-hidden="true">
-                      <CalendarClock size={66} strokeWidth={1.5} />
-                      <Bell className="countdown-empty-illustration__bell" size={28} strokeWidth={1.7} />
-                    </div>
-                    <h2>No Countdowns Yet</h2>
-                    <p>Create your first exam, deadline, or milestone and add customizable alerts.</p>
-                    <button className="countdown-empty-create-button" type="button" onClick={() => setShowFormModal(true)}>
-                      <Plus size={17} />
-                      <span>Create First Countdown</span>
-                    </button>
-                  </div>
-                ) : null}
-
-                {countdownsQuery.isLoading ? <p className="flashcard-status">Loading countdowns...</p> : null}
-                {countdownsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load countdowns.</p> : null}
+          {!countdownsQuery.isLoading && countdowns.length === 0 ? (
+            <Card className="flex min-h-0 flex-1 flex-col items-center justify-center p-8 text-center sm:p-12">
+              <div className="countdown-empty-illustration mb-4" aria-hidden="true">
+                <CalendarClock size={66} strokeWidth={1.5} className="text-muted-foreground" />
+                <Bell className="countdown-empty-illustration__bell" size={28} strokeWidth={1.7} />
               </div>
-          </section>
+              <h2 className="m-0 text-lg font-semibold sm:text-xl">No Countdowns Yet</h2>
+              <p className="m-0 mt-2 max-w-md text-sm text-muted-foreground">Create your first exam, deadline, or milestone and add customizable alerts.</p>
+              <Button className="mt-5 gap-1.5" type="button" onClick={() => setShowFormModal(true)}>
+                <Plus size={17} />
+                <span>Create First Countdown</span>
+              </Button>
+            </Card>
+          ) : null}
+
+          {countdownsQuery.isLoading ? <p className="flashcard-status">Loading countdowns...</p> : null}
+          {countdownsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load countdowns.</p> : null}
         </div>
 
         {showFormModal ? (
@@ -292,53 +301,86 @@ export function CountdownPage() {
               </div>
               <form onSubmit={submitCountdown}>
                 <label>
-                  Countdown name
-                  <input data-testid="countdown-name-input" required maxLength={50} value={name} onChange={(event) => setName(event.target.value)} placeholder="E.g., JLPT N2 Exam" />
+                  Title
+                  <Input data-testid="countdown-name-input" required maxLength={50} value={name} onChange={(event) => setName(event.target.value)} placeholder="E.g., JLPT N2 Exam" />
                 </label>
-                <label>
-                  Target date
-                  <input data-testid="countdown-target-input" type="date" required value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-                </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label>
+                    Target date
+                    <Input data-testid="countdown-target-input" type="date" required value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+                  </label>
+                  <label>
+                    Cover
+                    <div className="relative flex h-10 w-full items-center gap-2 rounded-md border border-input bg-card px-3 shadow-sm transition-colors hover:bg-secondary/30">
+                      <ImagePlus className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate text-sm text-muted-foreground">
+                        {coverFile ? coverFile.name : 'Choose file'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                        onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                  </label>
+                </div>
                 <label>
                   Repeat
                   <SelectMenu aria-label="Repeat pattern" value={repeatPattern} onChange={selectRepeatPattern} options={repeatOptions.map((option) => ({ value: option.value, label: option.label }))} />
                 </label>
-                <label>
-                  Cover image (optional)
-                  <div className="color-picker-wrapper">
-                    <ImagePlus size={18} />
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)} />
-                  </div>
-                </label>
                 <div className="detail-notes">
                   <label>Alerts</label>
-                  <div className="notes-box countdown-alerts-list">
+                  <div className="flex flex-col gap-2 rounded-lg border border-border/80 bg-secondary/20 p-2.5">
                     {alerts.map((alert, index) => (
-                      <div className="countdown-alert-row" key={`${alert.alertDay}-${index}`}>
+                      <div className="flex flex-wrap items-center gap-2" key={`${alert.alertDay}-${index}`}>
                         <SelectMenu
                           aria-label={`Alert ${index + 1} day`}
                           value={alert.alertDay}
                           onChange={(alertDay) => updateAlertDay(index, alertDay)}
                           options={alertDayOptions.map((option) => ({ value: option, label: option }))}
-                          className="min-w-40"
+                          className="min-w-36 flex-1"
                         />
-                        <input aria-label={`Alert ${index + 1} time`} type="time" value={alert.alertTime} onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))} />
-                        <button type="button" className="btn-cancel" onClick={() => removeAlert(index)} disabled={alerts.length === 1 || (repeatPattern !== 'None' && alert.alertDay === 'OnTargetDay' && alerts.filter((item) => item.alertDay === 'OnTargetDay').length === 1)}>
-                          Remove alert
-                        </button>
+                        <Input
+                          aria-label={`Alert ${index + 1} time`}
+                          type="time"
+                          value={alert.alertTime}
+                          onChange={(event) => setAlerts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, alertTime: event.target.value } : item))}
+                          className="h-10 w-28 shrink-0 sm:w-32"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-9 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Remove alert ${index + 1}`}
+                          title="Remove alert"
+                          onClick={() => removeAlert(index)}
+                          disabled={alerts.length === 1 || (repeatPattern !== 'None' && alert.alertDay === 'OnTargetDay' && alerts.filter((item) => item.alertDay === 'OnTargetDay').length === 1)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
                       </div>
                     ))}
-                    <button type="button" className="add-event-btn" onClick={() => setAlerts((current) => current.length >= 5 ? current : [...current, defaultAlert()])}>
-                      <Plus size={18} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 h-8 gap-1.5 self-start text-xs font-medium"
+                      onClick={() => setAlerts((current) => current.length >= 5 ? current : [...current, defaultAlert()])}
+                      disabled={alerts.length >= 5}
+                    >
+                      <Plus className="size-3.5" />
                       <span>Add alert</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
-                <p className="countdown-name-hint">{name.trim().length}/50 characters</p>
                 {formError ? <p className="flashcard-status flashcard-status--error" role="alert">{formError}</p> : null}
                 <div className="modal-actions">
-                  <button type="button" className="btn-cancel" onClick={resetForm}>Cancel</button>
-                  <button data-testid="save-countdown-button" type="submit" className="btn-submit" disabled={createCountdown.isPending}>Create Countdown</button>
+                  <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+                  <Button data-testid="save-countdown-button" type="submit" disabled={createCountdown.isPending}>
+                    {createCountdown.isPending ? 'Creating...' : 'Create Countdown'}
+                  </Button>
                 </div>
               </form>
             </div>
