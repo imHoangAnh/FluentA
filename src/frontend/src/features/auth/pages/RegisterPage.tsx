@@ -84,7 +84,7 @@ export function RegisterPage() {
           Create your account
         </h1>
         <p className="m-0 mt-1 text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
-          Start building a vocabulary you will remember.
+          Start your journey and build your second brain.
         </p>
       </div>
       <form className="grid gap-3.5 sm:gap-4.5 xl:gap-6" onSubmit={(event) => void submit(event)}>

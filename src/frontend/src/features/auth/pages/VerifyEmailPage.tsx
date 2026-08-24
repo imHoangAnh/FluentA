@@ -73,7 +73,7 @@ export function VerifyEmailPage() {
       <div>
         <h1 className="m-0 text-2xl font-semibold tracking-tight">Verify your email</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Enter the six-digit code sent to your inbox to finish creating your FluentA account.
+          Enter the six-digit code from your inbox.
         </p>
       </div>
       <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
