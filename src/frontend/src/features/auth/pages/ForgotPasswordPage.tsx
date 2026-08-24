@@ -18,7 +18,7 @@ export function ForgotPasswordPage() {
 
     try {
       await authApi.forgotPassword({ email })
-      setMessage('If an eligible account exists, we sent a password reset link. Check your Spam or Junk folder if you do not see it.')
+      setMessage('If your account exists, please check your inbox for a password reset link.')
     } catch (submissionError) {
       setError(authApiError(submissionError))
     } finally {
@@ -33,7 +33,7 @@ export function ForgotPasswordPage() {
           Reset your password
         </h1>
         <p className="m-0 mt-1 text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
-          Enter your email address and we’ll send you a password reset link.
+          Enter your email address.
         </p>
       </div>
       <form className="grid gap-4 sm:gap-5 xl:gap-6" onSubmit={(event) => void submit(event)}>
