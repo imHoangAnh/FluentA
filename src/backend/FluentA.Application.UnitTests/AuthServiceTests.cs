@@ -33,6 +33,44 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task Register_ReusesExistingUnverifiedUserAfterRefresh()
+    {
+        var fixture = CreateFixture();
+        var first = await fixture.Service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "Learner"));
+        var userId = fixture.Users.Single.Id;
+
+        var second = await fixture.Service.RegisterAsync(new RegisterRequest("LEARNER@example.com", "UpdatedPass123", "Updated Learner"));
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(userId, fixture.Users.Single.Id);
+        Assert.Equal("Updated Learner", fixture.Users.Single.FullName);
+        Assert.Equal("hash:UpdatedPass123", fixture.Users.Single.PasswordHash);
+        Assert.Contains("verification code sent", second.Value!.Message);
+        Assert.Equal(2, fixture.Email.Messages.Count);
+
+        var verified = await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123456"));
+        var login = await fixture.Service.LoginAsync(new LoginRequest("learner@example.com", "UpdatedPass123"));
+        Assert.True(verified.IsSuccess);
+        Assert.True(login.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Register_StillRejectsExistingVerifiedUser()
+    {
+        var fixture = CreateFixture();
+        var user = User.CreateWithPassword("learner@example.com", "Learner", "hash:old-password");
+        user.MarkEmailVerified(DateTime.UtcNow);
+        await fixture.Users.AddAsync(user);
+
+        var result = await fixture.Service.RegisterAsync(new RegisterRequest("LEARNER@example.com", "SecurePass123", "Learner"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("EMAIL_ALREADY_EXISTS", ((AuthError)result.Error!).Code);
+        Assert.Empty(fixture.Email.Messages);
+    }
+
+    [Fact]
     public async Task VerifyOtp_ConsumesChallengeAndEnablesPasswordLogin()
     {
         var fixture = CreateFixture();

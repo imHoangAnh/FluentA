@@ -40,7 +40,7 @@ test('email registration keeps OTP server-side and blocks an unverified login', 
   await expect(page.getByLabel('Email')).toBeDisabled();
   await expect(page.getByLabel('Password')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Reveal characters' })).toBeDisabled();
-  await expect(page.getByText('We sent a verification code to your inbox.')).toBeVisible();
+  await expect(page.getByText('Verification email sent. Check your inbox.')).toBeVisible();
   await expect(page.getByText(/Code expires at/)).toHaveCount(0);
   await expect(page.getByText('Change details')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/auth-register-inline-verification.png', fullPage: true });

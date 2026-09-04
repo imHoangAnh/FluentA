@@ -49,7 +49,7 @@ export function RegisterPage() {
         const payload = await register({ email, password, fullName })
         setVerification(payload)
         setSecondsRemaining(secondsUntil(payload.resendAvailableAtUtc))
-        setMessage('We sent a verification code to your inbox.')
+        setMessage(payload.message)
       }
     } catch (submissionError) {
       setError(authApiError(submissionError))
