@@ -474,8 +474,8 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
         ))}
 
         <form className="grid min-h-12 items-start bg-secondary/35 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
-          {columns.map((column) => <div className="min-w-0 self-start border-r border-foreground/70 px-1" key={column.key}>{renderBlankCell(column)}</div>)}
-          <div className="sticky right-0 z-[5] grid h-10 place-items-center border-l border-foreground/70 bg-secondary" data-testid="sticky-create-actions">
+          {columns.map((column) => <div className="min-w-0 self-start border-r border-foreground/70 px-1 last:border-r-0" key={column.key}>{renderBlankCell(column)}</div>)}
+          <div className="sticky right-0 z-[5] grid h-10 place-items-center bg-secondary" data-testid="sticky-create-actions">
             <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add" aria-label="Create word">
               <CheckCircle2 className="size-4" aria-hidden="true" />
             </button>

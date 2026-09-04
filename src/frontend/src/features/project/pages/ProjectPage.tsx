@@ -149,6 +149,10 @@ export function ProjectPage() {
     if (editingBoardId) editingBoardInputRef.current?.focus()
   }, [editingBoardId])
 
+  useEffect(() => {
+    if (emptyBoardComposerOpen) newBoardInputRef.current?.focus()
+  }, [emptyBoardComposerOpen])
+
   const refresh = async (boardId: string | null = selectedBoardId) => {
     await queryClient.invalidateQueries({ queryKey: projectKeys.boards })
     if (boardId) {
@@ -485,7 +489,7 @@ export function ProjectPage() {
               <div className="project-filter-bar" aria-label="Project card filters">
                 <SelectMenu
                   className="project-filter-control"
-                  buttonClassName="min-h-[38px] rounded-lg border-[var(--ds-border)] px-3 py-2 text-sm font-medium"
+                  buttonClassName="min-h-[32px] h-8 rounded-md border-[var(--ds-border)] px-2.5 py-1 text-xs font-medium"
                   aria-label="Filter by priority"
                   value={filters.priority}
                   onChange={(priority) => setFilters((current) => ({ ...current, priority }))}
@@ -493,7 +497,7 @@ export function ProjectPage() {
                 />
                 <SelectMenu
                   className="project-filter-control"
-                  buttonClassName="min-h-[38px] rounded-lg border-[var(--ds-border)] px-3 py-2 text-sm font-medium"
+                  buttonClassName="min-h-[32px] h-8 rounded-md border-[var(--ds-border)] px-2.5 py-1 text-xs font-medium"
                   aria-label="Filter by deadline"
                   value={filters.deadline}
                   onChange={(deadline) => setFilters((current) => ({ ...current, deadline }))}
@@ -541,6 +545,7 @@ export function ProjectPage() {
                       placeholder="Project name"
                       data-testid="project-empty-project-input"
                       maxLength={180}
+                      autoFocus
                     />
                     <div className="project-empty-form-actions">
                       <button type="button" className="project-secondary-btn" onClick={() => { setBoardName(''); setEmptyBoardComposerOpen(false) }}>

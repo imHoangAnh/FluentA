@@ -102,6 +102,27 @@ public sealed class User : BaseEntity, IAggregateRoot
         ClearPasswordReset();
     }
 
+    public void RestartPasswordRegistration(string fullName, string passwordHash)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            throw new ArgumentException("Full name is required.", nameof(fullName));
+        }
+
+        var normalizedName = fullName.Trim();
+        if (normalizedName.Length is < 2 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fullName), "Full name must be between 2 and 100 characters.");
+        }
+
+        FullName = normalizedName;
+        PasswordHash = passwordHash;
+        ResetPasswordToken = null;
+        ResetPasswordExpiresAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void LinkGoogleAccount(string googleId, DateTime verifiedAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(googleId);

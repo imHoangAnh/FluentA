@@ -178,11 +178,23 @@ export function WorkspacePage() {
 
   return (
     <>
-      <div className="grid h-full min-h-0 grid-cols-[248px_minmax(0,1fr)] gap-4 max-lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,5fr)] gap-4">
         <Card className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div><h2 className="m-0 text-sm font-semibold">Boards</h2><p className="m-0 mt-0.5 text-xs text-muted-foreground">{boards.length} collections</p></div>
-            <Button type="button" size="icon-sm" variant="ghost" aria-label="Create new board" onClick={openCreateBoardDialog}><FolderPlus /></Button>
+          <div className="flex items-center justify-between border-b border-border px-3.5 py-2">
+            <h2 className="m-0 text-sm font-semibold">Boards</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted-foreground">{boards.length}</span>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                className="size-7"
+                aria-label="Create new board"
+                onClick={openCreateBoardDialog}
+              >
+                <FolderPlus className="size-4" />
+              </Button>
+            </div>
           </div>
 
           <div ref={railFocusRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2 outline-none" data-testid="vocabulary-rail-scroll">

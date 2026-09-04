@@ -59,18 +59,37 @@ public sealed partial class AuthService : IAuthService
         }
 
         var normalizedEmail = User.NormalizeEmail(request.Email!);
-        if (await _users.EmailExistsAsync(normalizedEmail, cancellationToken))
+        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (user?.IsEmailVerified == true)
         {
             return OperationResult<RegisterResponse>.Failure(AuthError.EmailExists());
         }
 
         var now = DateTime.UtcNow;
+        var isNewUser = user is null;
+
+        if (user is null)
+        {
+            user = User.CreateWithPassword(normalizedEmail, request.FullName, _passwordHasher.Hash(request.Password));
+        }
+        else
+        {
+            user.RestartPasswordRegistration(request.FullName, _passwordHasher.Hash(request.Password));
+        }
+
         var rawOtp = _tokenHelper.GenerateOtp();
         var expiresAt = now.Add(OtpLifetime);
         var resendAt = now.Add(OtpResendCooldown);
-        var user = User.CreateWithPassword(normalizedEmail, request.FullName, _passwordHasher.Hash(request.Password));
         user.IssueVerificationOtp(_tokenHelper.HashOtp(normalizedEmail, rawOtp), expiresAt, resendAt);
-        await _users.AddAsync(user, cancellationToken);
+
+        if (isNewUser)
+        {
+            await _users.AddAsync(user, cancellationToken);
+        }
+        else
+        {
+            await _users.UpdateAsync(user, cancellationToken);
+        }
 
         var delivered = await _emailService.SendEmailAsync(BuildVerificationEmail(user, rawOtp, expiresAt), cancellationToken);
         if (!delivered)

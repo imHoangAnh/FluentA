@@ -252,7 +252,7 @@ describe('NotesPage', () => {
     const editor = screen.getByLabelText('Journal rich text editor')
     const editorShell = editor.parentElement
 
-    expect(header).toContainElement(toolbarHost)
+    expect(header.compareDocumentPosition(toolbarHost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(toolbarHost).toContainElement(toolbar)
     expect(editorShell).not.toContainElement(toolbar)
     expect(editor).toHaveClass('border-0', 'outline-none', 'focus-visible:ring-0')

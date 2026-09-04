@@ -20,6 +20,7 @@ export const settingsRoutes: RouteObject[] = [
     path: 'settings',
     handle: appShellRoute({
       title: 'Settings',
+      contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
     }),
     Component: SettingsLayout,
     children: [

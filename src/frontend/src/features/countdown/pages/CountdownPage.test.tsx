@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
@@ -46,15 +46,16 @@ describe('CountdownPage', () => {
     })
   })
 
-  it('renders the compact create action and moves the exact card to Trash without confirmation', async () => {
+  it('renders the compact create action and moves the exact card to Trash via context menu without confirmation', async () => {
     const user = userEvent.setup()
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Countdown' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New Countdown' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'IELTS Exam' })).toBeInTheDocument()
+    const itemHeading = await screen.findByRole('heading', { name: 'IELTS Exam' })
+    expect(itemHeading).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Open actions for IELTS Exam' }))
+    fireEvent.contextMenu(itemHeading)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => expect(countdownApi.deleteCountdown.mock.calls[0]?.[0]).toBe('countdown-1'))
   })

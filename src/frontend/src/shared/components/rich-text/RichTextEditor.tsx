@@ -10,7 +10,6 @@ import {
   Heading4,
   Highlighter,
   Italic,
-  Link2,
   List,
   ListChecks,
   ListOrdered,
@@ -44,6 +43,31 @@ function runCommand(command: string, value?: string) {
   return document.execCommand(command, false, value)
 }
 
+const COLOR_PALETTE = [
+  { name: 'Default', value: 'inherit', bg: 'var(--ds-foreground)' },
+  { name: 'Teal', value: '#0f9f8f', bg: '#0f9f8f' },
+  { name: 'Red', value: '#ef4444', bg: '#ef4444' },
+  { name: 'Orange', value: '#f97316', bg: '#f97316' },
+  { name: 'Amber', value: '#f59e0b', bg: '#f59e0b' },
+  { name: 'Green', value: '#10b981', bg: '#10b981' },
+  { name: 'Blue', value: '#3b82f6', bg: '#3b82f6' },
+  { name: 'Indigo', value: '#6366f1', bg: '#6366f1' },
+  { name: 'Purple', value: '#a855f7', bg: '#a855f7' },
+  { name: 'Pink', value: '#ec4899', bg: '#ec4899' },
+  { name: 'Gray', value: '#6b7280', bg: '#6b7280' },
+  { name: 'Dark Gray', value: '#1f2937', bg: '#1f2937' },
+]
+
+function TextColorIcon({ color = '#0f9f8f', size = 16 }: { color?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m4 16 6-12 6 12" />
+      <path d="M7 11h6" />
+      <line x1="3" y1="20" x2="21" y2="20" stroke={color} strokeWidth="3.5" />
+    </svg>
+  )
+}
+
 export function RichTextEditor({
   contentClassName,
   disabled = false,
@@ -58,8 +82,21 @@ export function RichTextEditor({
   toolbarHost,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
-  const [zoom, setZoom] = useState(100)
+  const colorPickerRef = useRef<HTMLDivElement | null>(null)
+  const [activeColor, setActiveColor] = useState<string>('#0f9f8f')
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+
+  useEffect(() => {
+    if (!isColorPickerOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+        setIsColorPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isColorPickerOpen])
 
   useEffect(() => {
     const element = editorRef.current
@@ -141,6 +178,40 @@ export function RichTextEditor({
         <button className="journal-toolbar-button" type="button" aria-label="Underline" disabled={disabled} onClick={() => apply('underline')}>
           <Underline size={16} />
         </button>
+        <div className="journal-color-picker-wrapper" ref={colorPickerRef}>
+          <button
+            className={cn('journal-toolbar-button', isColorPickerOpen && 'journal-toolbar-button--active')}
+            type="button"
+            aria-label="Text color"
+            disabled={disabled}
+            onClick={() => setIsColorPickerOpen((prev) => !prev)}
+          >
+            <TextColorIcon color={activeColor} size={16} />
+          </button>
+
+          {isColorPickerOpen ? (
+            <div className="journal-color-picker-dropdown" role="dialog" aria-label="Choose text color">
+              {COLOR_PALETTE.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  title={item.name}
+                  aria-label={`Color ${item.name}`}
+                  className="journal-color-swatch"
+                  style={{ backgroundColor: item.bg }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setActiveColor(item.value === 'inherit' ? '#0f9f8f' : item.value)
+                    apply('foreColor', item.value)
+                    setIsColorPickerOpen(false)
+                  }}
+                >
+                  {item.value === 'inherit' ? <span className="text-[9px] font-bold text-background">A</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <button className="journal-toolbar-button" type="button" aria-label="Highlight" disabled={disabled} onClick={() => apply('hiliteColor', '#fef08a')}>
           <Highlighter size={16} />
         </button>
@@ -171,43 +242,17 @@ export function RichTextEditor({
         <button className="journal-toolbar-button" type="button" aria-label="Justify" disabled={disabled} onClick={() => apply('justifyFull')}>
           <AlignJustify size={16} />
         </button>
-        <button
-          className="journal-toolbar-button"
-          type="button"
-          aria-label="Add link"
-          disabled={disabled}
-          onClick={() => {
-            const url = window.prompt('Enter a URL')
-            if (url) apply('createLink', url)
-          }}
-        >
-          <Link2 size={16} />
-        </button>
         <button className="journal-toolbar-button" type="button" aria-label="Undo" disabled={disabled} onClick={() => apply('undo')}>
           <Undo2 size={16} />
         </button>
         <button className="journal-toolbar-button" type="button" aria-label="Redo" disabled={disabled} onClick={() => apply('redo')}>
           <Redo2 size={16} />
         </button>
-        <label className="journal-toolbar-zoom">
-          <span className="journal-toolbar-text">{zoom}%</span>
-          <input
-            aria-label="Journal zoom"
-            disabled={disabled}
-            max={150}
-            min={80}
-            step={10}
-            className="hidden"
-            type="range"
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
-        </label>
     </div>
   )
 
   return (
-    <div className={cn('journal-rich-text-shell', shellClassName)} style={{ ['--journal-editor-zoom' as string]: `${zoom / 100}` }}>
+    <div className={cn('journal-rich-text-shell', shellClassName)}>
       {toolbarHost === undefined ? toolbar : toolbarHost ? createPortal(toolbar, toolbarHost) : null}
 
       <div

@@ -43,7 +43,7 @@ test('countdown CRUD and completed-state smoke', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeVisible();
   await expect(page.getByText(/days? left/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Open actions for IELTS Exam' }).click();
+  await page.getByRole('heading', { name: 'IELTS Exam' }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(page.getByRole('heading', { name: 'IELTS Exam' })).toBeHidden();
 

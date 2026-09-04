@@ -36,7 +36,7 @@ export function ResetPasswordPage() {
           Choose a new password
         </h1>
         <p className="m-0 mt-1 text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
-          Set a new password for your FluentA account. This link can only be used once.
+          Set a new password for your account.  
         </p>
       </div>
       <form className="grid gap-4 sm:gap-5 xl:gap-6" onSubmit={(event) => void submit(event)}>
