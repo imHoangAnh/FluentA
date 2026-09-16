@@ -20,8 +20,7 @@ public static class RecurringJobRegistration
 
     public static void Register(IRecurringJobManager jobs)
     {
-        jobs.AddOrUpdate<IScheduledProductivityJobs>(
-            TodoCarryOverId, job => job.CarryOverTodosAsync(CancellationToken.None), "5 0 * * *");
+        jobs.RemoveIfExists(TodoCarryOverId);
         jobs.AddOrUpdate<IScheduledProductivityJobs>(
             TodoReminderId, job => job.ProcessTodoRemindersAsync(CancellationToken.None), "* * * * *");
         jobs.AddOrUpdate<IScheduledProductivityJobs>(

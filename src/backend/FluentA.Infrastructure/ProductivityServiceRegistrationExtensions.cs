@@ -1,3 +1,4 @@
+using FluentA.Application.BackgroundJobs;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
@@ -6,6 +7,7 @@ using FluentA.Application.BoundedContexts.Notification;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Todo;
+using FluentA.Infrastructure.BackgroundJobs;
 using FluentA.Infrastructure.ContentProcessing.Journal;
 using FluentA.Infrastructure.ContentProcessing.Note;
 using FluentA.Infrastructure.Persistence.Repositories.Countdown;
@@ -25,6 +27,9 @@ internal static class ProductivityServiceRegistrationExtensions
 {
     public static IServiceCollection AddFluentAProductivityServices(this IServiceCollection services)
     {
+        services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
+        services.AddScoped<ScheduledMaintenanceJobs>();
+        services.AddScoped<ReviewDueDeferralJob>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<ICountdownRepository, EfCountdownRepository>();
