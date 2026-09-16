@@ -4,7 +4,6 @@ import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/components/ui/button-variants'
 
 const AlertDialog = AlertDialogPrimitive.Root
-const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 const AlertDialogPortal = AlertDialogPrimitive.Portal
 const AlertDialogCancel = AlertDialogPrimitive.Cancel
 const AlertDialogAction = AlertDialogPrimitive.Action
@@ -42,4 +41,4 @@ function AlertDialogActionButton({ className, ...props }: React.ComponentProps<t
   return <AlertDialogAction className={cn(buttonVariants({ variant: 'destructive', size: 'sm' }), className)} {...props} />
 }
 
-export { AlertDialog, AlertDialogAction, AlertDialogActionButton, AlertDialogCancel, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle, AlertDialogTrigger }
+export { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle }

@@ -128,15 +128,6 @@ function FluentABrandHeader({ size = 'default' }: { size?: 'default' | 'large' }
   )
 }
 
-export function AuthFormHeader({ title, description }: { title: string, description: ReactNode }) {
-  return (
-    <div className="mb-7">
-      <h1 className="m-0 text-2xl font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
-      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-    </div>
-  )
-}
-
 export function AuthDivider() {
   return (
     <div className="my-3.5 flex items-center gap-4 text-sm text-muted-foreground sm:my-4 xl:my-5">

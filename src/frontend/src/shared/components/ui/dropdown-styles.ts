@@ -11,8 +11,3 @@ export const dropdownItemClassName = [
 
 export const dropdownLabelClassName = 'px-4 py-2 text-xs font-semibold text-gray-500'
 export const dropdownSeparatorClassName = 'my-1 h-px bg-gray-200'
-
-export const dropdownDestructiveItemClassName = [
-  dropdownItemClassName,
-  'text-red-600 data-focus:bg-red-50 data-focus:text-red-700',
-].join(' ')

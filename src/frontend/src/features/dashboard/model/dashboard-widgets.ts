@@ -18,7 +18,7 @@ export const DASHBOARD_WIDGET_CATALOG: readonly DashboardWidgetDefinition[] = [
 
 export const DEFAULT_DASHBOARD_WIDGETS: readonly DashboardWidgetId[] = ['review', 'todo', 'countdown']
 
-export const DASHBOARD_WIDGET_SLOT_CLASSES = [
+const DASHBOARD_WIDGET_SLOT_CLASSES = [
   'col-span-7',
   'col-span-5',
   'col-span-5',

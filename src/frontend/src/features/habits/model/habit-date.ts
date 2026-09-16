@@ -59,7 +59,7 @@ export function monthDates(value: string) {
   return dates
 }
 
-export function dayOfWeek(value: string) {
+function dayOfWeek(value: string) {
   return weekdays[parseDateInput(value).getDay()]
 }
 

@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite --host localhost --port 5173",
     "build": "tsc -b && vite build",
-    "check:architecture": "node tools/check-architecture.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -33,7 +32,6 @@
     "axios": "^1.17.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",
     "react-day-picker": "^10.0.1",
