@@ -9049,7 +9049,8 @@
   grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
   align-items: center;
   column-gap: clamp(0.5rem, 2vw, 1rem);
-  margin-top: 0.25rem;
+  margin: 0.25rem auto 0;
+  justify-self: center;
 }
 
 .practice-recap-actions button {
@@ -9076,14 +9077,62 @@
 }
 
 .practice-recap__level-button {
-  border-color: #bedadd !important;
-  background: #e7f3f6;
-  color: #2e6a70;
+  border-color: var(--practice-level-border) !important;
+  background: var(--practice-level-background);
+  color: var(--practice-level-foreground);
 }
 
 .practice-recap__level-button:hover:not(:disabled) {
-  border-color: #397c84 !important;
-  background: #d6ebed;
+  border-color: var(--practice-level-hover-border) !important;
+  background: var(--practice-level-hover-background);
+}
+
+.practice-recap__level-button[data-level="0"] {
+  --practice-level-border: #c7d2fe;
+  --practice-level-background: #eef2ff;
+  --practice-level-foreground: #3730a3;
+  --practice-level-hover-border: #a5b4fc;
+  --practice-level-hover-background: #e0e7ff;
+}
+
+.practice-recap__level-button[data-level="1"] {
+  --practice-level-border: #fecaca;
+  --practice-level-background: #fee2e2;
+  --practice-level-foreground: #991b1b;
+  --practice-level-hover-border: #fca5a5;
+  --practice-level-hover-background: #fecaca;
+}
+
+.practice-recap__level-button[data-level="2"] {
+  --practice-level-border: #fde68a;
+  --practice-level-background: #fef3c7;
+  --practice-level-foreground: #92400e;
+  --practice-level-hover-border: #fcd34d;
+  --practice-level-hover-background: #fde68a;
+}
+
+.practice-recap__level-button[data-level="3"] {
+  --practice-level-border: #bbf7d0;
+  --practice-level-background: #dcfce7;
+  --practice-level-foreground: #166534;
+  --practice-level-hover-border: #86efac;
+  --practice-level-hover-background: #bbf7d0;
+}
+
+.practice-recap__level-button[data-level="4"] {
+  --practice-level-border: #bfdbfe;
+  --practice-level-background: #dbeafe;
+  --practice-level-foreground: #1e40af;
+  --practice-level-hover-border: #93c5fd;
+  --practice-level-hover-background: #bfdbfe;
+}
+
+.practice-recap__level-button[data-level="5"] {
+  --practice-level-border: #e9d5ff;
+  --practice-level-background: #f3e8ff;
+  --practice-level-foreground: #6b21a8;
+  --practice-level-hover-border: #d8b4fe;
+  --practice-level-hover-background: #e9d5ff;
 }
 
 .practice-recap__level-button:disabled {

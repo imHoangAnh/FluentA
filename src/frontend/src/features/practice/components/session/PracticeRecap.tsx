@@ -75,6 +75,7 @@ export function PracticeRecap({ card, reviewStatus, isAddingToReview, isSaving, 
               type="button"
               onClick={() => onSelectLevel(level)}
               disabled={levelsDisabled}
+              data-level={level}
               data-testid={`practice-review-level-${level}`}
               title={`Add to Review as ${label}`}
             >
