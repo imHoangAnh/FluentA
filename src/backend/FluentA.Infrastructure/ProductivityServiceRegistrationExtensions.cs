@@ -1,3 +1,4 @@
+using FluentA.Application.BackgroundJobs;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
@@ -6,6 +7,7 @@ using FluentA.Application.BoundedContexts.Notification;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Todo;
+using FluentA.Infrastructure.BackgroundJobs;
 using FluentA.Infrastructure.ContentProcessing.Journal;
 using FluentA.Infrastructure.ContentProcessing.Note;
 using FluentA.Infrastructure.Persistence.Repositories.Countdown;
@@ -17,6 +19,7 @@ using FluentA.Infrastructure.Persistence.Repositories.Pomodoro;
 using FluentA.Infrastructure.Persistence.Repositories.Project;
 using FluentA.Infrastructure.Persistence.Repositories.Todo;
 using FluentA.Infrastructure.RuntimeState.Pomodoro;
+using FluentA.Infrastructure.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentA.Infrastructure;
@@ -25,6 +28,11 @@ internal static class ProductivityServiceRegistrationExtensions
 {
     public static IServiceCollection AddFluentAProductivityServices(this IServiceCollection services)
     {
+        services.AddScoped<ScheduledProductivityJobs>();
+        services.AddScoped<IScheduledProductivityJobs>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
+        services.AddScoped<IScheduledMaintenanceExecutor>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
+        services.AddScoped<IScheduledOccurrenceExecutor, ScheduledProductivityExecution>();
+        services.AddScoped<ScheduledMaintenanceJobs>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<ICountdownRepository, EfCountdownRepository>();

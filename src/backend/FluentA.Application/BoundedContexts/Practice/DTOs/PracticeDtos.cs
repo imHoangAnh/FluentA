@@ -11,7 +11,8 @@ public sealed record CreatePracticeSessionSummaryRequest(
 public sealed record AddPracticeWordsToReviewRequest(
     Guid PageId,
     Guid WordId,
-    string TimeZoneId);
+    string TimeZoneId,
+    int InitialLevel = 0);
 
 public sealed record AddPracticeWordsToReviewDto(
     Guid PageId,

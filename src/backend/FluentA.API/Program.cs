@@ -1,12 +1,10 @@
 using System.Net;
-using FluentA.API.BackgroundJobs;
 using FluentA.API.Configuration;
 using FluentA.API.Extensions;
 using FluentA.API.Hubs;
 using FluentA.API.Middleware;
 using FluentA.Infrastructure;
 using FluentA.Infrastructure.Identity;
-using Hangfire;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,7 +44,6 @@ app.UseAuthorization();
 app.MapFluentAHealthChecks();
 app.MapControllers();
 app.MapHub<SyncHub>("/hubs/sync");
-RecurringJobRegistration.Register(app.Services.GetRequiredService<IRecurringJobManager>());
 app.Run();
 
 public partial class Program;

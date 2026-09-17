@@ -20,8 +20,8 @@ and progress tracking into one web application.
 The repository contains a React single-page application and an ASP.NET Core
 modular monolith. PostgreSQL is the durable store, process-local memory holds
 short-lived state, SignalR synchronizes active sessions, private object storage
-holds assets through one S3-compatible adapter, and Hangfire runs recurring
-jobs. Development configures MinIO while production uses AWS S3 through the
+holds assets through one S3-compatible adapter, and Quartz persists reminder
+triggers and maintenance schedules in PostgreSQL. Development configures MinIO while production uses AWS S3 through the
 default AWS credential chain.
 
 ## Key Features
@@ -44,7 +44,7 @@ flowchart LR
     APP --> INFRA["Infrastructure"]
     INFRA --> PG[("PostgreSQL")]
     INFRA --> OBJECTS[("MinIO local / AWS S3 production")]
-    API --> JOBS["Hangfire jobs"]
+    API --> JOBS["Quartz scheduler"]
 ```
 
 The backend keeps HTTP and realtime concerns in `FluentA.API`, use cases and
@@ -64,7 +64,7 @@ flows.
 | Client state and data | TanStack Query, Zustand, Axios |
 | Backend | ASP.NET Core, .NET 10, Entity Framework Core |
 | Data and infrastructure | PostgreSQL 16, MinIO for local development, AWS S3 for production, Docker Compose |
-| Realtime and jobs | SignalR, Hangfire |
+| Realtime and jobs | SignalR, Quartz |
 | Testing | xUnit, Vitest, Playwright |
 
 ## Engineering Highlights
@@ -93,7 +93,7 @@ flows.
 
 ### Full local Docker stack
 
-The packaged local runtime builds and starts the frontend, API/Hangfire,
+The packaged local runtime builds and starts the frontend, API/Quartz,
 automatic EF migration, a new PostgreSQL database, and private MinIO storage.
 It does not use AWS services.
 

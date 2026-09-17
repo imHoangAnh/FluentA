@@ -85,15 +85,33 @@ public sealed class CountdownEventTests
     }
 
     [Fact]
-    public void CountdownEvent_RecurringWeeklyAdvancesStrictlyAfterToday()
+    public void CountdownEvent_RecurringWeeklyKeepsTodayAsTheMissedCurrentOccurrence()
     {
         var countdownEvent = CountdownEventEntity.Create(
             Guid.NewGuid(),
             "Weekly",
             new DateTime(2026, 8, 2),
             repeatPattern: CountdownRepeatPattern.Weekly);
+        countdownEvent.AddAlert("OnTargetDay", "09:00", new DateTime(2026, 8, 2, 2, 0, 0, DateTimeKind.Utc));
 
         Assert.True(countdownEvent.AdvanceRecurrenceAt(new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc)));
-        Assert.Equal(new DateTime(2026, 8, 16, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
+        Assert.Equal(new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
+        Assert.Equal(
+            new DateTime(2026, 8, 9, 2, 0, 0, DateTimeKind.Utc),
+            countdownEvent.Alerts[0].ScheduledAtUtc);
+        Assert.Null(countdownEvent.Alerts[0].FiredAtUtc);
+    }
+
+    [Theory]
+    [InlineData(CountdownRepeatPattern.Monthly, 2026, 8, 17)]
+    [InlineData(CountdownRepeatPattern.Yearly, 2025, 9, 17)]
+    public void RecurrenceRecoveryKeepsAnOccurrenceOnToday(CountdownRepeatPattern pattern, int year, int month, int day)
+    {
+        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Recovery", new DateTime(year, month, day), repeatPattern: pattern);
+        var now = new DateTime(2026, 9, 17, 2, 0, 0, DateTimeKind.Utc);
+
+        Assert.True(countdown.AdvanceRecurrenceAt(now));
+        Assert.Equal(new DateTime(2026, 9, 17, 0, 0, 0, DateTimeKind.Utc), countdown.TargetDate);
+        Assert.False(countdown.AdvanceRecurrenceAt(now));
     }
 }

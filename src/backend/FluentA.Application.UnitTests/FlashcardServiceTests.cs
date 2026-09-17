@@ -4,6 +4,7 @@ using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
+using FluentA.Domain.BoundedContexts.Review;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 
@@ -118,7 +119,49 @@ public sealed class FlashcardServiceTests
         Assert.Equal(userId, reviewRepository.RequestedUserId);
         Assert.Equal(pageId, reviewRepository.RequestedPageId);
         Assert.Equal(wordId, reviewRepository.RequestedWordId);
+        Assert.Equal(0, reviewRepository.RequestedInitialLevel);
         Assert.Equal("added", result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task AddPracticeWordsToReview_ValidatesInitialLevelRangeBeforeRepository()
+    {
+        var practiceRepository = new RecordingPracticeRepository();
+        var reviewRepository = new RecordingReviewRepository();
+        var service = CreatePracticeService(practiceRepository, reviewRepository);
+
+        var result = await service.AddPracticeWordsToReviewAsync(
+            Guid.NewGuid(),
+            new AddPracticeWordsToReviewRequest(Guid.NewGuid(), Guid.NewGuid(), "UTC", InitialLevel: 6));
+
+        Assert.False(result.IsSuccess);
+        var error = Assert.IsType<PracticeError>(result.Error);
+        var details = Assert.IsType<Dictionary<string, string[]>>(error.Details);
+        Assert.Equal(["Initial level must be between 0 and 5."], details["initialLevel"]);
+        Assert.Equal(Guid.Empty, reviewRepository.RequestedWordId);
+    }
+
+    [Fact]
+    public async Task AddPracticeWordsToReview_UsesSelectedInitialLevelAndSrsInterval()
+    {
+        var practiceRepository = new RecordingPracticeRepository();
+        var reviewRepository = new RecordingReviewRepository();
+        var service = CreatePracticeService(practiceRepository, reviewRepository);
+        var pageId = Guid.NewGuid();
+        var wordId = Guid.NewGuid();
+
+        var result = await service.AddPracticeWordsToReviewAsync(
+            Guid.NewGuid(),
+            new AddPracticeWordsToReviewRequest(pageId, wordId, "UTC", InitialLevel: 4));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(4, reviewRepository.RequestedInitialLevel);
+        Assert.Equal(
+            ReviewTime.NextReviewDate(
+                reviewRepository.RequestedUtcNow,
+                FluentAsrsScheduler.IntervalDaysForLevel(4),
+                reviewRepository.RequestedTimeZone!),
+            result.Value!.NextReviewDate);
     }
 
     [Fact]
@@ -351,6 +394,8 @@ public sealed class FlashcardServiceTests
         public bool RequestedCorrect { get; private set; }
         public int RequestedTimeSpentSeconds { get; private set; }
         public TimeZoneInfo? RequestedTimeZone { get; private set; }
+        public DateTime RequestedUtcNow { get; private set; }
+        public int RequestedInitialLevel { get; private set; }
         public bool DashboardMissing { get; init; }
 
         public Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
@@ -359,13 +404,36 @@ public sealed class FlashcardServiceTests
             Guid wordId,
             TimeZoneInfo timeZone,
             DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            AddPracticeWordsToReviewAsync(
+                userId,
+                pageId,
+                wordId,
+                timeZone,
+                utcNow,
+                initialLevel: 0,
+                cancellationToken: cancellationToken);
+
+        public Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
+            Guid userId,
+            Guid pageId,
+            Guid wordId,
+            TimeZoneInfo timeZone,
+            DateTime utcNow,
+            int initialLevel,
             CancellationToken cancellationToken = default)
         {
             RequestedUserId = userId;
             RequestedPageId = pageId;
             RequestedWordId = wordId;
             RequestedTimeZone = timeZone;
-            return Task.FromResult<AddPracticeWordsToReviewDto?>(new AddPracticeWordsToReviewDto(pageId, wordId, "added", DateOnly.FromDateTime(utcNow).AddDays(1)));
+            RequestedUtcNow = utcNow;
+            RequestedInitialLevel = initialLevel;
+            return Task.FromResult<AddPracticeWordsToReviewDto?>(new AddPracticeWordsToReviewDto(
+                pageId,
+                wordId,
+                "added",
+                ReviewTime.NextReviewDate(utcNow, FluentAsrsScheduler.IntervalDaysForLevel(initialLevel), timeZone)));
         }
 
         public Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(

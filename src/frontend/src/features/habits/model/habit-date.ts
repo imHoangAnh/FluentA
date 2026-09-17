@@ -1,10 +1,7 @@
 import type { Habit } from '../api/habit.api'
+import { formatVietnamDateOnly } from '@/shared/lib/timezone'
 
 export const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-export function browserTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-}
 
 export function toDateInput(date: Date) {
   const year = date.getFullYear()
@@ -59,16 +56,16 @@ export function monthDates(value: string) {
   return dates
 }
 
-export function dayOfWeek(value: string) {
+function dayOfWeek(value: string) {
   return weekdays[parseDateInput(value).getDay()]
 }
 
 export function formatMonth(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(parseMonth(value))
+  return formatVietnamDateOnly(`${value}-01`, { month: 'long', year: 'numeric' })
 }
 
 export function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(parseDateInput(value))
+  return formatVietnamDateOnly(value, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function isScheduled(habit: Habit, date: string) {

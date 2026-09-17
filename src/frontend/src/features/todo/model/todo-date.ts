@@ -1,3 +1,5 @@
+import { formatVietnamDateOnly } from '@/shared/lib/timezone'
+
 export function toDateInput(date: Date) {
   const year = date.getFullYear()
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
@@ -26,35 +28,31 @@ export function weekDates(dateValue: string) {
 }
 
 export function formatMyDayDate(dateValue: string) {
-  const [year, month, day] = dateValue.split('-').map(Number)
-  return new Intl.DateTimeFormat(undefined, {
+  return formatVietnamDateOnly(dateValue, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-  }).format(new Date(year, month - 1, day))
-}
-
-function localDate(dateValue: string) {
-  const [year, month, day] = dateValue.split('-').map(Number)
-  return new Date(year, month - 1, day)
+  })
 }
 
 export function formatWeekday(dateValue: string) {
-  return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(localDate(dateValue))
+  return formatVietnamDateOnly(dateValue, { weekday: 'long' })
 }
 
 export function formatWeekRange(startDateValue: string, endDateValue: string) {
-  const start = localDate(startDateValue)
-  const end = localDate(endDateValue)
-  const month = new Intl.DateTimeFormat('en-US', { month: 'long' })
+  const startParts = startDateValue.split('-').map(Number)
+  const endParts = endDateValue.split('-').map(Number)
+  const start = { year: startParts[0], month: startParts[1], day: startParts[2] }
+  const end = { year: endParts[0], month: endParts[1], day: endParts[2] }
+  const month = (value: string) => formatVietnamDateOnly(value, { month: 'long' })
 
-  if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-    return `${month.format(start)} ${start.getDate()}\u2013${end.getDate()}, ${end.getFullYear()}`
+  if (start.year === end.year && start.month === end.month) {
+    return `${month(startDateValue)} ${start.day}\u2013${end.day}, ${end.year}`
   }
 
-  if (start.getFullYear() === end.getFullYear()) {
-    return `${month.format(start)} ${start.getDate()}\u2013${month.format(end)} ${end.getDate()}, ${end.getFullYear()}`
+  if (start.year === end.year) {
+    return `${month(startDateValue)} ${start.day}\u2013${month(endDateValue)} ${end.day}, ${end.year}`
   }
 
-  return `${month.format(start)} ${start.getDate()}, ${start.getFullYear()}\u2013${month.format(end)} ${end.getDate()}, ${end.getFullYear()}`
+  return `${month(startDateValue)} ${start.day}, ${start.year}\u2013${month(endDateValue)} ${end.day}, ${end.year}`
 }

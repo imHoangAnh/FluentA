@@ -50,7 +50,7 @@ public static class CountdownSchedule
     private static DateTime NextWeekly(DateTime current, DateTime today)
     {
         var candidate = current;
-        while (candidate <= today)
+        while (candidate < today)
         {
             candidate = candidate.AddDays(7);
         }
@@ -77,7 +77,10 @@ public static class CountdownSchedule
             }
 
             var candidate = new DateTime(year, month, current.Day, 0, 0, 0, DateTimeKind.Utc);
-            if (candidate > today)
+            // A missed recurrence whose next occurrence is today is still the
+            // current Vietnam-day occurrence.  Do not skip today's alerts while
+            // reconciling after a restart or a delayed scheduler tick.
+            if (candidate >= today)
             {
                 return candidate;
             }
@@ -96,7 +99,9 @@ public static class CountdownSchedule
             }
 
             var candidate = new DateTime(year, current.Month, current.Day, 0, 0, 0, DateTimeKind.Utc);
-            if (candidate > today)
+            // See the monthly rule above: today remains eligible when the
+            // previous target date is already in the past.
+            if (candidate >= today)
             {
                 return candidate;
             }

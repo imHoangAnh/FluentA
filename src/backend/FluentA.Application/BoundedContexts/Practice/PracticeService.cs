@@ -103,6 +103,11 @@ public sealed class PracticeService : IPracticeService
             errors["wordId"] = ["Word id is required."];
         }
 
+        if (request.InitialLevel is < 0 or > 5)
+        {
+            errors["initialLevel"] = ["Initial level must be between 0 and 5."];
+        }
+
         if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
         {
             errors["timeZoneId"] = ["A valid browser timezone id is required."];
@@ -119,6 +124,7 @@ public sealed class PracticeService : IPracticeService
             request.WordId,
             timeZone!,
             DateTime.UtcNow,
+            request.InitialLevel,
             cancellationToken);
 
         return result is null

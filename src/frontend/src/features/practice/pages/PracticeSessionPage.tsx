@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as practiceApi from '../api/practice.api'
+import type { PracticeReviewLevel } from '../api/practice.api'
 import { flashcardKeys, getPageSession, type FlashcardCard } from '@/features/flashcards'
 import { getPracticeSettings } from '../api/practice.api'
 import { practiceKeys } from '../api/practice.queries'
 import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
+import { APP_TIME_ZONE } from '@/shared/lib/timezone'
 import { PracticeModeSurface } from '../components/session/PracticeModeSurface'
 import { PracticeProgress } from '../components/session/PracticeProgress'
 import { PracticeRecap } from '../components/session/PracticeRecap'
@@ -54,6 +56,8 @@ export function PracticeSessionPage() {
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const initializedSessionKeyRef = useRef<string | null>(null)
+  const completionCountsRef = useRef<{ correct: number; wrong: number } | null>(null)
+  const completionInFlightRef = useRef(false)
 
   const sessionQuery = useQuery({ queryKey: flashcardKeys.pageSession(pageId), queryFn: () => getPageSession(pageId), enabled: Boolean(pageId) })
   const practiceSettingsQuery = useQuery({ queryKey: practiceKeys.settings, queryFn: getPracticeSettings })
@@ -107,6 +111,8 @@ export function PracticeSessionPage() {
     setCorrectWords(0)
     setWrongWords(0)
     setReviewStatuses(initialReviewStatuses)
+    completionCountsRef.current = null
+    completionInFlightRef.current = false
     saveSummaryMutation.reset()
     addToReviewMutation.reset()
     pronunciationMutation.reset()
@@ -132,9 +138,31 @@ export function PracticeSessionPage() {
       totalCards: sessionCards.length,
       correctCards: nextCorrectCards,
       wrongCards: nextWrongCards,
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      timeZoneId: APP_TIME_ZONE,
     })
   }, [practiceSettingsQuery.data?.modeSequence, saveSummaryMutation, sessionCards.length, sessionQuery.data])
+
+  const finalizePractice = useCallback(async (outcome: PracticeOutcome) => {
+    if (completionInFlightRef.current) return
+
+    const counts = completionCountsRef.current ?? {
+      correct: correctWords + (outcome === 'correct' ? 1 : 0),
+      wrong: wrongWords + (outcome === 'wrong' ? 1 : 0),
+    }
+    completionCountsRef.current = counts
+    setCorrectWords(counts.correct)
+    setWrongWords(counts.wrong)
+    completionInFlightRef.current = true
+
+    try {
+      await persistCompletion(counts.correct, counts.wrong)
+      setSessionStarted(false)
+      navigate('/practice')
+    } catch {
+      // Keep the recap visible so the learner can retry saving the session.
+      completionInFlightRef.current = false
+    }
+  }, [correctWords, navigate, persistCompletion, wrongWords])
 
   const advanceAfterRecap = useCallback((outcome: PracticeOutcome) => {
     const nextCorrect = correctWords + (outcome === 'correct' ? 1 : 0)
@@ -142,7 +170,7 @@ export function PracticeSessionPage() {
     setCorrectWords(nextCorrect)
     setWrongWords(nextWrong)
     if (currentIndex + 1 >= sessionCards.length) {
-      setSessionStarted(false)
+      void finalizePractice(outcome)
       return
     }
 
@@ -150,9 +178,7 @@ export function PracticeSessionPage() {
     setCurrentStepIndex(0)
     setWordHasMistake(false)
     resetStepState()
-  }, [correctWords, currentIndex, resetStepState, sessionCards.length, wrongWords])
-
-
+  }, [correctWords, currentIndex, finalizePractice, resetStepState, sessionCards.length, wrongWords])
 
   const resolveStep = useCallback((outcome: PracticeOutcome) => {
     setResolvedOutcome(outcome)
@@ -210,29 +236,47 @@ export function PracticeSessionPage() {
     }
   }, [handlePronunciationAudio, pronunciationMutation])
 
-  async function addCurrentWordToReview() {
+  const addCurrentWordToReview = useCallback(async (initialLevel: PracticeReviewLevel) => {
     if (!sessionQuery.data || !currentCard) return
     const result = await addToReviewMutation.mutateAsync({
       pageId: sessionQuery.data.pageId,
       wordId: currentCard.wordId,
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      initialLevel,
+      timeZoneId: APP_TIME_ZONE,
     })
     setReviewStatuses((current) => ({ ...current, [result.wordId]: result.status }))
-  }
+  }, [addToReviewMutation, currentCard, sessionQuery.data])
 
-  const finishPractice = useCallback(async () => {
-    const nextCorrect = correctWords + (wordHasMistake ? 0 : 1)
-    const nextWrong = wrongWords + (wordHasMistake ? 1 : 0)
-    setCorrectWords(nextCorrect)
-    setWrongWords(nextWrong)
+  const goToPreviousStep = useCallback(() => {
+    if (currentStepIndex === 0 || addToReviewMutation.isPending || saveSummaryMutation.isPending || completionInFlightRef.current) return
+    setCurrentStepIndex((value) => Math.max(0, value - 1))
+  }, [addToReviewMutation.isPending, currentStepIndex, saveSummaryMutation.isPending])
+
+  const handleReviewLevel = useCallback(async (initialLevel: PracticeReviewLevel) => {
+    if (!currentCard || addToReviewMutation.isPending || saveSummaryMutation.isPending || completionInFlightRef.current || reviewStatuses[currentCard.wordId]) return
+
+    const outcome: PracticeOutcome = wordHasMistake ? 'wrong' : 'correct'
     try {
-      await persistCompletion(nextCorrect, nextWrong)
-      setSessionStarted(false)
-      navigate('/practice')
+      await addCurrentWordToReview(initialLevel)
+      if (currentIndex + 1 >= sessionCards.length) {
+        await finalizePractice(outcome)
+      } else {
+        advanceAfterRecap(outcome)
+      }
     } catch {
-      // The recap remains visible so the learner can retry saving the session.
+      // Keep the recap visible so the learner can retry the level choice.
     }
-  }, [correctWords, navigate, persistCompletion, wordHasMistake, wrongWords])
+  }, [addCurrentWordToReview, addToReviewMutation.isPending, advanceAfterRecap, currentCard, currentIndex, finalizePractice, reviewStatuses, saveSummaryMutation.isPending, sessionCards.length, wordHasMistake])
+
+  const handleRecapSkip = useCallback(() => {
+    if (addToReviewMutation.isPending || saveSummaryMutation.isPending || completionInFlightRef.current) return
+    const outcome: PracticeOutcome = wordHasMistake ? 'wrong' : 'correct'
+    if (currentIndex + 1 >= sessionCards.length) {
+      void finalizePractice(outcome)
+      return
+    }
+    advanceAfterRecap(outcome)
+  }, [addToReviewMutation.isPending, advanceAfterRecap, currentIndex, finalizePractice, saveSummaryMutation.isPending, sessionCards.length, wordHasMistake])
 
   useEffect(() => {
     if (!sessionStarted || !currentCard) return
@@ -246,12 +290,9 @@ export function PracticeSessionPage() {
 
       if (event.key === 'Enter') {
         if (currentStep === 'recap') {
+          if (event.target instanceof HTMLElement && event.target.closest('button')) return
           event.preventDefault()
-          if (currentIndex + 1 >= sessionCards.length) {
-            void finishPractice()
-          } else {
-            advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')
-          }
+          handleRecapSkip()
           return
         }
         if (resolvedOutcome) {
@@ -263,6 +304,20 @@ export function PracticeSessionPage() {
           event.preventDefault()
           submitTypedAnswer()
         }
+        return
+      }
+
+      if (currentStep === 'recap' && event.key === 'ArrowLeft') {
+        if (event.target instanceof HTMLElement && event.target.closest('button')) return
+        event.preventDefault()
+        goToPreviousStep()
+        return
+      }
+
+      if (currentStep === 'recap' && event.key === 'ArrowRight') {
+        if (event.target instanceof HTMLElement && event.target.closest('button')) return
+        event.preventDefault()
+        handleRecapSkip()
         return
       }
 
@@ -290,7 +345,7 @@ export function PracticeSessionPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [advanceAfterRecap, continueResolvedStep, currentCard, currentIndex, currentStep, finishPractice, isRecording, language, pronunciationMutation.isPending, recordingSupported, revealAndSkip, resolvedOutcome, sessionCards.length, sessionStarted, startRecording, submitTypedAnswer, typedAnswer, wordHasMistake])
+  }, [continueResolvedStep, currentCard, currentStep, goToPreviousStep, handleRecapSkip, isRecording, language, pronunciationMutation.isPending, recordingSupported, revealAndSkip, resolvedOutcome, sessionStarted, startRecording, submitTypedAnswer, typedAnswer])
 
   const currentReviewStatus = currentCard ? (reviewStatuses[currentCard.wordId] ?? null) : null
 
@@ -313,10 +368,10 @@ export function PracticeSessionPage() {
                 addError={addToReviewMutation.isError}
                 saveError={saveSummaryMutation.isError}
                 isLastCard={currentIndex + 1 >= sessionCards.length}
-                onPrevious={() => setCurrentStepIndex(Math.max(0, currentStepIndex - 1))}
-                onAddToReview={() => void addCurrentWordToReview()}
-                onNext={() => advanceAfterRecap(wordHasMistake ? 'wrong' : 'correct')}
-                onFinish={() => void finishPractice()}
+                canGoPrevious={currentStepIndex > 0}
+                onPrevious={goToPreviousStep}
+                onSelectLevel={(initialLevel) => void handleReviewLevel(initialLevel)}
+                onSkip={handleRecapSkip}
               />
             ) : (
               <PracticeModeSurface

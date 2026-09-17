@@ -5,12 +5,12 @@ import * as habitApi from '../api/habit.api'
 import { habitKeys } from '../api/habit.queries'
 import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/shared/lib/toast'
+import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
 import { HabitDetailsPanel } from '../components/HabitDetailsPanel'
 import { HabitFormDialog } from '../components/HabitFormDialog'
 import { HabitList } from '../components/HabitList'
 import { HabitWeekStrip, type HabitWeekDay } from '../components/HabitWeekStrip'
 import {
-  browserTimeZone,
   isAggregateEligible,
   monthDates,
   parseDateInput,
@@ -18,17 +18,16 @@ import {
   shiftWeek,
   startOfWeek,
   toDateInput,
-  toMonthInput,
   weekdays,
 } from '../model/habit-date'
 
 export function HabitPage() {
   const queryClient = useQueryClient()
-  const timeZoneId = useMemo(() => browserTimeZone(), [])
-  const today = useMemo(() => toDateInput(new Date()), [])
+  const timeZoneId = APP_TIME_ZONE
+  const today = useMemo(() => todayInAppTimeZone(), [])
   const [selectedDate, setSelectedDate] = useState(today)
-  const [selectedMonth, setSelectedMonth] = useState(() => toMonthInput(new Date()))
-  const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(new Date())))
+  const [selectedMonth, setSelectedMonth] = useState(() => today.slice(0, 7))
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(parseDateInput(today))))
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [formHabitId, setFormHabitId] = useState<'new' | string | null>(null)
   const formTriggerRef = useRef<HTMLButtonElement | null>(null)

@@ -6,6 +6,12 @@ API container, and is released together with the API and migration images.
 
 ## Host Layout
 
+The API hosts Quartz with PostgreSQL persistence. Scheduler changes require the
+[cutover procedure](../../src/backend/SCHEDULING.md#cutover-and-recovery): old
+API/Hangfire instances must stop before the new scheduler starts. Keep old
+scheduler tables for recovery; do not replay old jobs alongside Quartz.
+`Quartz__WorkerCount` controls scheduler execution concurrency.
+
 ```text
 /opt/fluenta/current                   active deployment files
 /opt/fluenta/shared/production.env     root-readable production configuration

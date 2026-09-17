@@ -6,6 +6,7 @@ import { AppProviders } from '@/app/providers'
 import { useAuthStore } from '@/features/auth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { DASHBOARD_WIDGET_STORAGE_KEY } from '@/features/dashboard/model/dashboard-widget-preferences'
+import { APP_TIME_ZONE } from '@/shared/lib/timezone'
 
 const adapters = vi.hoisted(() => ({
   listByDate: vi.fn(),
@@ -125,9 +126,8 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: 'Open countdowns' })).toHaveAttribute('href', '/countdowns')
 
     expect(adapters.listByDate).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    expect(adapters.listHabits).toHaveBeenCalledWith(timeZone)
-    expect(adapters.getReviewDashboard).toHaveBeenCalledWith(timeZone)
+    expect(adapters.listHabits).toHaveBeenCalledWith(APP_TIME_ZONE)
+    expect(adapters.getReviewDashboard).toHaveBeenCalledWith(APP_TIME_ZONE)
     expect(adapters.listBoards).not.toHaveBeenCalled()
     expect(adapters.getPomodoroCurrent).not.toHaveBeenCalled()
     expect(adapters.getPomodoroToday).not.toHaveBeenCalled()
@@ -193,8 +193,7 @@ describe('DashboardPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Check habit Read English' }))
     const expectedDate = expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    await waitFor(() => expect(adapters.toggleHabitEntry).toHaveBeenCalledWith('habit-1', expectedDate, timeZone))
+    await waitFor(() => expect(adapters.toggleHabitEntry).toHaveBeenCalledWith('habit-1', expectedDate, APP_TIME_ZONE))
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['habit'] }))
   })
 

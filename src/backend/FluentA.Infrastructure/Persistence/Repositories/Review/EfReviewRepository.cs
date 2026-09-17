@@ -20,14 +20,33 @@ public sealed class EfReviewRepository : IReviewRepository
         _dashboardQueries = new EfReviewDashboardQueries(dbContext);
     }
 
+    public Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default) =>
+        AddPracticeWordsToReviewAsync(
+            userId,
+            pageId,
+            wordId,
+            timeZone,
+            utcNow,
+            initialLevel: 0,
+            cancellationToken: cancellationToken);
+
     public async Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,
         Guid pageId,
         Guid wordId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
+        int initialLevel,
         CancellationToken cancellationToken = default)
     {
+        var intervalDays = FluentAsrsScheduler.IntervalDaysForLevel(initialLevel);
+
         var pageWord = await (
             from word in _dbContext.Words
             join pageEntity in _dbContext.Pages on word.PageId equals pageEntity.Id
@@ -50,7 +69,7 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
-        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, intervalDays: 1, timeZone);
+        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, intervalDays, timeZone);
         var existingState = await _dbContext.WordReviewStates
             .SingleOrDefaultAsync(
                 state => state.UserId == userId
@@ -65,14 +84,14 @@ public sealed class EfReviewRepository : IReviewRepository
                 return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "alreadyInReview", existingState.NextReviewDate);
             }
 
-            existingState.ReactivateLevelZero(nextReviewDate);
+            existingState.ReactivateAtLevel(initialLevel, nextReviewDate);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
         }
 
-        await _dbContext.WordReviewStates.AddAsync(
-            WordReviewState.CreateLevelZero(userId, pageWord.WordId, nextReviewDate),
-            cancellationToken);
+        var state = WordReviewState.CreateAtLevel(userId, pageWord.WordId, initialLevel, nextReviewDate);
+
+        await _dbContext.WordReviewStates.AddAsync(state, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
     }

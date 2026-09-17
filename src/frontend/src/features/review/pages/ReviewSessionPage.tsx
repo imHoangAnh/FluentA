@@ -1,10 +1,12 @@
 import { CheckCircle2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as reviewApi from '../api/review.api'
 import { flashcardKeys, listBoards, type FlashcardBoard } from '@/features/flashcards'
 import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
+import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
+import { reviewKeys } from '../api/review.queries'
 import { ReviewCompletion } from '../components/session/ReviewCompletion'
 import { ReviewModeSurface } from '../components/session/ReviewModeSurface'
 import { ReviewProgress } from '../components/session/ReviewProgress'
@@ -21,15 +23,7 @@ function speakWord(word: string, language: string) {
   window.speechSynthesis.speak(utterance)
 }
 
-function buildBoardOptions(boards: FlashcardBoard[]): ReviewBoardOption[] {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const today = `${parts.find((part) => part.type === 'year')?.value}-${parts.find((part) => part.type === 'month')?.value}-${parts.find((part) => part.type === 'day')?.value}`
+function buildBoardOptions(boards: FlashcardBoard[], today: string): ReviewBoardOption[] {
 
   const options = boards.map((board) => {
     const words = board.pages.flatMap((page) => page.words)
@@ -51,6 +45,9 @@ function buildBoardOptions(boards: FlashcardBoard[]): ReviewBoardOption[] {
 }
 
 export function ReviewSessionPage() {
+  const queryClient = useQueryClient()
+  const [today, setToday] = useState(() => todayInAppTimeZone())
+  const todayRef = useRef(today)
   const [boardId, setBoardId] = useState('')
   const [orderType, setOrderType] = useState<reviewApi.ReviewOrderType>('sequential')
   const [reviewMode, setReviewMode] = useState<reviewApi.ReviewMode>('random')
@@ -75,7 +72,7 @@ export function ReviewSessionPage() {
   const feedbackTimerRef = useRef<number | null>(null)
 
   const decksQuery = useQuery({ queryKey: flashcardKeys.boards, queryFn: listBoards })
-  const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? []), [decksQuery.data])
+  const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? [], today), [decksQuery.data, today])
   const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
   const words = session?.words ?? []
   const currentWord = words[currentIndex] ?? null
@@ -89,8 +86,32 @@ export function ReviewSessionPage() {
     onSuccess: openSession,
   })
 
-  const submitReviewMutation = useMutation({ mutationFn: reviewApi.submitReview })
+  const submitReviewMutation = useMutation({
+    mutationFn: reviewApi.submitReview,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: flashcardKeys.boards, refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
+      ])
+    },
+  })
   const pronunciationMutation = useMutation({ mutationFn: ({ wordId, audio }: { wordId: string; audio: Blob }) => assessPronunciation(wordId, audio) })
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const nextToday = todayInAppTimeZone()
+      if (todayRef.current === nextToday) return
+
+      todayRef.current = nextToday
+      setToday(nextToday)
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: flashcardKeys.boards, refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
+      ])
+    }, 60_000)
+
+    return () => window.clearInterval(intervalId)
+  }, [queryClient])
 
   useEffect(() => {
     if (!currentWord) return
@@ -196,7 +217,7 @@ export function ReviewSessionPage() {
       wordId: currentWord.wordId,
       correct,
       timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      timeZoneId: APP_TIME_ZONE,
     })
 
     if (correct) {
@@ -248,7 +269,7 @@ export function ReviewSessionPage() {
       boardId,
       orderType,
       mode: reviewMode,
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      timeZoneId: APP_TIME_ZONE,
     })
   }
 
