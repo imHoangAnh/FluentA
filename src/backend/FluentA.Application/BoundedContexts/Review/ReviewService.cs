@@ -29,6 +29,25 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
         return _repository.AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
     }
 
+    public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        int initialLevel,
+        CancellationToken cancellationToken = default)
+    {
+        return _repository.AddPracticeWordsToReviewAsync(
+            userId,
+            pageId,
+            wordId,
+            timeZone,
+            utcNow,
+            initialLevel,
+            cancellationToken);
+    }
+
     public async Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
         Guid userId,
         CreateReviewSessionRequest request,

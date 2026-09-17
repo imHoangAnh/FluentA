@@ -5,6 +5,7 @@ namespace FluentA.Application.BoundedContexts.Review;
 
 public interface IReviewRepository
 {
+    // Preserve the original level-zero enrollment method for existing callers.
     Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,
         Guid pageId,
@@ -12,6 +13,16 @@ public interface IReviewRepository
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
+
+    Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        int initialLevel,
+        CancellationToken cancellationToken = default) =>
+        AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
 
     Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
         Guid userId,

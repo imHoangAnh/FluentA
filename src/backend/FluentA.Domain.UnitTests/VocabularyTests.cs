@@ -97,6 +97,20 @@ public sealed class VocabularyTests
     }
 
     [Fact]
+    public void WordReviewState_CreatesAtSelectedLevelWithoutReviewTimestamp()
+    {
+        var nextReviewDate = new DateOnly(2026, 9, 21);
+
+        var state = WordReviewState.CreateAtLevel(Guid.NewGuid(), Guid.NewGuid(), level: 4, nextReviewDate);
+
+        Assert.Equal(WordReviewStatus.Active, state.Status);
+        Assert.Equal(4, state.Level);
+        Assert.Equal(0, state.LapseCount);
+        Assert.Equal(nextReviewDate, state.NextReviewDate);
+        Assert.Null(state.LastReviewedAt);
+    }
+
+    [Fact]
     public void WordReviewState_ReactivatesInactiveWordsAtLevelZero()
     {
         var nextReviewDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
@@ -110,6 +124,23 @@ public sealed class VocabularyTests
         Assert.Equal(WordReviewStatus.Active, state.Status);
         Assert.Equal(0, state.Level);
         Assert.Equal(reactivatedDate, state.NextReviewDate);
+        Assert.Null(state.LastReviewedAt);
+    }
+
+    [Fact]
+    public void WordReviewState_ReactivatesAtSelectedLevelAndClearsReviewTimestamp()
+    {
+        var state = WordReviewState.CreateLevelZero(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 9, 18));
+        state.ApplyResult(5, new DateOnly(2026, 11, 17), 3, new DateOnly(2026, 9, 17));
+        state.Deactivate();
+
+        var nextReviewDate = new DateOnly(2026, 10, 27);
+        state.ReactivateAtLevel(level: 3, nextReviewDate);
+
+        Assert.Equal(WordReviewStatus.Active, state.Status);
+        Assert.Equal(3, state.Level);
+        Assert.Equal(3, state.LapseCount);
+        Assert.Equal(nextReviewDate, state.NextReviewDate);
         Assert.Null(state.LastReviewedAt);
     }
 

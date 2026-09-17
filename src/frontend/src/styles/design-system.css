@@ -9043,11 +9043,12 @@
 }
 
 .practice-recap-actions {
-  width: calc(100% - 0.25rem);
+  width: min(100%, 48rem);
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+  align-items: center;
+  column-gap: clamp(0.5rem, 2vw, 1rem);
   margin-top: 0.25rem;
 }
 
@@ -9066,19 +9067,43 @@
   cursor: pointer;
 }
 
-.practice-recap__add-button {
-  border-color: #397c84 !important;
-  background: #397c84;
-  color: #ffffff;
+.practice-recap__levels {
+  min-width: 0;
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
-.practice-recap__add-button:hover:not(:disabled) {
-  background: #2e6a70;
+.practice-recap__level-button {
+  border-color: #bedadd !important;
+  background: #e7f3f6;
+  color: #2e6a70;
+}
+
+.practice-recap__level-button:hover:not(:disabled) {
+  border-color: #397c84 !important;
+  background: #d6ebed;
+}
+
+.practice-recap__level-button:disabled {
+  background: color-mix(in srgb, var(--ds-border) 35%, transparent);
+  color: var(--ds-muted-foreground);
 }
 
 .practice-recap__nav-button {
+  width: 2.75rem;
+  min-height: 2.75rem !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
   background: rgba(255, 255, 255, 0.68);
   color: var(--ds-foreground);
+  font-size: 1.5rem !important;
+  line-height: 1;
+}
+
+.practice-recap__nav-button--previous {
+  grid-column: 1;
 }
 
 .practice-recap__nav-button:hover:not(:disabled) {
@@ -9086,10 +9111,8 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
-.practice-recap__finish-button {
-  border-color: var(--ds-primary) !important;
-  background: var(--ds-primary);
-  color: #ffffff;
+.practice-recap__nav-button--next {
+  grid-column: 3;
 }
 
 .practice-recap-actions button:disabled {
@@ -9098,19 +9121,38 @@
 }
 
 .practice-recap-actions button:focus-visible,
+.practice-recap__levels button:focus-visible,
 .practice-wrong-message:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--ds-primary) 28%, transparent);
   outline-offset: 3px;
 }
 
+.practice-recap-status {
+  margin: -0.5rem 0 0;
+  color: var(--ds-muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-align: center;
+}
+
 @media (max-width: 40rem) {
   .practice-recap-actions {
-    gap: 0.5rem;
+    grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+    column-gap: 0.5rem;
   }
 
   .practice-recap-actions button {
     min-height: 2.75rem;
     padding: 0 0.5rem;
     font-size: 0.75rem;
+  }
+
+  .practice-recap__nav-button {
+    width: 2.25rem;
+    font-size: 1.25rem !important;
+  }
+
+  .practice-recap__levels {
+    gap: 0.5rem;
   }
 }

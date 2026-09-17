@@ -3,6 +3,8 @@ import type { ApiEnvelope } from '@/shared/api/contracts'
 
 export type PracticeMode = 'dictation' | 'meaningToWord' | 'pronunciation'
 
+export type PracticeReviewLevel = 0 | 1 | 2 | 3 | 4 | 5
+
 export type PracticeSettings = {
   modeSequence: PracticeMode[]
 }
@@ -40,7 +42,7 @@ export async function createPracticeSessionSummary(input: { pageId: string; mode
   return response.data.data!
 }
 
-export async function addPracticeWordsToReview(input: { pageId: string; wordId: string; timeZoneId: string }) {
+export async function addPracticeWordsToReview(input: { pageId: string; wordId: string; initialLevel: PracticeReviewLevel; timeZoneId: string }) {
   const response = await apiClient.post<ApiEnvelope<AddPracticeWordsToReviewResult>>('/practice/add-to-review', input)
   return response.data.data!
 }

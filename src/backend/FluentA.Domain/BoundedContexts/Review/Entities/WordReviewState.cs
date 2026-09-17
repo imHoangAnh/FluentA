@@ -41,7 +41,14 @@ public sealed class WordReviewState : BaseEntity
     public DateOnly? LastReviewedAt { get; private set; }
 
     public static WordReviewState CreateLevelZero(Guid userId, Guid wordId, DateOnly nextReviewDate) =>
-        new(userId, wordId, WordReviewStatus.Active, level: 0, nextReviewDate, lapseCount: 0, lastReviewedAt: null);
+        CreateAtLevel(userId, wordId, level: 0, nextReviewDate);
+
+    public static WordReviewState CreateAtLevel(
+        Guid userId,
+        Guid wordId,
+        int level,
+        DateOnly nextReviewDate) =>
+        new(userId, wordId, WordReviewStatus.Active, level, nextReviewDate, lapseCount: 0, lastReviewedAt: null);
 
     public void ApplyResult(int levelAfter, DateOnly nextReviewDate, int lapseCountAfter, DateOnly reviewedOn)
     {
@@ -69,9 +76,14 @@ public sealed class WordReviewState : BaseEntity
 
     public void ReactivateLevelZero(DateOnly nextReviewDate)
     {
-        ValidateState(0, nextReviewDate, LapseCount);
+        ReactivateAtLevel(level: 0, nextReviewDate);
+    }
+
+    public void ReactivateAtLevel(int level, DateOnly nextReviewDate)
+    {
+        ValidateState(level, nextReviewDate, LapseCount);
         Status = WordReviewStatus.Active;
-        Level = 0;
+        Level = level;
         NextReviewDate = nextReviewDate;
         LastReviewedAt = null;
         UpdatedAt = DateTime.UtcNow;
