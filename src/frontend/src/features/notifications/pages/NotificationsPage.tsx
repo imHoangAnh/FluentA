@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Alert } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { formatVietnamTimestamp } from '@/shared/lib/timezone'
 import { cn } from '@/shared/lib/utils'
 import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
 import { notificationKeys } from '../api/notification.queries'
@@ -49,7 +50,7 @@ export function NotificationsPage() {
           {!query.isLoading && !query.isError ? <ul className="m-0 divide-y divide-border p-0" aria-label="Notifications">{query.data?.map((item) => {
             const pending = read.isPending && read.variables === item.id
             const unread = !item.readAt
-            return <li key={item.id}><button type="button" disabled={pending} className={cn('flex w-full items-start gap-3 p-5 text-left transition-colors hover:bg-accent disabled:cursor-wait', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)} aria-label={`${item.title}. ${unread ? pending ? 'Marking as read.' : 'Unread. Activate to open.' : item.actionPath ? 'Read. Activate to open.' : 'Read.'}`}><span className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-full', unread ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}><Bell className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm text-foreground">{item.title}</strong><span className="mt-1 block text-sm text-muted-foreground">{item.message}</span></span><span className="shrink-0 text-xs font-medium text-muted-foreground">{pending ? 'Marking read…' : unread ? 'Unread' : 'Read'}</span></button></li>
+            return <li key={item.id}><button type="button" disabled={pending} className={cn('flex w-full items-start gap-3 p-5 text-left transition-colors hover:bg-accent disabled:cursor-wait', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)} aria-label={`${item.title}. ${unread ? pending ? 'Marking as read.' : 'Unread. Activate to open.' : item.actionPath ? 'Read. Activate to open.' : 'Read.'}`}><span className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-full', unread ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}><Bell className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-sm text-foreground">{item.title}</strong><span className="mt-1 block text-sm text-muted-foreground">{item.message}</span><time className="mt-1 block text-xs text-muted-foreground" dateTime={item.createdAt}>{formatVietnamTimestamp(item.createdAt)}</time></span><span className="shrink-0 text-xs font-medium text-muted-foreground">{pending ? 'Marking read…' : unread ? 'Unread' : 'Read'}</span></button></li>
           })}</ul> : null}
         </CardContent>
       </Card>

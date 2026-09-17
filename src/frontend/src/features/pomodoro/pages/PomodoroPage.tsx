@@ -8,6 +8,7 @@ import * as projectApi from '@/features/project'
 import { projectKeys } from '@/features/project'
 import { PomodoroConfigurationDialog, type PomodoroConfigFormValues } from '../components/PomodoroConfigurationDialog'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
+import { todayInAppTimeZone } from '@/shared/lib/timezone'
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)
@@ -50,7 +51,7 @@ export function PomodoroPage() {
   })
   const todosQuery = useQuery({
     queryKey: pomodoroKeys.todoToday,
-    queryFn: () => todoApi.listByDate(new Date().toISOString().slice(0, 10)),
+    queryFn: () => todoApi.listByDate(todayInAppTimeZone()),
   })
   const boardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards })
   const boardDetailsQuery = useQuery({

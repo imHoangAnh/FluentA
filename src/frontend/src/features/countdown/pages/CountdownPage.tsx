@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { cn } from '@/shared/lib/utils'
+import { addCalendarDays, differenceInCalendarDays, formatVietnamDateOnly, todayInAppTimeZone } from '@/shared/lib/timezone'
 import * as countdownApi from '../api/countdown.api'
 import { countdownKeys } from '../api/countdown.queries'
 
@@ -21,10 +22,8 @@ const repeatOptions = [
   { value: 'Yearly', label: 'Yearly' },
 ] as const
 
-function defaultTargetDate() {
-  const date = new Date()
-  date.setDate(date.getDate() + 7)
-  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
+function defaultTargetDate(now = new Date()) {
+  return addCalendarDays(todayInAppTimeZone(now), 7)
 }
 
 function defaultAlert() {
@@ -32,19 +31,20 @@ function defaultAlert() {
 }
 
 function formatTargetDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+  return formatVietnamDateOnly(value, {
     month: 'short',
     day: '2-digit',
     year: 'numeric',
-  }).format(new Date(`${value}T00:00:00`))
+  })
 }
 
-function statusText(item: countdownApi.CountdownEvent) {
+function statusText(item: countdownApi.CountdownEvent, now = new Date()) {
   if (item.isCompleted) {
     return ''
   }
 
-  const diff = Math.ceil((new Date(`${item.targetDate}T00:00:00`).getTime() - new Date().getTime()) / 86_400_000)
+  const diff = differenceInCalendarDays(item.targetDate, todayInAppTimeZone(now))
+  if (!Number.isFinite(diff)) return 'Unknown'
   return diff <= 0 ? 'Today' : `${diff} day${diff === 1 ? '' : 's'} left`
 }
 
@@ -59,6 +59,8 @@ export function CountdownPage() {
   const [openBoard, setOpenBoard] = useState<'active' | 'complete'>('active')
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => new Date())
+  const appDateRef = useRef(todayInAppTimeZone())
   const dialogTitleId = useId()
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -83,6 +85,20 @@ export function CountdownPage() {
     setShowFormModal(false)
     window.requestAnimationFrame(() => createTriggerRef.current?.focus())
   }, [])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const nextNow = new Date()
+      setNow(nextNow)
+
+      const nextAppDate = todayInAppTimeZone(nextNow)
+      if (appDateRef.current === nextAppDate) return
+
+      appDateRef.current = nextAppDate
+      void queryClient.invalidateQueries({ queryKey: countdownKeys.events, refetchType: 'all' })
+    }, 60_000)
+    return () => window.clearInterval(intervalId)
+  }, [queryClient])
 
   useEffect(() => {
     if (!showFormModal) return
@@ -208,7 +224,7 @@ export function CountdownPage() {
                             <h2 title={item.name}>{item.name}</h2>
                           </div>
                           <div className="countdown-card-count">
-                            {!item.isCompleted ? <strong>{statusText(item)}</strong> : null}
+                            {!item.isCompleted ? <strong>{statusText(item, now)}</strong> : null}
                           </div>
                           <div className="countdown-card-footer">
                             {item.isCompleted ? (

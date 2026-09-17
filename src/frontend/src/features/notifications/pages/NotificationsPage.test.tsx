@@ -58,6 +58,8 @@ describe('NotificationsPage', () => {
 
     await waitFor(() => expect(api.markRead).toHaveBeenCalled())
     expect(api.markRead.mock.calls[0]?.[0]).toBe('notification-1')
+    expect(screen.getByRole('time')).toHaveAttribute('dateTime', '2026-07-22T01:00:00Z')
+    expect(screen.getByRole('time')).not.toHaveTextContent('2026-07-22T01:00:00Z')
     expect(await screen.findByLabelText('Current location')).toHaveTextContent('/todo?taskId=todo-1')
   })
 

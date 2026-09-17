@@ -8,7 +8,7 @@
 
 FluentA Backend là backend ASP.NET Core trên .NET 10 của hệ thống FluentA. Dự
 án cung cấp REST API dưới prefix `/api/v1`, SignalR hub tại `/hubs/sync`, xử lý
-xác thực và thực thi background job định kỳ bằng Hangfire.
+xác thực và thực thi reminder cùng background job định kỳ bằng Quartz.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
@@ -22,7 +22,7 @@ của nó. Những phần dễ phình to được tách thành collaborator nộ
 nhiệm, chẳng hạn validator, DTO mapper, statistics calculator và query/provider
 parser. API dùng `ApiControllerBase` cho identity và error mapping dùng chung;
 Infrastructure giữ EF adapter, provider, job facade và composition extension.
-Thiết kế này giữ nguyên bốn project, route, payload, Hangfire và SignalR contract;
+Thiết kế này giữ bốn project, route, payload và SignalR contract;
 không dùng CQRS, MediatR hoặc một handler cho từng endpoint.
 
 ## 3. Mục lục
@@ -39,7 +39,7 @@ không dùng CQRS, MediatR hoặc một handler cho từng endpoint.
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
-Để chạy toàn bộ frontend, API/Hangfire, migration, PostgreSQL mới và MinIO chỉ
+Để chạy toàn bộ frontend, API/Quartz, migration, PostgreSQL mới và MinIO chỉ
 bằng Docker, dùng `deploy/local/start.ps1` theo
 [local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
 chạy backend trực tiếp trên host khi phát triển source.
@@ -125,8 +125,10 @@ trình duyệt.
 
 ### 5.3. Background job
 
-Khi API khởi động, Hangfire đăng ký các recurring job phục vụ reminder và cập
-nhật định kỳ. Vì vậy PostgreSQL cần sẵn sàng trước khi chạy API.
+Quartz chạy cùng API, lưu lịch trong PostgreSQL và dùng trigger theo từng mốc
+reminder. Job bảo trì dùng cron. PostgreSQL cần sẵn sàng trước khi chạy API.
+Quy tắc giờ Việt Nam, chạy bù và chuyển môi trường được mô tả tại
+[Scheduling](SCHEDULING.md).
 
 ## 6. API Response Contract
 

@@ -8,11 +8,12 @@ import { Alert } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
+import { formatVietnamTimestamp } from '@/shared/lib/timezone'
 import { bulkPermanentlyDeleteTrashEntries, bulkRestoreTrashEntries, emptyTrash, listTrash, permanentlyDeleteTrashEntry, restoreTrashEntry } from '../api/trash.api'
 import { trashKeys } from '../api/trash.queries'
 
 function displayDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return formatVietnamTimestamp(value)
 }
 
 function timeRemaining(value: string) {

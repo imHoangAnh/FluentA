@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
+import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
-import { formatWeekRange, toDateInput, weekDates } from '../model/todo-date'
+import { formatWeekRange, weekDates } from '../model/todo-date'
 import { TodoPage } from './TodoPage'
 
 const api = vi.hoisted(() => ({
@@ -26,8 +27,8 @@ vi.mock('../lib/todo-reminder', () => ({
   createBrowserReminder: vi.fn((_date: string, time: string) => ({
     reminder: {
       time,
-      timeZoneId: 'UTC',
-      scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+      timeZoneId: APP_TIME_ZONE,
+      scheduledAtUtc: '2035-07-22T03:30:00.000Z',
     },
   })),
 }))
@@ -39,7 +40,7 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     id: 'todo-1',
     title: 'Review vocabulary',
     note: null,
-    date: toDateInput(new Date()),
+    date: todayInAppTimeZone(),
     sortOrder: 0,
     isCompleted: false,
     isImportant: false,
@@ -101,7 +102,7 @@ describe('TodoPage My Day workspace', () => {
         entityKind: 'Todo',
         entityId: id,
         displayName: 'Review vocabulary',
-        originalLocation: toDateInput(new Date()),
+        originalLocation: todayInAppTimeZone(),
         trashedAt: '2026-07-28T00:00:00Z',
         purgeAfterAt: '2026-08-27T00:00:00Z',
       }
@@ -128,7 +129,7 @@ describe('TodoPage My Day workspace', () => {
     expect(details).toBeInTheDocument()
     expect(api.createTodo).toHaveBeenCalledWith({
       title: 'Plan speaking practice',
-      date: toDateInput(new Date()),
+      date: todayInAppTimeZone(),
     })
     expect(screen.getByLabelText('Task title')).toHaveFocus()
   })
@@ -204,8 +205,8 @@ describe('TodoPage My Day workspace', () => {
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', {
       reminder: {
         time: '10:30',
-        timeZoneId: 'UTC',
-        scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+        timeZoneId: APP_TIME_ZONE,
+        scheduledAtUtc: '2035-07-22T03:30:00.000Z',
       },
     }))
 
@@ -262,11 +263,11 @@ describe('TodoPage My Day workspace', () => {
       repeatPattern: 'Weekly',
       reminder: {
         time: '10:30',
-        timeZoneId: 'UTC',
-        scheduledAtUtc: '2035-07-22T10:30:00.000Z',
+        timeZoneId: APP_TIME_ZONE,
+        scheduledAtUtc: '2035-07-22T03:30:00.000Z',
       },
     })]
-    const dates = weekDates(toDateInput(new Date()))
+    const dates = weekDates(todayInAppTimeZone())
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'My Day menu' }))

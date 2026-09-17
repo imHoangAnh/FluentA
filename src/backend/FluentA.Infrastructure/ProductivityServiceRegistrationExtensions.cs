@@ -19,6 +19,7 @@ using FluentA.Infrastructure.Persistence.Repositories.Pomodoro;
 using FluentA.Infrastructure.Persistence.Repositories.Project;
 using FluentA.Infrastructure.Persistence.Repositories.Todo;
 using FluentA.Infrastructure.RuntimeState.Pomodoro;
+using FluentA.Infrastructure.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentA.Infrastructure;
@@ -27,9 +28,11 @@ internal static class ProductivityServiceRegistrationExtensions
 {
     public static IServiceCollection AddFluentAProductivityServices(this IServiceCollection services)
     {
-        services.AddScoped<IScheduledProductivityJobs, ScheduledProductivityJobs>();
+        services.AddScoped<ScheduledProductivityJobs>();
+        services.AddScoped<IScheduledProductivityJobs>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
+        services.AddScoped<IScheduledMaintenanceExecutor>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
+        services.AddScoped<IScheduledOccurrenceExecutor, ScheduledProductivityExecution>();
         services.AddScoped<ScheduledMaintenanceJobs>();
-        services.AddScoped<ReviewDueDeferralJob>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<ICountdownRepository, EfCountdownRepository>();

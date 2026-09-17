@@ -1,7 +1,7 @@
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CalendarClock, FolderKanban, ListChecks, Repeat2, RotateCcw, Timer } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth'
 import * as countdownApi from '@/features/countdown'
@@ -17,23 +17,13 @@ import { reviewKeys } from '@/features/review'
 import * as todoApi from '@/features/todo'
 import { todoKeys } from '@/features/todo'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { APP_TIME_ZONE, appHour, formatVietnamDateOnly, todayInAppTimeZone, vietnamDateOnlyToUtc } from '@/shared/lib/timezone'
 import { cn } from '@/shared/lib/utils'
 import { DashboardWidgetMenu } from '../components/DashboardWidgetMenu'
 import { CountdownAction, CountdownWidget, HabitWidget, PomodoroAction, PomodoroWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
 import { SortableDashboardWidget } from '../components/SortableDashboardWidget'
 import { dashboardWidgetLabel, dashboardWidgetRows, dashboardWidgetSlotClass, type DashboardWidgetId } from '../model/dashboard-widgets'
 import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../model/dashboard-widget-preferences'
-
-function browserTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-}
-
-function toDateInput(date: Date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 function greeting(hour: number, name: string) {
   if (hour >= 5 && hour < 12) return `Good morning 🌅, ${name}`
@@ -43,7 +33,13 @@ function greeting(hour: number, name: string) {
 }
 
 function remainingText(targetDate: string, now: Date) {
-  const diff = new Date(targetDate).getTime() - now.getTime()
+  const today = todayInAppTimeZone(now)
+  if (targetDate === today) return 'Today'
+
+  const target = vietnamDateOnlyToUtc(targetDate)
+  if (!target) return 'Unknown'
+
+  const diff = target.getTime() - now.getTime()
   if (diff <= 0) return 'Completed'
   const totalHours = Math.floor(diff / 3_600_000)
   const days = Math.floor(totalHours / 24)
@@ -71,9 +67,10 @@ export function DashboardPage() {
   const [now, setNow] = useState(() => new Date())
   const [visibleWidgets, setVisibleWidgets] = useState<DashboardWidgetId[]>(() => readDashboardWidgetOrder())
   const [activeWidget, setActiveWidget] = useState<DashboardWidgetId | null>(null)
+  const previousTodayRef = useRef<string | null>(null)
 
-  const today = useMemo(() => toDateInput(new Date()), [])
-  const timeZoneId = useMemo(() => browserTimeZone(), [])
+  const today = useMemo(() => todayInAppTimeZone(now), [now])
+  const timeZoneId = APP_TIME_ZONE
   const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
   const visible = (id: DashboardWidgetId) => visibleWidgets.includes(id)
 
@@ -81,6 +78,23 @@ export function DashboardPage() {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000)
     return () => window.clearInterval(intervalId)
   }, [])
+
+  useEffect(() => {
+    if (previousTodayRef.current === null) {
+      previousTodayRef.current = today
+      return
+    }
+    if (previousTodayRef.current === today) return
+
+    previousTodayRef.current = today
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: todoKeys.all, refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: habitKeys.all, refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: countdownKeys.events, refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: pomodoroKeys.today, refetchType: 'all' }),
+    ])
+  }, [queryClient, today])
 
   const todosQuery = useQuery({ queryKey: todoKeys.day(today), queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
   const habitsQuery = useQuery({ queryKey: habitKeys.list(timeZoneId), queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
@@ -168,8 +182,8 @@ export function DashboardPage() {
     <div className="flex h-full min-h-0 flex-col gap-3" data-testid="dashboard-overview">
       <section className="flex shrink-0 flex-wrap items-end justify-between gap-3" aria-labelledby="welcome-heading">
         <div className="min-w-0">
-          <h2 id="welcome-heading" className="m-0 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-3xl">{greeting(now.getHours(), displayName)}</h2>
-          <p className="m-0 mt-1.5 text-sm text-muted-foreground">{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(now)}</p>
+          <h2 id="welcome-heading" className="m-0 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-3xl">{greeting(appHour(now), displayName)}</h2>
+          <p className="m-0 mt-1.5 text-sm text-muted-foreground">{formatVietnamDateOnly(today, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <DashboardWidgetMenu visibleWidgets={visibleWidgets} onToggle={handleWidgetToggle} />
       </section>

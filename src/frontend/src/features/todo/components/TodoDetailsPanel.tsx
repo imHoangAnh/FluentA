@@ -2,6 +2,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useEffect, useRef, useState } from 'react'
 import { Bell, Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
+import { formatVietnamTime } from '@/shared/lib/timezone'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
 import { createBrowserReminder } from '../lib/todo-reminder'
 
@@ -37,6 +38,15 @@ export function TodoDetailsEmptyState() {
   )
 }
 
+function reminderDisplayTime(item: TodoItem) {
+  if (!item.reminder) return ''
+  try {
+    return formatVietnamTime(item.reminder.scheduledAtUtc)
+  } catch {
+    return item.reminder.time
+  }
+}
+
 export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }: TodoDetailsPanelProps) {
   const [title, setTitle] = useState(item.title)
   const [note, setNote] = useState(item.note ?? '')
@@ -44,7 +54,7 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
   const savedNote = useRef(item.note ?? '')
   const titleInputRef = useRef<HTMLInputElement>(null)
   const [reminderEditorOpen, setReminderEditorOpen] = useState(false)
-  const [reminderTime, setReminderTime] = useState(item.reminder?.time ?? '')
+  const [reminderTime, setReminderTime] = useState(() => reminderDisplayTime(item))
   const [reminderError, setReminderError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -169,10 +179,11 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
           <button
             className="todo-details__field"
             type="button"
-            aria-label={`Reminder: ${item.reminder?.time ?? 'Not set'}`}
+            aria-label={`Reminder: ${item.reminder ? reminderDisplayTime(item) : 'Not set'}`}
             aria-expanded={reminderEditorOpen}
             disabled={pending}
             onClick={() => {
+              setReminderTime(item.reminder ? reminderDisplayTime(item) : '')
               setReminderEditorOpen((open) => !open)
               setReminderError(null)
             }}
@@ -180,7 +191,7 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
             <Bell aria-hidden="true" />
             <span>
               <small>Reminder</small>
-              <strong>{item.reminder?.time ?? 'Not set'}</strong>
+              <strong>{item.reminder ? reminderDisplayTime(item) : 'Not set'}</strong>
             </span>
             <ChevronRight aria-hidden="true" />
           </button>

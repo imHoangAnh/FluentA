@@ -69,7 +69,7 @@ services:
       Database__Postgres__MaxPoolSize: "15"
       Database__Postgres__ConnectionTimeoutSeconds: "15"
       Database__Postgres__CommandTimeoutSeconds: "30"
-      Hangfire__WorkerCount: "2"
+      Quartz__WorkerCount: "2"
       AssetStorage__Enabled: "true"
       AssetStorage__Bucket: ${S3_BUCKET:?S3_BUCKET is required}
       AssetStorage__Region: ${AWS_REGION:-ap-southeast-1}

@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
+import { APP_UTC_OFFSET_MINUTES } from '@/shared/lib/timezone'
 
 export type PomodoroConfig = {
   id: string
@@ -54,8 +55,7 @@ export async function getPomodoroCurrent() {
 }
 
 export async function getPomodoroToday() {
-  const utcOffsetMinutes = -new Date().getTimezoneOffset()
-  const response = await apiClient.get<ApiEnvelope<PomodoroToday>>('/pomodoro/today', { params: { utcOffsetMinutes } })
+  const response = await apiClient.get<ApiEnvelope<PomodoroToday>>('/pomodoro/today', { params: { utcOffsetMinutes: APP_UTC_OFFSET_MINUTES } })
   return response.data.data!
 }
 

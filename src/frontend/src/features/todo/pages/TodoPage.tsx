@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from '@/shared/lib/toast'
+import { todayInAppTimeZone } from '@/shared/lib/timezone'
 import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import * as todoApi from '../api/todo.api'
 import { todoKeys } from '../api/todo.queries'
@@ -10,7 +11,7 @@ import { MyDayView } from '../components/MyDayView'
 import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
 import { TodoSortMenu } from '../components/TodoSortMenu'
-import { formatMyDayDate, formatWeekRange, shiftDate, toDateInput, weekDates } from '../model/todo-date'
+import { formatMyDayDate, formatWeekRange, shiftDate, weekDates } from '../model/todo-date'
 import { readTodoSortMode, writeTodoSortMode, type TodoSortMode } from '../model/todo-sort'
 import { TodoWeekView } from './TodoWeekView'
 import '../todo.css'
@@ -26,7 +27,7 @@ export function TodoPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTaskId = searchParams.get('taskId')
-  const today = useMemo(() => toDateInput(new Date()), [])
+  const today = useMemo(() => todayInAppTimeZone(), [])
   const [view, setView] = useState<TodoView>('my-day')
   const activeView: TodoView = requestedTaskId ? 'my-day' : view
   const [weekAnchor, setWeekAnchor] = useState(today)

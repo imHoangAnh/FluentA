@@ -119,7 +119,7 @@ services:
       Database__Postgres__MaxPoolSize: "15"
       Database__Postgres__ConnectionTimeoutSeconds: "15"
       Database__Postgres__CommandTimeoutSeconds: "30"
-      Hangfire__WorkerCount: "2"
+      Quartz__WorkerCount: "2"
       AssetStorage__Enabled: "true"
       AssetStorage__Endpoint: http://minio:59000
       AssetStorage__PublicEndpoint: https://localhost:${FLUENTA_HTTPS_PORT:-7443}

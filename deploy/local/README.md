@@ -1,7 +1,7 @@
 # FluentA Local Docker Runtime
 
 This stack runs FluentA locally without AWS services. It builds the React SPA,
-ASP.NET Core API/Hangfire runtime, and EF migration bundle from the current
+ASP.NET Core API/Quartz runtime, and EF migration bundle from the current
 checkout, then starts them with a new PostgreSQL database and private MinIO
 bucket. Resend remains the email provider for OTP and password-reset messages.
 Azure Speech remains enabled for pronunciation assessment, and Google Identity
@@ -69,6 +69,10 @@ docker compose --env-file deploy/local/.env -f deploy/local/compose.yml up --bui
 ```
 
 ## Status And Logs
+
+For scheduler upgrades, follow the [Quartz cutover rules](../../src/backend/SCHEDULING.md#cutover-and-recovery).
+Stop older API/Hangfire instances before starting the Quartz API against the
+same database. `Quartz__WorkerCount` controls scheduler execution concurrency.
 
 ```powershell
 docker compose --env-file deploy/local/.env -f deploy/local/compose.yml ps

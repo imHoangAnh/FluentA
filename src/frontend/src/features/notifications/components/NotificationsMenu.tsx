@@ -4,9 +4,11 @@ import { Bell, Inbox, LoaderCircle } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/ui/button'
 import { dropdownContentClassName, dropdownItemClassName, dropdownSeparatorClassName } from '@/shared/components/ui/dropdown-styles'
+import { formatVietnamTimestamp } from '@/shared/lib/timezone'
 import { cn } from '@/shared/lib/utils'
 import { notificationApi, safeNotificationActionPath, type NotificationItem } from '../api/notification.api'
 import { notificationKeys } from '../api/notification.queries'
+import { useNotificationSync } from '../hooks/useNotificationSync'
 
 type NotificationsMenuProps = {
   notificationsPath: string
@@ -14,6 +16,7 @@ type NotificationsMenuProps = {
 }
 
 export function NotificationsMenu({ notificationsPath, active = false }: NotificationsMenuProps) {
+  useNotificationSync()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const query = useQuery({ queryKey: notificationKeys.all, queryFn: notificationApi.list })
@@ -72,7 +75,7 @@ export function NotificationsMenu({ notificationsPath, active = false }: Notific
             {!query.isLoading && !query.isError && query.data?.length === 0 ? <div className="grid place-items-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground"><Inbox className="size-5" /><p className="m-0">Your notification inbox is clear.</p></div> : null}
             {!query.isLoading && !query.isError && query.data?.length ? <ul className="m-0 divide-y divide-border p-0" aria-label="Recent notifications">{query.data.map((item) => {
               const unread = !item.readAt
-              return <li key={item.id}><MenuItem as="button" type="button" className={cn(dropdownItemClassName, 'h-auto w-full items-start rounded-none px-4 py-3 font-normal', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span></span></MenuItem></li>
+              return <li key={item.id}><MenuItem as="button" type="button" className={cn(dropdownItemClassName, 'h-auto w-full items-start rounded-none px-4 py-3 font-normal', unread && 'bg-primary/[0.035]')} onClick={() => void activate(item)}><span className={cn('mt-1.5 size-2 shrink-0 rounded-full', unread ? 'bg-primary' : 'bg-transparent')} aria-hidden="true" /><span className="min-w-0"><strong className="block truncate text-sm font-medium text-foreground">{item.title}</strong><span className="mt-0.5 block text-sm text-muted-foreground">{item.message}</span><time className="mt-1 block text-xs text-muted-foreground" dateTime={item.createdAt}>{formatVietnamTimestamp(item.createdAt)}</time></span></MenuItem></li>
             })}</ul> : null}
           </div>
           <div className={cn(dropdownSeparatorClassName, 'm-0')} role="separator" />

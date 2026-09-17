@@ -24,7 +24,7 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
-Để chạy toàn bộ frontend, API/Hangfire, migration, PostgreSQL mới và MinIO chỉ
+Để chạy toàn bộ frontend, API/Quartz, migration, PostgreSQL mới và MinIO chỉ
 bằng Docker, dùng `deploy/local/start.ps1` theo
 [local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
 chạy Vite trực tiếp trên host khi phát triển giao diện.

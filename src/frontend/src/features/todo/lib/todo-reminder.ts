@@ -1,4 +1,5 @@
 import type { TodoReminderInput } from '../api/todo.api'
+import { APP_TIME_ZONE, vietnamWallClockToUtc } from '@/shared/lib/timezone'
 
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/
 const timePattern = /^(\d{2}):(\d{2})$/
@@ -11,37 +12,30 @@ export function createBrowserReminder(
   taskDate: string,
   time: string,
   nowMs = Date.now(),
-  timeZoneId = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  // Keep the optional argument for callers compiled against the old helper; the
+  // product policy is Vietnam-only, so it is intentionally ignored.
+  legacyTimeZoneId?: string,
 ): BrowserReminderResult {
+  // The legacy browser timezone argument remains accepted for source compatibility.
+  void legacyTimeZoneId
   const dateMatch = datePattern.exec(taskDate)
   const timeMatch = timePattern.exec(time)
   if (!dateMatch || !timeMatch) return { error: 'Choose a reminder time.' }
 
-  const year = Number(dateMatch[1])
-  const month = Number(dateMatch[2])
-  const day = Number(dateMatch[3])
   const hour = Number(timeMatch[1])
   const minute = Number(timeMatch[2])
-  if (hour > 23 || minute > 59 || !timeZoneId) return { error: 'Choose a valid reminder time.' }
+  if (hour > 23 || minute > 59) return { error: 'Choose a valid reminder time.' }
 
-  const local = new Date(year, month - 1, day, hour, minute, 0, 0)
-  if (
-    local.getFullYear() !== year
-    || local.getMonth() !== month - 1
-    || local.getDate() !== day
-    || local.getHours() !== hour
-    || local.getMinutes() !== minute
-  ) {
-    return { error: 'That time does not exist in your current timezone.' }
-  }
+  const utc = vietnamWallClockToUtc(taskDate, time)
+  if (!utc) return { error: 'That time does not exist in the Vietnam timezone.' }
 
-  if (local.getTime() <= nowMs) return { error: 'Choose a future reminder time.' }
+  if (utc.getTime() <= nowMs) return { error: 'Choose a future reminder time.' }
 
   return {
     reminder: {
       time,
-      timeZoneId,
-      scheduledAtUtc: local.toISOString(),
+      timeZoneId: APP_TIME_ZONE,
+      scheduledAtUtc: utc.toISOString(),
     },
   }
 }
