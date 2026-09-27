@@ -1,8 +1,14 @@
 namespace FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 
-public sealed record CreateBoardRequest(string Name, string Language);
+public sealed record CreateBoardRequest(
+    string Name,
+    string Language,
+    IReadOnlyList<string>? IncludedOptionalColumns = null);
 
-public sealed record UpdateBoardRequest(string Name, string Language);
+public sealed record UpdateBoardRequest(
+    string Name,
+    string Language,
+    IReadOnlyList<string>? IncludedOptionalColumns = null);
 
 public sealed record BoardSummaryDto(
     Guid Id,

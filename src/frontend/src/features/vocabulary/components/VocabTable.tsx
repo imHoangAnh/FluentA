@@ -1,9 +1,9 @@
-import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { CheckCircle2, GripVertical, Trash2 } from 'lucide-react'
+import { Check, CheckCircle2, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import * as vocabularyApi from '../api/vocabulary.api'
 import { vocabularyKeys } from '../api/vocabulary.queries'
 import { toast } from '@/shared/lib/toast'
@@ -35,20 +35,11 @@ type Column = {
   update: (word: vocabularyApi.WordInput, value: string) => vocabularyApi.WordInput
 }
 
-type AutosaveCellProps = {
-  label: string
-  value: string
-  type: Column['type']
-  required?: boolean
-  onSave: (value: string) => Promise<void>
-  onEndEnter?: () => Promise<void> | void
-  register: (element: HTMLElement | null) => void
-}
-
 type VocabTableProps = {
   boardId: string
   page: vocabularyApi.Page
   preferences: vocabularyApi.BoardPreferences
+  searchTerm?: string
   onPreferencesChange: (preferences: vocabularyApi.BoardPreferences) => Promise<void>
 }
 
@@ -60,137 +51,18 @@ function resizeTextarea(element: HTMLTextAreaElement | null) {
   element.style.height = `${element.scrollHeight + border}px`
 }
 
-function AutosaveCell({ label, value, type, required, onSave, onEndEnter, register }: AutosaveCellProps) {
-  const [draft, setDraft] = useState(value)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const confirmed = useRef(value)
-  const pending = useRef(false)
-  const queued = useRef<string | null>(null)
-  const suppressBlur = useRef(false)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-
-  useEffect(() => {
-    if (!pending.current && !error && draft === confirmed.current) {
-      confirmed.current = value
-      setDraft(value)
-    }
-  }, [draft, error, value])
-
-  useLayoutEffect(() => {
-    resizeTextarea(textareaRef.current)
-  }, [draft, value])
-
-  useEffect(() => {
-    const element = textareaRef.current
-    if (!element || typeof ResizeObserver === 'undefined') return
-
-    const observer = new ResizeObserver(() => resizeTextarea(element))
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-
-  async function commitValue(nextValue: string): Promise<void> {
-    if (nextValue === confirmed.current) return
-    if (pending.current) {
-      queued.current = nextValue
-      return
-    }
-
-    pending.current = true
-    setSaving(true)
-    setError(null)
-    try {
-      await onSave(nextValue)
-      confirmed.current = nextValue
-    } catch {
-      setError('Save failed.')
-    } finally {
-      pending.current = false
-      setSaving(false)
-      const next = queued.current
-      queued.current = null
-      if (next !== null && next !== confirmed.current) {
-        await commitValue(next)
-      }
-    }
+function toWordInput(word: vocabularyApi.Word): vocabularyApi.WordInput {
+  return {
+    word: word.word,
+    meaningVn: word.meaningVn,
+    ipaPronunciation: word.ipaPronunciation,
+    definition: word.definition ?? '',
+    class: word.class,
+    example: word.example,
+    note: word.note ?? '',
+    synonyms: word.synonyms ?? '',
+    antonyms: word.antonyms ?? '',
   }
-
-  function onBlur() {
-    if (suppressBlur.current) {
-      suppressBlur.current = false
-      return
-    }
-
-    void commitValue(draft)
-  }
-
-  async function onKeyDown(event: KeyboardEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      suppressBlur.current = true
-      queued.current = null
-      setDraft(confirmed.current)
-      setError(null)
-      event.currentTarget.blur()
-      return
-    }
-
-    if (event.key === 'Enter') {
-      if (onEndEnter && !event.shiftKey) {
-        event.preventDefault()
-        await commitValue(draft)
-        await onEndEnter()
-        return
-      }
-
-      if (type === 'text') event.preventDefault()
-    }
-  }
-
-  const shared = {
-    'aria-label': label,
-    value: draft,
-    required,
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setDraft(event.target.value),
-    onBlur,
-    onKeyDown,
-  }
-
-  return (
-    <div>
-      {type === 'select' ? (
-        <SelectMenu
-          aria-label={label}
-          value={draft}
-          onChange={(nextValue) => {
-            setDraft(nextValue)
-            void commitValue(nextValue)
-          }}
-          buttonRef={register}
-          buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
-          options={vocabularyApi.WORD_CLASS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-        />
-      ) : (
-        <textarea
-          className={textCellClassName}
-          ref={(element) => {
-            textareaRef.current = element
-            register(element)
-            resizeTextarea(element)
-          }}
-          {...shared}
-          rows={1}
-        />
-      )}
-      {saving ? <small className="px-2 text-[11px] text-muted-foreground">Saving...</small> : null}
-      {error ? (
-        <small className="px-2 text-[11px] text-destructive">
-          {error} <button className="cursor-pointer font-semibold underline underline-offset-2" type="button" onClick={() => void commitValue(draft)}>Retry</button>
-        </small>
-      ) : null}
-    </div>
-  )
 }
 
 function SortableHeader({
@@ -231,9 +103,12 @@ function SortableHeader({
   )
 }
 
-export function VocabTable({ boardId, page, preferences, onPreferencesChange }: VocabTableProps) {
+export function VocabTable({ boardId, page, preferences, searchTerm = '', onPreferencesChange }: VocabTableProps) {
   const queryClient = useQueryClient()
   const [newWord, setNewWord] = useState<vocabularyApi.WordInput>(emptyWord)
+  const [isAddingWord, setIsAddingWord] = useState(false)
+  const [editingWordId, setEditingWordId] = useState<string | null>(null)
+  const [editingWord, setEditingWord] = useState<vocabularyApi.WordInput | null>(null)
   const [columnOrder, setColumnOrder] = useState<string[]>(preferences.columnOrder)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS,
@@ -242,9 +117,16 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   const cellRefs = useRef<Record<string, HTMLElement | null>>({})
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
   const tableFocusRef = useRef<HTMLDivElement>(null)
+  const addRowTriggerRef = useRef<HTMLButtonElement>(null)
 
   const wordsKey = vocabularyKeys.words(page.id)
   const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase()
+  const visibleWords = (wordsQuery.data ?? []).filter((word) => {
+    if (!normalizedSearch) return true
+    return [word.word, word.meaningVn, word.ipaPronunciation, word.definition, word.class, word.example, word.note, word.synonyms, word.antonyms]
+      .some((value) => String(value ?? '').toLocaleLowerCase().includes(normalizedSearch))
+  })
   const sensors = useSensors(useSensor(PointerSensor))
   const hidden = new Set(preferences.hiddenColumns)
 
@@ -260,8 +142,8 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
 
   const baseColumns: Column[] = [
     fixed('word', 'Word', 'word', 'text', true),
-    fixed('meaningVn', 'Vietnamese meaning', 'Vietnamese meaning', 'textarea', true),
-    fixed('ipaPronunciation', 'IPA pronunciation', 'IPA pronunciation', 'text', true),
+    fixed('meaningVn', 'Meaning', 'Vietnamese meaning', 'textarea', true),
+    fixed('ipaPronunciation', 'IPA', 'IPA pronunciation', 'text', true),
     ...(!hidden.has('definition') ? [fixed('definition', 'Definition', 'definition', 'textarea')] : []),
     fixed('class', 'Class', 'word class', 'select', true),
     fixed('example', 'Example', 'example', 'textarea', true),
@@ -271,17 +153,27 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
   ]
 
   const columns = [...baseColumns].sort((left, right) => columnOrder.indexOf(left.key) - columnOrder.indexOf(right.key))
-  const gridTemplateColumns = `${columns.map((column) => `${columnWidths[column.key] ?? vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS[column.key]}px`).join(' ')} 40px`
+  const gridTemplateColumns = `${columns.map((column) => `${columnWidths[column.key] ?? vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS[column.key]}px`).join(' ')} 80px`
   const firstKey = columns[0]?.key
-  const lastKey = columns.at(-1)?.key
 
   const createWord = useMutation({
     mutationFn: (input: vocabularyApi.WordInput) => vocabularyApi.createWord(boardId, page.id, input),
     onSuccess: (word) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => [...current, word])
       setNewWord(emptyWord())
-      focus('new', firstKey)
+      setIsAddingWord(false)
+      requestAnimationFrame(() => addRowTriggerRef.current?.focus())
       toast.success('Word created successfully')
+    },
+  })
+
+  const updateWord = useMutation({
+    mutationFn: (input: { id: string; word: vocabularyApi.WordInput }) => vocabularyApi.updateWord(boardId, input.id, input.word),
+    onSuccess: (updatedWord) => {
+      queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.map((word) => word.id === updatedWord.id ? updatedWord : word))
+      setEditingWordId(null)
+      setEditingWord(null)
+      toast.success('Word updated successfully')
     },
   })
 
@@ -289,6 +181,10 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
     mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(boardId, target.id),
     onSuccess: (entry, target) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== target.id))
+      if (editingWordId === target.id) {
+        setEditingWordId(null)
+        setEditingWord(null)
+      }
       requestAnimationFrame(() => tableFocusRef.current?.focus())
       toast.success('Word moved to Trash.', {
         action: {
@@ -358,14 +254,6 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
     }
   }
 
-  async function saveCell(wordId: string, columnKey: string, value: string) {
-    const updated = await vocabularyApi.updateWordCell(boardId, wordId, columnKey, value)
-    const column = columns.find((item) => item.key === columnKey)
-    queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.map((word) =>
-      word.id === updated.id && column ? column.update(word, column.value(updated)) as vocabularyApi.Word : word,
-    ))
-  }
-
   async function createFromBlank() {
     if (createWord.isPending) return
     await createWord.mutateAsync(newWord)
@@ -376,49 +264,100 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
     void createFromBlank()
   }
 
-  function renderBlankCell(column: Column): ReactNode {
-    const shared = {
-      ref: (element: HTMLElement | null) => { cellRefs.current[`new:${column.key}`] = element },
-      'aria-label': `New ${column.newLabel}`,
-      value: column.value(newWord),
-      required: column.required,
-      onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setNewWord((current) => column.update(current, event.target.value)),
-      onKeyDown: (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        if (event.key === 'Escape') setNewWord(emptyWord())
-        if (event.key === 'Enter' && column.key === lastKey) {
-          event.preventDefault()
-          void createFromBlank()
-        }
-      },
+  function beginAddingWord() {
+    createWord.reset()
+    updateWord.reset()
+    setEditingWordId(null)
+    setEditingWord(null)
+    setNewWord(emptyWord())
+    setIsAddingWord(true)
+    focus('new', firstKey)
+  }
+
+  function cancelAddingWord() {
+    setNewWord(emptyWord())
+    setIsAddingWord(false)
+    requestAnimationFrame(() => addRowTriggerRef.current?.focus())
+  }
+
+  function beginEditingWord(word: vocabularyApi.Word) {
+    createWord.reset()
+    updateWord.reset()
+    setIsAddingWord(false)
+    setEditingWordId(word.id)
+    setEditingWord(toWordInput(word))
+    focus(word.id, firstKey)
+  }
+
+  function cancelEditingWord() {
+    setEditingWordId(null)
+    setEditingWord(null)
+    updateWord.reset()
+  }
+
+  function submitEditedWord(event: FormEvent, wordId: string) {
+    event.preventDefault()
+    if (!editingWord || editingWordId !== wordId || updateWord.isPending) return
+    updateWord.mutate({ id: wordId, word: editingWord })
+  }
+
+  function renderEditableCell(
+    column: Column,
+    rowId: string,
+    value: vocabularyApi.WordInput,
+    onChange: (nextValue: vocabularyApi.WordInput) => void,
+    onEscape: () => void,
+  ): ReactNode {
+    const cellValue = column.value(value)
+    const register = (element: HTMLElement | null) => { cellRefs.current[`${rowId}:${column.key}`] = element }
+    const updateValue = (nextValue: string) => onChange(column.update(value, nextValue))
+    const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onEscape()
+      } else if (column.type === 'text' && event.key === 'Enter') {
+        event.preventDefault()
+      }
     }
 
     if (column.type === 'select') {
       return (
         <SelectMenu
-          aria-label={`New ${column.newLabel}`}
-          value={column.value(newWord)}
-          onChange={(nextValue) => setNewWord((current) => column.update(current, nextValue))}
-          buttonRef={shared.ref}
+          aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
+          value={cellValue}
+          onChange={updateValue}
+          buttonRef={register}
           buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
           options={vocabularyApi.WORD_CLASS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
         />
       )
     }
 
-    return <textarea
-      className={textCellClassName}
-      {...shared}
-      rows={1}
-      placeholder={column.label}
-      onKeyDown={(event) => {
-        shared.onKeyDown(event)
-        if (column.type === 'text' && event.key === 'Enter') event.preventDefault()
-      }}
-      ref={(element) => {
-        shared.ref(element)
-        resizeTextarea(element)
-      }}
-    />
+    return (
+      <textarea
+        ref={(element) => {
+          register(element)
+          resizeTextarea(element)
+        }}
+        className={textCellClassName}
+        aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
+        value={cellValue}
+        required={column.required}
+        onChange={(event) => updateValue(event.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={column.label}
+        rows={1}
+      />
+    )
+  }
+
+  function renderReadOnlyCell(column: Column, word: vocabularyApi.Word): ReactNode {
+    const value = column.value(word)
+    const displayValue = column.key === 'class'
+      ? vocabularyApi.WORD_CLASS_OPTIONS.find((option) => option.value === value)?.label ?? value
+      : value
+
+    return <div className="min-h-10 whitespace-pre-wrap break-words px-2 py-1.5 text-sm leading-5">{displayValue}</div>
   }
 
   return (
@@ -426,7 +365,7 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
       <div className="min-w-max">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={columns.map((column) => column.key)} strategy={horizontalListSortingStrategy}>
-            <div className="sticky top-0 z-10 grid border-b border-border bg-muted/95 shadow-[0_1px_0_var(--border)] backdrop-blur" style={{ gridTemplateColumns }}>
+            <div className="sticky top-0 z-10 grid border-b border-border bg-primary/10 shadow-[0_1px_0_var(--border)] backdrop-blur" style={{ gridTemplateColumns }}>
               {columns.map((column) => (
                 <SortableHeader
                   key={column.key}
@@ -437,52 +376,93 @@ export function VocabTable({ boardId, page, preferences, onPreferencesChange }: 
                 />
               ))}
               <div
-                className="sticky right-0 z-20 min-h-10 border-l border-foreground/70 bg-muted"
+                className="sticky right-0 z-20 min-h-10 border-l border-border bg-primary/10"
                 data-testid="sticky-actions-header"
               />
             </div>
           </SortableContext>
         </DndContext>
 
-        {wordsQuery.data?.map((word) => (
-          <div className="grid min-h-12 items-start border-b border-border bg-card py-1 transition-colors hover:bg-accent/20" style={{ gridTemplateColumns }} key={word.id}>
+        {isAddingWord ? (
+          <form className="grid min-h-12 items-start border-b border-border bg-primary/5 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
             {columns.map((column) => (
-              <div className="min-w-0 self-start border-r border-foreground/70 px-1" key={column.key}>
-                <AutosaveCell
-                  label={`${column.label} for ${word.word}`}
-                  value={column.value(word)}
-                  type={column.type}
-                  required={column.required}
-                  register={(element) => { cellRefs.current[`${word.id}:${column.key}`] = element }}
-                  onSave={(value) => saveCell(word.id, column.key, value)}
-                  onEndEnter={column.key === lastKey ? () => focus('new', firstKey) : undefined}
-                />
+              <div className="min-w-0 self-start border-r border-border px-1 last:border-r-0" key={column.key}>
+                {renderEditableCell(column, 'new', newWord, setNewWord, cancelAddingWord)}
               </div>
             ))}
-            <div className="sticky right-0 z-[5] grid h-10 place-items-center border-l border-foreground/70 bg-card" data-testid="sticky-word-actions">
-              <button
-                className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                type="button"
-                tabIndex={-1}
-                aria-label={`Delete ${word.word}`}
-                onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}
-              >
-                <Trash2 className="size-4" aria-hidden="true" />
+            <div className="sticky right-0 z-[5] flex min-h-10 items-center justify-center gap-1 border-l border-border bg-primary/10 px-1" data-testid="sticky-create-actions">
+              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={createWord.isPending} data-testid="create-word-button" title="Add word" aria-label="Add word">
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+              </button>
+              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-accent" type="button" title="Cancel adding word" aria-label="Cancel adding word" onClick={cancelAddingWord}>
+                <X className="size-4" aria-hidden="true" />
               </button>
             </div>
-          </div>
+          </form>
+        ) : (
+          <button
+            ref={addRowTriggerRef}
+            className="grid min-h-11 w-full cursor-pointer items-center border-b border-border bg-card text-left text-sm text-muted-foreground transition-colors hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-55"
+            style={{ gridTemplateColumns }}
+            type="button"
+            onClick={beginAddingWord}
+            disabled={editingWordId !== null}
+            data-testid="add-vocabulary-row-trigger"
+          >
+            <span className="col-span-full flex items-center gap-2 px-2">
+              <Plus className="size-4" aria-hidden="true" />
+              Click to add a new vocabulary row...
+            </span>
+          </button>
+        )}
+
+        {visibleWords.map((word, index) => (
+          editingWordId === word.id && editingWord ? (
+            <form className="grid min-h-12 items-start border-b border-border bg-primary/5 py-1" style={{ gridTemplateColumns }} key={word.id} onSubmit={(event) => submitEditedWord(event, word.id)}>
+              {columns.map((column) => (
+                <div className="min-w-0 self-start border-r border-border px-1" key={column.key}>
+                  {renderEditableCell(column, word.id, editingWord, (nextWord) => setEditingWord(nextWord), cancelEditingWord)}
+                </div>
+              ))}
+              <div className="sticky right-0 z-[5] flex min-h-10 items-center justify-center gap-1 border-l border-border bg-primary/10 px-1" data-testid="sticky-word-actions">
+                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={updateWord.isPending || deleteWord.isPending} aria-label={`Update ${word.word}`} title="Update word">
+                  <Check className="size-4" aria-hidden="true" />
+                </button>
+                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={updateWord.isPending || deleteWord.isPending} aria-label={`Delete ${word.word}`} title="Delete word" onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              {updateWord.isError && updateWord.variables?.id === word.id ? <div className="col-span-full px-3 py-1 text-xs text-destructive" role="alert">Could not update this word. Check the fields and try again.</div> : null}
+            </form>
+          ) : (
+            <div className={`grid min-h-12 items-start border-b border-border py-1 transition-colors hover:bg-accent/20 ${index % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`} style={{ gridTemplateColumns }} key={word.id}>
+              {columns.map((column) => (
+                <div className="min-w-0 self-start border-r border-border px-1" key={column.key}>
+                  {renderReadOnlyCell(column, word)}
+                </div>
+              ))}
+              <div className="sticky right-0 z-[5] flex min-h-10 items-center justify-center border-l border-border bg-card" data-testid="sticky-word-actions">
+                <button
+                  className="grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
+                  type="button"
+                  aria-label={`Edit ${word.word}`}
+                  title="Edit word"
+                  disabled={editingWordId !== null || isAddingWord}
+                  onClick={() => beginEditingWord(word)}
+                >
+                  <Pencil className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          )
         ))}
 
-        <form className="grid min-h-12 items-start bg-secondary/35 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
-          {columns.map((column) => <div className="min-w-0 self-start border-r border-foreground/70 px-1 last:border-r-0" key={column.key}>{renderBlankCell(column)}</div>)}
-          <div className="sticky right-0 z-[5] grid h-10 place-items-center bg-secondary" data-testid="sticky-create-actions">
-            <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" tabIndex={-1} disabled={createWord.isPending} data-testid="create-word-button" title="Confirm Add" aria-label="Create word">
-              <CheckCircle2 className="size-4" aria-hidden="true" />
-            </button>
-          </div>
-        </form>
+        {!wordsQuery.isLoading && normalizedSearch && visibleWords.length === 0 ? (
+          <div className="border-b border-border px-4 py-8 text-center text-sm text-muted-foreground">No vocabulary matches your search.</div>
+        ) : null}
+
         {wordsQuery.isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading words...</div> : null}
-        {createWord.isError ? <div className="p-4 text-sm text-destructive" role="alert">Could not create word. Fix the row and try again.</div> : null}
+        {createWord.isError && isAddingWord ? <div className="border-b border-border px-4 py-2 text-sm text-destructive" role="alert">Could not create word. Check the fields and try again.</div> : null}
       </div>
     </div>
   )

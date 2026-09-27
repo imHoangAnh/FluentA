@@ -117,6 +117,13 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task AddBoardWithPreferencesAsync(VocabBoard board, VocabBoardPreference preference, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Boards.AddAsync(board, cancellationToken);
+        await _dbContext.VocabBoardPreferences.AddAsync(preference, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task AddPageAsync(VocabPage page, CancellationToken cancellationToken = default)
     {
         await _dbContext.Pages.AddAsync(page, cancellationToken);

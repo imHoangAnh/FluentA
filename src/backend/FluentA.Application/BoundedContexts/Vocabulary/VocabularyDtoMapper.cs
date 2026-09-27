@@ -5,10 +5,6 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 
 internal static class VocabularyDtoMapper
 {
-    private static readonly string[] FixedColumnOrder =
-    [
-        "word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms"
-    ];
     public static BoardSummaryDto ToSummary(VocabBoard board)
     {
         return new BoardSummaryDto(
@@ -69,13 +65,13 @@ internal static class VocabularyDtoMapper
     {
         if (preference is null)
         {
-            return new BoardPreferencesDto(null, [], FixedColumnOrder, new Dictionary<string, int>(), null, null);
+            return new BoardPreferencesDto(null, [], VocabularyRequestValidator.FixedColumnOrder, new Dictionary<string, int>(), null, null);
         }
 
         return new BoardPreferencesDto(
             preference.Id,
             preference.HiddenColumns,
-            preference.ColumnOrder.Count == 0 ? FixedColumnOrder : preference.ColumnOrder,
+            preference.ColumnOrder.Count == 0 ? VocabularyRequestValidator.FixedColumnOrder : preference.ColumnOrder,
             preference.ColumnWidths,
             preference.CreatedAt,
             preference.UpdatedAt);

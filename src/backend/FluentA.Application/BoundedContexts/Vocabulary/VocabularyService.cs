@@ -34,13 +34,26 @@ public sealed class VocabularyService : IVocabularyService
 
     public async Task<OperationResult<BoardDetailDto>> CreateBoardAsync(Guid userId, CreateBoardRequest request, CancellationToken cancellationToken = default)
     {
-        var errors = VocabularyRequestValidator.ValidateBoard(request.Name, request.Language);
+        var errors = VocabularyRequestValidator.ValidateCreateBoard(request);
         if (errors.Count > 0)
         {
             return OperationResult<BoardDetailDto>.Failure(VocabularyError.Validation(errors));
         }
 
         var board = VocabBoard.Create(userId, request.Name, request.Language);
+
+        if (request.IncludedOptionalColumns is not null)
+        {
+            var preferences = VocabBoardPreference.Create(
+                userId,
+                board.Id,
+                VocabularyRequestValidator.GetHiddenOptionalColumns(request.IncludedOptionalColumns),
+                VocabularyRequestValidator.FixedColumnOrder,
+                new Dictionary<string, int>());
+            await _repository.AddBoardWithPreferencesAsync(board, preferences, cancellationToken);
+            return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, preferences));
+        }
+
         await _repository.AddBoardAsync(board, cancellationToken);
         return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, null));
     }
@@ -59,7 +72,7 @@ public sealed class VocabularyService : IVocabularyService
 
     public async Task<OperationResult<BoardDetailDto>> UpdateBoardAsync(Guid userId, Guid boardId, UpdateBoardRequest request, CancellationToken cancellationToken = default)
     {
-        var errors = VocabularyRequestValidator.ValidateBoard(request.Name, request.Language);
+        var errors = VocabularyRequestValidator.ValidateUpdateBoard(request);
         if (errors.Count > 0)
         {
             return OperationResult<BoardDetailDto>.Failure(VocabularyError.Validation(errors));
@@ -72,6 +85,30 @@ public sealed class VocabularyService : IVocabularyService
         }
 
         board.Update(request.Name, request.Language);
+        if (request.IncludedOptionalColumns is not null)
+        {
+            var hiddenColumns = VocabularyRequestValidator.GetHiddenOptionalColumns(request.IncludedOptionalColumns);
+            var preference = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
+            if (preference is null)
+            {
+                preference = VocabBoardPreference.Create(
+                    userId,
+                    boardId,
+                    hiddenColumns,
+                    VocabularyRequestValidator.FixedColumnOrder,
+                    new Dictionary<string, int>());
+                await _repository.AddBoardPreferenceAsync(preference, cancellationToken);
+            }
+            else
+            {
+                var columnOrder = preference.ColumnOrder.Count == 0
+                    ? VocabularyRequestValidator.FixedColumnOrder
+                    : preference.ColumnOrder;
+                preference.Update(hiddenColumns, columnOrder, preference.ColumnWidths);
+                await _repository.UpdateBoardPreferenceAsync(preference, cancellationToken);
+            }
+        }
+
         await _repository.UpdateBoardAsync(board, cancellationToken);
         var preferences = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
         return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, preferences));

@@ -6,7 +6,9 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 internal static class VocabularyRequestValidator
 {
     private static readonly HashSet<string> HideableColumns = ["definition", "note", "synonyms", "antonyms"];
-    private static readonly string[] FixedColumnOrder = ["word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms"];
+    internal static IReadOnlyList<string> FixedColumnOrder { get; } = Array.AsReadOnly(
+        new[] { "word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms" });
+
     public static Dictionary<string, string[]> ValidateBoard(string? name, string? language)
     {
         var errors = new Dictionary<string, string[]>();
@@ -22,6 +24,40 @@ internal static class VocabularyRequestValidator
         }
 
         return errors;
+    }
+
+    public static Dictionary<string, string[]> ValidateCreateBoard(CreateBoardRequest request)
+    {
+        var errors = ValidateBoard(request.Name, request.Language);
+        ValidateIncludedOptionalColumns(errors, request.IncludedOptionalColumns);
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> ValidateUpdateBoard(UpdateBoardRequest request)
+    {
+        var errors = ValidateBoard(request.Name, request.Language);
+        ValidateIncludedOptionalColumns(errors, request.IncludedOptionalColumns);
+
+        return errors;
+    }
+
+    private static void ValidateIncludedOptionalColumns(Dictionary<string, string[]> errors, IReadOnlyList<string>? includedOptionalColumns)
+    {
+        if (includedOptionalColumns is not null
+            && includedOptionalColumns.Any(key =>
+                string.IsNullOrWhiteSpace(key) || !HideableColumns.Contains(key.Trim())))
+        {
+            errors["includedOptionalColumns"] = ["Only optional vocabulary columns may be selected."];
+        }
+    }
+
+    public static IReadOnlyList<string> GetHiddenOptionalColumns(IReadOnlyList<string> includedOptionalColumns)
+    {
+        var included = includedOptionalColumns
+            .Select(key => key.Trim())
+            .ToHashSet(StringComparer.Ordinal);
+        return HideableColumns.Where(key => !included.Contains(key)).ToList();
     }
 
     public static Dictionary<string, string[]> ValidatePage(string? name)
@@ -77,8 +113,8 @@ internal static class VocabularyRequestValidator
             .Select(key => key.Trim())
             .Where(key => key.Length > 0)
             .ToList();
-        if (columnOrder.Count != FixedColumnOrder.Length
-            || columnOrder.Distinct(StringComparer.OrdinalIgnoreCase).Count() != FixedColumnOrder.Length
+        if (columnOrder.Count != FixedColumnOrder.Count
+            || columnOrder.Distinct(StringComparer.OrdinalIgnoreCase).Count() != FixedColumnOrder.Count
             || FixedColumnOrder.Except(columnOrder, StringComparer.OrdinalIgnoreCase).Any()
             || columnOrder.Except(FixedColumnOrder, StringComparer.OrdinalIgnoreCase).Any())
         {

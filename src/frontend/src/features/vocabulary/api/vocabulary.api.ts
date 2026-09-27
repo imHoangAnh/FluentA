@@ -26,6 +26,13 @@ export const DEFAULT_VOCAB_COLUMN_WIDTHS: Record<string, number> = {
   antonyms: 220,
 }
 
+export const OPTIONAL_VOCAB_COLUMNS = [
+  { key: 'definition', label: 'Definition' },
+  { key: 'note', label: 'Note' },
+  { key: 'synonyms', label: 'Synonyms' },
+  { key: 'antonyms', label: 'Antonyms' },
+] as const
+
 export type BoardSummary = {
   id: string
   name: string
@@ -55,6 +62,18 @@ export type BoardPreferences = {
 export type BoardDetail = BoardSummary & {
   pages: Page[]
   preferences: BoardPreferences
+}
+
+export type CreateBoardInput = {
+  name: string
+  language: string
+  includedOptionalColumns: string[]
+}
+
+export type UpdateBoardInput = {
+  name: string
+  language: string
+  includedOptionalColumns?: string[]
 }
 
 export type WordClass =
@@ -110,7 +129,7 @@ export async function listBoards() {
   return response.data.data ?? []
 }
 
-export async function createBoard(input: { name: string; language: string }) {
+export async function createBoard(input: CreateBoardInput) {
   const response = await apiClient.post<ApiEnvelope<BoardDetail>>('/boards', input)
   return response.data.data!
 }
@@ -120,7 +139,7 @@ export async function getBoard(boardId: string) {
   return response.data.data!
 }
 
-export async function updateBoard(boardId: string, input: { name: string; language: string }) {
+export async function updateBoard(boardId: string, input: UpdateBoardInput) {
   const response = await apiClient.patch<ApiEnvelope<BoardDetail>>(`/boards/${boardId}`, input)
   return response.data.data!
 }
@@ -152,6 +171,11 @@ export async function listWords(boardId: string, pageId: string) {
 
 export async function createWord(boardId: string, pageId: string, input: WordInput) {
   const response = await apiClient.post<ApiEnvelope<Word>>(`/boards/${boardId}/pages/${pageId}/words`, input)
+  return response.data.data!
+}
+
+export async function updateWord(boardId: string, wordId: string, input: WordInput) {
+  const response = await apiClient.patch<ApiEnvelope<Word>>(`/boards/${boardId}/words/${wordId}`, input)
   return response.data.data!
 }
 
