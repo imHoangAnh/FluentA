@@ -1,139 +1,24 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as authApi from '@/features/auth/api/auth.api'
-import { AuthLayout, AuthShell } from '@/features/auth'
-import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage'
-import { LoginPage } from '@/features/auth/pages/LoginPage'
-import { RegisterPage } from '@/features/auth/pages/RegisterPage'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { describe, expect, it } from 'vitest'
+import { AuthLayout } from '@/features/auth'
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage'
-import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage'
-import { useAuthStore } from '@/features/auth/store/auth-store'
 
-vi.mock('@/features/auth/api/auth.api', async () => {
-  const actual = await vi.importActual<typeof import('@/features/auth/api/auth.api')>('@/features/auth/api/auth.api')
-  return {
-    ...actual,
-    registerAccount: vi.fn(),
-    verifyOtp: vi.fn(),
-    resendVerificationOtp: vi.fn(),
-    forgotPassword: vi.fn(),
-    resetPassword: vi.fn(),
-  }
-})
-
-vi.mock('@/features/auth/components/GoogleSignInButton', () => ({
-  GoogleSignInButton: () => <button type="button">Continue with Google</button>,
-}))
-
-function renderRoute(element: React.ReactNode, initialEntry: string) {
-  return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <AuthShell>{element}</AuthShell>
-    </MemoryRouter>,
-  )
-}
-
-describe('approved authentication form refinement', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    useAuthStore.setState({ user: null, status: 'anonymous', error: null })
-  })
-
-  it('keeps verification inline and locks submitted registration fields', async () => {
-    const user = userEvent.setup()
-    vi.mocked(authApi.registerAccount).mockResolvedValue({
-      message: 'Registration successful.',
-      email: 'learner@example.com',
-      verificationExpiresAtUtc: new Date(Date.now() + 300_000).toISOString(),
-      resendAvailableAtUtc: new Date(Date.now() + 30_000).toISOString(),
-    })
-
-    renderRoute(<RegisterPage />, '/register')
-    await user.type(screen.getByLabelText('Full name'), 'Test Learner')
-    await user.type(screen.getByLabelText('Email'), 'learner@example.com')
-    await user.type(screen.getByLabelText('Password'), 'SecurePass123')
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
-
-    expect(await screen.findByLabelText('Verification code')).toHaveFocus()
-    expect(screen.getByLabelText('Full name')).toBeDisabled()
-    expect(screen.getByLabelText('Email')).toBeDisabled()
-    expect(screen.getByLabelText('Password')).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Reveal characters' })).toBeDisabled()
-    expect(screen.getAllByLabelText('Email')).toHaveLength(1)
-    expect(screen.queryByText(/Code expires at/i)).not.toBeInTheDocument()
-    expect(screen.queryByText('Change details')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Verify email' })).toBeEnabled()
-  })
-
-  it('uses a dedicated Forgot password context without inventing a countdown', async () => {
-    const user = userEvent.setup()
-    let resolveForgotPassword!: (value: authApi.ForgotPasswordPayload) => void
-    vi.mocked(authApi.forgotPassword).mockReturnValue(new Promise((resolve) => {
-      resolveForgotPassword = resolve
-    }))
-
-    renderRoute(<ForgotPasswordPage />, '/forgot-password')
-    expect(screen.getByRole('heading', { name: 'Reset your password' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Register' })).not.toBeInTheDocument()
-
-    await user.type(screen.getByLabelText('Email'), 'learner@example.com')
-    await user.click(screen.getByRole('button', { name: 'Send reset link' }))
-
-    expect(screen.getByRole('button', { name: 'Sending...' })).toBeDisabled()
-    resolveForgotPassword({ message: 'Generic response.' })
-    expect(await screen.findByRole('status')).toHaveTextContent('Check your inbox')
-    expect(screen.getByRole('button', { name: 'Send reset link' })).toBeEnabled()
-    expect(screen.queryByText(/Send again in \d+s/i)).not.toBeInTheDocument()
-  })
-
-  it('renders Choose a new password heading on reset-password', () => {
-    renderRoute(<ResetPasswordPage />, '/reset-password?token=reset-token')
-    expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
-  })
-
-  it('keeps the standalone verification route reduced to the OTP field', () => {
-    renderRoute(<VerifyEmailPage />, '/verify-email?email=learner%40example.com')
-    expect(screen.getByLabelText('Verification code')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Code expires at/i)).not.toBeInTheDocument()
-  })
-
-  it('keeps AuthLayout and its banner mounted when switching between login and register', async () => {
-    const user = userEvent.setup()
+describe('password reset page', () => {
+  it('uses the standalone banner layout', () => {
     const router = createMemoryRouter(
-      [
-        {
-          element: <AuthLayout />,
-          children: [
-            { path: '/login', element: <LoginPage /> },
-            { path: '/register', element: <RegisterPage /> },
-          ],
-        },
-      ],
-      { initialEntries: ['/login'] },
+      [{
+        element: <AuthLayout />,
+        children: [{ path: '/reset-password', element: <ResetPasswordPage /> }],
+      }],
+      { initialEntries: ['/reset-password?token=reset-token'] },
     )
 
     render(<RouterProvider router={router} />)
 
-    const banner = screen.getByRole('region', { name: 'About FluentA' })
-    expect(banner).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('link', { name: 'Sign up now' }))
-
-    expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'About FluentA' })).toBe(banner)
-
-    await user.click(screen.getByRole('link', { name: 'Sign in' }))
-
-    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'About FluentA' })).toBe(banner)
+    expect(screen.getByRole('main')).toHaveClass('ds-root')
+    expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
   })
 })

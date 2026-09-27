@@ -200,9 +200,8 @@ describe('FluentA app routes', async () => {
       status: 'authenticated',
       user: {
         id: 'user-1',
-        email: 'learner@example.com',
         fullName: 'FluentA Learner',
-        isEmailVerified: true,
+        avatarUrl: null,
       },
     })
 
@@ -232,7 +231,7 @@ describe('FluentA app routes', async () => {
   it('renders the flashcard empty state for authenticated users', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderApp('/flashcards')
@@ -250,7 +249,7 @@ describe('FluentA app routes', async () => {
   it('opens the modal-first Practice flow and starts the selected deck directly', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/practice')
@@ -269,7 +268,7 @@ describe('FluentA app routes', async () => {
   it('renders the dedicated practice entry route with practice-first copy', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/practice?deck=page-1')
@@ -299,7 +298,7 @@ describe('FluentA app routes', async () => {
 
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/flashcards/pages/page-1')
@@ -328,7 +327,7 @@ describe('FluentA app routes', async () => {
   it('keeps the viewer route usable when a stale API response omits IPA', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/flashcards/pages/page-1', { ipaPronunciation: undefined })
@@ -341,7 +340,7 @@ describe('FluentA app routes', async () => {
   it('supports Quizlet keyboard shortcuts and shuffle toggle in flashcard viewer', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/flashcards/pages/page-1')
@@ -367,7 +366,7 @@ describe('FluentA app routes', async () => {
   it('renders fallback notice on back face when card details are missing without crashing', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderAppWithDeck('/flashcards/pages/page-1', {
@@ -386,7 +385,7 @@ describe('FluentA app routes', async () => {
   it('renders the protected profile at its dedicated route', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderApp('/profile')
@@ -399,7 +398,7 @@ describe('FluentA app routes', async () => {
   it('opens learning settings at Practice and excludes Profile from settings navigation', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     await renderApp('/settings')
@@ -416,7 +415,7 @@ describe('FluentA app routes', async () => {
   it('renders split settings routes inside the shared shell', async () => {
     useAuthStore.setState({
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'FluentA Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
     })
 
     const view = await renderApp('/settings/practice')

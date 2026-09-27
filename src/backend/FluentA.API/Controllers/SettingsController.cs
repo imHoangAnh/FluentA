@@ -26,7 +26,7 @@ public sealed class SettingsController : ApiControllerBase
     public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
     {
         var userId = CurrentUserId();
-        var profileResult = await _auth.GetMeAsync(userId, cancellationToken);
+        var profileResult = await _auth.GetProfileAsync(userId, cancellationToken);
         if (!profileResult.IsSuccess)
         {
             return ToErrorResult(profileResult);

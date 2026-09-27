@@ -28,11 +28,9 @@ public sealed class User : BaseEntity, IAggregateRoot
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
     public DateTime? EmailVerifiedAt { get; private set; }
-    public string? OtpCode { get; private set; }
+    public string? OtpHash { get; private set; }
     public DateTime? OtpExpiresAt { get; private set; }
-    public int OtpFailedAttempts { get; private set; }
-    public DateTime? OtpResendAvailableAt { get; private set; }
-    public string? ResetPasswordToken { get; private set; }
+    public string? ResetPasswordTokenHash { get; private set; }
     public DateTime? ResetPasswordExpiresAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
     public bool IsEmailVerified => EmailVerifiedAt.HasValue;
@@ -57,13 +55,11 @@ public sealed class User : BaseEntity, IAggregateRoot
         return new User(email, fullName, passwordHash: null, googleId, verifiedAt);
     }
 
-    public void IssueVerificationOtp(string otpHash, DateTime expiresAt, DateTime resendAvailableAt)
+    public void IssueVerificationOtp(string otpHash, DateTime expiresAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(otpHash);
-        OtpCode = otpHash;
+        OtpHash = otpHash;
         OtpExpiresAt = expiresAt;
-        OtpFailedAttempts = 0;
-        OtpResendAvailableAt = resendAvailableAt;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -77,14 +73,14 @@ public sealed class User : BaseEntity, IAggregateRoot
     public void IssuePasswordReset(string tokenHash, DateTime expiresAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
-        ResetPasswordToken = tokenHash;
+        ResetPasswordTokenHash = tokenHash;
         ResetPasswordExpiresAt = expiresAt;
         UpdatedAt = DateTime.UtcNow;
     }
 
     public void ClearPasswordReset()
     {
-        ResetPasswordToken = null;
+        ResetPasswordTokenHash = null;
         ResetPasswordExpiresAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -118,7 +114,7 @@ public sealed class User : BaseEntity, IAggregateRoot
 
         FullName = normalizedName;
         PasswordHash = passwordHash;
-        ResetPasswordToken = null;
+        ResetPasswordTokenHash = null;
         ResetPasswordExpiresAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -172,9 +168,7 @@ public sealed class User : BaseEntity, IAggregateRoot
 
     private void ClearVerificationOtp()
     {
-        OtpCode = null;
+        OtpHash = null;
         OtpExpiresAt = null;
-        OtpFailedAttempts = 0;
-        OtpResendAvailableAt = null;
     }
 }

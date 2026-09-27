@@ -159,24 +159,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
 
-                    b.Property<string>("OtpCode")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("otp_code");
-
                     b.Property<DateTime?>("OtpExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("otp_expires_at");
 
-                    b.Property<int>("OtpFailedAttempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("otp_failed_attempts");
-
-                    b.Property<DateTime?>("OtpResendAvailableAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("otp_resend_available_at");
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("otp_hash");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(256)
@@ -187,10 +177,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reset_password_expires_at");
 
-                    b.Property<string>("ResetPasswordToken")
+                    b.Property<string>("ResetPasswordTokenHash")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
-                        .HasColumnName("reset_password_token");
+                        .HasColumnName("reset_password_token_hash");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -207,9 +197,9 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("google_id IS NOT NULL");
 
-                    b.HasIndex("ResetPasswordToken")
+                    b.HasIndex("ResetPasswordTokenHash")
                         .IsUnique()
-                        .HasFilter("reset_password_token IS NOT NULL");
+                        .HasFilter("reset_password_token_hash IS NOT NULL");
 
                     b.ToTable("users", (string)null);
                 });
@@ -1629,6 +1619,45 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("vocab_words", (string)null);
                 });
 
+            modelBuilder.Entity("FluentA.Infrastructure.Persistence.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAt");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
@@ -1827,6 +1856,15 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PageId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Infrastructure.Persistence.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

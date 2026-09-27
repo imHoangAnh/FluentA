@@ -71,7 +71,7 @@ export function DashboardPage() {
 
   const today = useMemo(() => todayInAppTimeZone(now), [now])
   const timeZoneId = APP_TIME_ZONE
-  const displayName = user?.fullName?.split(' ')[0] || user?.email?.split('@')[0] || 'Learner'
+  const displayName = user?.fullName?.split(' ')[0] || 'Learner'
   const visible = (id: DashboardWidgetId) => visibleWidgets.includes(id)
 
   useEffect(() => {

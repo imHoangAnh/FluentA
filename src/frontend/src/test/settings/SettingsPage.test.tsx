@@ -51,10 +51,8 @@ describe('SettingsPage profile save', () => {
       error: null,
       user: {
         id: 'user-1',
-        email: 'learner@example.com',
         fullName: 'FluentA Learner',
-        isEmailVerified: true,
-        bio: '',
+        avatarUrl: null,
       },
     })
 
@@ -64,7 +62,7 @@ describe('SettingsPage profile save', () => {
         email: 'learner@example.com',
         fullName: 'FluentA Learner',
         isEmailVerified: true,
-        bio: '',
+        avatarAssetId: null,
       },
       practiceSettings: {
         modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
@@ -93,7 +91,6 @@ describe('SettingsPage profile save', () => {
         email: 'learner@example.com',
         fullName: 'FluentA Learner',
         isEmailVerified: true,
-        bio: '',
         avatarAssetId: 'asset-2',
         avatarDownloadUrl: 'https://signed.example.com/avatar-2.png',
       })

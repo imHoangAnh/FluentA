@@ -19,14 +19,12 @@ public sealed class UserTests
     {
         var user = User.CreateWithPassword("learner@example.com", "Learner", "hash");
         var now = DateTime.UtcNow;
-        user.IssueVerificationOtp("hashed-otp", now.AddMinutes(5), now.AddSeconds(30));
+        user.IssueVerificationOtp("hashed-otp", now.AddMinutes(5));
         user.MarkEmailVerified(now);
         Assert.True(user.IsEmailVerified);
         Assert.Equal(now, user.EmailVerifiedAt);
-        Assert.Null(user.OtpCode);
+        Assert.Null(user.OtpHash);
         Assert.Null(user.OtpExpiresAt);
-        Assert.Null(user.OtpResendAvailableAt);
-        Assert.Equal(0, user.OtpFailedAttempts);
     }
 
     [Fact]
@@ -50,7 +48,7 @@ public sealed class UserTests
         user.IssuePasswordReset("reset-hash", DateTime.UtcNow.AddMinutes(15));
         user.UpdatePassword("new-hash");
         Assert.Equal("new-hash", user.PasswordHash);
-        Assert.Null(user.ResetPasswordToken);
+        Assert.Null(user.ResetPasswordTokenHash);
         Assert.Null(user.ResetPasswordExpiresAt);
     }
 

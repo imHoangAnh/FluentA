@@ -10,7 +10,7 @@ const user = {
 const publicRoutes = [
   ['/login', 'Welcome back'],
   ['/register', 'Create your account'],
-  ['/verify-email', 'Verify your email'],
+  ['/verify-email', 'Welcome back'],
   ['/forgot-password', 'Reset your password'],
   ['/reset-password', 'Choose a new password'],
 ]
@@ -80,7 +80,7 @@ for (const viewport of [
   test(`E27 ${viewport.name} public and protected route manifest`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    const authState = { enabled: true }
+    const authState = { enabled: false }
     await mockReleaseApis(page, authState)
 
     for (const [path, heading] of publicRoutes) {
@@ -104,7 +104,7 @@ for (const viewport of [
 
     authState.enabled = false
     await page.goto('/practice/route-proof?order=shuffle')
-    await expect(page).toHaveURL(/\/login$/)
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
     authState.enabled = true
     // Re-enter the protected shell after the anonymous-route assertion so the

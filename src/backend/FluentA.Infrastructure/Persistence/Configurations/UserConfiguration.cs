@@ -22,11 +22,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.GoogleId).HasColumnName("google_id").HasMaxLength(128);
         builder.Ignore(user => user.IsEmailVerified);
         builder.Property(user => user.EmailVerifiedAt).HasColumnName("email_verified_at");
-        builder.Property(user => user.OtpCode).HasColumnName("otp_code").HasMaxLength(256);
+        builder.Property(user => user.OtpHash).HasColumnName("otp_hash").HasMaxLength(256);
         builder.Property(user => user.OtpExpiresAt).HasColumnName("otp_expires_at");
-        builder.Property(user => user.OtpFailedAttempts).HasColumnName("otp_failed_attempts").HasDefaultValue(0).IsRequired();
-        builder.Property(user => user.OtpResendAvailableAt).HasColumnName("otp_resend_available_at");
-        builder.Property(user => user.ResetPasswordToken).HasColumnName("reset_password_token").HasMaxLength(256);
+        builder.Property(user => user.ResetPasswordTokenHash).HasColumnName("reset_password_token_hash").HasMaxLength(256);
         builder.Property(user => user.ResetPasswordExpiresAt).HasColumnName("reset_password_expires_at");
         builder.Property(user => user.LastLoginAt).HasColumnName("last_login_at");
         builder.Property(user => user.CreatedAt).HasColumnName("created_at").IsRequired();
@@ -35,7 +33,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(user => user.Email).IsUnique();
         builder.HasIndex(user => user.GoogleId).IsUnique().HasFilter("google_id IS NOT NULL");
-        builder.HasIndex(user => user.ResetPasswordToken).IsUnique().HasFilter("reset_password_token IS NOT NULL");
+        builder.HasIndex(user => user.ResetPasswordTokenHash).IsUnique().HasFilter("reset_password_token_hash IS NOT NULL");
         builder.HasIndex(user => user.CurrentAvatarAssetId);
 
         builder.HasOne<Asset>()

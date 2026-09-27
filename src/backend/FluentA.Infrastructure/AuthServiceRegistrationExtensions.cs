@@ -15,6 +15,7 @@ internal static class AuthServiceRegistrationExtensions
         AuthSecurityOptions authSecurityOptions)
     {
         services.AddScoped<IUserRepository, EfUserRepository>();
+        services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton(authSecurityOptions);
         services.AddSingleton(new AuthApplicationOptions(authSecurityOptions.FrontendBaseUrl));

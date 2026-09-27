@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Input } from '@/shared/components/ui/input'
@@ -18,6 +18,8 @@ type TextFieldProps = {
   autoFocus?: boolean
   className?: string
   inputClassName?: string
+  leadingIcon?: ReactNode
+  minLength?: number
 }
 
 export function TextField({
@@ -34,6 +36,8 @@ export function TextField({
   autoFocus = false,
   className,
   inputClassName,
+  leadingIcon,
+  minLength,
 }: TextFieldProps) {
   const id = useId()
   const [showPassword, setShowPassword] = useState(false)
@@ -51,6 +55,7 @@ export function TextField({
         {label}
       </label>
       <div className="relative">
+        {leadingIcon ? <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400" aria-hidden="true">{leadingIcon}</span> : null}
         <Input
           id={id}
           name={name}
@@ -60,12 +65,14 @@ export function TextField({
           value={value}
           placeholder={placeholder}
           required={required}
+          minLength={minLength}
           disabled={disabled}
           autoFocus={autoFocus}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             'h-10 rounded-lg px-3.5 text-sm sm:h-11 sm:text-base xl:h-12',
             isPassword && 'pr-12',
+            leadingIcon && 'pl-12',
             inputClassName,
           )}
         />

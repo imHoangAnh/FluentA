@@ -3,6 +3,7 @@ import { Button } from '@/shared/components/ui/button'
 
 type Props = {
   onCredential: (idToken: string) => Promise<void>
+  disabled?: boolean
 }
 
 declare global {
@@ -64,7 +65,7 @@ function loadGoogleIdentityServices() {
   })
 }
 
-export function GoogleSignInButton({ onCredential }: Props) {
+export function GoogleSignInButton({ onCredential, disabled = false }: Props) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   const containerRef = useRef<HTMLDivElement>(null)
   const [message, setMessage] = useState<string | null>(clientId ? null : 'Google sign-in is not configured locally.')
@@ -81,6 +82,7 @@ export function GoogleSignInButton({ onCredential }: Props) {
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response) => {
+          if (disabled) return
           if (!response.credential) {
             setMessage('Google did not return an identity token.')
             return
@@ -104,14 +106,14 @@ export function GoogleSignInButton({ onCredential }: Props) {
     })
 
     return () => { active = false }
-  }, [clientId, onCredential])
+  }, [clientId, disabled, onCredential])
 
   return (
     <div className="grid gap-2">
       <Button
         variant="outline"
         type="button"
-        disabled={!clientId || !isReady}
+        disabled={!clientId || !isReady || disabled}
         className="relative h-10 w-full rounded-lg border border-input bg-card text-sm font-semibold text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground sm:h-11 sm:text-base xl:h-12"
       >
         <GoogleIcon className="mr-2 size-5 shrink-0" />
@@ -119,7 +121,7 @@ export function GoogleSignInButton({ onCredential }: Props) {
         {clientId ? (
           <div
             ref={containerRef}
-            className="absolute inset-0 z-10 cursor-pointer overflow-hidden opacity-[0.001] [&_iframe]:!h-full [&_iframe]:!w-full"
+            className={`absolute inset-0 z-10 overflow-hidden opacity-[0.001] [&_iframe]:!h-full [&_iframe]:!w-full${disabled ? ' pointer-events-none' : ' cursor-pointer'}`}
             aria-hidden="true"
           />
         ) : null}

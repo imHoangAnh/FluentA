@@ -101,7 +101,7 @@ describe('DashboardPage', () => {
     useAuthStore.setState({
       status: 'authenticated',
       error: null,
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'Dashboard Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'Dashboard Learner', avatarUrl: null },
     })
     adapters.listByDate.mockResolvedValue([])
     adapters.listHabits.mockResolvedValue([])

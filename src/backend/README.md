@@ -110,8 +110,17 @@ credential chain.
 - Các endpoint nghiệp vụ dùng prefix `/api/v1`, ví dụ `/api/v1/auth`,
   `/api/v1/boards`, `/api/v1/flashcards`, `/api/v1/todos` và
   `/api/v1/settings`.
-- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; API đặt JWT vào
-  HttpOnly cookie `access_token` và không trả token trong JSON.
+- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; đăng nhập đặt JWT
+  truy cập 5 phút và refresh token cố định 7 ngày vào hai HttpOnly cookie
+  `access_token` và `refresh_token`. Token không xuất hiện trong JSON.
+- `POST /api/v1/auth/refresh` giữ nguyên refresh token và chỉ cấp lại cookie
+  truy cập. `POST /api/v1/auth/logout` thu hồi refresh token của lần đăng nhập
+  hiện tại rồi xóa cả hai cookie. JWT truy cập đã sao chép còn hiệu lực tối đa
+  năm phút.
+- Các yêu cầu `POST /login`, `/google`, `/refresh` và `/logout` phải gửi header
+  `Origin` khớp với `Frontend:Origins` hoặc `Frontend:BaseUrl`.
+- `GET /api/v1/auth/me` trả về hồ sơ tối thiểu `id`, `fullName`, `avatarUrl`;
+  `/api/v1/settings` tiếp tục trả về hồ sơ cài đặt đầy đủ.
 - Với endpoint được bảo vệ, client HTTPS gửi cookie bằng `withCredentials`;
   không tạo header Bearer trong JavaScript.
 - Response body dùng envelope gồm `success`, `data` và `error`; contract đầy
