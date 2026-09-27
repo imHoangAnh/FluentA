@@ -1,0 +1,4 @@
+interface:
+  display_name: "Smart Commits"
+  short_description: "Group changes into local commits without pushing"
+  default_prompt: "Use $smart-commits to group the current working tree into logical local commits. Do not push."

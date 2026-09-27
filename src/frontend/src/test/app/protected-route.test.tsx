@@ -44,7 +44,7 @@ describe('ProtectedRoute session states', () => {
     useAuthStore.setState({
       ...originalState,
       status: 'authenticated',
-      user: { id: 'user-1', email: 'learner@example.com', fullName: 'Learner', isEmailVerified: true },
+      user: { id: 'user-1', fullName: 'Learner', avatarUrl: null },
     }, true)
     renderGuard()
     expect(screen.getByText('Private page')).toBeInTheDocument()

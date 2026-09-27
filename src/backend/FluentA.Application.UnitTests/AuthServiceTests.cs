@@ -14,12 +14,15 @@ public sealed class AuthServiceTests
     public async Task Register_PersistsOnlyHashedOtpAndSendsRawOtp()
     {
         var fixture = CreateFixture();
+        var startedAtUtc = DateTime.UtcNow;
         var result = await fixture.Service.RegisterAsync(new RegisterRequest("Learner@Example.com", "SecurePass123", "FluentA Learner"));
         Assert.True(result.IsSuccess);
-        Assert.Equal("otp:learner@example.com:123456", fixture.Users.Single.OtpCode);
-        Assert.NotEqual("123456", fixture.Users.Single.OtpCode);
+        Assert.Equal("otp:learner@example.com:123456", fixture.Users.Single.OtpHash);
+        Assert.NotEqual("123456", fixture.Users.Single.OtpHash);
         Assert.Contains("123456", fixture.Email.Messages.Single().TextBody);
-        Assert.Equal(30, (result.Value!.ResendAvailableAtUtc - fixture.Users.Single.UpdatedAt).TotalSeconds, 1);
+        Assert.InRange(result.Value!.VerificationExpiresAtUtc - startedAtUtc,
+            TimeSpan.FromMinutes(5).Subtract(TimeSpan.FromSeconds(1)),
+            TimeSpan.FromMinutes(5).Add(TimeSpan.FromSeconds(1)));
     }
 
     [Fact]
@@ -49,7 +52,7 @@ public sealed class AuthServiceTests
         Assert.Contains("verification code sent", second.Value!.Message);
         Assert.Equal(2, fixture.Email.Messages.Count);
 
-        var verified = await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123456"));
+        var verified = await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123457"));
         var login = await fixture.Service.LoginAsync(new LoginRequest("learner@example.com", "UpdatedPass123"));
         Assert.True(verified.IsSuccess);
         Assert.True(login.IsSuccess);
@@ -78,20 +81,26 @@ public sealed class AuthServiceTests
         var before = await fixture.Service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
         var verified = await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123456"));
         var login = await fixture.Service.LoginAsync(new LoginRequest("learner@example.com", "SecurePass123"));
-        Assert.Equal("EMAIL_NOT_VERIFIED", ((AuthError)before.Error!).Code);
+        Assert.True(before.IsSuccess);
+        Assert.Equal("VERIFY_EMAIL", before.Value!.NextStep);
         Assert.True(verified.IsSuccess);
         Assert.True(login.IsSuccess);
-        Assert.StartsWith("jwt:", login.Value!.Token);
+        Assert.StartsWith("jwt:", login.Value!.AccessToken);
     }
 
     [Fact]
-    public async Task Resend_EnforcesThirtySecondCooldownAndReplacesOtp()
+    public async Task Resend_ReplacesOtpWithoutCooldown()
     {
         var fixture = CreateFixture();
         await fixture.Service.RegisterAsync(new RegisterRequest("learner@example.com", "SecurePass123", "Learner"));
+        var firstOtpHash = fixture.Users.Single.OtpHash;
         var result = await fixture.Service.ResendVerificationOtpAsync(new ResendVerificationOtpRequest("learner@example.com"));
-        Assert.False(result.IsSuccess);
-        Assert.Equal("VERIFICATION_OTP_COOLDOWN", ((AuthError)result.Error!).Code);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(firstOtpHash, fixture.Users.Single.OtpHash);
+        Assert.Contains("123457", fixture.Email.Messages[1].TextBody);
+        Assert.False((await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123456"))).IsSuccess);
+        Assert.True((await fixture.Service.VerifyOtpAsync(new VerifyOtpRequest("learner@example.com", "123457"))).IsSuccess);
     }
 
     [Fact]
@@ -121,7 +130,7 @@ public sealed class AuthServiceTests
         Assert.True(first.IsSuccess);
         Assert.False(second.IsSuccess);
         Assert.Equal("hash:new-password", fixture.Users.Single.PasswordHash);
-        Assert.Null(fixture.Users.Single.ResetPasswordToken);
+        Assert.Null(fixture.Users.Single.ResetPasswordTokenHash);
     }
 
     [Fact]
@@ -154,10 +163,12 @@ public sealed class AuthServiceTests
     private static Fixture CreateFixture()
     {
         var users = new InMemoryUserRepository();
+        var refreshTokens = new InMemoryRefreshTokenRepository(users);
         var email = new RecordingEmailService();
         var google = new FakeGoogleVerifier();
         var service = new AuthService(
             users,
+            refreshTokens,
             new FakePasswordHasher(),
             new FakeTokenHelper(),
             new FakeJwtService(),
@@ -179,7 +190,8 @@ public sealed class AuthServiceTests
 
     private sealed class FakeTokenHelper : ITokenHelper
     {
-        public string GenerateOtp() => "123456";
+        private int _otpSequence;
+        public string GenerateOtp() => (123456 + _otpSequence++).ToString();
         public string GenerateRawToken() => "raw-reset-token";
         public string HashOtp(string normalizedEmail, string otp) => $"otp:{normalizedEmail}:{otp}";
         public string HashToken(string rawToken) => $"token:{rawToken}";
@@ -187,7 +199,8 @@ public sealed class AuthServiceTests
 
     private sealed class FakeJwtService : IJwtService
     {
-        public string GenerateToken(UserProfileDto user) => $"jwt:{user.Id}";
+        public AccessTokenIssue GenerateToken(Guid userId, DateTime issuedAtUtc) =>
+            new($"jwt:{userId}", issuedAtUtc.AddMinutes(5));
     }
 
     private sealed class FakeGoogleVerifier : IGoogleIdTokenVerifier
@@ -212,31 +225,142 @@ public sealed class AuthServiceTests
     {
         private readonly List<User> _users = [];
         public User Single => Assert.Single(_users);
-        public Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken = default) => Task.FromResult(_users.Any(user => user.Email == normalizedEmail));
+        public Action<Guid>? RevokeRefreshTokensForUser { get; set; }
         public Task<User?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken = default) => Task.FromResult(_users.FirstOrDefault(user => user.Email == normalizedEmail));
         public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(_users.FirstOrDefault(user => user.Id == userId));
         public Task AddAsync(User user, CancellationToken cancellationToken = default) { _users.Add(user); return Task.CompletedTask; }
-        public Task UpdateAsync(User user, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<VerificationOtpConsumeResult> ConsumeVerificationOtpAsync(string normalizedEmail, string otpHash, DateTime now, int maxFailedAttempts, CancellationToken cancellationToken = default)
+        public Task<bool> TryUpsertUnverifiedRegistrationAsync(User user, CancellationToken cancellationToken = default)
+        {
+            var existing = _users.FirstOrDefault(candidate => candidate.Email == user.Email);
+            if (existing is null)
+            {
+                _users.Add(user);
+                return Task.FromResult(true);
+            }
+
+            if (existing.IsEmailVerified) return Task.FromResult(false);
+            existing.RestartPasswordRegistration(user.FullName, user.PasswordHash!);
+            existing.IssueVerificationOtp(user.OtpHash!, user.OtpExpiresAt!.Value);
+            return Task.FromResult(true);
+        }
+
+        public Task<VerificationOtpConsumeResult> ConsumeVerificationOtpAsync(string normalizedEmail, string otpHash, DateTime now, CancellationToken cancellationToken = default)
         {
             var user = _users.FirstOrDefault(candidate => candidate.Email == normalizedEmail);
-            if (user?.OtpCode != otpHash || user.OtpExpiresAt <= now || user.IsEmailVerified) return Task.FromResult(VerificationOtpConsumeResult.Invalid);
+            if (user is null || user.OtpHash != otpHash || user.OtpExpiresAt is null || user.OtpExpiresAt <= now || user.IsEmailVerified)
+                return Task.FromResult(VerificationOtpConsumeResult.Invalid);
             user.MarkEmailVerified(now);
             return Task.FromResult(VerificationOtpConsumeResult.Verified);
         }
-        public Task<bool> TryReplaceVerificationOtpAsync(Guid userId, string otpHash, DateTime expiresAt, DateTime resendAvailableAt, DateTime now, CancellationToken cancellationToken = default)
+        public Task<bool> TryReplaceVerificationOtpAsync(Guid userId, string otpHash, DateTime expiresAt, DateTime now, CancellationToken cancellationToken = default)
         {
             var user = _users.FirstOrDefault(candidate => candidate.Id == userId);
-            if (user is null || user.IsEmailVerified || user.OtpResendAvailableAt > now) return Task.FromResult(false);
-            user.IssueVerificationOtp(otpHash, expiresAt, resendAvailableAt);
+            if (user is null || user.IsEmailVerified) return Task.FromResult(false);
+            user.IssueVerificationOtp(otpHash, expiresAt);
+            return Task.FromResult(true);
+        }
+        public Task<bool> TrySetPasswordResetAsync(string normalizedEmail, string tokenHash, DateTime expiresAt, DateTime now, CancellationToken cancellationToken = default)
+        {
+            var user = _users.FirstOrDefault(candidate => candidate.Email == normalizedEmail && candidate.PasswordHash is not null);
+            if (user is null) return Task.FromResult(false);
+            user.IssuePasswordReset(tokenHash, expiresAt);
             return Task.FromResult(true);
         }
         public Task<bool> ConsumePasswordResetAsync(string tokenHash, string passwordHash, DateTime now, CancellationToken cancellationToken = default)
         {
-            var user = _users.FirstOrDefault(candidate => candidate.ResetPasswordToken == tokenHash && candidate.ResetPasswordExpiresAt > now);
+            var user = _users.FirstOrDefault(candidate => candidate.ResetPasswordTokenHash == tokenHash && candidate.ResetPasswordExpiresAt > now);
             if (user is null) return Task.FromResult(false);
             user.UpdatePassword(passwordHash);
+            RevokeRefreshTokensForUser?.Invoke(user.Id);
             return Task.FromResult(true);
+        }
+        public Task<bool> UpdateProfileAsync(User user, CancellationToken cancellationToken = default) => Task.FromResult(_users.Contains(user));
+    }
+
+    private sealed class InMemoryRefreshTokenRepository : IRefreshTokenRepository
+    {
+        private readonly InMemoryUserRepository _users;
+        private readonly List<StoredRefreshToken> _tokens = [];
+
+        public InMemoryRefreshTokenRepository(InMemoryUserRepository users)
+        {
+            _users = users;
+            users.RevokeRefreshTokensForUser = RevokeForUser;
+        }
+
+        public async Task<AccessTokenIssue?> TryCreateForPasswordLoginAsync(
+            Guid userId,
+            string tokenHash,
+            DateTime createdAt,
+            DateTime expiresAt,
+            string expectedPasswordHash,
+            Func<Guid, AccessTokenIssue> issueAccessToken,
+            CancellationToken cancellationToken = default)
+        {
+            var user = await _users.GetByIdAsync(userId, cancellationToken);
+            if (user is null || !user.IsEmailVerified || user.PasswordHash != expectedPasswordHash) return null;
+            user.RecordLogin(createdAt);
+            _tokens.Add(new StoredRefreshToken(userId, tokenHash, expiresAt));
+            return issueAccessToken(userId);
+        }
+
+        public async Task<GoogleLoginSessionResult> TryCreateForGoogleLoginAsync(
+            string normalizedEmail,
+            string fullName,
+            string googleSubject,
+            string tokenHash,
+            DateTime createdAt,
+            DateTime expiresAt,
+            Func<Guid, AccessTokenIssue> issueAccessToken,
+            CancellationToken cancellationToken = default)
+        {
+            var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+            if (user?.GoogleId is not null && user.GoogleId != googleSubject)
+                return new GoogleLoginSessionResult(GoogleLoginResult.AccountConflict, null);
+            if (user is null)
+            {
+                user = User.CreateWithGoogle(normalizedEmail, fullName, googleSubject, createdAt);
+                await _users.AddAsync(user, cancellationToken);
+            }
+            else if (user.GoogleId is null)
+            {
+                user.LinkGoogleAccount(googleSubject, createdAt);
+            }
+
+            user.RecordLogin(createdAt);
+            _tokens.Add(new StoredRefreshToken(user.Id, tokenHash, expiresAt));
+            return new GoogleLoginSessionResult(GoogleLoginResult.Authenticated, issueAccessToken(user.Id));
+        }
+
+        public async Task<RefreshResponse?> IssueAccessTokenAsync(
+            string tokenHash,
+            Func<Guid, AccessTokenIssue> issueAccessToken,
+            CancellationToken cancellationToken = default)
+        {
+            var stored = _tokens.FirstOrDefault(token => token.TokenHash == tokenHash && !token.Revoked && token.ExpiresAt > DateTime.UtcNow);
+            if (stored is null || await _users.GetByIdAsync(stored.UserId, cancellationToken) is null) return null;
+            var access = issueAccessToken(stored.UserId);
+            return new RefreshResponse(access.Token, access.ExpiresAtUtc);
+        }
+
+        public Task RevokeAsync(string tokenHash, CancellationToken cancellationToken = default)
+        {
+            var stored = _tokens.FirstOrDefault(token => token.TokenHash == tokenHash);
+            if (stored is not null) stored.Revoked = true;
+            return Task.CompletedTask;
+        }
+
+        private void RevokeForUser(Guid userId)
+        {
+            foreach (var token in _tokens.Where(token => token.UserId == userId)) token.Revoked = true;
+        }
+
+        private sealed class StoredRefreshToken(Guid userId, string tokenHash, DateTime expiresAt)
+        {
+            public Guid UserId { get; } = userId;
+            public string TokenHash { get; } = tokenHash;
+            public DateTime ExpiresAt { get; } = expiresAt;
+            public bool Revoked { get; set; }
         }
     }
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Smart Commits"
+  short_description: "Group existing changes into authorized commits"
+  default_prompt: "Use $smart-commits to group the in-scope changes into logical local commits and report validation."
+policy:
+  allow_implicit_invocation: true

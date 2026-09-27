@@ -43,7 +43,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapFluentAHealthChecks();
 app.MapControllers();
-app.MapHub<SyncHub>("/hubs/sync");
+app.MapHub<SyncHub>("/hubs/sync", options => options.CloseOnAuthenticationExpiration = true);
 app.Run();
 
 public partial class Program;

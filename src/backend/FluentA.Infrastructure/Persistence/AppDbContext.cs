@@ -1,5 +1,6 @@
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
+using FluentA.Infrastructure.Persistence.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Domain.BoundedContexts.Note.Entities;
@@ -26,6 +27,7 @@ public sealed class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<VocabBoard> Boards => Set<VocabBoard>();
     public DbSet<VocabPage> Pages => Set<VocabPage>();

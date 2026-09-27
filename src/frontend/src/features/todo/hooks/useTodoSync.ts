@@ -1,12 +1,9 @@
-import type { HubConnection } from '@microsoft/signalr'
+import { connectAuthenticatedSync } from '@/shared/api/realtime'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/features/auth'
 import { dashboardKeys } from '@/shared/api/dashboard.queries'
 import { todoKeys } from '../api/todo.queries'
-
-const apiUrl = import.meta.env.VITE_API_URL ?? 'https://localhost:7000/api/v1'
-const hubUrl = `${apiUrl.replace(/\/api\/v1\/?$/, '')}/hubs/sync`
 
 export function useTodoSync() {
   const isAuthenticated = useAuthStore((state) => state.status === 'authenticated')
@@ -15,28 +12,11 @@ export function useTodoSync() {
   useEffect(() => {
     if (!isAuthenticated || import.meta.env.MODE === 'test' || typeof window.WebSocket === 'undefined') return
 
-    let disposed = false
-    let connection: HubConnection | null = null
-
-    void import('@microsoft/signalr').then(async ({ HubConnectionBuilder }) => {
-      if (disposed) return
-
-      connection = new HubConnectionBuilder()
-        .withUrl(hubUrl)
-        .withAutomaticReconnect()
-        .build()
-
+    return connectAuthenticatedSync((connection) => {
       connection.on('TodoItemChecked', () => {
         void queryClient.invalidateQueries({ queryKey: todoKeys.all, refetchType: 'all' })
         void queryClient.invalidateQueries({ queryKey: dashboardKeys.all, refetchType: 'all' })
       })
-
-      await connection.start()
-    }).catch(() => undefined)
-
-    return () => {
-      disposed = true
-      if (connection) void connection.stop()
-    }
+    })
   }, [isAuthenticated, queryClient])
 }

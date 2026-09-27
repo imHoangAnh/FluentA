@@ -52,7 +52,7 @@ export function SettingsPage() {
       })
     },
     onSuccess: (profile) => {
-      setUser(profile)
+      setUser({ id: profile.id, fullName: profile.fullName, avatarUrl: profile.avatarDownloadUrl ?? null })
       queryClient.setQueryData(settingsKeys.all, (current: settingsApi.SettingsPayload | undefined) => current
         ? { ...current, profile }
         : current)

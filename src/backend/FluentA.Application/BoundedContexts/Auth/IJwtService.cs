@@ -4,5 +4,5 @@ namespace FluentA.Application.BoundedContexts.Auth;
 
 public interface IJwtService
 {
-    string GenerateToken(UserProfileDto user);
+    AccessTokenIssue GenerateToken(Guid userId, DateTime issuedAtUtc);
 }

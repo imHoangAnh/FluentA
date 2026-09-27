@@ -1,0 +1,605 @@
+.fluenta-landing,
+.fluenta-landing * {
+  box-sizing: border-box;
+}
+
+.fluenta-landing {
+  display: grid;
+  min-height: 100svh;
+  overflow: hidden;
+  place-items: center;
+  background: #f0fafa;
+  color: #17232d;
+  font-family: Inter, Arial, sans-serif;
+}
+
+.fluenta-landing-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 1440px;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 48px;
+  padding: 32px 64px 64px;
+
+  overflow: visible;
+  isolation: isolate;
+
+  background: #f0fafa;
+}
+
+.fluenta-landing-glow {
+  position: absolute;
+  z-index: -1;
+  width: 763.2px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(60.48px);
+  pointer-events: none;
+}
+
+.fluenta-landing-glow-top {
+  top: -251.1px;
+  right: -216px;
+  background: radial-gradient(circle, rgb(177 238 228 / 48%), rgb(211 246 241 / 20%) 48%, transparent 72%);
+}
+
+.fluenta-landing-glow-bottom {
+  bottom: -299.7px;
+  left: -288px;
+  background: radial-gradient(circle, rgb(184 239 225 / 52%), rgb(216 247 239 / 23%) 49%, transparent 72%);
+}
+
+.fluenta-landing-header {
+  position: absolute;
+  top: 32px;
+  left: 70px;
+  right: 70px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fluenta-landing-header nav { display: flex; align-items: center; gap: 14px; }
+.fluenta-landing-header nav button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent; color: #33434b; cursor: pointer; font: inherit; font-size: 15px; font-weight: 650; }
+.fluenta-landing-header nav button:hover { background: rgb(32 185 173 / 9%); color: #117e78; }
+.fluenta-landing-header nav .fluenta-landing-login,
+.fluenta-landing-header nav .fluenta-landing-register { background: #fff; color: #111827; transition: background-color .18s ease, color .18s ease; }
+.fluenta-landing-header nav .fluenta-landing-login:hover,
+.fluenta-landing-header nav .fluenta-landing-register:hover { background: #00ada4; color: #fff; }
+
+.fluenta-landing-header img {
+  display: block;
+}
+
+.fluenta-landing-header img {
+  width: 190.08px;
+  height: 74.03px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.fluenta-landing-copy {
+  position: absolute;
+  top: 240px;
+  left: 80px;
+  width: 604.8px;
+}
+
+.fluenta-landing-copy h1 {
+  margin: 0;
+  color: #111a24;
+  font-size: 56px;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1.07143;
+}
+
+.fluenta-landing-copy p {
+  max-width: 540px;
+  margin: 16px 0 0;
+  color: #66747c;
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.fluenta-landing-copy button {
+  display: inline-flex;
+  width: 164px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #20b9ad;
+  box-shadow: 0 7.92px 19.44px rgb(24 158 149 / 16%);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.fluenta-landing-copy button:hover {
+  background: #00ada4;
+}
+
+.fluenta-landing-copy button:active {
+  transform: translateY(1px);
+}
+
+.fluenta-landing-copy button:focus-visible,
+.fluenta-landing-header a:focus-visible,
+.fluenta-landing-header nav button:focus-visible {
+  outline: 2px solid #117e78;
+  outline-offset: 4px;
+}
+
+.fluenta-landing-cards {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fluenta-landing-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 9.36px 27.36px rgb(32 75 75 / 8%);
+  pointer-events: auto;
+}
+
+.fluenta-landing-card-heading {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 12px;
+}
+
+.fluenta-landing-card-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: #e8f8f5;
+  color: #25aa9e;
+}
+
+.fluenta-landing-card-icon svg {
+  width: 16.99px;
+  height: 16.99px;
+  stroke-width: 1.9;
+}
+
+.fluenta-landing-card-heading h2 {
+  margin: 0;
+  color: #18252e;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.fluenta-landing-task-card {
+  top: 170px;
+  left: 760px;
+  width: 250px;
+  height: 184px;
+}
+
+.fluenta-landing-task-list {
+  display: grid;
+  gap: 7.5px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fluenta-landing-task-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #48575f;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.fluenta-landing-task-list li::before {
+  width: 4.61px;
+  height: 4.61px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #31b7a9;
+  content: '';
+}
+
+.fluenta-landing-progress-card {
+  top: 222px;
+  left: 1034px;
+  width: 296px;
+  height: 190px;
+}
+
+.fluenta-landing-progress-lines {
+  display: grid;
+  gap: 6px;
+  margin-top: 15px;
+}
+
+.fluenta-landing-skeleton,
+.fluenta-landing-progress-track {
+  display: block;
+  height: 4.5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eded;
+}
+
+.fluenta-landing-skeleton-short {
+  width: 40%;
+}
+
+.fluenta-landing-skeleton-medium {
+  width: 63%;
+}
+
+.fluenta-landing-skeleton-long {
+  width: 86%;
+}
+
+.fluenta-landing-progress-track {
+  height: 6px;
+  background: #e5f3f1;
+}
+
+.fluenta-landing-progress-fill {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: #2bb7aa;
+}
+
+.fluenta-landing-progress-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 7.5px;
+  color: #64727a;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.fluenta-landing-progress-label strong {
+  color: #18252e;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.fluenta-landing-progress-label > span[aria-hidden='true'] {
+  color: #a3afb3;
+}
+
+.fluenta-landing-notes-card {
+  top: 431px;
+  left: 760px;
+  width: 250px;
+  height: 192px;
+}
+
+.fluenta-landing-notes-copy {
+  display: grid;
+  gap: 3px;
+  margin: 14px 0 0;
+  color: #526169;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.fluenta-landing-notes-copy strong {
+  color: #34444c;
+  font-weight: 700;
+}
+
+.fluenta-landing-calendar-card {
+  top: 467px;
+  left: 1034px;
+  width: 296px;
+  height: 200px;
+}
+
+.fluenta-landing-calendar-accent {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 18px;
+  border-radius: 999px;
+  background: #38bbae;
+}
+
+.fluenta-landing-calendar-event {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: #59676f;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.fluenta-landing-calendar-event strong {
+  color: #33434b;
+  font-weight: 700;
+}
+
+/* Laptop: content remains readable independently of window height. */
+.fluenta-landing-header { position: relative; inset: auto; grid-column: 1 / -1; margin-bottom: 48px; }
+.fluenta-landing-copy { position: relative; inset: auto; width: auto; align-self: center; padding-bottom: 64px; }
+.fluenta-landing-copy h1 { font-size: clamp(48px, 3.9vw, 60px); }
+.fluenta-landing-copy p { max-width: 540px; font-size: 18px; }
+.fluenta-landing-desktop-break { display: none; }
+.fluenta-landing-cards { position: relative; inset: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); align-self: center; align-items: start; gap: 28px 24px; padding-bottom: 52px; }
+.fluenta-landing-card { position: relative; inset: auto; width: auto; height: auto; min-height: 184px; padding: 18px; }
+.fluenta-landing-progress-card, .fluenta-landing-calendar-card { transform: translateY(52px); min-height: 196px; }
+.fluenta-landing-notes-card { min-height: 192px; }
+.fluenta-landing-task-list li { white-space: normal; }
+.fluenta-landing-progress-label { margin-top: 24px; }
+/* Monitor: bounded type and a wider composition. */
+@media (min-width: 1600px) {
+ .fluenta-landing-canvas { max-width: 1760px; padding: 48px 80px 80px; column-gap: 96px; }
+ .fluenta-landing-header img { width: 220px; height: 86px; }
+ .fluenta-landing-copy h1 { font-size: clamp(60px, 3.75vw, 72px); }
+ .fluenta-landing-copy p { font-size: 20px; }
+ .fluenta-landing-card { padding: 24px; min-height: 216px; }
+ .fluenta-landing-card-heading h2 { font-size: 18px; }
+ .fluenta-landing-task-list li, .fluenta-landing-notes-copy, .fluenta-landing-calendar-event { font-size: 16px; }
+ .fluenta-landing-cards { gap: 36px 28px; }
+}
+/* Landscape tablet: two columns and full-sized controls. */
+@media (min-width: 960px) and (max-width: 1279px) {
+ .fluenta-landing-canvas { padding: 24px 32px 40px; column-gap: 28px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
+ .fluenta-landing-header { margin-bottom: 32px; }
+ .fluenta-landing-header img { width: 170px; height: 66px; }
+ .fluenta-landing-copy { padding-bottom: 36px; }
+ .fluenta-landing-copy h1 { font-size: 44px; }
+ .fluenta-landing-copy p { font-size: 17px; }
+ .fluenta-landing-cards { gap: 20px 16px; padding-bottom: 32px; }
+ .fluenta-landing-card { padding: 16px; min-height: 180px; }
+ .fluenta-landing-card-heading { gap: 8px; }
+ .fluenta-landing-card-heading h2 { font-size: 15px; }
+ .fluenta-landing-progress-card, .fluenta-landing-calendar-card { transform: translateY(32px); }
+}
+@media (max-width: 959px) {
+  .fluenta-landing {
+    display: block;
+    min-height: 100svh;
+    overflow: hidden;
+  }
+
+  .fluenta-landing-canvas {
+    display: flex;
+    width: 100%;
+    min-height: 100svh;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 28px 24px 38px;
+    aspect-ratio: auto;
+    container-type: normal;
+  }
+
+  .fluenta-landing-glow {
+    width: 78vw;
+    filter: blur(48px);
+  }
+
+  .fluenta-landing-glow-top {
+    top: -100px;
+    right: -34vw;
+  }
+
+  .fluenta-landing-glow-bottom {
+    bottom: -125px;
+    left: -42vw;
+  }
+
+  .fluenta-landing-header {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    margin-bottom: 58px;
+  }
+
+  .fluenta-landing-header nav { gap: 4px; }
+  .fluenta-landing-header nav button { min-height: 40px; padding: 0 10px; font-size: 14px; }
+
+  .fluenta-landing-header img {
+    width: min(190px, 56vw);
+    height: auto;
+  }
+
+  .fluenta-landing-copy {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    padding-bottom: 0;
+  }
+
+  .fluenta-landing-copy h1 {
+    font-size: clamp(42px, 12vw, 56px);
+    letter-spacing: -0.055em;
+    line-height: 1.06;
+  }
+
+  .fluenta-landing-copy p {
+    max-width: 540px;
+    margin-top: 18px;
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .fluenta-landing-desktop-break {
+    display: none;
+  }
+
+  .fluenta-landing-copy button {
+    width: 164px;
+    height: 56px;
+    margin-top: 28px;
+    font-size: 16px;
+  }
+
+  .fluenta-landing-cards {
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 48px;
+  }
+
+  .fluenta-landing-card {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    min-height: 166px;
+    transform: none;
+    padding: 18px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgb(32 75 75 / 8%);
+  }
+
+  .fluenta-landing-card-heading {
+    min-height: 28px;
+    gap: 10px;
+  }
+
+  .fluenta-landing-card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .fluenta-landing-card-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .fluenta-landing-card-heading h2 {
+    font-size: 16px;
+  }
+
+  .fluenta-landing-task-list {
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .fluenta-landing-task-list li,
+  .fluenta-landing-notes-copy,
+  .fluenta-landing-calendar-event {
+    font-size: 13px;
+  }
+
+  .fluenta-landing-task-list li {
+    gap: 7px;
+    white-space: normal;
+  }
+
+  .fluenta-landing-task-list li::before {
+    width: 5px;
+    height: 5px;
+  }
+
+  .fluenta-landing-progress-lines {
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .fluenta-landing-skeleton,
+  .fluenta-landing-progress-track {
+    height: 5px;
+  }
+
+  .fluenta-landing-progress-track {
+    height: 7px;
+  }
+
+  .fluenta-landing-progress-label {
+    gap: 8px;
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+  .fluenta-landing-progress-label strong {
+    font-size: 14px;
+  }
+
+  .fluenta-landing-notes-copy {
+    gap: 3px;
+    margin-top: 16px;
+  }
+
+  .fluenta-landing-calendar-accent {
+    height: 3px;
+    margin-top: 18px;
+  }
+
+  .fluenta-landing-calendar-event {
+    gap: 6px;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .fluenta-landing-canvas {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .fluenta-landing-header {
+    margin-bottom: 48px;
+  }
+
+  .fluenta-landing-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 40px;
+  }
+
+  .fluenta-landing-card {
+    min-height: 0;
+  }
+
+  .fluenta-landing-task-card {
+    min-height: 164px;
+  }
+
+  .fluenta-landing-progress-card {
+    min-height: 170px;
+  }
+
+  .fluenta-landing-notes-card,
+  .fluenta-landing-calendar-card {
+    min-height: 150px;
+  }
+}

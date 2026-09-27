@@ -59,9 +59,8 @@ describe('NotesPage', () => {
       status: 'authenticated',
       user: {
         id: 'user-1',
-        email: 'learner@example.com',
         fullName: 'FluentA Learner',
-        isEmailVerified: true,
+        avatarUrl: null,
       },
     })
     vi.mocked(noteApi.listBoards).mockResolvedValue([])

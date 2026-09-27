@@ -10,10 +10,10 @@ test('email registration keeps OTP server-side and blocks an unverified login', 
       contentType: 'application/json',
       body: JSON.stringify({
         data: {
+          nextStep: 'VERIFY_EMAIL',
           message: 'Verification email sent. Check your inbox.',
           email,
           verificationExpiresAtUtc: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-          resendAvailableAtUtc: new Date(Date.now() + 30 * 1000).toISOString(),
         },
       }),
     });
@@ -31,16 +31,11 @@ test('email registration keeps OTP server-side and blocks an unverified login', 
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const registerResponsePromise = page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/register'));
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Register', exact: true }).click();
   const registerPayload = await (await registerResponsePromise).json();
   expect(registerPayload.data).not.toHaveProperty('developmentOtp');
-  await expect(page).toHaveURL(/\/register$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByLabel('Verification code')).toBeVisible();
-  await expect(page.getByLabel('Full name')).toBeDisabled();
-  await expect(page.getByLabel('Email')).toBeDisabled();
-  await expect(page.getByLabel('Password')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Reveal characters' })).toBeDisabled();
-  await expect(page.getByText('Verification email sent. Check your inbox.')).toBeVisible();
   await expect(page.getByText(/Code expires at/)).toHaveCount(0);
   await expect(page.getByText('Change details')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/auth-register-inline-verification.png', fullPage: true });
@@ -48,6 +43,6 @@ test('email registration keeps OTP server-side and blocks an unverified login', 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Login', exact: true }).click();
   await expect(page.getByText('Please verify your email before logging in.')).toBeVisible();
 });

@@ -54,9 +54,8 @@ describe('JournalPage workspace redesign', () => {
       status: 'authenticated',
       user: {
         id: 'user-1',
-        email: 'learner@example.com',
         fullName: 'FluentA Learner',
-        isEmailVerified: true,
+        avatarUrl: null,
       },
     })
     vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry])
