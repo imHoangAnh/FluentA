@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "core_version": "0.1.10",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "upstream_sha256": "ff3da2082ad3771877603722f1da61ee62e486ac782d3fc2991bec229ec23542"
+    },
+    {
+      "path": ".agents/skills/agent-spawn/SKILL.md",
+      "upstream_sha256": "82a15b1824a79cc35068f8956d2b06b80387263da03f6b6084bb177b379dd13e"
+    },
+    {
+      "path": ".agents/skills/agent-spawn/agents/openai.yaml",
+      "upstream_sha256": "4c153b7671d3c7e9090d6d818b840f984a73a9555da6ed961f8790832d48f7db"
+    },
+    {
+      "path": ".agents/skills/goal-griller/SKILL.md",
+      "upstream_sha256": "a99e9d4b6d7fd6b5e7715302ad690a87cc1b3da21b6a4abce7a4f293ccac4647"
+    },
+    {
+      "path": ".agents/skills/goal-griller/agents/openai.yaml",
+      "upstream_sha256": "77c428a55a2716ea0da2c5748f389589bef22968f0d2adde86c23acdad442de4"
+    },
+    {
+      "path": ".agents/skills/audit-onboarding-proposal/SKILL.md",
+      "upstream_sha256": "8aa6e5d75743f747818a72cb2376efea9971882c23ebaaee18489095cad5f53e"
+    },
+    {
+      "path": ".agents/skills/audit-onboarding-proposal/agents/openai.yaml",
+      "upstream_sha256": "1f822840d05d627c43e8dcb87a8c54ef28e52c24cba72cf6950c142e360e1a81"
+    },
+    {
+      "path": ".agents/skills/audit-onboarding-proposal/scripts/validate_evidence_capsule.py",
+      "upstream_sha256": "9ea918717fa72f9040e851d93c3e9783a6e0100a94d23bec0d31a96f63859cb0"
+    },
+    {
+      "path": ".agents/skills/encode-invariant/SKILL.md",
+      "upstream_sha256": "cd2742df488a1046b049fae868094df7b2f882ff98488fd76579468c3b41e606"
+    },
+    {
+      "path": ".agents/skills/encode-invariant/agents/openai.yaml",
+      "upstream_sha256": "480be69346c2af2d8f6f381692add09a71593dc6746b8b1cd603412e40e75f2a"
+    },
+    {
+      "path": ".agents/skills/improve-harness/SKILL.md",
+      "upstream_sha256": "1061235593bc7f9564671d2912bccc0b45397ced9a2193d8695c8fafc4b3cfe6"
+    },
+    {
+      "path": ".agents/skills/improve-harness/agents/openai.yaml",
+      "upstream_sha256": "77982c7e2c70c3becb5076c2ce10eefb49ada39f53ed01da930f092fe6d263c5"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/SKILL.md",
+      "upstream_sha256": "220302bec89ebe70f983fd515bdffd3e417a652c0777fe8ba8d34a0197cf6f3e"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/agents/openai.yaml",
+      "upstream_sha256": "0992cf606b2680397e6aee60db3d39c62aa3d5773acaeefc2f4f1e18103537e9"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/references/evidence-capsule-v1.md",
+      "upstream_sha256": "b9e1f9208842e725289469d0976b3e65670a30ee7f69be6d799cf4ba2a19fadb"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/references/evidence-capsule-v2.md",
+      "upstream_sha256": "e91ef78922e3a196e966a7e60ae53e4894617668887abf165b293d147fb88737"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/scripts/emit_evidence_bundle.py",
+      "upstream_sha256": "30583170ed4764b9ee3a147bc6e02ebce5095600a292688b9411825404f9e13f"
+    },
+    {
+      "path": ".agents/skills/onboard-repository/scripts/render_patch.py",
+      "upstream_sha256": "9e6b5c4b148e78171695ab964757e792d2a67b32517d08ad113df8de2da9cb38"
+    },
+    {
+      "path": ".agents/skills/prompt-leverage/SKILL.md",
+      "upstream_sha256": "ea739db468214df78a07ad0197f3e686b1a4e933f025eb9e31076391dd693251"
+    },
+    {
+      "path": ".agents/skills/prompt-leverage/agents/openai.yaml",
+      "upstream_sha256": "cdf728acd1ee043e458e94f589f2bf43a5cdda2fe4a7b6563d31170f87fe66fe"
+    },
+    {
+      "path": ".agents/skills/prompt-leverage/references/framework.md",
+      "upstream_sha256": "077c15695ee6d81ea98ea1e4a9784e2608d14458c4492a186fd00aabce866f45"
+    },
+    {
+      "path": ".agents/skills/prompt-leverage/scripts/augment_prompt.py",
+      "upstream_sha256": "64b9b042b01bc3f026c277abf75ec9abf535f1761a3abc6c8fc6c732702f310c"
+    },
+    {
+      "path": ".agents/skills/prompt-leverage/scripts/test_augment_prompt.py",
+      "upstream_sha256": "2c9f453b774f1637c6231e9b1eceb725cd43abde38cf9e198cb691456a81642f"
+    },
+    {
+      "path": ".agents/skills/sequence-execution-plan/SKILL.md",
+      "upstream_sha256": "31163e92daa35193fe65c92fc7dd8c482f322e3ad331a616cefdb3ee0f44642c"
+    },
+    {
+      "path": ".agents/skills/sequence-execution-plan/agents/openai.yaml",
+      "upstream_sha256": "27cc6c80634641d5f77fec75a8e38d2013a722d492766ca254203dc72d10adad"
+    },
+    {
+      "path": ".agents/skills/sequence-execution-plan/references/worked-examples.md",
+      "upstream_sha256": "fe99e1697e8741a6eea17113a49917491015222161e0807b197f1c5c71823820"
+    },
+    {
+      "path": ".agents/skills/smart-commits/SKILL.md",
+      "upstream_sha256": "80aa0196a7e8adeb9f46922883ba0fad56e037362e813003db78cbc8cc5cfe9a"
+    },
+    {
+      "path": ".agents/skills/smart-commits/agents/openai.yaml",
+      "upstream_sha256": "eb938b07f84d7ba2f4f2014a8228d7e4b4993d5c101f3f57d26791ac3e75eb29"
+    },
+    {
+      "path": ".agents/skills/tldraw-api/SKILL.md",
+      "upstream_sha256": "178e5b79d015534061b4e0a2a1ddcf13a115ddef01acc2a2fbd885a1bec0f64b"
+    },
+    {
+      "path": ".agents/skills/tldraw-api/agents/openai.yaml",
+      "upstream_sha256": "4a0f60a4cbc23c4e8b65478bab8f24b340f567629ff93aabfa8a929174515bbd"
+    },
+    {
+      "path": ".agents/skills/tldraw-api/references/api.md",
+      "upstream_sha256": "4c4fca88b9651c7b97f14be21775894fef6ea1bae8a6918ae4d5849d5768d7f1"
+    },
+    {
+      "path": ".agents/skills/tldraw-api/scripts/tldraw_api.sh",
+      "upstream_sha256": "7b310ce8d4ec2d96ca6c2e1a4646baddc51ff4538eb81a7afabbfbbe76caef2e"
+    },
+    {
+      "path": "docs/WORKFLOW.md",
+      "upstream_sha256": "a15fd2d2f2c98b197433f87cf4cc1fc91831aaa27f9cc7b21924eacef925c71b"
+    },
+    {
+      "path": "docs/README.md",
+      "upstream_sha256": "2a2aef87ec04d1f9be82ab385d9841df6f61bce211047533f6ebf97274e48acd"
+    },
+    {
+      "path": "docs/patterns/encoding-invariants.md",
+      "upstream_sha256": "c49f7fe5c5995e11f095c70791f731874c8cb8e1cdabef36d26581aa0a25ffd5"
+    },
+    {
+      "path": "docs/product/README.md",
+      "upstream_sha256": "463441ca9b77d8ae5cbb40fd653277496b005447f98f77d6f3bc3ca51195a65b"
+    },
+    {
+      "path": "docs/plans/README.md",
+      "upstream_sha256": "e552bbb5a2940754a9c4ab7d4582ec68dba12f6a536da6cb2d9a7a2effc31550"
+    },
+    {
+      "path": "docs/plans/active/README.md",
+      "upstream_sha256": "aec64998a72585b2a9c4c8909c7ed775c396c4c2e39c71b0ce4ee6e392784160"
+    },
+    {
+      "path": "docs/plans/completed/README.md",
+      "upstream_sha256": "1ba887f4fb54b7aa45e3f4f619d4b2dfa1eb63d52c09fbbd9588598862346dc7"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "upstream_sha256": "521abd46ee1291dfe13a500664f6046723c0f8360728501da434c0292ed92b2b"
+    },
+    {
+      "path": "docs/templates/application-runbook.md",
+      "upstream_sha256": "1e87f2189066dd0469555406c9ef63c3939e53adfcb23494d2f13f0b9552a72d"
+    },
+    {
+      "path": "docs/templates/decision.md",
+      "upstream_sha256": "e92ba7a5b7bc10ce6c213af75a191619fc305c3945cdd55d4dc6bac72dcd42c1"
+    },
+    {
+      "path": "docs/templates/exec-plan.md",
+      "upstream_sha256": "111c40ea8ab63a03561fdb54f235358546788b3a4e1bb26f220da8db50db92b9"
+    },
+    {
+      "path": "docs/templates/harness-improvement.md",
+      "upstream_sha256": "cbdab1aefab8a38840cc408ce512e16f63acbbcdb0acacf271599e149a5ea608"
+    }
+  ]
+}
