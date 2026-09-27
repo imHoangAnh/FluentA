@@ -14,14 +14,9 @@ Thumbs.db
 !src/frontend/.env.example
 *.local
 
-# Harness local state
-
-# docs/
-# .agents/
-# .harness-backup/
-# .harness-core/
-# AGENTS.md
-
+# Harness 
+.agents/
+AGENTS.md
 # Logs / temp runtime files
 logs/
 *.log
