@@ -1,6 +1,0 @@
-interface:
-  display_name: "Agent Spawn"
-  short_description: "Delegate independent work at each change phase"
-  default_prompt: "Use $agent-spawn to coordinate eligible subagent work at each change phase using the current agent defaults."
-policy:
-  allow_implicit_invocation: true
