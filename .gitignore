@@ -7,7 +7,7 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# Local env / secrets
+# env
 .env
 .env.*
 !.env.example
@@ -17,6 +17,10 @@ Thumbs.db
 # Harness 
 .agents/
 AGENTS.md
+.harness-core/
+docs/
+scripts/
+
 # Logs / temp runtime files
 logs/
 *.log
