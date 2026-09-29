@@ -81,7 +81,7 @@ Output production được tạo trong thư mục `dist/`.
 2. Sau khi đăng nhập, trang `/` hiển thị dashboard tổng quan.
 3. Sử dụng các route chính:
    - `/vocabulary`: quản lý vocabulary board, page và từ vựng.
-   - `/flashcards`, `/practice`, `/review`: học và ôn tập.
+   - `/practice`, `/review`: luyện tập và ôn tập từ vựng.
    - `/todo`, `/habits`, `/countdowns`: quản lý kế hoạch cá nhân.
    - `/project`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
    - `/journal`, `/notes`: lưu nhật ký và ghi chú.

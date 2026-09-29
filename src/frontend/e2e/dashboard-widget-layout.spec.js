@@ -17,7 +17,7 @@ async function mockDashboardApi(page) {
       return
     }
     if (path.endsWith('/review/dashboard')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { overdue: 0, dueToday: 0, newCards: 0 } }) })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { localDate: '2026-07-14', dueCount: 0 } }) })
       return
     }
     if (path.endsWith('/todos') || path.endsWith('/habits') || path.endsWith('/countdowns')) {

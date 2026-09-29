@@ -1,3 +1,4 @@
+using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review.DTOs;
 
@@ -5,7 +6,7 @@ namespace FluentA.Application.BoundedContexts.Review;
 
 public interface IReviewRepository
 {
-    // Preserve the original level-zero enrollment method for existing callers.
+    // Practice still uses this enrollment contract; keep both overloads stable.
     Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,
         Guid pageId,
@@ -24,38 +25,45 @@ public interface IReviewRepository
         CancellationToken cancellationToken = default) =>
         AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
 
-    Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
+    Task<ReviewSessionDto> CreateReviewSessionAsync(
         Guid userId,
-        Guid boardId,
-        string orderType,
-        string mode,
-        TimeZoneInfo timeZone,
-        DateTime utcNow,
-        Guid sessionId,
-        CancellationToken cancellationToken = default);
-
-    Task<FlashcardDashboardDto?> GetDashboardAsync(
-        Guid userId,
-        Guid? boardId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
-    Task<ReviewResultDto?> AddReviewAsync(
+    Task<ReviewDashboardDto> GetDashboardAsync(
+        Guid userId,
+        TimeZoneInfo timeZone,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<ReviewSessionDto?> GetSessionAsync(
         Guid userId,
         Guid sessionId,
-        Guid wordId,
+        CancellationToken cancellationToken = default);
+
+    Task<ReviewAnswerTargetDto?> GetAnswerTargetAsync(
+        Guid userId,
+        Guid sessionId,
+        Guid itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<ReviewAnswerResultDto?> SubmitTypedAnswerAsync(
+        Guid userId,
+        Guid sessionId,
+        Guid itemId,
+        string answerText,
         bool correct,
         int timeSpentSeconds,
-        TimeZoneInfo timeZone,
+        DateTime utcNow,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+    Task<ReviewAnswerResultDto?> AddPronunciationAttemptAsync(
         Guid userId,
-        CancellationToken cancellationToken = default);
-
-    Task<int> RemoveLevelFiveWordsAsync(
-        Guid userId,
-        IReadOnlyList<Guid> wordIds,
+        Guid sessionId,
+        Guid itemId,
+        PronunciationAssessmentDto assessment,
+        int timeSpentSeconds,
+        DateTime utcNow,
         CancellationToken cancellationToken = default);
 }

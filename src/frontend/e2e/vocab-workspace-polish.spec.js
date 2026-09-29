@@ -37,15 +37,14 @@ const pages = [
 
 const preferences = {
   hiddenColumns: [],
-  columnOrder: ['word', 'meaningVn', 'ipaPronunciation', 'definition', 'class', 'example', 'note', 'synonyms', 'antonyms'],
+  columnOrder: ['word', 'meaning', 'ipaPronunciation', 'context', 'type', 'example', 'synonyms', 'antonyms'],
   columnWidths: {
     word: 220,
-    meaningVn: 260,
+    meaning: 260,
     ipaPronunciation: 200,
-    definition: 360,
-    class: 160,
+    context: 360,
+    type: 160,
     example: 380,
-    note: 300,
     synonyms: 280,
     antonyms: 280,
   },
@@ -56,12 +55,11 @@ const words = Array.from({ length: 30 }, (_, index) => ({
   id: `word-${index + 1}`,
   pageId: page.id,
   word: `vocabulary-${index + 1}`,
-  meaningVn: `Nghĩa tiếng Việt ${index + 1}`,
+  meaning: `Nghĩa tiếng Việt ${index + 1}`,
   ipaPronunciation: '/vəˈkæbjəˌleri/',
-  definition: 'A deliberately long definition that wraps across multiple lines without scrolling inside the vocabulary cell. '.repeat(4),
-  class: 'noun',
+  context: 'A deliberately long usage context that wraps across multiple lines without scrolling inside the vocabulary cell. '.repeat(4),
+  type: 'noun',
   example: 'This example remains readable while the surrounding list scrolls. '.repeat(5),
-  note: '',
   synonyms: 'term, expression',
   antonyms: 'silence',
   createdAt: '2026-07-13T00:00:00Z',
@@ -74,9 +72,9 @@ async function mockWorkspaceApis(pageInstance) {
     let data = []
 
     if (path.endsWith('/auth/me')) data = user
-    else if (path.endsWith('/boards')) data = [board]
-    else if (path.endsWith(`/boards/${board.id}`)) data = { ...board, pages, preferences }
-    else if (path.includes(`/boards/${board.id}/pages/`) && path.endsWith('/words')) data = words
+    else if (path.endsWith('/vocabs/boards')) data = [board]
+    else if (path.endsWith(`/vocabs/boards/${board.id}`)) data = { ...board, pages, preferences }
+    else if (path.endsWith(`/vocabs/pages/${page.id}/words`)) data = words
 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) })
   })
@@ -139,7 +137,7 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
     expect(Math.abs(deleteBefore.x - deleteAfter.x)).toBeLessThanOrEqual(1)
     expect(Math.abs(createBefore.x - createAfter.x)).toBeLessThanOrEqual(1)
 
-    const longCell = browserPage.getByRole('textbox', { name: 'Definition for vocabulary-1', exact: true })
+    const longCell = browserPage.getByRole('textbox', { name: 'Context for vocabulary-1', exact: true })
     const cellMetrics = await longCell.evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,

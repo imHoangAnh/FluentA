@@ -10,4 +10,10 @@ public interface IPronunciationService
         Guid wordId,
         ReadOnlyMemory<byte> wavAudio,
         CancellationToken cancellationToken = default);
+
+    Task<OperationResult<PronunciationAssessmentDto>> AssessFromSessionAsync(
+        Guid userId,
+        PronunciationTarget target,
+        ReadOnlyMemory<byte> wavAudio,
+        CancellationToken cancellationToken = default);
 }

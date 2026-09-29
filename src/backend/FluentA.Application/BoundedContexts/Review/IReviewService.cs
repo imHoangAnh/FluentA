@@ -1,33 +1,36 @@
 using FluentA.Application.BoundedContexts.Review.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 
 namespace FluentA.Application.BoundedContexts.Review;
 
 public interface IReviewService
 {
-    Task<OperationResult<ReviewSessionCreatedDto>> CreateReviewSessionAsync(
+    Task<OperationResult<ReviewSessionDto>> CreateReviewSessionAsync(
         Guid userId,
         CreateReviewSessionRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<FlashcardDashboardDto>> GetDashboardAsync(
+    Task<OperationResult<ReviewDashboardDto>> GetDashboardAsync(
         Guid userId,
-        Guid? boardId,
         string? timeZoneId,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<ReviewResultDto>> SubmitReviewAsync(
+    Task<OperationResult<ReviewSessionDto>> GetSessionAsync(
         Guid userId,
-        SubmitReviewRequest request,
+        Guid sessionId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+    Task<OperationResult<ReviewAnswerResultDto>> SubmitTypedAnswerAsync(
         Guid userId,
+        Guid sessionId,
+        SubmitReviewAnswerRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<IReadOnlyList<TrashEntryDto>>> RemoveLevelFiveWordsAsync(
+    Task<OperationResult<ReviewAnswerResultDto>> SubmitPronunciationAttemptAsync(
         Guid userId,
-        RemoveLevelFiveWordsRequest request,
+        Guid sessionId,
+        Guid itemId,
+        ReadOnlyMemory<byte> wavAudio,
+        int timeSpentSeconds,
         CancellationToken cancellationToken = default);
 }

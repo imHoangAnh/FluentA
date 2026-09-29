@@ -45,6 +45,33 @@ public sealed class PronunciationService : IPronunciationService
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.WordNotFound());
         }
 
+        return await AssessTargetAsync(target, wavAudio, cancellationToken);
+    }
+
+    public Task<OperationResult<PronunciationAssessmentDto>> AssessFromSessionAsync(
+        Guid userId,
+        PronunciationTarget target,
+        ReadOnlyMemory<byte> wavAudio,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty
+            || target is null
+            || string.IsNullOrWhiteSpace(target.Word)
+            || string.IsNullOrWhiteSpace(target.Language)
+            || !PronunciationAudioValidator.IsValidPcmWav(wavAudio.Span))
+        {
+            return Task.FromResult(
+                OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.InvalidAudio()));
+        }
+
+        return AssessTargetAsync(target, wavAudio, cancellationToken);
+    }
+
+    private async Task<OperationResult<PronunciationAssessmentDto>> AssessTargetAsync(
+        PronunciationTarget target,
+        ReadOnlyMemory<byte> wavAudio,
+        CancellationToken cancellationToken)
+    {
         if (!_options.IsConfigured || !Locales.TryGetValue(target.Language, out var locale))
         {
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.ProviderUnavailable());

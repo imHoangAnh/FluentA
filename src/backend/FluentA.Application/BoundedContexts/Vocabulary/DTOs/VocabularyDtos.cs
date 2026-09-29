@@ -1,8 +1,14 @@
 namespace FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 
-public sealed record CreateBoardRequest(string Name, string Language);
+public sealed record CreateBoardRequest(
+    string Name,
+    string Language,
+    IReadOnlyList<string>? IncludedOptionalColumns = null);
 
-public sealed record UpdateBoardRequest(string Name, string Language);
+public sealed record UpdateBoardRequest(
+    string Name,
+    string Language,
+    IReadOnlyList<string>? IncludedOptionalColumns = null);
 
 public sealed record BoardSummaryDto(
     Guid Id,
@@ -29,27 +35,33 @@ public sealed record PageDto(Guid Id, Guid BoardId, string Name, DateTime Create
 
 public sealed record WordRequest(
     string Word,
-    string MeaningVn,
+    string Meaning,
     string IpaPronunciation,
-    string Class,
-    string? Definition,
+    string Type,
+    string? Context,
     string Example,
-    string? Note = null,
     string? Synonyms = null,
     string? Antonyms = null);
 
-public sealed record UpdateWordCellRequest(string ColumnKey, string? Value);
+public sealed record WordPatchRequest(
+    string? Word = null,
+    string? Meaning = null,
+    string? IpaPronunciation = null,
+    string? Type = null,
+    string? Context = null,
+    string? Example = null,
+    string? Synonyms = null,
+    string? Antonyms = null);
 
 public sealed record WordDto(
     Guid Id,
     Guid PageId,
     string Word,
-    string MeaningVn,
+    string Meaning,
     string IpaPronunciation,
-    string Class,
-    string? Definition,
+    string Type,
+    string? Context,
     string Example,
-    string? Note,
     string? Synonyms,
     string? Antonyms,
     DateTime CreatedAt,

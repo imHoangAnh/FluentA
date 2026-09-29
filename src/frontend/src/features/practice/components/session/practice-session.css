@@ -1,0 +1,921 @@
+.practice-figma-session {
+  --practice-canvas: #f6f5f1;
+  --practice-paper: #ffffff;
+  --practice-teal: #236b5b;
+  --practice-ink: #263d37;
+  --practice-muted: #5f6d65;
+  --practice-tint: #ddebe4;
+  --practice-line: #cfd6cf;
+  box-sizing: border-box;
+  width: min(70rem, 100%);
+  max-width: 70rem;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-inline: auto;
+  color: var(--practice-ink);
+  font-family: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.practice-figma-session *,
+.practice-figma-session *::before,
+.practice-figma-session *::after {
+  box-sizing: border-box;
+}
+
+.practice-figma-session__header {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.practice-figma-session__brand {
+  color: var(--practice-teal);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.practice-figma-session__exit {
+  width: 120px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--practice-line);
+  border-radius: 12px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.practice-figma-session__exit:hover {
+  background: #f8faf8;
+}
+
+.practice-figma-session__exit:focus-visible,
+.practice-figma-session button:focus-visible,
+.practice-dictation-input:focus-visible {
+  outline: 3px solid rgb(35 107 91 / 26%);
+  outline-offset: 2px;
+}
+
+.practice-figma-progress {
+  width: 100%;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.practice-figma-progress__labels {
+  height: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  line-height: 1.45;
+}
+
+.practice-figma-progress__labels span {
+  color: var(--practice-teal);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.practice-figma-progress__labels strong {
+  color: var(--practice-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.practice-figma-progress__track {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--practice-tint);
+}
+
+.practice-figma-progress__value {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: var(--practice-teal);
+  transition: width 180ms ease;
+}
+
+.practice-figma-session__card {
+  width: 100%;
+  min-height: 704px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 64px;
+  border: 1px solid var(--practice-line);
+  border-radius: 24px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+}
+
+.practice-exercise,
+.practice-recap {
+  width: 100%;
+  max-width: 992px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.practice-exercise__prompt {
+  width: 100%;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--practice-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.practice-exercise__body {
+  width: 100%;
+  height: 392px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.practice-exercise__body--feedback {
+  height: 352px;
+}
+
+.practice-dictation-audio {
+  width: min(784px, 100%);
+  height: 200px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  background: var(--practice-tint);
+}
+
+.practice-dictation-audio__play {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-bottom: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--practice-paper);
+  cursor: pointer;
+}
+
+.practice-dictation-audio__play:hover {
+  background: #f7fbf8;
+}
+
+.practice-dictation-audio__icon,
+.practice-pronunciation__controls svg,
+.practice-word-meaning__radio svg,
+.practice-recap__status-dot {
+  display: block;
+}
+
+.practice-dictation-audio__icon,
+.practice-pronunciation__controls svg {
+  color: var(--practice-teal);
+}
+
+.practice-dictation-audio > span {
+  color: var(--practice-teal);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.practice-dictation-audio > p {
+  margin: 0;
+  color: var(--practice-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.practice-dictation-input {
+  width: min(784px, 100%);
+  height: 56px;
+  flex: 0 0 auto;
+  padding: 0 20px;
+  border: 1px solid var(--practice-line);
+  border-radius: 12px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.practice-dictation-input::placeholder {
+  color: var(--practice-muted);
+  opacity: 1;
+}
+
+.practice-dictation-input:disabled {
+  opacity: 1;
+}
+
+.practice-exercise--correct .practice-dictation-input {
+  border-color: #4d9b6a;
+}
+
+.practice-exercise--wrong .practice-dictation-input {
+  border-color: #c96055;
+}
+
+.practice-word-meaning {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.practice-word-meaning__context {
+  width: min(784px, 100%);
+  min-height: 142px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 24px 16px;
+  border-radius: 16px;
+  background: var(--practice-tint);
+}
+
+.practice-word-meaning__context strong {
+  color: var(--practice-ink);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.practice-word-meaning__context > span {
+  color: var(--practice-teal);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.practice-word-meaning__context p {
+  margin: 0;
+  color: var(--practice-ink);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.practice-word-meaning__choices {
+  width: min(784px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 64px;
+  gap: 12px;
+}
+
+.practice-word-meaning__choice {
+  min-width: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border: 1px solid var(--practice-line);
+  border-radius: 12px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.practice-word-meaning__choice:hover:not(:disabled) {
+  border-color: var(--practice-teal);
+  background: #f8fbf9;
+}
+
+.practice-word-meaning__choice--selected {
+  border-color: var(--practice-teal);
+  background: #f2f8f4;
+}
+
+.practice-word-meaning__choice--wrong {
+  border-color: #c96055;
+  background: #fff0ee;
+}
+
+.practice-word-meaning__choice--correct {
+  border-color: #4d9b6a;
+  background: #e8f4ec;
+}
+
+.practice-word-meaning__choice--empty {
+  border-style: dashed;
+  background: #f8faf8;
+  cursor: not-allowed;
+}
+
+.practice-word-meaning__choice:disabled:not(.practice-word-meaning__choice--empty) {
+  cursor: default;
+}
+
+.practice-word-meaning__radio {
+  width: 18px;
+  height: 18px;
+  position: relative;
+  flex: 0 0 18px;
+  display: grid;
+  place-items: center;
+  color: var(--practice-line);
+}
+
+.practice-word-meaning__choice--selected .practice-word-meaning__radio::after,
+.practice-word-meaning__choice--wrong .practice-word-meaning__radio::after {
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--practice-teal);
+  content: '';
+}
+
+.practice-word-meaning__choice--wrong .practice-word-meaning__radio::after {
+  background: #c96055;
+}
+
+.practice-word-meaning__choice--correct .practice-word-meaning__radio::after {
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: #4d9b6a;
+  content: '';
+}
+
+.practice-word-meaning__choice-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.practice-pronunciation {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.practice-pronunciation__word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.practice-pronunciation__word strong {
+  color: var(--practice-ink);
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.practice-pronunciation__word span {
+  color: var(--practice-muted);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.practice-pronunciation__controls {
+  width: 440px;
+  max-width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.practice-pronunciation__controls button {
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--practice-line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.practice-pronunciation__listen {
+  width: 136px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+}
+
+.practice-pronunciation__record {
+  width: 156px;
+  border-color: var(--practice-teal) !important;
+  background: var(--practice-teal);
+  color: var(--practice-paper);
+}
+
+.practice-pronunciation__record:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.practice-pronunciation__hint,
+.practice-pronunciation__warning,
+.practice-pronunciation__error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.practice-pronunciation__hint {
+  color: var(--practice-muted);
+}
+
+.practice-pronunciation__warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #875f1b;
+}
+
+.practice-pronunciation__error {
+  color: #a53d32;
+}
+
+.practice-exercise__feedback {
+  width: min(784px, 100%);
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border: 1px solid;
+  border-radius: 12px;
+  line-height: 1.4;
+}
+
+.practice-exercise__feedback strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.practice-exercise__feedback span {
+  font-size: 14px;
+}
+
+.practice-exercise__feedback--correct {
+  border-color: #8bc5a0;
+  background: #e8f4ec;
+  color: #256d45;
+}
+
+.practice-exercise__feedback--wrong {
+  border-color: #e9a39a;
+  background: #fff0ee;
+  color: #a53d32;
+}
+
+.practice-exercise__actions,
+.practice-recap__actions {
+  width: min(784px, 100%);
+  height: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.practice-exercise__actions--resolved {
+  height: 48px;
+  align-items: flex-start;
+}
+
+.practice-exercise__actions button,
+.practice-recap__actions button {
+  width: 120px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--practice-line);
+  border-radius: 12px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.practice-exercise__actions button:hover:not(:disabled),
+.practice-recap__actions button:hover:not(:disabled) {
+  border-color: var(--practice-teal);
+  background: #f8fbf9;
+}
+
+.practice-exercise__actions button:disabled,
+.practice-recap__actions button:disabled {
+  opacity: 0.64;
+  cursor: not-allowed;
+}
+
+.practice-figma-session__shortcuts {
+  width: 100%;
+  min-height: 24px;
+  margin: 0;
+  color: var(--practice-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.practice-figma-session__shortcuts kbd {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+}
+
+.practice-figma-session__shortcuts span[aria-hidden='true'] {
+  padding-inline: 8px;
+}
+
+.practice-recap__content {
+  width: 100%;
+  height: 290px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.practice-recap__word {
+  width: min(784px, 100%);
+  height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.practice-recap__word h3 {
+  margin: 0;
+  color: var(--practice-ink);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.practice-recap__word p {
+  margin: 0;
+  color: var(--practice-muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.practice-recap__details {
+  width: min(784px, 100%);
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--practice-tint);
+}
+
+.practice-recap__details > div {
+  display: grid;
+  gap: 3px;
+}
+
+.practice-recap__details span {
+  color: var(--practice-teal);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.practice-recap__details p {
+  margin: 0;
+  color: var(--practice-ink);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.practice-recap__details > div:first-child p {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.practice-recap__details .practice-recap__example {
+  color: var(--practice-muted);
+  font-style: italic;
+}
+
+.practice-recap__levels-section {
+  width: 100%;
+  min-height: 121px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.practice-recap__question {
+  margin: 0;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.practice-recap__levels {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 130px);
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.practice-recap__level-button {
+  width: 130px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: 10px;
+  box-shadow: 0 1px 1.5px rgb(0 0 0 / 3%);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.practice-recap__level-button:hover:not(:disabled) {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+
+.practice-recap__level-button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.practice-recap__level-button[data-level='0'] {
+  border-color: #999ea6;
+  background: #f5f5f7;
+  color: #475569;
+}
+
+.practice-recap__level-button[data-level='1'] {
+  border-color: #e04536;
+  background: #fcedeb;
+  color: #a53d32;
+}
+
+.practice-recap__level-button[data-level='2'] {
+  border-color: #f2a626;
+  background: #fff5e5;
+  color: #8a5b13;
+}
+
+.practice-recap__level-button[data-level='3'] {
+  border-color: #3dba78;
+  background: #e8faf0;
+  color: #256d45;
+}
+
+.practice-recap__level-button[data-level='4'] {
+  border-color: #2196d1;
+  background: #e8f5fc;
+  color: #1c668e;
+}
+
+.practice-recap__level-button[data-level='5'] {
+  border-color: #4d59bf;
+  background: #edf0fa;
+  color: #3b479e;
+}
+
+.practice-recap__pool-status {
+  min-height: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.practice-recap__status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #0f766e;
+}
+
+.practice-recap__error {
+  margin: 0;
+  color: #a53d32;
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .practice-figma-session__card {
+    padding-inline: 40px;
+  }
+
+  .practice-recap__levels {
+    grid-template-columns: repeat(3, minmax(130px, 1fr));
+    justify-content: center;
+  }
+
+  .practice-recap__level-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .practice-figma-session {
+    gap: 18px;
+  }
+
+  .practice-figma-session__card {
+    min-height: 0;
+    padding: 24px 20px;
+    border-radius: 18px;
+  }
+
+  .practice-exercise,
+  .practice-recap {
+    gap: 20px;
+  }
+
+  .practice-exercise__prompt {
+    height: auto;
+    min-height: 76px;
+    font-size: 18px;
+  }
+
+  .practice-exercise__body,
+  .practice-exercise__body--feedback {
+    height: auto;
+    min-height: 352px;
+    gap: 16px;
+  }
+
+  .practice-word-meaning__choices {
+    grid-auto-rows: minmax(64px, auto);
+  }
+
+  .practice-word-meaning__choice {
+    min-height: 64px;
+    height: auto;
+    padding-block: 12px;
+  }
+
+  .practice-pronunciation__word strong {
+    font-size: 40px;
+  }
+
+  .practice-recap__content {
+    height: auto;
+  }
+
+  .practice-recap__details {
+    min-height: 180px;
+    height: auto;
+  }
+
+  .practice-recap__levels-section {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .practice-figma-session__header {
+    height: auto;
+    min-height: 44px;
+  }
+
+  .practice-figma-session__exit {
+    width: 112px;
+  }
+
+  .practice-figma-session__card {
+    padding: 20px 14px;
+  }
+
+  .practice-word-meaning__context {
+    padding-inline: 18px;
+  }
+
+  .practice-word-meaning__context strong {
+    font-size: 26px;
+  }
+
+  .practice-word-meaning__choices {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(64px, auto);
+  }
+
+  .practice-word-meaning__choice {
+    width: 100%;
+  }
+
+  .practice-pronunciation__controls {
+    gap: 10px;
+  }
+
+  .practice-pronunciation__controls button {
+    width: min(50%, 156px);
+  }
+
+  .practice-pronunciation__word strong {
+    font-size: 34px;
+  }
+
+  .practice-exercise__feedback {
+    padding-inline: 14px;
+  }
+
+  .practice-recap__levels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .practice-recap__details {
+    padding-inline: 18px;
+  }
+
+  .practice-figma-session__shortcuts {
+    padding-inline: 4px;
+    line-height: 1.6;
+  }
+}

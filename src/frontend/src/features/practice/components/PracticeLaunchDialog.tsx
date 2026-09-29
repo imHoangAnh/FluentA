@@ -1,51 +1,71 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import type { FlashcardPage } from '@/features/flashcards'
-import { getPracticeSettings, type PracticeMode } from '../api/practice.api'
-import { practiceKeys } from '../api/practice.queries'
-import { Badge } from '@/shared/components/ui/badge'
+import { ArrowRight, BookOpen, Copy, Headphones, Mic, X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/shared/components/ui/dialog'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/shared/components/ui/dialog'
+import type { PracticeDeck } from '../api/practice.api'
 
-type PracticeOrder = 'sequential' | 'shuffle'
+const steps = [
+  { number: '01', title: 'Dictation', description: 'Listen & type', icon: Headphones },
+  { number: '02', title: 'Word to meaning', description: 'Recall', icon: Copy },
+  { number: '03', title: 'Pronunciation', description: 'Speak', icon: Mic },
+] as const
 
-const modeLabels: Record<PracticeMode, string> = {
-  dictation: 'Dictation',
-  meaningToWord: 'Meaning → Word',
-  pronunciation: 'Pronunciation',
+type PracticeLaunchDialogProps = {
+  deck: PracticeDeck | null
+  isStarting: boolean
+  startError: boolean
+  onClose: () => void
+  onStart: () => void
 }
 
-export function PracticeLaunchDialog({ page, onClose, onStart }: { page: FlashcardPage | null; onClose: () => void; onStart: (pageId: string, order: PracticeOrder) => void }) {
-  const [order, setOrder] = useState<PracticeOrder>('sequential')
-  const settingsQuery = useQuery({ queryKey: practiceKeys.settings, queryFn: getPracticeSettings, enabled: Boolean(page) })
-
+export function PracticeLaunchDialog({ deck, isStarting, startError, onClose, onStart }: PracticeLaunchDialogProps) {
   return (
-    <Dialog open={Boolean(page)} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent aria-describedby="practice-launch-description">
-        <div className="grid gap-1">
-          <DialogTitle>Start practice</DialogTitle>
-          <DialogDescription id="practice-launch-description">{page ? `${page.pageName} · ${page.words.length} ${page.words.length === 1 ? 'word' : 'words'}` : ''}</DialogDescription>
+    <Dialog open={Boolean(deck)} onOpenChange={(open) => { if (!open && !isStarting) onClose() }}>
+      <DialogContent className="practice-launch-dialog" aria-describedby="practice-launch-description">
+        <header className="practice-launch__header" data-node-id="92:237">
+          <p className="practice-launch__eyebrow">PRACTICE SESSION</p>
+          <DialogClose asChild>
+            <button className="practice-launch__close" type="button" aria-label="Close practice dialog" disabled={isStarting}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          </DialogClose>
+        </header>
+
+        <div className="practice-launch__welcome" data-node-id="92:241">
+          <DialogTitle className="practice-launch__title">A little practice. Lasting progress.</DialogTitle>
+          <DialogDescription className="practice-launch__description" id="practice-launch-description">
+            {deck ? `${deck.boardName}, ${deck.pageName}, ${deck.wordCount} ${deck.wordCount === 1 ? 'word' : 'words'}.` : ''}
+          </DialogDescription>
         </div>
 
-        <div className="grid gap-2">
-          <span className="text-sm font-medium text-foreground">Order</span>
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Practice order">
-            <Button type="button" variant={order === 'sequential' ? 'default' : 'outline'} onClick={() => setOrder('sequential')}>Sequential</Button>
-            <Button type="button" variant={order === 'shuffle' ? 'default' : 'outline'} onClick={() => setOrder('shuffle')}>Shuffle</Button>
+        <div className="practice-launch__deck" data-node-id="92:243" aria-label={deck ? `${deck.pageName}, ${deck.wordCount} ${deck.wordCount === 1 ? 'word' : 'words'}` : undefined}>
+          <span className="practice-launch__deck-icon"><BookOpen size={26} strokeWidth={1.6} aria-hidden="true" /></span>
+          <div className="practice-launch__deck-copy">
+            <p className="practice-launch__board-name">{deck?.boardName ?? ''}</p>
+            <p className="practice-launch__deck-name">{deck?.pageName ?? ''}</p>
+            <p className="practice-launch__word-count">{deck ? `${deck.wordCount} ${deck.wordCount === 1 ? 'word' : 'words'}` : ''}</p>
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <span className="text-sm font-medium text-foreground">Configured modes</span>
-          {settingsQuery.isLoading ? <p role="status" className="m-0 text-sm text-muted-foreground">Loading practice modes...</p> : null}
-          {settingsQuery.isError ? <p role="alert" className="m-0 text-sm text-destructive">Unable to load practice modes. Try again when your connection is available.</p> : null}
-          {settingsQuery.isSuccess ? <div className="flex flex-wrap gap-2">{settingsQuery.data.modeSequence.map((mode) => <Badge key={mode} variant="outline">{modeLabels[mode]}</Badge>)}</div> : null}
-        </div>
+        <section className="practice-launch__overview" aria-labelledby="practice-launch-overview-title" data-node-id="92:250">
+          <h3 id="practice-launch-overview-title">IN THIS SESSION</h3>
+          <div className="practice-launch__steps">
+            {steps.map((step) => (
+              <article className="practice-launch__step" key={step.number}>
+                <step.icon className="practice-launch__step-icon" aria-hidden="true" strokeWidth={1.5} />
+                <span className="practice-launch__step-number">{step.number}</span>
+                <strong className="practice-launch__step-title">{step.title}</strong>
+                <span className="practice-launch__step-description">{step.description}</span>
+              </article>
+            ))}
+          </div>
+        </section>
 
-        <DialogFooter>
-          <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button type="button" disabled={!page || !settingsQuery.isSuccess} onClick={() => { if (page) onStart(page.pageId, order) }}>Start practice</Button>
-        </DialogFooter>
+        {startError ? <p className="practice-launch__error" role="alert">Unable to start this practice session. Try again.</p> : null}
+
+        <Button className="practice-launch__start" type="button" disabled={!deck || isStarting} onClick={onStart}>
+          <span className="practice-launch__start-label">{isStarting ? 'Starting…' : 'Start practice'}</span>
+          {!isStarting ? <ArrowRight className="practice-launch__start-arrow" size={18} aria-hidden="true" /> : null}
+        </Button>
       </DialogContent>
     </Dialog>
   )

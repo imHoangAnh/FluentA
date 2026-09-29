@@ -13,7 +13,7 @@ public sealed record ResetPasswordRequest(string Token, string NewPassword);
 public sealed record BasicMessageResponse(string Message, string? NextStep = null);
 public sealed record GoogleLoginRequest(string IdToken);
 public sealed record UpdateProfileRequest(string? FullName = null, string? Bio = null, bool RemoveAvatar = false, Guid? AvatarAssetId = null);
-public sealed record SettingsDto(UserProfileDto Profile, FluentA.Application.BoundedContexts.Practice.DTOs.PracticeSettingsDto PracticeSettings);
+public sealed record SettingsDto(UserProfileDto Profile);
 
 // AuthResponse is an application-to-controller result. Access and refresh token values
 // are written only to HttpOnly cookies; AuthResultDto is the JSON projection.

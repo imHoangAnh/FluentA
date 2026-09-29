@@ -108,7 +108,7 @@ credential chain.
 
 - Dùng OpenAPI JSON tại `/openapi/v1.json` để xem schema và endpoint hiện có.
 - Các endpoint nghiệp vụ dùng prefix `/api/v1`, ví dụ `/api/v1/auth`,
-  `/api/v1/boards`, `/api/v1/flashcards`, `/api/v1/todos` và
+  `/api/v1/vocabs`, `/api/v1/practice`, `/api/v1/review`, `/api/v1/todos` và
   `/api/v1/settings`.
 - Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; đăng nhập đặt JWT
   truy cập 5 phút và refresh token cố định 7 ngày vào hai HttpOnly cookie
@@ -129,8 +129,8 @@ credential chain.
 ### 5.2. Realtime
 
 Client đã xác thực kết nối tới SignalR hub `/hubs/sync`. Hub thông báo các thay
-đổi cần đồng bộ cho flashcard, todo, habit, Project và Pomodoro giữa các phiên
-trình duyệt.
+đổi cần đồng bộ cho todo, habit, notification, Project và Pomodoro giữa các
+phiên trình duyệt.
 
 ### 5.3. Background job
 

@@ -41,12 +41,19 @@ public sealed class VocabularyTrashParticipant : ITrashParticipant
             return OperationResult<TrashEntry>.Success(TrashEntry.Create(userId, EntityKind, page.Id, page.Name, "Vocabulary", nowUtc, retention));
         }
 
-        foreach (var activeBoard in await _vocabulary.ListBoardsAsync(userId, cancellationToken))
+        var word = await _vocabulary.GetWordAsync(userId, entityId, cancellationToken);
+        if (word is not null)
         {
-            var word = await _vocabulary.GetWordAsync(userId, activeBoard.Id, entityId, cancellationToken);
-            if (word is null)
+            var owningPage = await _vocabulary.GetPageAsync(userId, word.PageId, cancellationToken);
+            if (owningPage is null)
             {
-                continue;
+                return OperationResult<TrashEntry>.Failure(TrashError.NotFound());
+            }
+
+            var activeBoard = await _vocabulary.GetBoardAsync(userId, owningPage.BoardId, cancellationToken);
+            if (activeBoard is null)
+            {
+                return OperationResult<TrashEntry>.Failure(TrashError.NotFound());
             }
 
             await _vocabulary.SoftDeleteWordAsync(word, nowUtc, cancellationToken);

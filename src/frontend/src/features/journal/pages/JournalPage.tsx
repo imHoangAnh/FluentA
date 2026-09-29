@@ -324,7 +324,7 @@ export function JournalPage() {
                 },
               }}
             />
-            {calendarQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load calendar dates.</p> : null}
+            {calendarQuery.isError ? <p className="status-message status-message--error">Could not load calendar dates.</p> : null}
           </section>
 
           <div className="journal-sidebar-search">
@@ -353,8 +353,8 @@ export function JournalPage() {
               <h3>Recent journals</h3>
             </div>
 
-            {isListLoading ? <p className="flashcard-status">{isSearching ? 'Searching journal...' : 'Loading journal...'}</p> : null}
-            {isListError ? <p className="flashcard-status flashcard-status--error">Could not load journal entries.</p> : null}
+            {isListLoading ? <p className="status-message">{isSearching ? 'Searching journal...' : 'Loading journal...'}</p> : null}
+            {isListError ? <p className="status-message status-message--error">Could not load journal entries.</p> : null}
             {!isListLoading && !isListError && entries.length === 0 ? (
               <div className="journal-empty-state" role="status">
                 <div className="journal-empty-state-icon" aria-hidden="true">

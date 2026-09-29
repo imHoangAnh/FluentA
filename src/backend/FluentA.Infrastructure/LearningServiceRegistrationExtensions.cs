@@ -1,10 +1,8 @@
-using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Infrastructure.ExternalServices.Pronunciation;
-using FluentA.Infrastructure.Persistence.Repositories.Flashcards;
 using FluentA.Infrastructure.Persistence.Repositories.Practice;
 using FluentA.Infrastructure.Persistence.Repositories.Pronunciation;
 using FluentA.Infrastructure.Persistence.Repositories.Review;
@@ -19,12 +17,13 @@ internal static class LearningServiceRegistrationExtensions
         this IServiceCollection services,
         PronunciationAssessmentOptions pronunciationOptions)
     {
-        services.AddScoped<IFlashcardRepository, EfFlashcardRepository>();
         services.AddScoped<IPracticeRepository, EfPracticeRepository>();
+        services.AddScoped<IPracticeSessionRepository>(provider =>
+            provider.GetRequiredService<IPracticeRepository>() as IPracticeSessionRepository
+            ?? throw new InvalidOperationException("Practice repository must implement session persistence."));
         services.AddScoped<IPronunciationWordRepository, EfPronunciationWordRepository>();
         services.AddScoped<IReviewRepository, EfReviewRepository>();
         services.AddScoped<ILevelFiveTrashRepository, EfLevelFiveTrashRepository>();
-        services.AddScoped<IFlashcardService, FlashcardService>();
         services.AddScoped<IPracticeService, PracticeService>();
         services.AddScoped<IPronunciationService, PronunciationService>();
         services.AddScoped<IReviewService, ReviewService>();

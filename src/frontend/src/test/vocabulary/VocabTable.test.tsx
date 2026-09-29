@@ -20,12 +20,11 @@ const word: vocabularyApi.Word = {
   id: 'word-1',
   pageId: 'page-1',
   word: 'mitigate',
-  meaningVn: 'giam nhe',
+  meaning: 'giam nhe',
   ipaPronunciation: '/mItIgeIt/',
-  definition: 'reduce harm',
-  class: 'verb',
+  context: 'reduce harm',
+  type: 'verb',
   example: 'Mitigate risk.',
-  note: '',
   synonyms: 'reduce',
   antonyms: 'worsen',
   createdAt: '',
@@ -43,7 +42,6 @@ function renderTable(overridePreferences: vocabularyApi.BoardPreferences = prefe
   return render(
     <QueryClientProvider client={queryClient}>
       <VocabTable
-        boardId="board-1"
         page={{ id: 'page-1', boardId: 'board-1', name: 'Page One', createdAt: '', updatedAt: '' }}
         preferences={overridePreferences}
         onPreferencesChange={onPreferencesChange}
@@ -63,13 +61,12 @@ describe('VocabTable', () => {
   it('hides nullable fixed columns from board preferences', async () => {
     renderTable({
       ...preferences,
-      hiddenColumns: ['definition', 'note'],
+      hiddenColumns: ['context'],
     })
 
-    expect(await screen.findByLabelText('IPA pronunciation for mitigate')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Definition for mitigate')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Note for mitigate')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Synonyms for mitigate')).toBeInTheDocument()
+    expect(await screen.findByLabelText('IPA for word')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Context for word')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Synonyms for word')).toBeInTheDocument()
   })
 
   it('autosaves IPA values on Tab and preserves slash characters', async () => {
@@ -77,19 +74,19 @@ describe('VocabTable', () => {
     vi.mocked(vocabularyApi.updateWordCell).mockResolvedValue({ ...word, ipaPronunciation: '/mItI' })
     renderTable()
 
-    const input = await screen.findByLabelText('IPA pronunciation for mitigate')
+    const input = await screen.findByLabelText('IPA for word')
     await user.clear(input)
     await user.type(input, '/mItI/')
     await user.tab()
 
-    expect(vocabularyApi.updateWordCell).toHaveBeenCalledWith('board-1', 'word-1', 'ipaPronunciation', '/mItI/')
+    expect(vocabularyApi.updateWordCell).toHaveBeenCalledWith('word-1', 'ipaPronunciation', '/mItI/')
   })
 
   it('shows all extended Word classes with readable labels and stable API values', async () => {
     renderTable()
 
-    const classSelect = await screen.findByLabelText('Class for mitigate')
-    await userEvent.setup().click(classSelect)
+    const typeSelect = await screen.findByLabelText('Type for word')
+    await userEvent.setup().click(typeSelect)
     const options = await screen.findAllByRole('option')
 
     expect(options.map((option) => option.textContent)).toEqual([
@@ -105,10 +102,10 @@ describe('VocabTable', () => {
     const user = userEvent.setup()
     vi.mocked(vocabularyApi.updateWordCell)
       .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce({ ...word, definition: 'harm reduction' })
+      .mockResolvedValueOnce({ ...word, context: 'harm reduction' })
     renderTable()
 
-    const input = await screen.findByLabelText('Definition for mitigate')
+    const input = await screen.findByLabelText('Context for word')
     await user.clear(input)
     await user.type(input, 'harm reduction')
     await user.tab()
@@ -124,7 +121,7 @@ describe('VocabTable', () => {
     vi.mocked(vocabularyApi.updateWordCell).mockResolvedValue(word)
     renderTable({
       ...preferences,
-      hiddenColumns: ['definition', 'note', 'synonyms', 'antonyms'],
+      hiddenColumns: ['context', 'synonyms', 'antonyms'],
     })
 
     const finalCell = await screen.findByLabelText('Example for mitigate')
@@ -155,13 +152,13 @@ describe('VocabTable', () => {
   it('uses independently sized wrapped editors with visible column dividers', async () => {
     renderTable()
 
-    const wordEditor = await screen.findByLabelText('Word for mitigate')
-    const definitionEditor = screen.getByLabelText('Definition for mitigate')
+    const wordEditor = await screen.findByLabelText('Word for word')
+    const contextEditor = screen.getByLabelText('Context for word')
 
     expect(wordEditor.tagName).toBe('TEXTAREA')
-    expect(definitionEditor.tagName).toBe('TEXTAREA')
+    expect(contextEditor.tagName).toBe('TEXTAREA')
     expect(wordEditor).toHaveClass('overflow-hidden')
-    expect(definitionEditor).toHaveClass('overflow-hidden')
+    expect(contextEditor).toHaveClass('overflow-hidden')
     expect(screen.getByLabelText('Resize Word').parentElement).toHaveClass('border-foreground/70')
   })
 
@@ -171,6 +168,6 @@ describe('VocabTable', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete mitigate' }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    await waitFor(() => expect(vocabularyApi.deleteWord).toHaveBeenCalledWith('board-1', 'word-1'))
+    await waitFor(() => expect(vocabularyApi.deleteWord).toHaveBeenCalledWith('word-1'))
   })
 })

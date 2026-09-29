@@ -64,9 +64,6 @@ describe('SettingsPage profile save', () => {
         isEmailVerified: true,
         avatarAssetId: null,
       },
-      practiceSettings: {
-        modeSequence: ['dictation', 'meaningToWord', 'pronunciation'],
-      },
     })
   })
 

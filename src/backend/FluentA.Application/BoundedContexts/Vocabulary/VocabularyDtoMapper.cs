@@ -5,10 +5,6 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 
 internal static class VocabularyDtoMapper
 {
-    private static readonly string[] FixedColumnOrder =
-    [
-        "word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms"
-    ];
     public static BoardSummaryDto ToSummary(VocabBoard board)
     {
         return new BoardSummaryDto(
@@ -53,12 +49,11 @@ internal static class VocabularyDtoMapper
             word.Id,
             word.PageId,
             word.Word,
-            word.MeaningVn,
+            word.Meaning,
             word.IpaPronunciation,
-            word.Class.ToString().ToLowerInvariant(),
-            word.Definition,
+            word.Type.ToString().ToLowerInvariant(),
+            word.Context,
             word.Example,
-            word.Note,
             word.Synonyms,
             word.Antonyms,
             word.CreatedAt,
@@ -69,16 +64,67 @@ internal static class VocabularyDtoMapper
     {
         if (preference is null)
         {
-            return new BoardPreferencesDto(null, [], FixedColumnOrder, new Dictionary<string, int>(), null, null);
+            return new BoardPreferencesDto(null, [], VocabularyRequestValidator.FixedColumnOrder, new Dictionary<string, int>(), null, null);
         }
 
         return new BoardPreferencesDto(
             preference.Id,
-            preference.HiddenColumns,
-            preference.ColumnOrder.Count == 0 ? FixedColumnOrder : preference.ColumnOrder,
-            preference.ColumnWidths,
+            NormalizeHiddenColumns(preference.HiddenColumns),
+            NormalizeColumnOrder(preference.ColumnOrder),
+            NormalizeColumnWidths(preference.ColumnWidths),
             preference.CreatedAt,
             preference.UpdatedAt);
+    }
+
+    private static IReadOnlyList<string> NormalizeHiddenColumns(IEnumerable<string> columns)
+    {
+        return columns
+            .Select(NormalizeColumnKey)
+            .Where(key => key is "context" or "synonyms" or "antonyms")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> NormalizeColumnOrder(IEnumerable<string> columns)
+    {
+        var normalized = columns
+            .Select(NormalizeColumnKey)
+            .Where(key => VocabularyRequestValidator.FixedColumnOrder.Contains(key, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        normalized.AddRange(VocabularyRequestValidator.FixedColumnOrder
+            .Where(key => !normalized.Contains(key, StringComparer.OrdinalIgnoreCase)));
+        return normalized;
+    }
+
+    private static IReadOnlyDictionary<string, int> NormalizeColumnWidths(IReadOnlyDictionary<string, int> widths)
+    {
+        var normalized = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in widths)
+        {
+            var key = NormalizeColumnKey(pair.Key);
+            if (VocabularyRequestValidator.FixedColumnOrder.Contains(key, StringComparer.OrdinalIgnoreCase))
+            {
+                normalized[key] = pair.Value;
+            }
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeColumnKey(string key)
+    {
+        var trimmed = key.Trim();
+        return trimmed.ToLowerInvariant() switch
+        {
+            "meaningvn" => "meaning",
+            "definition" => "context",
+            "class" => "type",
+            "note" => string.Empty,
+            _ => VocabularyRequestValidator.FixedColumnOrder.FirstOrDefault(
+                column => string.Equals(column, trimmed, StringComparison.OrdinalIgnoreCase)) ?? trimmed
+        };
     }
 }
 

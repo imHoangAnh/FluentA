@@ -1,6 +1,5 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
-using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,8 +15,7 @@ public sealed class ReviewSessionConfiguration : IEntityTypeConfiguration<Review
 
         builder.Property(session => session.Id).HasColumnName("id");
         builder.Property(session => session.UserId).HasColumnName("user_id").IsRequired();
-        builder.Property(session => session.BoardId).HasColumnName("board_id").IsRequired();
-        builder.Property(session => session.OrderType).HasColumnName("order_type").HasMaxLength(20).IsRequired();
+        builder.Property(session => session.TimeZoneId).HasColumnName("time_zone_id").HasMaxLength(128).IsRequired();
         builder.Property(session => session.SessionDate).HasColumnName("session_date").IsRequired();
         builder.Property(session => session.StartedAt).HasColumnName("started_at").IsRequired();
         builder.Property(session => session.CompletedAt).HasColumnName("completed_at");
@@ -31,12 +29,7 @@ public sealed class ReviewSessionConfiguration : IEntityTypeConfiguration<Review
             .HasForeignKey(session => session.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne<VocabBoard>()
-            .WithMany()
-            .HasForeignKey(session => session.BoardId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasIndex(session => new { session.UserId, session.BoardId, session.SessionDate, session.Status })
+        builder.HasIndex(session => new { session.UserId, session.SessionDate, session.Status })
             .HasFilter("deleted_at IS NULL");
     }
 }

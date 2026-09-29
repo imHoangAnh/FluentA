@@ -304,8 +304,8 @@ export function CountdownPage() {
             </Card>
           ) : null}
 
-          {countdownsQuery.isLoading ? <p className="flashcard-status">Loading countdowns...</p> : null}
-          {countdownsQuery.isError ? <p className="flashcard-status flashcard-status--error">Could not load countdowns.</p> : null}
+          {countdownsQuery.isLoading ? <p className="status-message">Loading countdowns...</p> : null}
+          {countdownsQuery.isError ? <p className="status-message status-message--error">Could not load countdowns.</p> : null}
         </div>
 
         {showFormModal ? (
@@ -391,7 +391,7 @@ export function CountdownPage() {
                     </Button>
                   </div>
                 </div>
-                {formError ? <p className="flashcard-status flashcard-status--error" role="alert">{formError}</p> : null}
+                {formError ? <p className="status-message status-message--error" role="alert">{formError}</p> : null}
                 <div className="modal-actions">
                   <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
                   <Button data-testid="save-countdown-button" type="submit" disabled={createCountdown.isPending}>

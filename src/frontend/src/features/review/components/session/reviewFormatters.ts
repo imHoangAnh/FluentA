@@ -3,7 +3,7 @@ export function formatIpa(value: string) {
   return `/${cleaned}/`
 }
 
-export function formatWordClass(value: string) {
+export function formatWordType(value: string) {
   return value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
