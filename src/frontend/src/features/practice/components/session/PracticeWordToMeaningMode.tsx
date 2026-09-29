@@ -19,8 +19,12 @@ export function PracticeWordToMeaningMode({ item, selectedSlotId, isResolved, is
     <div className="practice-word-meaning">
       <div className="practice-word-meaning__context">
         <strong>{item.word}</strong>
-        <span>{hasContext ? 'CONTEXT · ENGLISH DEFINITION' : 'MEANING'}</span>
-        <p>{hasContext ? item.context : item.meaning}</p>
+        {hasContext ? (
+          <>
+            <span>CONTEXT </span>
+            <p>{item.context}</p>
+          </>
+        ) : null}
       </div>
 
       <div className="practice-word-meaning__choices" role="group" aria-label={`Meanings for ${item.word}`}>

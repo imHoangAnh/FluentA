@@ -4,6 +4,7 @@ import { PracticeAnswerForm } from './PracticeAnswerForm'
 import { PracticeDictationMode } from './PracticeDictationMode'
 import { PracticeWordToMeaningMode } from './PracticeWordToMeaningMode'
 import { PracticePronunciationMode } from './PracticePronunciationMode'
+import { hasText } from './practiceFormatters'
 
 type InteractivePracticeStep = Exclude<PracticeStep, 'recap'>
 
@@ -45,7 +46,7 @@ export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, f
 
   return (
     <div className={`practice-exercise practice-exercise--${mode}${feedback ? ` practice-exercise--${feedback}` : ''}`}>
-      <h2 className="practice-exercise__prompt">{prompts[mode]}</h2>
+      <h2 className="practice-exercise__prompt">{mode === 'wordToMeaning' && !hasText(item.context) ? 'Read the word, then click the correct meaning.' : prompts[mode]}</h2>
 
       <div className={`practice-exercise__body practice-exercise__body--${mode}${feedback ? ' practice-exercise__body--feedback' : ''}`}>
         {mode === 'dictation' ? <PracticeDictationMode onPlayAudio={onPlayAudio} /> : null}

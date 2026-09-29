@@ -26,18 +26,18 @@ type ReviewModeSurfaceProps = {
 }
 
 const prompts = {
-  dictation: 'Listen to the audio, type the word, then press Enter.',
-  meaningToWord: 'Read the meaning and context, type the word, then press Enter.',
+  dictation: 'Listen to the audio, type the word.',
+  meaningToWord: 'Read the meaning and context, type the word.',
   listenAndRepeat: 'Listen to the word, then record your pronunciation.',
 } satisfies Record<ReviewSessionItem['mode'], string>
 
 export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecording, recordingSupported, pronunciationError, onPlayAudio, onAnswerChange, onCheckAnswer, onSkip, onContinue, onToggleRecording }: ReviewModeSurfaceProps) {
   const isPronunciation = item.mode === 'listenAndRepeat'
-  const contextText = hasText(item.context) ? item.context : item.example
+  const hasContext = hasText(item.context)
 
   return (
     <div className="review-figma-session__mode-surface">
-      <h2 className="review-figma-session__prompt">{prompts[item.mode]}</h2>
+      <h2 className="review-figma-session__prompt">{item.mode === 'meaningToWord' && !hasContext ? 'Read the meaning, type the word.' : prompts[item.mode]}</h2>
 
       <div className={`review-figma-session__exercise-content${feedback ? ' review-figma-session__exercise-content--feedback' : ''}`}>
         {item.mode === 'dictation' ? (
@@ -45,7 +45,7 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
             <button className="review-figma-session__audio-disc" type="button" aria-label="Play word" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio} disabled={isBusy}>
               <Volume2 size={32} strokeWidth={2.26667} color="var(--review-green)" aria-hidden="true" />
             </button>
-            <strong>Play word</strong>
+            <strong>Play</strong>
             <span>Listen again whenever you need.</span>
           </div>
         ) : null}
@@ -54,10 +54,10 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
           <div className="review-figma-session__meaning-card">
             <span className="review-figma-session__meaning-label">Meaning</span>
             <strong className="review-figma-session__meaning-value">{hasText(item.meaning) ? item.meaning : 'No meaning was saved for this word.'}</strong>
-            {hasText(contextText) ? (
+            {hasContext ? (
               <>
                 <span className="review-figma-session__meaning-label">Usage context</span>
-                <p className="review-figma-session__meaning-context">{contextText}</p>
+                <p className="review-figma-session__meaning-context">{item.context}</p>
               </>
             ) : null}
           </div>

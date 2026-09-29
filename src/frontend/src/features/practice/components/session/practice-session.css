@@ -196,7 +196,7 @@
 .practice-dictation-audio__icon,
 .practice-pronunciation__controls svg,
 .practice-word-meaning__radio svg,
-.practice-recap__status-dot {
+.practice-session-recap__status-dot {
   display: block;
 }
 
@@ -524,7 +524,7 @@
 }
 
 .practice-exercise__actions,
-.practice-recap__actions {
+.practice-session-recap__actions {
   width: min(784px, 100%);
   height: 48px;
   display: flex;
@@ -538,7 +538,7 @@
 }
 
 .practice-exercise__actions button,
-.practice-recap__actions button {
+.practice-session-recap__actions button {
   width: 120px;
   height: 48px;
   display: inline-flex;
@@ -555,13 +555,13 @@
 }
 
 .practice-exercise__actions button:hover:not(:disabled),
-.practice-recap__actions button:hover:not(:disabled) {
+.practice-session-recap__actions button:hover:not(:disabled) {
   border-color: var(--practice-teal);
   background: #f8fbf9;
 }
 
 .practice-exercise__actions button:disabled,
-.practice-recap__actions button:disabled {
+.practice-session-recap__actions button:disabled {
   opacity: 0.64;
   cursor: not-allowed;
 }
@@ -590,7 +590,7 @@
   padding-inline: 8px;
 }
 
-.practice-recap__content {
+.practice-session-recap__content {
   width: 100%;
   height: 290px;
   display: flex;
@@ -599,7 +599,7 @@
   gap: 20px;
 }
 
-.practice-recap__word {
+.practice-session-recap__word {
   width: min(784px, 100%);
   height: 90px;
   display: flex;
@@ -610,7 +610,7 @@
   text-align: center;
 }
 
-.practice-recap__word h3 {
+.practice-session-recap__word h3 {
   margin: 0;
   color: var(--practice-ink);
   font-size: 36px;
@@ -619,14 +619,15 @@
   overflow-wrap: anywhere;
 }
 
-.practice-recap__word p {
+.practice-session-recap__word p {
   margin: 0;
   color: var(--practice-muted);
   font-size: 15px;
   line-height: 1.4;
 }
 
-.practice-recap__details {
+.practice-session-recap__details {
+  align-self: center;
   width: min(784px, 100%);
   height: 180px;
   display: flex;
@@ -638,12 +639,12 @@
   background: var(--practice-tint);
 }
 
-.practice-recap__details > div {
+.practice-session-recap__details > div {
   display: grid;
   gap: 3px;
 }
 
-.practice-recap__details span {
+.practice-session-recap__details span {
   color: var(--practice-teal);
   font-size: 10px;
   font-weight: 700;
@@ -652,7 +653,7 @@
   text-transform: uppercase;
 }
 
-.practice-recap__details p {
+.practice-session-recap__details p {
   margin: 0;
   color: var(--practice-ink);
   font-size: 14px;
@@ -660,17 +661,17 @@
   overflow-wrap: anywhere;
 }
 
-.practice-recap__details > div:first-child p {
+.practice-session-recap__details > div:first-child p {
   font-size: 18px;
   font-weight: 600;
 }
 
-.practice-recap__details .practice-recap__example {
+.practice-session-recap__details .practice-session-recap__example {
   color: var(--practice-muted);
   font-style: italic;
 }
 
-.practice-recap__levels-section {
+.practice-session-recap__levels-section {
   width: 100%;
   min-height: 121px;
   display: flex;
@@ -679,7 +680,7 @@
   gap: 16px;
 }
 
-.practice-recap__question {
+.practice-session-recap__question {
   margin: 0;
   color: #475569;
   font-size: 15px;
@@ -688,7 +689,7 @@
   text-align: center;
 }
 
-.practice-recap__levels {
+.practice-session-recap__levels {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(6, 130px);
@@ -696,7 +697,7 @@
   gap: 8px;
 }
 
-.practice-recap__level-button {
+.practice-session-recap__level-button {
   width: 130px;
   height: 44px;
   display: inline-flex;
@@ -715,53 +716,53 @@
   transition: filter 150ms ease, transform 150ms ease;
 }
 
-.practice-recap__level-button:hover:not(:disabled) {
+.practice-session-recap__level-button:hover:not(:disabled) {
   filter: brightness(0.97);
   transform: translateY(-1px);
 }
 
-.practice-recap__level-button:disabled {
+.practice-session-recap__level-button:disabled {
   opacity: 0.58;
   cursor: not-allowed;
 }
 
-.practice-recap__level-button[data-level='0'] {
+.practice-session-recap__level-button[data-level='0'] {
   border-color: #999ea6;
   background: #f5f5f7;
   color: #475569;
 }
 
-.practice-recap__level-button[data-level='1'] {
+.practice-session-recap__level-button[data-level='1'] {
   border-color: #e04536;
   background: #fcedeb;
   color: #a53d32;
 }
 
-.practice-recap__level-button[data-level='2'] {
+.practice-session-recap__level-button[data-level='2'] {
   border-color: #f2a626;
   background: #fff5e5;
   color: #8a5b13;
 }
 
-.practice-recap__level-button[data-level='3'] {
+.practice-session-recap__level-button[data-level='3'] {
   border-color: #3dba78;
   background: #e8faf0;
   color: #256d45;
 }
 
-.practice-recap__level-button[data-level='4'] {
+.practice-session-recap__level-button[data-level='4'] {
   border-color: #2196d1;
   background: #e8f5fc;
   color: #1c668e;
 }
 
-.practice-recap__level-button[data-level='5'] {
+.practice-session-recap__level-button[data-level='5'] {
   border-color: #4d59bf;
   background: #edf0fa;
   color: #3b479e;
 }
 
-.practice-recap__pool-status {
+.practice-session-recap__pool-status {
   min-height: 16px;
   display: inline-flex;
   align-items: center;
@@ -772,7 +773,7 @@
   line-height: 1.25;
 }
 
-.practice-recap__status-dot {
+.practice-session-recap__status-dot {
   width: 6px;
   height: 6px;
   flex: 0 0 6px;
@@ -780,7 +781,7 @@
   background: #0f766e;
 }
 
-.practice-recap__error {
+.practice-session-recap__error {
   margin: 0;
   color: #a53d32;
   font-size: 14px;
@@ -792,12 +793,12 @@
     padding-inline: 40px;
   }
 
-  .practice-recap__levels {
+  .practice-session-recap__levels {
     grid-template-columns: repeat(3, minmax(130px, 1fr));
     justify-content: center;
   }
 
-  .practice-recap__level-button {
+  .practice-session-recap__level-button {
     width: 100%;
   }
 }
@@ -845,16 +846,16 @@
     font-size: 40px;
   }
 
-  .practice-recap__content {
+  .practice-session-recap__content {
     height: auto;
   }
 
-  .practice-recap__details {
+  .practice-session-recap__details {
     min-height: 180px;
     height: auto;
   }
 
-  .practice-recap__levels-section {
+  .practice-session-recap__levels-section {
     min-height: 0;
   }
 }
@@ -906,11 +907,11 @@
     padding-inline: 14px;
   }
 
-  .practice-recap__levels {
+  .practice-session-recap__levels {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .practice-recap__details {
+  .practice-session-recap__details {
     padding-inline: 18px;
   }
 

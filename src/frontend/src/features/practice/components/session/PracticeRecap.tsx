@@ -30,26 +30,26 @@ export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelec
     <div className="practice-recap">
       <h2 className="practice-exercise__prompt">Review the word and choose how well you remember it.</h2>
 
-      <div className="practice-recap__content">
-        <header className="practice-recap__word">
+      <div className="practice-session-recap__content">
+        <header className="practice-session-recap__word">
           <h3>{item.word}</h3>
           {wordDetails ? <p>{wordDetails}</p> : null}
         </header>
 
-        <div className="practice-recap__details">
+        <div className="practice-session-recap__details">
           {hasText(item.meaning) ? <div><span>Meaning</span><p>{item.meaning}</p></div> : null}
           {hasText(item.context) ? <div><span>Usage context</span><p>{item.context}</p></div> : null}
-          {hasText(item.example) ? <div><span>Example</span><p className="practice-recap__example">{item.example}</p></div> : null}
+          {hasText(item.example) ? <div><span>Example</span><p className="practice-session-recap__example">{item.example}</p></div> : null}
         </div>
       </div>
 
-      <section className="practice-recap__levels-section" aria-label="Choose a review level">
-        <p className="practice-recap__question">How well did you recall this word?</p>
-        <div className="practice-recap__levels" role="group" aria-label="Choose initial review level">
+      <section className="practice-session-recap__levels-section" aria-label="Choose a review level">
+        <p className="practice-session-recap__question">How well did you recall this word?</p>
+        <div className="practice-session-recap__levels" role="group" aria-label="Choose initial review level">
           {reviewLevels.map(({ level, label }) => (
             <button
               key={level}
-              className="practice-recap__level-button"
+              className="practice-session-recap__level-button"
               type="button"
               onClick={() => onSelectLevel(level)}
               disabled={levelsDisabled}
@@ -64,20 +64,20 @@ export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelec
         </div>
 
         {activeInReview ? (
-          <p className="practice-recap__pool-status" role="status">
-            <span aria-hidden="true" className="practice-recap__status-dot" />
+          <p className="practice-session-recap__pool-status" role="status">
+            <span aria-hidden="true" className="practice-session-recap__status-dot" />
             Already in review
           </p>
         ) : null}
-        {reviewStatus === 'added' ? <p className="practice-recap__pool-status" role="status">Added to Review</p> : null}
-        {isSaving ? <p className="practice-recap__pool-status" role="status" aria-live="polite">Saving practice progress…</p> : null}
+        {reviewStatus === 'added' ? <p className="practice-session-recap__pool-status" role="status">Added to Review</p> : null}
+        {isSaving ? <p className="practice-session-recap__pool-status" role="status" aria-live="polite">Saving practice progress…</p> : null}
       </section>
 
-      <div className="practice-recap__actions" data-testid="practice-recap-actions" aria-busy={isSaving}>
+      <div className="practice-session-recap__actions" data-testid="practice-recap-actions" aria-busy={isSaving}>
         <button type="button" onClick={onSkip} disabled={isSaving} aria-label="Skip recap">Skip</button>
       </div>
 
-      {saveError ? <p className="practice-recap__error" role="alert">Unable to save this practice result. Try again.</p> : null}
+      {saveError ? <p className="practice-session-recap__error" role="alert">Unable to save this practice result. Try again.</p> : null}
     </div>
   )
 }
