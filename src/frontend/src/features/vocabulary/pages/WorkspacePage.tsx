@@ -54,13 +54,13 @@ function vocabularySnapshotKey(userId: string, section: 'boards' | 'board' | 'wo
   return `fluenta:vocabulary:snapshot:${userId}:${section}${id ? `:${id}` : ''}`
 }
 
-function readSessionSnapshot<T>(key: string, isValid: (value: unknown) => value is T): T | undefined {
+function readSessionSnapshot<T>(key: string, normalize: (value: unknown) => T | undefined): T | undefined {
   if (typeof window === 'undefined') return undefined
   try {
     const serialized = window.sessionStorage.getItem(key)
     if (!serialized) return undefined
     const value: unknown = JSON.parse(serialized)
-    return isValid(value) ? value : undefined
+    return normalize(value)
   } catch {
     return undefined
   }
@@ -86,20 +86,102 @@ function isBoardSummaries(value: unknown): value is vocabularyApi.BoardSummary[]
   return Array.isArray(value) && value.every(isBoardSummary)
 }
 
-function isBoardDetail(value: unknown): value is vocabularyApi.BoardDetail {
-  if (!isBoardSummary(value)) return false
-  const detail = value as vocabularyApi.BoardDetail
-  return Array.isArray(detail.pages)
-    && detail.pages.every((page) => typeof page?.id === 'string' && typeof page.name === 'string')
-    && Array.isArray(detail.preferences?.hiddenColumns)
-    && Array.isArray(detail.preferences?.columnOrder)
-    && typeof detail.preferences?.columnWidths === 'object'
-    && detail.preferences.columnWidths !== null
+function normalizeBoardSummaries(value: unknown): vocabularyApi.BoardSummary[] | undefined {
+  return isBoardSummaries(value) ? value : undefined
 }
 
-function isWords(value: unknown): value is vocabularyApi.Word[] {
-  return Array.isArray(value)
-    && value.every((word) => typeof word?.id === 'string' && typeof word.pageId === 'string' && typeof word.word === 'string')
+const legacyColumnKeys: Record<string, string> = {
+  meaningVn: 'meaning',
+  class: 'type',
+  definition: 'context',
+}
+
+function normalizeColumnKey(key: string) {
+  if (key === 'note') return null
+  return legacyColumnKeys[key] ?? key
+}
+
+function normalizeColumnKeys(value: unknown) {
+  if (!Array.isArray(value) || !value.every((key) => typeof key === 'string')) return undefined
+  const normalized: string[] = []
+  for (const key of value) {
+    const mappedKey = normalizeColumnKey(key)
+    if (mappedKey && !normalized.includes(mappedKey)) normalized.push(mappedKey)
+  }
+  return normalized
+}
+
+function normalizeColumnWidths(value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const normalized: Record<string, number> = {}
+  for (const [key, width] of Object.entries(value)) {
+    const mappedKey = normalizeColumnKey(key)
+    if (!mappedKey || typeof width !== 'number' || !Number.isFinite(width)) continue
+    if (!(mappedKey in normalized) || mappedKey === key) normalized[mappedKey] = width
+  }
+  return normalized
+}
+
+function normalizeBoardPreferences(value: unknown): vocabularyApi.BoardPreferences | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const preferences = value as vocabularyApi.BoardPreferences
+  const hiddenColumns = normalizeColumnKeys(preferences.hiddenColumns)
+  const columnOrder = normalizeColumnKeys(preferences.columnOrder)
+  const columnWidths = normalizeColumnWidths(preferences.columnWidths)
+  if (!hiddenColumns || !columnOrder || !columnWidths) return undefined
+  return { ...preferences, hiddenColumns, columnOrder, columnWidths }
+}
+
+function normalizeBoardDetail(value: unknown): vocabularyApi.BoardDetail | undefined {
+  if (!isBoardSummary(value)) return undefined
+  const detail = value as vocabularyApi.BoardDetail
+  if (!Array.isArray(detail.pages)
+    || !detail.pages.every((page) => typeof page?.id === 'string' && typeof page.name === 'string')) return undefined
+  const preferences = normalizeBoardPreferences(detail.preferences)
+  return preferences ? { ...detail, preferences } : undefined
+}
+
+function isWordType(value: unknown): value is vocabularyApi.WordType {
+  return typeof value === 'string'
+    && vocabularyApi.WORD_TYPE_OPTIONS.some((option) => option.value === value)
+}
+
+function stringOrEmpty(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function nullableString(value: unknown) {
+  return value === null || typeof value === 'string' ? value : null
+}
+
+function normalizeWordSnapshot(value: unknown): vocabularyApi.Word | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const word = value as Record<string, unknown>
+  if (typeof word.id !== 'string' || typeof word.pageId !== 'string' || typeof word.word !== 'string') return undefined
+
+  const rawType = typeof word.type === 'string' ? word.type : word.class
+  const contextValue = Object.prototype.hasOwnProperty.call(word, 'context') ? word.context : word.definition
+
+  return {
+    id: word.id,
+    pageId: word.pageId,
+    word: word.word,
+    meaning: stringOrEmpty(typeof word.meaning === 'string' ? word.meaning : word.meaningVn),
+    ipaPronunciation: stringOrEmpty(word.ipaPronunciation),
+    type: isWordType(rawType) ? rawType : 'other',
+    context: nullableString(contextValue),
+    example: stringOrEmpty(word.example),
+    synonyms: nullableString(word.synonyms),
+    antonyms: nullableString(word.antonyms),
+    createdAt: stringOrEmpty(word.createdAt),
+    updatedAt: stringOrEmpty(word.updatedAt),
+  }
+}
+
+function normalizeWords(value: unknown): vocabularyApi.Word[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const normalized = value.map(normalizeWordSnapshot)
+  return normalized.every((word): word is vocabularyApi.Word => word !== undefined) ? normalized : undefined
 }
 
 function newestFirst<T extends { createdAt: string; id: string }>(items: T[]) {
@@ -155,7 +237,7 @@ export function WorkspacePage() {
     queryKey: vocabularyKeys.boards,
     queryFn: vocabularyApi.listBoards,
     initialData: () => userId
-      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'boards'), isBoardSummaries)
+      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'boards'), normalizeBoardSummaries)
       : undefined,
   })
   const boards = useMemo(() => boardsQuery.data ?? [], [boardsQuery.data])
@@ -170,7 +252,7 @@ export function WorkspacePage() {
     queryFn: () => vocabularyApi.getBoard(activeBoardId!),
     enabled: Boolean(activeBoardId),
     initialData: () => userId && activeBoardId
-      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'board', activeBoardId), isBoardDetail)
+      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'board', activeBoardId), normalizeBoardDetail)
       : undefined,
   })
 
@@ -193,10 +275,10 @@ export function WorkspacePage() {
 
   const activeWordsQuery = useQuery({
     queryKey: vocabularyKeys.words(activePage?.id ?? 'none'),
-    queryFn: () => vocabularyApi.listWords(activeBoardId!, activePage!.id),
+    queryFn: () => vocabularyApi.listWords(activePage!.id),
     enabled: Boolean(activeBoardId && activePage),
     initialData: () => userId && activePage
-      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'words', activePage.id), isWords)
+      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'words', activePage.id), normalizeWords)
       : undefined,
   })
 
@@ -308,7 +390,7 @@ export function WorkspacePage() {
 
   const renamePage = useMutation({
     mutationFn: (input: { target: RenameTarget; name: string }) =>
-      vocabularyApi.updatePage(input.target.boardId, input.target.pageId, { name: input.name }),
+      vocabularyApi.updatePage(input.target.pageId, { name: input.name }),
     onSuccess: (page, input) => {
       queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(input.target.boardId), (board) => board
         ? { ...board, pages: board.pages.map((item) => item.id === page.id ? page : item) }
@@ -335,7 +417,7 @@ export function WorkspacePage() {
   })
 
   const deletePage = useMutation({
-    mutationFn: (target: Extract<DeleteTarget, { kind: 'page' }>) => vocabularyApi.deletePage(target.boardId, target.pageId),
+    mutationFn: (target: Extract<DeleteTarget, { kind: 'page' }>) => vocabularyApi.deletePage(target.pageId),
     onSuccess: (entry, target) => {
       const boardKey = vocabularyKeys.board(target.boardId)
       const current = queryClient.getQueryData<vocabularyApi.BoardDetail>(boardKey)
@@ -555,7 +637,6 @@ export function WorkspacePage() {
           ) : activeBoard && activePage ? (
             <VocabTable
               key={`${activeBoard.id}:${activeBoard.preferences.updatedAt ?? 'default'}`}
-              boardId={activeBoard.id}
               page={activePage}
               preferences={activeBoard.preferences}
               searchTerm={wordSearch}

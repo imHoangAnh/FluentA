@@ -15,6 +15,8 @@ export type ShellNavigationItem = {
   icon?: LucideIcon
   end?: boolean
   isActive?: (pathname: string) => boolean
+  dialogQueryParam?: string
+  renderDialog?: (open: boolean, onOpenChange: (open: boolean) => void) => ReactNode
 }
 
 export type ShellNavigationSection = {

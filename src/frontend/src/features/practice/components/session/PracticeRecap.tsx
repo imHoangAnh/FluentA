@@ -1,8 +1,5 @@
-import type { FlashcardCard } from '@/features/flashcards'
-import type { PracticeReviewLevel } from '../../api/practice.api'
-import { formatIpa, formatWordClass, hasText } from './practiceFormatters'
-
-type PracticeReviewStatus = 'added' | 'alreadyInReview'
+import type { PracticeReviewLevel, PracticeReviewStatus, PracticeSessionItem } from '../../api/practice.api'
+import { formatIpa, formatWordType, hasText } from './practiceFormatters'
 
 const reviewLevels: ReadonlyArray<{ level: PracticeReviewLevel; label: string }> = [
   { level: 0, label: 'New' },
@@ -14,59 +11,40 @@ const reviewLevels: ReadonlyArray<{ level: PracticeReviewLevel; label: string }>
 ]
 
 type PracticeRecapProps = {
-  card: FlashcardCard
+  item: PracticeSessionItem
   reviewStatus: PracticeReviewStatus | null
-  isAddingToReview: boolean
   isSaving: boolean
-  addError: boolean
   saveError: boolean
-  isLastCard: boolean
-  canGoPrevious: boolean
-  onPrevious: () => void
-  onSelectLevel: (initialLevel: PracticeReviewLevel) => void
+  onSelectLevel: (level: PracticeReviewLevel) => void
   onSkip: () => void
 }
 
-export function PracticeRecap({ card, reviewStatus, isAddingToReview, isSaving, addError, saveError, isLastCard, canGoPrevious, onPrevious, onSelectLevel, onSkip }: PracticeRecapProps) {
-  const controlsDisabled = isAddingToReview || isSaving
-  const levelsDisabled = controlsDisabled || reviewStatus !== null
+export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelectLevel, onSkip }: PracticeRecapProps) {
+  const activeInReview = reviewStatus === 'alreadyInReview' || item.alreadyInReview
+  const levelsDisabled = isSaving || activeInReview || reviewStatus === 'added'
+  const wordDetails = [hasText(item.type) ? formatWordType(item.type) : '', hasText(item.ipaPronunciation) ? formatIpa(item.ipaPronunciation) : '']
+    .filter(Boolean)
+    .join('  ·  ')
 
   return (
-    <div className="review-recap practice-recap" data-testid="practice-answer-reveal">
-      <header className="review-recap__header">
-        <h2>
-          {card.word}
-          {hasText(card.wordClass) ? <span> ({formatWordClass(card.wordClass)})</span> : null}
-        </h2>
-        {hasText(card.ipaPronunciation) ? <p>{formatIpa(card.ipaPronunciation)}</p> : null}
-      </header>
+    <div className="practice-recap">
+      <h2 className="practice-exercise__prompt">Review the word and choose how well you remember it.</h2>
 
-      {hasText(card.meaningEn) || hasText(card.meaningVn) || hasText(card.example) || hasText(card.synonyms) || hasText(card.antonyms) ? (
-        <div className="review-recap__details practice-recap__details">
-          {hasText(card.meaningEn) ? <p><strong><em>Definition:</em></strong> {card.meaningEn}</p> : null}
-          {hasText(card.meaningVn) ? <p><strong><em>Meaning:</em></strong> {card.meaningVn}</p> : null}
-          {hasText(card.example) ? <p><strong><em>Example:</em></strong> {card.example}</p> : null}
-          {hasText(card.synonyms) ? <p><strong><em>Synonyms:</em></strong> {card.synonyms}</p> : null}
-          {hasText(card.antonyms) ? <p><strong><em>Antonyms:</em></strong> {card.antonyms}</p> : null}
+      <div className="practice-recap__content">
+        <header className="practice-recap__word">
+          <h3>{item.word}</h3>
+          {wordDetails ? <p>{wordDetails}</p> : null}
+        </header>
+
+        <div className="practice-recap__details">
+          {hasText(item.meaning) ? <div><span>Meaning</span><p>{item.meaning}</p></div> : null}
+          {hasText(item.context) ? <div><span>Usage context</span><p>{item.context}</p></div> : null}
+          {hasText(item.example) ? <div><span>Example</span><p className="practice-recap__example">{item.example}</p></div> : null}
         </div>
-      ) : null}
+      </div>
 
-      {reviewStatus === 'alreadyInReview' ? <p className="practice-recap-status" role="status">Already in Review</p> : null}
-      {reviewStatus === 'added' ? <p className="practice-recap-status" role="status">Added to Review</p> : null}
-      {isAddingToReview ? <p className="practice-recap-status" role="status" aria-live="polite">Adding to Review...</p> : null}
-
-      <div className="practice-recap-actions" data-testid="practice-recap-actions" aria-busy={controlsDisabled}>
-        <button
-          className="practice-recap__nav-button practice-recap__nav-button--previous"
-          type="button"
-          onClick={onPrevious}
-          disabled={!canGoPrevious || controlsDisabled}
-          aria-label="Previous"
-          title="Previous practice step"
-        >
-          <span aria-hidden="true">&lt;</span>
-        </button>
-
+      <section className="practice-recap__levels-section" aria-label="Choose a review level">
+        <p className="practice-recap__question">How well did you recall this word?</p>
         <div className="practice-recap__levels" role="group" aria-label="Choose initial review level">
           {reviewLevels.map(({ level, label }) => (
             <button
@@ -75,6 +53,8 @@ export function PracticeRecap({ card, reviewStatus, isAddingToReview, isSaving, 
               type="button"
               onClick={() => onSelectLevel(level)}
               disabled={levelsDisabled}
+              aria-pressed={item.selectedLevel === level}
+              data-level={level}
               data-testid={`practice-review-level-${level}`}
               title={`Add to Review as ${label}`}
             >
@@ -83,20 +63,21 @@ export function PracticeRecap({ card, reviewStatus, isAddingToReview, isSaving, 
           ))}
         </div>
 
-        <button
-          className="practice-recap__nav-button practice-recap__nav-button--next"
-          type="button"
-          onClick={onSkip}
-          disabled={controlsDisabled}
-          aria-label="Skip"
-          title={isLastCard ? 'Skip and finish practice' : 'Skip to the next card'}
-        >
-          <span aria-hidden="true">&gt;</span>
-        </button>
+        {activeInReview ? (
+          <p className="practice-recap__pool-status" role="status">
+            <span aria-hidden="true" className="practice-recap__status-dot" />
+            Already in review
+          </p>
+        ) : null}
+        {reviewStatus === 'added' ? <p className="practice-recap__pool-status" role="status">Added to Review</p> : null}
+        {isSaving ? <p className="practice-recap__pool-status" role="status" aria-live="polite">Saving practice progress…</p> : null}
+      </section>
+
+      <div className="practice-recap__actions" data-testid="practice-recap-actions" aria-busy={isSaving}>
+        <button type="button" onClick={onSkip} disabled={isSaving} aria-label="Skip recap">Skip</button>
       </div>
 
-      {addError ? <p className="flashcard-status flashcard-status--error" role="alert">Unable to add this word to Review. Try again.</p> : null}
-      {saveError ? <p className="flashcard-status flashcard-status--error" role="alert">Unable to save this practice result. Try again.</p> : null}
+      {saveError ? <p className="practice-recap__error" role="alert">Unable to save this practice result. Try again.</p> : null}
     </div>
   )
 }

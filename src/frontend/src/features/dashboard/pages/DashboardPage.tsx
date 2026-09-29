@@ -99,7 +99,7 @@ export function DashboardPage() {
   const todosQuery = useQuery({ queryKey: todoKeys.day(today), queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
   const habitsQuery = useQuery({ queryKey: habitKeys.list(timeZoneId), queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
   const countdownsQuery = useQuery({ queryKey: countdownKeys.events, queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
-  const flashcardDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
+  const reviewDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
   const projectBoardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards, enabled: visible('project') })
   const pomodoroCurrentQuery = useQuery({ queryKey: pomodoroKeys.current, queryFn: pomodoroApi.getPomodoroCurrent, enabled: visible('pomodoro') })
   const pomodoroTodayQuery = useQuery({ queryKey: pomodoroKeys.today, queryFn: pomodoroApi.getPomodoroToday, enabled: visible('pomodoro') })
@@ -123,13 +123,11 @@ export function DashboardPage() {
     .filter((countdown) => !countdown.isCompleted)
     .toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime())
     .slice(0, 1), [countdownsQuery.data])
-  const flashcardDashboard = flashcardDashboardQuery.data
-  const dueReview = (flashcardDashboard?.overdue ?? 0) + (flashcardDashboard?.dueToday ?? 0)
-  const learningCards = flashcardDashboard?.newCards ?? 0
+  const dueReview = reviewDashboardQuery.data?.dueCount ?? 0
   const isLoading = (visible('todo') && todosQuery.isLoading)
     || (visible('habits') && habitsQuery.isLoading)
     || (visible('countdown') && countdownsQuery.isLoading)
-    || (visible('review') && flashcardDashboardQuery.isLoading)
+    || (visible('review') && reviewDashboardQuery.isLoading)
     || (visible('project') && projectBoardsQuery.isLoading)
     || (visible('pomodoro') && (pomodoroCurrentQuery.isLoading || pomodoroTodayQuery.isLoading))
 
@@ -154,7 +152,7 @@ export function DashboardPage() {
   }
 
   function renderWidget(id: DashboardWidgetId) {
-    if (id === 'review') return flashcardDashboardQuery.isError ? <WidgetError label="Review queue" /> : <ReviewQueueWidget dueReview={dueReview} learningCards={learningCards} />
+    if (id === 'review') return reviewDashboardQuery.isError ? <WidgetError label="Review queue" /> : <ReviewQueueWidget dueReview={dueReview} />
     if (id === 'todo') return todosQuery.isError ? <WidgetError label="Todo" /> : <TodoWidget todos={todos} onToggle={(todo) => todoToggle.mutate(todo)} />
     if (id === 'countdown') return countdownsQuery.isError ? <WidgetError label="Countdowns" /> : <CountdownWidget countdown={countdowns[0]} remainingText={(targetDate) => remainingText(targetDate, now)} />
     if (id === 'habits') return habitsQuery.isError ? <WidgetError label="Habit tracker" /> : <HabitWidget habits={habits} onToggle={(habit) => habitToggle.mutate(habit)} />

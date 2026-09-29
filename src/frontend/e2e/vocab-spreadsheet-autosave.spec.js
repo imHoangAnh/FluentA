@@ -12,31 +12,31 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
   await page.getByTestId('page-name-input').fill('Unit One');
   await page.getByTestId('create-page-button').click();
 
-  await page.getByLabel('New word', { exact: true }).fill('mitigate');
-  await page.getByLabel('New Vietnamese meaning').fill('giảm nhẹ');
-  await page.getByLabel('New IPA pronunciation').fill('/ˈmɪt.ɪ.ɡeɪt/');
-  await page.getByLabel('New definition').fill('make less severe');
-  await page.getByLabel('New word class').click();
+  await page.getByLabel('Word for new word').fill('mitigate');
+  await page.getByLabel('Meaning for new word').fill('giảm nhẹ');
+  await page.getByLabel('IPA for new word').fill('/ˈmɪt.ɪ.ɡeɪt/');
+  await page.getByLabel('Context for new word').fill('used to describe making a risk less severe');
+  await page.getByLabel('Type for new word').click();
   await page.getByRole('option', { name: 'Verb', exact: true }).click();
-  await page.getByLabel('New example').fill('Mitigate risk.');
+  await page.getByLabel('Example for new word').fill('Mitigate risk.');
   await page.getByTestId('create-word-button').click();
-  await expect(page.getByLabel('Word for mitigate')).toBeVisible();
+  await expect(page.getByLabel('Word for word')).toBeVisible();
 
-  await page.getByLabel('Word for mitigate').fill('mitigation');
-  await page.getByLabel('Word for mitigate').press('Tab');
-  await expect(page.getByLabel('Vietnamese meaning for mitigation')).toBeFocused();
-  await page.getByLabel('Vietnamese meaning for mitigation').press('Shift+Tab');
-  await expect(page.getByLabel('Word for mitigation')).toBeFocused();
+  await page.getByLabel('Word for word').fill('mitigation');
+  await page.getByLabel('Word for word').press('Tab');
+  await expect(page.getByLabel('Meaning for word')).toBeFocused();
+  await page.getByLabel('Meaning for word').press('Shift+Tab');
+  await expect(page.getByLabel('Word for word')).toBeFocused();
 
-  await page.getByLabel('Vietnamese meaning for mitigation').fill('discard me');
-  await page.getByLabel('Vietnamese meaning for mitigation').press('Escape');
-  await expect(page.getByLabel('Vietnamese meaning for mitigation')).toHaveValue('giảm nhẹ');
+  await page.getByLabel('Meaning for word').fill('discard me');
+  await page.getByLabel('Meaning for word').press('Escape');
+  await expect(page.getByLabel('Meaning for word')).toHaveValue('giảm nhẹ');
 
-  await page.getByLabel('Antonyms for mitigation').press('Enter');
-  await expect(page.getByLabel('New word', { exact: true })).toBeFocused();
+  await page.getByLabel('Antonyms for word').press('Enter');
+  await expect(page.getByLabel('Word for new word')).toBeFocused();
 
   let failNextCellSave = true;
-  await page.route('**/api/v1/boards/*/words/*/cells', async (route) => {
+  await page.route('**/api/v1/vocabs/words/*', async (route) => {
     if (failNextCellSave) {
       failNextCellSave = false;
       await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false }) });
@@ -44,23 +44,23 @@ test('spreadsheet keyboard autosave preserves failed drafts and retries', async 
     }
     await route.continue();
   });
-  await page.getByLabel('Definition for mitigation').fill('reduction of harm');
-  await page.getByLabel('Definition for mitigation').press('Tab');
+  await page.getByLabel('Context for word').fill('used to describe reduction of harm');
+  await page.getByLabel('Context for word').press('Tab');
   await expect(page.getByText('Save failed.')).toBeVisible();
-  await expect(page.getByLabel('Definition for mitigation')).toHaveValue('reduction of harm');
+  await expect(page.getByLabel('Context for word')).toHaveValue('used to describe reduction of harm');
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByText('Save failed.')).toBeHidden();
-  await expect(page.getByLabel('Definition for mitigation')).toHaveValue('reduction of harm');
+  await expect(page.getByLabel('Context for word')).toHaveValue('used to describe reduction of harm');
 
-  await page.getByLabel('New word', { exact: true }).fill('retain');
-  await page.getByLabel('New Vietnamese meaning').fill('giữ lại');
-  await page.getByLabel('New IPA pronunciation').fill('/rɪˈteɪn/');
-  await page.getByLabel('New definition').fill('continue to have');
-  await page.getByLabel('New word class').click();
+  await page.getByLabel('Word for new word').fill('retain');
+  await page.getByLabel('Meaning for new word').fill('giữ lại');
+  await page.getByLabel('IPA for new word').fill('/rɪˈteɪn/');
+  await page.getByLabel('Context for new word').fill('used to describe continuing to have something');
+  await page.getByLabel('Type for new word').click();
   await page.getByRole('option', { name: 'Verb', exact: true }).click();
-  await page.getByLabel('New example').fill('Retain the value.');
-  await page.getByLabel('New antonyms').press('Enter');
-  await expect(page.getByLabel('Word for retain')).toBeVisible();
-  await expect(page.getByLabel('New word', { exact: true })).toBeFocused();
+  await page.getByLabel('Example for new word').fill('Retain the value.');
+  await page.getByLabel('Antonyms for new word').press('Enter');
+  await expect(page.getByLabel('Word for word')).toBeVisible();
+  await expect(page.getByLabel('Word for new word')).toBeFocused();
 });
 

@@ -1,4 +1,3 @@
-using FluentA.Application.BoundedContexts.Flashcards;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
@@ -62,35 +61,35 @@ public sealed class VocabularyServiceTests
     public async Task CreateUpdateDeleteWord_UsesOwnedEntities()
     {
         var repository = new FakeVocabularyRepository();
-        var notifier = new RecordingFlashcardSyncNotifier();
         var reviewCleanup = new RecordingVocabularyReviewCleanupPort();
-        var service = new VocabularyService(repository, notifier, reviewCleanup);
+        var service = new VocabularyService(repository, reviewCleanup);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
 
-        var created = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("mitigate", "verb"));
-        var updated = await service.UpdateWordAsync(userId, board.Value.Id, created.Value!.Id, Word("mitigation", "noun") with
-        {
-            IpaPronunciation = "/mItI'geISn/",
-            Definition = "risk reduction",
-            Synonyms = "reduction",
-            Antonyms = "aggravation",
-        });
-        var deleted = await service.DeleteWordAsync(userId, board.Value.Id, created.Value.Id);
+        var created = await service.CreateWordAsync(userId, page.Value!.Id, Word("mitigate", "verb"));
+        var updated = await service.UpdateWordAsync(userId, created.Value!.Id, new WordPatchRequest(
+            Word: "mitigation",
+            Meaning: "nghia tieng Viet",
+            IpaPronunciation: "/mItI'geISn/",
+            Type: "noun",
+            Context: "risk reduction",
+            Example: "Example sentence.",
+            Synonyms: "reduction",
+            Antonyms: "aggravation"));
+        var deleted = await service.DeleteWordAsync(userId, created.Value.Id);
 
         Assert.True(created.IsSuccess);
         Assert.Equal("/mItI'geISn/", updated.Value!.IpaPronunciation);
         Assert.Equal("reduction", updated.Value.Synonyms);
         Assert.True(deleted.IsSuccess);
         Assert.DoesNotContain(repository.Words, word => word.DeletedAt is null);
-        Assert.Equal(2, notifier.SavedWords.Count);
-        Assert.All(notifier.UpdatedDeckGroups, update => Assert.Contains(page.Value.Id, update.DeckIds));
         Assert.Equal([created.Value.Id], reviewCleanup.RemovedWordIds);
     }
 
-    [Fact]
-    public async Task CreateWord_RejectsInvalidClass()
+    [Theory]
+    [InlineData("invalid")]
+    public async Task CreateWord_RejectsUnsupportedType(string wordType)
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
@@ -98,20 +97,29 @@ public sealed class VocabularyServiceTests
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
 
-        var result = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "invalid"));
+        var result = await service.CreateWordAsync(userId, page.Value!.Id, Word("mitigate", wordType));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
     }
 
     [Theory]
+    [InlineData("noun")]
+    [InlineData("verb")]
+    [InlineData("adjective")]
+    [InlineData("adverb")]
+    [InlineData("conjunction")]
+    [InlineData("preposition")]
+    [InlineData("phrase")]
     [InlineData("collocation")]
+    [InlineData("expression")]
+    [InlineData("slang")]
     [InlineData("phrasalverb")]
     [InlineData("idiom")]
-    [InlineData("proverb")]
     [InlineData("nounphrase")]
     [InlineData("verbphrase")]
-    public async Task CreateWord_AcceptsAndReturnsExtendedClasses(string wordClass)
+    [InlineData("other")]
+    public async Task CreateWord_AcceptsAndReturnsSupportedTypes(string wordType)
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
@@ -119,41 +127,47 @@ public sealed class VocabularyServiceTests
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("Expressions", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
 
-        var result = await service.CreateWordAsync(userId, board.Value.Id, page.Value!.Id, Word("take part", wordClass));
+        var result = await service.CreateWordAsync(userId, page.Value!.Id, Word("take part", wordType));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(wordClass, result.Value!.Class);
+        Assert.Equal(wordType, result.Value!.Type);
     }
 
-    [Fact]
-    public async Task CreateWord_DoesNotNotifyWhenValidationFails()
-    {
-        var notifier = new RecordingFlashcardSyncNotifier();
-        var service = new VocabularyService(new FakeVocabularyRepository(), notifier);
-
-        var result = await service.CreateWordAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Word("mitigate", "invalid"));
-
-        Assert.False(result.IsSuccess);
-        Assert.Empty(notifier.SavedWords);
-        Assert.Empty(notifier.UpdatedDeckGroups);
-    }
-
-    [Fact]
-    public async Task CreateWord_DoesNotNotifyWhenRepositoryCommitFails()
+    [Theory]
+    [InlineData("adj", "adjective")]
+    [InlineData("adv", "adverb")]
+    [InlineData("proverb", "expression")]
+    public async Task CreateWord_AcceptsLegacyTypeAliasesAndReturnsCanonicalType(string alias, string canonicalType)
     {
         var repository = new FakeVocabularyRepository();
-        var notifier = new RecordingFlashcardSyncNotifier();
-        var service = new VocabularyService(repository, notifier);
+        var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
-        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
+        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("Expressions", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        repository.FailCommits = true;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb")));
+        var result = await service.CreateWordAsync(userId, page.Value!.Id, Word("take part", alias));
 
-        Assert.Empty(notifier.SavedWords);
-        Assert.Empty(notifier.UpdatedDeckGroups);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(canonicalType, result.Value!.Type);
+    }
+
+    [Theory]
+    [InlineData("adj", "adjective")]
+    [InlineData("adv", "adverb")]
+    [InlineData("proverb", "expression")]
+    public async Task UpdateWordPatch_AcceptsLegacyTypeAliasesAndReturnsCanonicalType(string alias, string canonicalType)
+    {
+        var repository = new FakeVocabularyRepository();
+        var service = new VocabularyService(repository);
+        var userId = Guid.NewGuid();
+        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("Expressions", "en"));
+        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
+        var created = await service.CreateWordAsync(userId, page.Value!.Id, Word("take part", "noun"));
+
+        var result = await service.UpdateWordAsync(userId, created.Value!.Id, new WordPatchRequest(Type: alias));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(canonicalType, result.Value!.Type);
     }
 
     [Fact]
@@ -168,16 +182,16 @@ public sealed class VocabularyServiceTests
             userId,
             board.Value!.Id,
             new UpdateBoardPreferencesRequest(
-                ["definition", "note"],
-                ["word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms"],
+                ["context"],
+                ["word", "meaning", "ipaPronunciation", "context", "type", "example", "synonyms", "antonyms"],
                 new Dictionary<string, int> { ["word"] = 260, ["example"] = 360 }));
         var loaded = await service.GetBoardAsync(userId, board.Value.Id);
         var foreign = await service.GetBoardAsync(Guid.NewGuid(), board.Value.Id);
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(["definition", "note"], updated.Value!.HiddenColumns);
+        Assert.Equal(["context"], updated.Value!.HiddenColumns);
         Assert.Equal(260, updated.Value.ColumnWidths["word"]);
-        Assert.Equal(["definition", "note"], loaded.Value!.Preferences.HiddenColumns);
+        Assert.Equal(["context"], loaded.Value!.Preferences.HiddenColumns);
         Assert.False(foreign.IsSuccess);
     }
 
@@ -199,43 +213,41 @@ public sealed class VocabularyServiceTests
     }
 
     [Fact]
-    public async Task UpdateWordCell_ChangesOnlyNamedCell()
-    {
-        var repository = new FakeVocabularyRepository();
-        var notifier = new RecordingFlashcardSyncNotifier();
-        var service = new VocabularyService(repository, notifier);
-        var userId = Guid.NewGuid();
-        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
-        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var created = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb"));
-        notifier.SavedWords.Clear();
-
-        var updated = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value!.Id, new UpdateWordCellRequest("ipaPronunciation", "/mItIgeIt/"));
-
-        Assert.Equal("/mItIgeIt/", updated.Value!.IpaPronunciation);
-        Assert.Equal("reduce harm", updated.Value.Definition);
-        Assert.Single(notifier.SavedWords);
-    }
-
-    [Fact]
-    public async Task UpdateWordCell_RejectsInvalidRequiredValue()
+    public async Task UpdateWordPatch_ChangesOnlyProvidedFields()
     {
         var repository = new FakeVocabularyRepository();
         var service = new VocabularyService(repository);
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
-        var created = await service.CreateWordAsync(userId, board.Value!.Id, page.Value!.Id, Word("mitigate", "verb"));
+        var created = await service.CreateWordAsync(userId, page.Value!.Id, Word("mitigate", "verb"));
 
-        var result = await service.UpdateWordCellAsync(userId, board.Value.Id, created.Value!.Id, new UpdateWordCellRequest("word", ""));
+        var updated = await service.UpdateWordAsync(userId, created.Value!.Id, new WordPatchRequest(IpaPronunciation: "/mItIgeIt/"));
+
+        Assert.Equal("/mItIgeIt/", updated.Value!.IpaPronunciation);
+        Assert.Equal("reduce harm", updated.Value.Context);
+        Assert.Equal("mitigate", updated.Value.Word);
+    }
+
+    [Fact]
+    public async Task UpdateWordPatch_RejectsInvalidRequiredValue()
+    {
+        var repository = new FakeVocabularyRepository();
+        var service = new VocabularyService(repository);
+        var userId = Guid.NewGuid();
+        var board = await service.CreateBoardAsync(userId, new CreateBoardRequest("IELTS", "en"));
+        var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreatePageRequest("Unit 1"));
+        var created = await service.CreateWordAsync(userId, page.Value!.Id, Word("mitigate", "verb"));
+
+        var result = await service.UpdateWordAsync(userId, created.Value!.Id, new WordPatchRequest(Word: ""));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((VocabularyError)result.Error!).Code);
     }
 
-    private static WordRequest Word(string word, string wordClass)
+    private static WordRequest Word(string word, string wordType)
     {
-        return new WordRequest(word, "nghia tieng Viet", "/mItIgeIt/", wordClass, "reduce harm", "Example sentence.", null, "reduce", "worsen");
+        return new WordRequest(word, "nghia tieng Viet", "/mItIgeIt/", wordType, "reduce harm", "Example sentence.", "reduce", "worsen");
     }
 
     private sealed class FakeVocabularyRepository : IVocabularyRepository
@@ -256,12 +268,12 @@ public sealed class VocabularyServiceTests
         public Task<VocabBoard?> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
             => Task.FromResult(_boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt is null));
 
-        public Task<VocabPage?> GetPageAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
-            => Task.FromResult(_pages.FirstOrDefault(page => page.BoardId == boardId && page.Id == pageId && page.DeletedAt is null));
+        public Task<VocabPage?> GetPageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_pages.FirstOrDefault(page => page.Id == pageId && page.DeletedAt is null));
 
-        public Task<VocabWord?> GetWordAsync(Guid userId, Guid boardId, Guid wordId, CancellationToken cancellationToken = default)
+        public Task<VocabWord?> GetWordAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
         {
-            var ownedPageIds = _pages.Where(page => page.BoardId == boardId && page.DeletedAt is null).Select(page => page.Id).ToHashSet();
+            var ownedPageIds = _pages.Where(page => page.DeletedAt is null).Select(page => page.Id).ToHashSet();
             return Task.FromResult(Words.FirstOrDefault(word => word.Id == wordId && ownedPageIds.Contains(word.PageId) && word.DeletedAt is null));
         }
 
@@ -283,7 +295,7 @@ public sealed class VocabularyServiceTests
         public Task<VocabBoardPreference?> GetBoardPreferenceAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
             => Task.FromResult(Preferences.FirstOrDefault(preference => preference.UserId == userId && preference.BoardId == boardId && preference.DeletedAt is null));
 
-        public Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<VocabWord>>(Words.Where(word => word.PageId == pageId && word.DeletedAt is null).ToList());
 
         public Task<IReadOnlyList<VocabWord>> ListTrashedWordsAsync(IReadOnlyCollection<Guid> pageIds, DateTime trashedAt, CancellationToken cancellationToken = default) =>
@@ -320,8 +332,6 @@ public sealed class VocabularyServiceTests
         public Task UpdatePageAsync(VocabPage page, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateWordAsync(VocabWord word, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task UpdateBoardPreferenceAsync(VocabBoardPreference preference, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task UpdateFixedCellAsync(VocabWord word, string columnKey, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
         public Task SoftDeleteBoardAsync(VocabBoard board, DateTime trashedAt, CancellationToken cancellationToken = default)
         {
             board.SoftDelete(trashedAt);
@@ -355,24 +365,6 @@ public sealed class VocabularyServiceTests
                 throw new InvalidOperationException("Simulated commit failure.");
             }
 
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class RecordingFlashcardSyncNotifier : IFlashcardSyncNotifier
-    {
-        public List<(Guid UserId, Guid WordId, Guid PageId)> SavedWords { get; } = [];
-        public List<(Guid UserId, Guid BoardId, IReadOnlyList<Guid> DeckIds)> UpdatedDeckGroups { get; } = [];
-
-        public Task WordSavedAsync(Guid userId, Guid wordId, Guid pageId, CancellationToken cancellationToken = default)
-        {
-            SavedWords.Add((userId, wordId, pageId));
-            return Task.CompletedTask;
-        }
-
-        public Task DecksUpdatedAsync(Guid userId, Guid boardId, IReadOnlyList<Guid> deckIds, CancellationToken cancellationToken = default)
-        {
-            UpdatedDeckGroups.Add((userId, boardId, deckIds));
             return Task.CompletedTask;
         }
     }

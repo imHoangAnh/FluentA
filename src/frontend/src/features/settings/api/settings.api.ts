@@ -1,11 +1,9 @@
-import type { PracticeSettings } from '@/features/practice'
 import type { UserProfile } from '@/features/auth'
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
 
 export type SettingsPayload = {
   profile: UserProfile
-  practiceSettings: PracticeSettings
 }
 
 export async function getSettings() {

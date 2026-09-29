@@ -43,7 +43,7 @@ type CreatePageDialogProps = CreateDialogProps & {
   onConfirm: (name: string) => void
 }
 
-const coreColumns = ['Word', 'Meaning', 'IPA', 'Class', 'Example'] as const
+const coreColumns = ['Word', 'Meaning', 'IPA', 'Type', 'Example'] as const
 
 export function CreateBoardDialog(props: CreateBoardDialogProps) {
   return (

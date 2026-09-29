@@ -5,9 +5,9 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 
 internal static class VocabularyRequestValidator
 {
-    private static readonly HashSet<string> HideableColumns = ["definition", "note", "synonyms", "antonyms"];
+    private static readonly HashSet<string> HideableColumns = ["context", "synonyms", "antonyms"];
     internal static IReadOnlyList<string> FixedColumnOrder { get; } = Array.AsReadOnly(
-        new[] { "word", "meaningVn", "ipaPronunciation", "definition", "class", "example", "note", "synonyms", "antonyms" });
+        new[] { "word", "meaning", "ipaPronunciation", "context", "type", "example", "synonyms", "antonyms" });
 
     public static Dictionary<string, string[]> ValidateBoard(string? name, string? language)
     {
@@ -71,29 +71,68 @@ internal static class VocabularyRequestValidator
         return errors;
     }
 
-    public static (Dictionary<string, string[]> Errors, WordClass? WordClass) ValidateWord(WordRequest request)
+    public static (Dictionary<string, string[]> Errors, WordType? WordType) ValidateWord(WordRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         ValidateRequired(errors, "word", request.Word, 240);
-        ValidateRequired(errors, "meaningVn", request.MeaningVn, 1000);
+        ValidateRequired(errors, "meaning", request.Meaning, 1000);
         ValidateRequired(errors, "ipaPronunciation", request.IpaPronunciation, 2000);
-        ValidateOptional(errors, "definition", request.Definition, 4000);
+        ValidateOptional(errors, "context", request.Context, 4000);
         ValidateRequired(errors, "example", request.Example, 2000);
-        ValidateOptional(errors, "note", request.Note, 4000);
         ValidateOptional(errors, "synonyms", request.Synonyms, 2000);
         ValidateOptional(errors, "antonyms", request.Antonyms, 2000);
 
-        WordClass? wordClass = null;
-        if (Enum.TryParse<WordClass>(request.Class, true, out var parsedClass) && Enum.IsDefined(parsedClass))
+        WordType? wordType = null;
+        if (TryParseWordType(request.Type, out var parsedType))
         {
-            wordClass = parsedClass;
+            wordType = parsedType;
         }
         else
         {
-            errors["class"] = ["Class must be noun, verb, adj, adv, phrase, or other."];
+            errors["type"] = ["Type must be a supported vocabulary type."];
         }
 
-        return (errors, wordClass);
+        return (errors, wordType);
+    }
+
+    public static (Dictionary<string, string[]> Errors, WordType? WordType) ValidateWordPatch(WordPatchRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        ValidateIfProvided(errors, "word", request.Word, 240);
+        ValidateIfProvided(errors, "meaning", request.Meaning, 1000);
+        ValidateIfProvided(errors, "ipaPronunciation", request.IpaPronunciation, 2000);
+        ValidateOptional(errors, "context", request.Context, 4000);
+        ValidateIfProvided(errors, "example", request.Example, 2000);
+        ValidateOptional(errors, "synonyms", request.Synonyms, 2000);
+        ValidateOptional(errors, "antonyms", request.Antonyms, 2000);
+
+        WordType? wordType = null;
+        if (request.Type is not null)
+        {
+            if (TryParseWordType(request.Type, out var parsedType))
+            {
+                wordType = parsedType;
+            }
+            else
+            {
+                errors["type"] = ["Type must be a supported vocabulary type."];
+            }
+        }
+
+        return (errors, wordType);
+    }
+
+    private static bool TryParseWordType(string? value, out WordType wordType)
+    {
+        var normalizedValue = value?.Trim().ToLowerInvariant() switch
+        {
+            "adj" => nameof(WordType.Adjective),
+            "adv" => nameof(WordType.Adverb),
+            "proverb" => nameof(WordType.Expression),
+            _ => value
+        };
+
+        return Enum.TryParse(normalizedValue, true, out wordType) && Enum.IsDefined(wordType);
     }
 
     public static Dictionary<string, string[]> ValidatePreferences(UpdateBoardPreferencesRequest request)
@@ -145,6 +184,14 @@ internal static class VocabularyRequestValidator
         if (!string.IsNullOrWhiteSpace(value) && value.Trim().Length > maxLength)
         {
             errors[field] = [$"{field} must be at most {maxLength} characters."];
+        }
+    }
+
+    private static void ValidateIfProvided(Dictionary<string, string[]> errors, string field, string? value, int maxLength)
+    {
+        if (value is not null)
+        {
+            ValidateRequired(errors, field, value, maxLength);
         }
     }
 }

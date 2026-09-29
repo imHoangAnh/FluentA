@@ -5,7 +5,16 @@ export const reviewRoutes: RouteObject[] = [{
   path: 'review',
   handle: appShellRoute({
     title: 'Review',
-    contentClassName: 'h-screen min-h-0 overflow-hidden p-3 lg:p-4',
+    contentClassName: 'learning-figma-main',
+  }),
+  lazy: async () => ({ Component: (await import('./pages/ReviewSessionPage')).ReviewSessionPage }),
+}]
+
+export const reviewSessionRoutes: RouteObject[] = [{
+  path: 'review/sessions/:sessionId',
+  handle: appShellRoute({
+    title: 'Review session',
+    contentClassName: 'learning-figma-main',
   }),
   lazy: async () => ({ Component: (await import('./pages/ReviewSessionPage')).ReviewSessionPage }),
 }]

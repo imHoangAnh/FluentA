@@ -787,8 +787,8 @@ export function ProjectPage() {
         </AlertDialog>
       </div>
 
-      {message ? <p className="flashcard-status flashcard-status--error project-status-notice" role="alert">{message}</p> : null}
-      {(boardQuery.isError || boardsQuery.isError) ? <p className="flashcard-status flashcard-status--error project-status-notice" role="alert">Could not load Project data.</p> : null}
+      {message ? <p className="status-message status-message--error project-status-notice" role="alert">{message}</p> : null}
+      {(boardQuery.isError || boardsQuery.isError) ? <p className="status-message status-message--error project-status-notice" role="alert">Could not load Project data.</p> : null}
     </main>
   )
 }

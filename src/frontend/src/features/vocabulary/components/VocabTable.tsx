@@ -15,12 +15,11 @@ const textCellClassName = `${cellClassName} block h-auto resize-none overflow-hi
 
 const emptyWord = (): vocabularyApi.WordInput => ({
   word: '',
-  meaningVn: '',
+  meaning: '',
   ipaPronunciation: '',
-  definition: '',
-  class: 'noun',
+  type: 'noun',
+  context: '',
   example: '',
-  note: '',
   synonyms: '',
   antonyms: '',
 })
@@ -36,7 +35,6 @@ type Column = {
 }
 
 type VocabTableProps = {
-  boardId: string
   page: vocabularyApi.Page
   preferences: vocabularyApi.BoardPreferences
   searchTerm?: string
@@ -54,12 +52,11 @@ function resizeTextarea(element: HTMLTextAreaElement | null) {
 function toWordInput(word: vocabularyApi.Word): vocabularyApi.WordInput {
   return {
     word: word.word,
-    meaningVn: word.meaningVn,
+    meaning: word.meaning,
     ipaPronunciation: word.ipaPronunciation,
-    definition: word.definition ?? '',
-    class: word.class,
+    type: word.type,
+    context: word.context ?? '',
     example: word.example,
-    note: word.note ?? '',
     synonyms: word.synonyms ?? '',
     antonyms: word.antonyms ?? '',
   }
@@ -103,7 +100,7 @@ function SortableHeader({
   )
 }
 
-export function VocabTable({ boardId, page, preferences, searchTerm = '', onPreferencesChange }: VocabTableProps) {
+export function VocabTable({ page, preferences, searchTerm = '', onPreferencesChange }: VocabTableProps) {
   const queryClient = useQueryClient()
   const [newWord, setNewWord] = useState<vocabularyApi.WordInput>(emptyWord)
   const [isAddingWord, setIsAddingWord] = useState(false)
@@ -120,11 +117,11 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
   const addRowTriggerRef = useRef<HTMLButtonElement>(null)
 
   const wordsKey = vocabularyKeys.words(page.id)
-  const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(boardId, page.id) })
+  const wordsQuery = useQuery({ queryKey: wordsKey, queryFn: () => vocabularyApi.listWords(page.id) })
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase()
   const visibleWords = (wordsQuery.data ?? []).filter((word) => {
     if (!normalizedSearch) return true
-    return [word.word, word.meaningVn, word.ipaPronunciation, word.definition, word.class, word.example, word.note, word.synonyms, word.antonyms]
+    return [word.word, word.meaning, word.ipaPronunciation, word.type, word.context, word.example, word.synonyms, word.antonyms]
       .some((value) => String(value ?? '').toLocaleLowerCase().includes(normalizedSearch))
   })
   const sensors = useSensors(useSensor(PointerSensor))
@@ -142,12 +139,11 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
 
   const baseColumns: Column[] = [
     fixed('word', 'Word', 'word', 'text', true),
-    fixed('meaningVn', 'Meaning', 'Vietnamese meaning', 'textarea', true),
+    fixed('meaning', 'Meaning', 'meaning', 'textarea', true),
     fixed('ipaPronunciation', 'IPA', 'IPA pronunciation', 'text', true),
-    ...(!hidden.has('definition') ? [fixed('definition', 'Definition', 'definition', 'textarea')] : []),
-    fixed('class', 'Class', 'word class', 'select', true),
+    ...(!hidden.has('context') ? [fixed('context', 'Context', 'context', 'textarea')] : []),
+    fixed('type', 'Type', 'word type', 'select', true),
     fixed('example', 'Example', 'example', 'textarea', true),
-    ...(!hidden.has('note') ? [fixed('note', 'Note', 'note', 'textarea')] : []),
     ...(!hidden.has('synonyms') ? [fixed('synonyms', 'Synonyms', 'synonyms', 'textarea')] : []),
     ...(!hidden.has('antonyms') ? [fixed('antonyms', 'Antonyms', 'antonyms', 'textarea')] : []),
   ]
@@ -157,7 +153,7 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
   const firstKey = columns[0]?.key
 
   const createWord = useMutation({
-    mutationFn: (input: vocabularyApi.WordInput) => vocabularyApi.createWord(boardId, page.id, input),
+    mutationFn: (input: vocabularyApi.WordInput) => vocabularyApi.createWord(page.id, input),
     onSuccess: (word) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => [...current, word])
       setNewWord(emptyWord())
@@ -168,7 +164,7 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
   })
 
   const updateWord = useMutation({
-    mutationFn: (input: { id: string; word: vocabularyApi.WordInput }) => vocabularyApi.updateWord(boardId, input.id, input.word),
+    mutationFn: (input: { id: string; word: vocabularyApi.WordInput }) => vocabularyApi.updateWord(input.id, input.word),
     onSuccess: (updatedWord) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.map((word) => word.id === updatedWord.id ? updatedWord : word))
       setEditingWordId(null)
@@ -178,7 +174,7 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
   })
 
   const deleteWord = useMutation({
-    mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(boardId, target.id),
+    mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(target.id),
     onSuccess: (entry, target) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== target.id))
       if (editingWordId === target.id) {
@@ -328,7 +324,7 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
           onChange={updateValue}
           buttonRef={register}
           buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
-          options={vocabularyApi.WORD_CLASS_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+          options={vocabularyApi.WORD_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
         />
       )
     }
@@ -353,8 +349,8 @@ export function VocabTable({ boardId, page, preferences, searchTerm = '', onPref
 
   function renderReadOnlyCell(column: Column, word: vocabularyApi.Word): ReactNode {
     const value = column.value(word)
-    const displayValue = column.key === 'class'
-      ? vocabularyApi.WORD_CLASS_OPTIONS.find((option) => option.value === value)?.label ?? value
+    const displayValue = column.key === 'type'
+      ? vocabularyApi.WORD_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value
       : value
 
     return <div className="min-h-10 whitespace-pre-wrap break-words px-2 py-1.5 text-sm leading-5">{displayValue}</div>

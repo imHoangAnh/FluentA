@@ -4,9 +4,8 @@ import { dashboardRoutes } from '@/features/dashboard'
 import { notificationsRoutes } from '@/features/notifications'
 import { settingsRoutes } from '@/features/settings'
 import { vocabularyRoutes } from '@/features/vocabulary'
-import { flashcardRoutes } from '@/features/flashcards'
 import { practiceRoutes } from '@/features/practice'
-import { reviewRoutes } from '@/features/review'
+import { reviewRoutes, reviewSessionRoutes } from '@/features/review'
 import { todoRoutes } from '@/features/todo'
 import { projectRoutes } from '@/features/project'
 import { journalRoutes } from '@/features/journal'
@@ -31,9 +30,9 @@ export const protectedAppRoutes: RouteObject[] = [
   ...settingsRoutes,
   ...notificationsRoutes,
   ...vocabularyRoutes,
-  ...flashcardRoutes,
   ...practiceRoutes,
   ...reviewRoutes,
+  ...reviewSessionRoutes,
   ...todoRoutes,
   ...projectRoutes,
   ...journalRoutes,

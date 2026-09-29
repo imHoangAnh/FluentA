@@ -1,0 +1,27 @@
+.learning-touch-submit { display: none; }
+
+@media (pointer: coarse) {
+  button.learning-touch-submit { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+.practice-library-main {
+  background: #f6f5f1;
+  padding: 36px clamp(16px, 3vw, 44px);
+}
+
+.learning-figma-main {
+  background: #f6f5f1;
+  font-family: 'Inter Variable', Inter, sans-serif;
+  padding: 40px clamp(16px, 3vw, 48px);
+  min-height: 100vh;
+}
+
+@media (max-width: 800px) {
+  .practice-library-main { padding: 24px 16px; }
+  .learning-figma-main { padding: 24px 16px; }
+}
+
+@media (max-width: 480px) {
+  .practice-library-main { padding: 20px 12px; }
+  .learning-figma-main { padding: 20px 12px; }
+}

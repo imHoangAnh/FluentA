@@ -8,10 +8,11 @@ import {
   Repeat2,
   RotateCcw,
   Settings,
-  SquareStack,
   StickyNote,
   Timer,
 } from 'lucide-react'
+import { createElement } from 'react'
+import { ReviewSetup } from '@/features/review'
 import type { ShellNavigationItem, ShellNavigationSection } from '@/shared/components/layout/ShellEnvironment'
 
 const practiceRoute = (pathname: string) => pathname === '/practice'
@@ -22,14 +23,14 @@ export const shellNavigationSections: ShellNavigationSection[] = [
     label: 'Studying',
     items: [
       { to: '/vocabulary', label: 'Vocabulary', icon: LibraryBig },
-      {
-        to: '/flashcards',
-        label: 'Flashcard',
-        icon: SquareStack,
-        isActive: (pathname) => pathname.startsWith('/flashcards') && !practiceRoute(pathname),
-      },
       { to: '/practice', label: 'Practice', icon: Dumbbell, isActive: practiceRoute },
-      { to: '/review', label: 'Review', icon: RotateCcw },
+      {
+        to: '/review',
+        label: 'Review',
+        icon: RotateCcw,
+        dialogQueryParam: 'review',
+        renderDialog: (open, onOpenChange) => createElement(ReviewSetup, { open, onOpenChange }),
+      },
     ],
   },
   {

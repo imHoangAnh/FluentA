@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
@@ -44,21 +44,7 @@ function createQueryClient() {
   queryClient.setQueryData(['todo', 'items', today], [])
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['vocab', 'boards'], [])
-  queryClient.setQueryData(['flashcard', 'boards'], [])
-  queryClient.setQueryData(['review', 'dashboard'], {
-    boardId: null,
-    boardName: null,
-    totalCards: 0,
-    totalReviews: 0,
-    streakDays: 0,
-    retentionRate: 0,
-    overdue: 0,
-    dueToday: 0,
-    newCards: 0,
-    forecast: [],
-  })
-  queryClient.setQueryData(['review', 'level-five'], [])
-  queryClient.setQueryData(['practice', 'settings'], { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
+  queryClient.setQueryData(['review', 'dashboard'], { localDate: today, dueCount: 0 })
   queryClient.setQueryData(['settings'], {
     profile: {
       id: 'user-1',
@@ -67,7 +53,6 @@ function createQueryClient() {
       isEmailVerified: true,
       bio: '',
     },
-    practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
   })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
@@ -112,63 +97,6 @@ async function renderApp(initialEntry: string) {
   return view
 }
 
-async function renderAppWithDeck(initialEntry: string, wordOverrides: Record<string, unknown> = {}) {
-  const queryClient = createQueryClient()
-
-  const board = {
-    boardId: 'board-1',
-    boardName: 'HSK',
-    boardLanguage: 'zh',
-    pages: [{
-      pageId: 'page-1',
-      pageName: 'HSK - Unit 1',
-      words: [{
-      id: 'card-1',
-      wordId: 'word-1',
-      word: '你好',
-      wordClass: 'phrase',
-      ipaPronunciation: 'niː haʊ',
-      meaningVn: 'xin chào',
-      meaningEn: 'ni hao',
-      example: '你好！',
-      synonyms: '您好',
-      antonyms: '再见',
-      isInReview: false,
-      reviewLevel: null,
-      nextReviewDate: null,
-      lapseCount: 0,
-      ...wordOverrides,
-      }],
-      isPracticed: false,
-    }],
-  }
-
-  queryClient.setQueryData(['flashcard', 'boards'], [board])
-  queryClient.setQueryData(['review', 'dashboard'], {
-    boardId: null,
-    boardName: null,
-    totalCards: 1,
-    totalReviews: 2,
-    streakDays: 2,
-    retentionRate: 100,
-    overdue: 1,
-    dueToday: 0,
-    newCards: 1,
-    forecast: [{ date: '2026-06-10', dueCount: 1 }],
-  })
-  queryClient.setQueryData(['flashcard', 'page-session', 'page-1'], {
-    pageId: 'page-1',
-    boardId: board.boardId,
-    pageName: 'HSK - Unit 1',
-    boardLanguage: board.boardLanguage,
-    words: board.pages[0].words,
-  })
-
-  const view = renderWithClient(queryClient, initialEntry)
-  await act(async () => { await vi.dynamicImportSettled() })
-  return view
-}
-
 describe('FluentA app routes', async () => {
   beforeEach(() => {
     useAuthStore.setState({ user: null, status: 'anonymous', error: null })
@@ -209,9 +137,8 @@ describe('FluentA app routes', async () => {
 
     expect(screen.getByRole('heading', { name: /Good|Burning midnight oil/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Vocabulary' })).toHaveAttribute('href', '/vocabulary')
-    expect(screen.getByRole('link', { name: 'Flashcard' })).toHaveAttribute('href', '/flashcards')
     expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/practice')
-    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/review')
+    expect(screen.getByRole('button', { name: 'Review' })).toHaveAttribute('aria-haspopup', 'dialog')
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
@@ -228,158 +155,11 @@ describe('FluentA app routes', async () => {
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
-  it('renders the flashcard empty state for authenticated users', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderApp('/flashcards')
-
-    expect(screen.getByRole('heading', { name: 'No decks yet' })).toBeInTheDocument()
-  })
-
   it('protects practice sessions when anonymous', async () => {
     await renderApp('/practice/page-1')
 
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
-  })
-
-  it('opens the modal-first Practice flow and starts the selected deck directly', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/practice')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Practice HSK - Unit 1, 1 words' }))
-    expect(screen.getByRole('heading', { name: 'Start practice' })).toBeInTheDocument()
-    expect(screen.getByText('Dictation')).toBeInTheDocument()
-    expect(screen.getByText('Meaning → Word')).toBeInTheDocument()
-    expect(screen.getByText('Pronunciation')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Start practice' }))
-
-    await waitFor(() => expect(screen.getByTestId('active-practice-card')).toBeInTheDocument())
-  })
-
-  it('renders the dedicated practice entry route with practice-first copy', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/practice?deck=page-1')
-
-    expect(screen.getByRole('heading', { name: 'Start practice' })).toBeInTheDocument()
-    expect(screen.getByText('HSK - Unit 1 · 1 word')).toBeInTheDocument()
-    expect(screen.queryByText('Vocabulary page')).not.toBeInTheDocument()
-  })
-
-  it('renders the one-card flashcard viewer route from cached data', async () => {
-    const cancelSpeech = vi.fn()
-    const speak = vi.fn()
-    vi.stubGlobal('speechSynthesis', {
-      cancel: cancelSpeech,
-      getVoices: () => [],
-      speak,
-    })
-    vi.stubGlobal('SpeechSynthesisUtterance', class {
-      lang = ''
-      voice = null
-      text: string
-
-      constructor(text: string) {
-        this.text = text
-      }
-    })
-
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/flashcards/pages/page-1')
-
-    expect(screen.getByRole('heading', { name: 'HSK - Unit 1' })).toBeInTheDocument()
-    expect(screen.getByText('1 / 1')).toBeInTheDocument()
-    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
-    expect(screen.getByText('你好 (phrase)')).toBeInTheDocument()
-    expect(screen.getByText('/niː haʊ/')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Listen to 你好' }))
-    expect(speak).toHaveBeenCalledTimes(1)
-    expect(speak.mock.calls[0][0]).toMatchObject({ text: '你好', lang: 'zh-CN' })
-    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-    const stage = screen.getByTestId('flashcard-stage')
-    expect(stage).toHaveTextContent('Definition: ni hao')
-    expect(stage).toHaveTextContent('Meaning: xin chào')
-    expect(stage).toHaveTextContent('Example: 你好！')
-    expect(stage).toHaveTextContent('Synonyms: 您好')
-    expect(stage).toHaveTextContent('Antonyms: 再见')
-    expect(screen.getByRole('link', { name: "Let's practice" })).toHaveAttribute('href', '/practice?deck=page-1')
-  })
-
-  it('keeps the viewer route usable when a stale API response omits IPA', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/flashcards/pages/page-1', { ipaPronunciation: undefined })
-
-    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('IPA is unavailable. Refresh after the API restarts.')
-    expect(screen.queryByText('Load failed this page.')).not.toBeInTheDocument()
-  })
-
-  it('supports Quizlet keyboard shortcuts and shuffle toggle in flashcard viewer', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/flashcards/pages/page-1')
-
-    expect(screen.getByTestId('flashcard-stage')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
-
-    // Test keyboard shortcut Space to flip card
-    fireEvent.keyDown(window, { key: ' ' })
-    expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
-
-    // Test keyboard shortcut Space to flip back
-    fireEvent.keyDown(window, { key: ' ' })
-    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
-
-    // Test shuffle toggle button
-    const shuffleBtn = screen.getByRole('button', { name: 'Enable deck shuffle' })
-    expect(shuffleBtn).toBeInTheDocument()
-    fireEvent.click(shuffleBtn)
-    expect(screen.getByRole('button', { name: 'Disable deck shuffle' })).toBeInTheDocument()
-  })
-
-  it('renders fallback notice on back face when card details are missing without crashing', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderAppWithDeck('/flashcards/pages/page-1', {
-      meaningEn: '',
-      meaningVn: '',
-      example: '',
-      synonyms: null,
-      antonyms: null,
-    })
-
-    const stage = screen.getByTestId('flashcard-stage')
-    fireEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-    expect(stage).toHaveTextContent('No definition or example recorded for this word.')
   })
 
   it('renders the protected profile at its dedicated route', async () => {
@@ -395,36 +175,4 @@ describe('FluentA app routes', async () => {
     expect(screen.queryByRole('navigation', { name: 'Settings navigation' })).not.toBeInTheDocument()
   })
 
-  it('opens learning settings at Practice and excludes Profile from settings navigation', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    await renderApp('/settings')
-
-    const settingsNavigation = within(screen.getByRole('navigation', { name: 'Settings navigation' }))
-    expect(settingsNavigation.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(settingsNavigation.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
-    expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/settings/practice')
-    expect(settingsNavigation.getByRole('link', { name: 'Level 5' })).toHaveAttribute('href', '/settings/level5')
-    expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
-    await waitFor(() => expect(settingsNavigation.getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page'))
-  })
-
-  it('renders split settings routes inside the shared shell', async () => {
-    useAuthStore.setState({
-      status: 'authenticated',
-      user: { id: 'user-1', fullName: 'FluentA Learner', avatarUrl: null },
-    })
-
-    const view = await renderApp('/settings/practice')
-    expect(screen.getByRole('heading', { name: 'Practice' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Settings navigation' })).getByRole('link', { name: 'Practice' })).toHaveAttribute('aria-current', 'page')
-
-    view.unmount()
-    await renderApp('/settings/level5')
-    expect(screen.getByRole('heading', { name: 'Level 5 words' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Level 5' })).toHaveAttribute('aria-current', 'page')
-  })
 })

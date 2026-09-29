@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Auth;
 using FluentA.Application.BoundedContexts.Auth.DTOs;
-using FluentA.Application.BoundedContexts.Practice;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,11 +14,9 @@ namespace FluentA.API.Controllers;
 public sealed class SettingsController : ApiControllerBase
 {
     private readonly IAuthService _auth;
-    private readonly IPracticeService _practice;
-    public SettingsController(IAuthService auth, IPracticeService practice)
+    public SettingsController(IAuthService auth)
     {
         _auth = auth;
-        _practice = practice;
     }
 
     [HttpGet("settings")]
@@ -32,8 +29,7 @@ public sealed class SettingsController : ApiControllerBase
             return ToErrorResult(profileResult);
         }
 
-        var practiceSettings = await _practice.GetPracticeSettingsAsync(userId, cancellationToken);
-        return Ok(ApiEnvelope<SettingsDto>.Ok(new SettingsDto(profileResult.Value!, practiceSettings)));
+        return Ok(ApiEnvelope<SettingsDto>.Ok(new SettingsDto(profileResult.Value!)));
     }
 
 }

@@ -1,17 +1,15 @@
-import { CheckCircle2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CheckCircle2, LoaderCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import * as reviewApi from '../api/review.api'
-import { flashcardKeys, listBoards, type FlashcardBoard } from '@/features/flashcards'
-import { assessPronunciation, getPronunciationAssessmentErrorMessage, ShortcutGuide, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
-import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
 import { reviewKeys } from '../api/review.queries'
+import { getPronunciationAssessmentErrorMessage, startPcmRecording, supportsPcmRecording, type ActivePcmRecording } from '@/features/pronunciation'
+import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
 import { ReviewCompletion } from '../components/session/ReviewCompletion'
-import { ReviewModeSurface } from '../components/session/ReviewModeSurface'
+import { ReviewModeSurface, type ReviewFeedback } from '../components/session/ReviewModeSurface'
 import { ReviewProgress } from '../components/session/ReviewProgress'
-import { ReviewRecap } from '../components/session/ReviewRecap'
-import { ReviewSetup, type ReviewBoardOption } from '../components/session/ReviewSetup'
+import '../components/session/review-session.css'
 
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
@@ -23,337 +21,340 @@ function speakWord(word: string, language: string) {
   window.speechSynthesis.speak(utterance)
 }
 
-function buildBoardOptions(boards: FlashcardBoard[], today: string): ReviewBoardOption[] {
+function statusIsComplete(status: string) {
+  return status.toLowerCase() === 'complete' || status.toLowerCase() === 'completed'
+}
 
-  const options = boards.map((board) => {
-    const words = board.pages.flatMap((page) => page.words)
-    const dueCount = words.filter((word) => word.isInReview && word.nextReviewDate && word.nextReviewDate <= today).length
+function itemWithAnswerResult(item: reviewApi.ReviewSessionItem, result: reviewApi.ReviewAnswerResult): reviewApi.ReviewSessionItem {
+  return {
+    ...item,
+    isReviewed: result.isReviewed || item.isReviewed,
+    result: result.isReviewed ? result.result : item.result,
+    levelBefore: result.levelBefore ?? item.levelBefore,
+    levelAfter: result.levelAfter ?? item.levelAfter,
+    nextReviewDateBefore: result.nextReviewDateBefore ?? item.nextReviewDateBefore,
+    nextReviewDateAfter: result.nextReviewDateAfter ?? item.nextReviewDateAfter,
+    pronunciationAttemptCount: item.mode === 'listenAndRepeat' ? result.attemptsUsed : item.pronunciationAttemptCount,
+  }
+}
 
+function withAnswerResult(session: reviewApi.ReviewSession, result: reviewApi.ReviewAnswerResult): reviewApi.ReviewSession {
+  return {
+    ...session,
+    completedWords: result.completedWords,
+    currentItemIndex: result.currentItemIndex,
+    status: result.sessionStatus,
+    items: session.items.map((item) => item.itemId === result.itemId ? itemWithAnswerResult(item, result) : item),
+  }
+}
+
+function feedbackFor(item: reviewApi.ReviewSessionItem, result: reviewApi.ReviewAnswerResult): ReviewFeedback {
+  if (item.mode === 'listenAndRepeat' && !result.isReviewed && !result.correct) {
+    const pronunciation = item.ipaPronunciation?.trim()
     return {
-      boardId: board.boardId,
-      boardName: board.boardName,
-      boardLanguage: board.boardLanguage,
-      dueCount,
-      totalWords: words.length,
+      kind: 'retry',
+      title: '×  Pronunciation needs another try',
+      message: `${pronunciation ? `Listen to /${pronunciation.replace(/^\/+|\/+$/g, '')}/ again.` : 'Listen to the word again.'} Press Enter to continue.`,
+      item,
     }
-  })
+  }
 
-  return options.sort((left, right) => {
-    if (right.dueCount !== left.dueCount) return right.dueCount - left.dueCount
-    return right.boardName.localeCompare(left.boardName)
-  })
+  if (result.correct) {
+    return { kind: 'correct', title: '✓  Correct', message: 'Nice work. Press Enter to continue.', item }
+  }
+
+  if (item.mode === 'listenAndRepeat') {
+    return { kind: 'wrong', title: '×  Not quite', message: 'Both attempts are used. Press Enter to continue.', item }
+  }
+
+  return { kind: 'wrong', title: '×  Not quite', message: `Correct answer: ${item.word}  ·  Press Enter to continue.`, item }
+}
+
+function ReviewSessionFrame({ onExit, children }: { onExit: () => void; children: ReactNode }) {
+  return (
+    <div className="review-figma-session" data-testid="review-page">
+      <header className="review-figma-session__header">
+        <span className="review-figma-session__brand">FluentA</span>
+        <button className="review-figma-session__exit" type="button" onClick={onExit}>Exit session</button>
+      </header>
+      {children}
+    </div>
+  )
+}
+
+function ReviewShortcutGuide({ mode, feedback }: { mode: reviewApi.ReviewMode; feedback: ReviewFeedback | null }) {
+  if (feedback) {
+    return <p className="review-figma-session__shortcut"><kbd>Enter</kbd> Continue</p>
+  }
+  if (mode === 'listenAndRepeat') {
+    return <p className="review-figma-session__shortcut"><kbd>Tab</kbd> Listen <span>·</span> <kbd>R</kbd> Record <span>·</span> <kbd>Space</kbd> Stop</p>
+  }
+  if (mode === 'meaningToWord') {
+    return <p className="review-figma-session__shortcut"><kbd>Enter</kbd> Check answer <span>·</span> <kbd>Esc</kbd> Skip</p>
+  }
+  return <p className="review-figma-session__shortcut"><kbd>Enter</kbd> Check answer <span>·</span> <kbd>Esc</kbd> Skip <span>·</span> <kbd>Tab</kbd> Play audio</p>
+}
+
+function ReviewStateCard({ title, message, actionLabel, onAction }: { title: string; message: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <section className="review-figma-session__card review-figma-session__state-card">
+      <div className="review-figma-session__state-content">
+        <h1>{title}</h1>
+        <p>{message}</p>
+        <button className="review-figma-session__done-button" type="button" onClick={onAction}>{actionLabel}</button>
+      </div>
+    </section>
+  )
 }
 
 export function ReviewSessionPage() {
+  const { sessionId } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [today, setToday] = useState(() => todayInAppTimeZone())
-  const todayRef = useRef(today)
-  const [boardId, setBoardId] = useState('')
-  const [orderType, setOrderType] = useState<reviewApi.ReviewOrderType>('sequential')
-  const [reviewMode, setReviewMode] = useState<reviewApi.ReviewMode>('random')
-  const [recapEnabled, setRecapEnabled] = useState(true)
-  const [session, setSession] = useState<reviewApi.ReviewSessionCreated | null>(null)
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [typedAnswer, setTypedAnswer] = useState('')
-  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
-  const [pronunciationFailed, setPronunciationFailed] = useState(false)
+  const [outcomeFeedback, setOutcomeFeedback] = useState<ReviewFeedback | null>(null)
   const [pronunciationError, setPronunciationError] = useState<string | null>(null)
-  const [correctCount, setCorrectCount] = useState(0)
-  const [wrongCount, setWrongCount] = useState(0)
-  const [showRecap, setShowRecap] = useState(false)
-  const [completedElapsedSeconds, setCompletedElapsedSeconds] = useState(0)
-  const [pronunciationAttempts, setPronunciationAttempts] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
-  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false)
-  const [completed, setCompleted] = useState(false)
-  const sessionStartedAt = useRef(0)
-  const cardStartedAt = useRef(0)
   const recordingRef = useRef<ActivePcmRecording | null>(null)
-  const feedbackTimerRef = useRef<number | null>(null)
-
-  const decksQuery = useQuery({ queryKey: flashcardKeys.boards, queryFn: listBoards })
-  const boards = useMemo(() => buildBoardOptions(decksQuery.data ?? [], today), [decksQuery.data, today])
-  const activeBoard = boards.find((item) => item.boardId === boardId) ?? null
-  const words = session?.words ?? []
-  const currentWord = words[currentIndex] ?? null
-  const usesLargeAnswerLayout = currentWord?.mode === 'dictation' || currentWord?.mode === 'meaningToWord'
-  const usesLargeSessionLayout = usesLargeAnswerLayout || currentWord?.mode === 'pronunciation'
-  const currentLanguage = activeBoard?.boardLanguage ?? 'en'
+  const cardStartedAt = useRef(0)
   const recordingSupported = supportsPcmRecording()
 
-  const startSessionMutation = useMutation({
-    mutationFn: reviewApi.createReviewSession,
-    onSuccess: openSession,
+  const sessionQuery = useQuery({
+    queryKey: reviewKeys.session(sessionId ?? ''),
+    queryFn: () => reviewApi.getReviewSession(sessionId!),
+    enabled: Boolean(sessionId),
+    staleTime: 15_000,
   })
+  const session = sessionQuery.data
 
-  const submitReviewMutation = useMutation({
-    mutationFn: reviewApi.submitReview,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flashcardKeys.boards, refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
-      ])
+  const answerMutation = useMutation({
+    mutationFn: reviewApi.submitReviewAnswer,
+    onSuccess: (result, variables) => {
+      const queryKey = reviewKeys.session(variables.sessionId)
+      const current = queryClient.getQueryData<reviewApi.ReviewSession>(queryKey)
+      const answeredItem = current?.items.find((item) => item.itemId === result.itemId)
+      queryClient.setQueryData<reviewApi.ReviewSession>(queryKey, (cached) => cached ? withAnswerResult(cached, result) : cached)
+      if (answeredItem) setOutcomeFeedback(feedbackFor(itemWithAnswerResult(answeredItem, result), result))
+      setPronunciationError(null)
     },
   })
-  const pronunciationMutation = useMutation({ mutationFn: ({ wordId, audio }: { wordId: string; audio: Blob }) => assessPronunciation(wordId, audio) })
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      const nextToday = todayInAppTimeZone()
-      if (todayRef.current === nextToday) return
-
-      todayRef.current = nextToday
-      setToday(nextToday)
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: flashcardKeys.boards, refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
-      ])
-    }, 60_000)
-
-    return () => window.clearInterval(intervalId)
-  }, [queryClient])
-
-  useEffect(() => {
-    if (!currentWord) return
-    cardStartedAt.current = Date.now()
-    // A newly active word must not display the prior word's answer or pronunciation state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTypedAnswer('')
-    setFeedback(null)
-    setPronunciationFailed(false)
-    setPronunciationError(null)
-    setPronunciationAttempts(0)
-    setShowRecap(false)
-    void recordingRef.current?.cancel()
-    recordingRef.current = null
-    setIsRecording(false)
-
-    if (currentWord.mode !== 'meaningToWord' && activeBoard) {
-      speakWord(currentWord.word, activeBoard.boardLanguage)
-    }
-  }, [activeBoard, currentLanguage, currentWord])
-
-  useEffect(() => () => {
-    void recordingRef.current?.cancel()
-    if (feedbackTimerRef.current !== null) {
-      window.clearTimeout(feedbackTimerRef.current)
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
-  }, [])
-
-  function openSession(nextSession: reviewApi.ReviewSessionCreated) {
-    setSession(nextSession)
-    setCurrentIndex(0)
-    setTypedAnswer('')
-    setFeedback(null)
-    setPronunciationFailed(false)
-    setPronunciationError(null)
-    setCorrectCount(0)
-    setWrongCount(0)
-    setShowRecap(false)
-    setPronunciationAttempts(0)
-    setIsAutoAdvancing(false)
-    setCompletedElapsedSeconds(0)
-    setCompleted(false)
-    sessionStartedAt.current = Date.now()
-    cardStartedAt.current = Date.now()
-  }
-  function resetToLanding() {
-    setSession(null)
-    setBoardId('')
-    setRecapEnabled(true)
-    setTypedAnswer('')
-    setFeedback(null)
-    setPronunciationFailed(false)
-    setPronunciationError(null)
-    setCorrectCount(0)
-    setWrongCount(0)
-    setShowRecap(false)
-    setPronunciationAttempts(0)
-    setIsAutoAdvancing(false)
-    setCompletedElapsedSeconds(0)
-    setCompleted(false)
-  }
-
-  function normalizeAnswer(value: string) {
-    return value.trim().toLowerCase()
-  }
-
-  const moveToNextWord = useCallback(() => {
-    if (currentIndex + 1 >= words.length) {
-      setCompletedElapsedSeconds(Math.max(0, Math.round((Date.now() - sessionStartedAt.current) / 1000)))
-      setCompleted(true)
-      return
-    }
-
-    setCurrentIndex((value) => value + 1)
-  }, [currentIndex, words.length])
-
-  const schedulePostAnswerTransition = useCallback(() => {
-    setIsAutoAdvancing(true)
-    if (feedbackTimerRef.current !== null) {
-      window.clearTimeout(feedbackTimerRef.current)
-    }
-    feedbackTimerRef.current = window.setTimeout(() => {
-      feedbackTimerRef.current = null
-      setFeedback(null)
-      setIsAutoAdvancing(false)
-      if (recapEnabled) {
-        setShowRecap(true)
-        return
-      }
-
-      moveToNextWord()
-    }, 2000)
-  }, [moveToNextWord, recapEnabled])
-
-  const submitOutcome = useCallback(async (correct: boolean) => {
-    if (!session || !currentWord || submitReviewMutation.isPending) return
-
-    await submitReviewMutation.mutateAsync({
-      sessionId: session.sessionId,
-      wordId: currentWord.wordId,
-      correct,
-      timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
-      timeZoneId: APP_TIME_ZONE,
-    })
-
-    if (correct) {
-      setCorrectCount((value) => value + 1)
-    } else {
-      setWrongCount((value) => value + 1)
-    }
-
-    setFeedback(correct ? 'correct' : 'wrong')
-    schedulePostAnswerTransition()
-  }, [currentWord, schedulePostAnswerTransition, session, submitReviewMutation])
-
-  const handlePronunciationAudio = useCallback(async (audio: Blob) => {
-    recordingRef.current = null
-    setIsRecording(false)
-    if (!currentWord) return
-
-    try {
-      const result = await pronunciationMutation.mutateAsync({ wordId: currentWord.wordId, audio })
-      const attempts = pronunciationAttempts + 1
-      setPronunciationAttempts(attempts)
-      if (result.correct) {
-        await submitOutcome(true)
-      } else if (attempts >= 2) {
-        await submitOutcome(false)
-      } else {
-        setPronunciationFailed(true)
-      }
-    } catch (error) {
+  const pronunciationMutation = useMutation({
+    mutationFn: reviewApi.submitReviewPronunciation,
+    onSuccess: (result, variables) => {
+      const queryKey = reviewKeys.session(variables.sessionId)
+      const current = queryClient.getQueryData<reviewApi.ReviewSession>(queryKey)
+      const answeredItem = current?.items.find((item) => item.itemId === result.itemId)
+      queryClient.setQueryData<reviewApi.ReviewSession>(queryKey, (cached) => cached ? withAnswerResult(cached, result) : cached)
+      cardStartedAt.current = Date.now()
+      setPronunciationError(null)
+      if (answeredItem) setOutcomeFeedback(feedbackFor(itemWithAnswerResult(answeredItem, result), result))
+    },
+    onError: (error) => {
+      cardStartedAt.current = Date.now()
       setPronunciationError(getPronunciationAssessmentErrorMessage(error))
-    }
-  }, [currentWord, pronunciationAttempts, pronunciationMutation, submitOutcome])
+    },
+  })
+
+  const currentItem = session?.currentItemIndex === null || session?.currentItemIndex === undefined
+    ? null
+    : session.items[session.currentItemIndex] ?? session.items.find((item) => !item.isReviewed) ?? null
+  const sessionComplete = Boolean(session && (
+    statusIsComplete(session.status)
+    || session.currentItemIndex === null
+    || session.currentItemIndex >= session.items.length
+  ))
+  const correctCount = useMemo(() => session?.items.filter((item) => item.result?.toLowerCase() === 'correct').length ?? 0, [session?.items])
+  const wrongCount = useMemo(() => session?.items.filter((item) => item.result?.toLowerCase() === 'wrong').length ?? 0, [session?.items])
+
+  const playCurrentWord = useCallback(() => {
+    const item = outcomeFeedback?.item ?? currentItem
+    if (item) speakWord(item.word, item.language || 'en')
+  }, [currentItem, outcomeFeedback])
+
+  const handleRecordingResult = useCallback(async (audio: Blob) => {
+    recordingRef.current = null
+    setIsRecording(false)
+    if (!session || !currentItem) return
+
+    setPronunciationError(null)
+    await pronunciationMutation.mutateAsync({
+      sessionId: session.sessionId,
+      itemId: currentItem.itemId,
+      audio,
+      timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
+    }).catch(() => undefined)
+  }, [currentItem, pronunciationMutation, session])
 
   const startRecording = useCallback(async () => {
+    if (!currentItem || outcomeFeedback || pronunciationMutation.isPending || !recordingSupported || currentItem.pronunciationAttemptCount >= 2) return
     setPronunciationError(null)
     pronunciationMutation.reset()
     try {
-      recordingRef.current = await startPcmRecording(handlePronunciationAudio)
+      recordingRef.current = await startPcmRecording(handleRecordingResult)
       setIsRecording(true)
     } catch {
+      cardStartedAt.current = Date.now()
       setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
     }
-  }, [handlePronunciationAudio, pronunciationMutation])
+  }, [currentItem, handleRecordingResult, outcomeFeedback, pronunciationMutation, recordingSupported])
 
-  async function startReview() {
-    if (!boardId) return
+  const stopRecording = useCallback(() => {
+    void recordingRef.current?.stop()
+  }, [])
 
-    await startSessionMutation.mutateAsync({
-      boardId,
-      orderType,
-      mode: reviewMode,
-      timeZoneId: APP_TIME_ZONE,
+  const submitTypedAnswer = useCallback((answerText: string) => {
+    if (!session || !currentItem || answerMutation.isPending || outcomeFeedback) return
+    answerMutation.mutate({
+      sessionId: session.sessionId,
+      itemId: currentItem.itemId,
+      answerText,
+      timeSpentSeconds: Math.max(0, Math.round((Date.now() - cardStartedAt.current) / 1000)),
     })
-  }
+  }, [answerMutation, currentItem, outcomeFeedback, session])
 
-  const checkTypedAnswer = useCallback(() => {
-    if (!currentWord || isAutoAdvancing) return
-    const correct = normalizeAnswer(typedAnswer) === normalizeAnswer(currentWord.word)
-    void submitOutcome(correct)
-  }, [currentWord, isAutoAdvancing, submitOutcome, typedAnswer])
+  const finishSession = useCallback(() => {
+    const navigationState = location.state as { returnTo?: string } | null
+    navigate(navigationState?.returnTo || '/', { replace: true })
+  }, [location.state, navigate])
+
+  const continueAfterFeedback = useCallback(() => {
+    if (!outcomeFeedback) return
+    setOutcomeFeedback(null)
+    setTypedAnswer('')
+    setPronunciationError(null)
+    cardStartedAt.current = Date.now()
+  }, [outcomeFeedback])
 
   useEffect(() => {
-    if (!session || !currentWord || completed) return
+    const item = outcomeFeedback?.item ?? currentItem
+    if (!session || !item || (sessionComplete && !outcomeFeedback)) return
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Tab' && currentWord.mode !== 'meaningToWord' && !showRecap) {
-        event.preventDefault()
-        speakWord(currentWord.word, currentLanguage)
-        return
-      }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
 
-      if (event.key === 'Enter') {
-        if (isAutoAdvancing) return
-        if (showRecap) {
+      if (outcomeFeedback) {
+        if (event.key === 'Enter') {
           event.preventDefault()
-          moveToNextWord()
-          return
-        }
-        if (currentWord.mode !== 'pronunciation' && normalizeAnswer(typedAnswer).length > 0) {
-          event.preventDefault()
-          checkTypedAnswer()
+          continueAfterFeedback()
         }
         return
       }
 
-      if (event.key === 'Escape' && !showRecap && !isAutoAdvancing && !isRecording && !submitReviewMutation.isPending) {
+      if (event.key === 'Tab' && item.mode !== 'meaningToWord' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
-        void submitOutcome(false)
+        playCurrentWord()
         return
       }
 
-      if ((event.key === 'r' || event.key === 'R') && currentWord.mode === 'pronunciation') {
-        const target = event.target as HTMLElement | null
-        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
-        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && !isAutoAdvancing && pronunciationAttempts < 2) {
+      if (event.key === 'Enter' && item.mode !== 'listenAndRepeat' && typedAnswer.trim().length > 0) {
+        event.preventDefault()
+        submitTypedAnswer(typedAnswer)
+        return
+      }
+
+      if (event.key === 'Escape' && item.mode !== 'listenAndRepeat' && !answerMutation.isPending) {
+        event.preventDefault()
+        submitTypedAnswer('')
+        return
+      }
+
+      if ((event.key === 'r' || event.key === 'R') && item.mode === 'listenAndRepeat') {
+        if (!isInput && !isRecording && recordingSupported && !pronunciationMutation.isPending && item.pronunciationAttemptCount < 2) {
           event.preventDefault()
           void startRecording()
         }
         return
       }
 
-      if ((event.key === ' ' || event.key === 'Space') && currentWord.mode === 'pronunciation' && isRecording) {
+      if ((event.key === ' ' || event.key === 'Space') && item.mode === 'listenAndRepeat' && isRecording) {
         event.preventDefault()
-        void recordingRef.current?.stop()
+        stopRecording()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [checkTypedAnswer, completed, currentLanguage, currentWord, feedback, isAutoAdvancing, isRecording, moveToNextWord, pronunciationAttempts, pronunciationMutation.isPending, recordingSupported, session, showRecap, startRecording, submitOutcome, submitReviewMutation.isPending, typedAnswer])
+  }, [answerMutation.isPending, continueAfterFeedback, currentItem, isRecording, outcomeFeedback, playCurrentWord, pronunciationMutation.isPending, recordingSupported, session, sessionComplete, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
 
-  const noBoardSelected = !boardId
-  const noDueWords = Boolean(activeBoard) && (activeBoard?.dueCount ?? 0) === 0
+  useEffect(() => () => {
+    void recordingRef.current?.cancel()
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  }, [])
 
+  useEffect(() => {
+    if (currentItem) cardStartedAt.current = Date.now()
+  }, [currentItem])
+
+  if (!sessionId) {
+    return (
+      <div className="review-figma-session" data-testid="review-page">
+        <section className="review-figma-session__standalone">
+          <div className="review-figma-session__standalone-content">
+            <CheckCircle2 className="review-figma-session__completion-icon" aria-hidden="true" />
+            <h1>Review</h1>
+            <p>Open the Review dialog from the sidebar to see today’s due words.</p>
+            <button className="review-figma-session__done-button" type="button" onClick={() => navigate('/?review=open')}>Open Review</button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  if (sessionQuery.isLoading) {
+    return <ReviewSessionFrame onExit={finishSession}><div className="review-figma-session__loading" role="status" aria-label="Loading review session"><LoaderCircle aria-hidden="true" />Loading review session…</div></ReviewSessionFrame>
+  }
+
+  if (sessionQuery.isError || !session) {
+    return <ReviewSessionFrame onExit={finishSession}><ReviewStateCard title="Session unavailable" message="Unable to load this review session." actionLabel="Try again" onAction={() => void sessionQuery.refetch()} /></ReviewSessionFrame>
+  }
+
+  if (session.totalWords === 0) {
+    return <ReviewSessionFrame onExit={finishSession}><ReviewStateCard title="All clear" message="No words are due right now." actionLabel="Done" onAction={finishSession} /></ReviewSessionFrame>
+  }
+
+  if (session.status.toLowerCase() === 'abandoned') {
+    return <ReviewSessionFrame onExit={finishSession}><ReviewStateCard title="Session unavailable" message="This session is no longer active." actionLabel="Done" onAction={finishSession} /></ReviewSessionFrame>
+  }
+
+  if (sessionComplete && !outcomeFeedback) {
+    return <ReviewSessionFrame onExit={finishSession}><ReviewCompletion totalWords={session.totalWords} correctCount={correctCount} wrongCount={wrongCount} onDone={finishSession} /></ReviewSessionFrame>
+  }
+
+  const itemForExercise = outcomeFeedback?.item ?? currentItem
+  if (!itemForExercise) {
+    return <ReviewSessionFrame onExit={finishSession}><ReviewStateCard title="Session unavailable" message="This review session has no active word." actionLabel="Done" onAction={finishSession} /></ReviewSessionFrame>
+  }
+
+  const progressItemIndex = session.items.findIndex((item) => item.itemId === itemForExercise.itemId)
+  const progressCurrentWord = progressItemIndex >= 0 ? progressItemIndex + 1 : Math.min(session.completedWords + 1, session.totalWords)
+  const isBusy = answerMutation.isPending || pronunciationMutation.isPending || Boolean(outcomeFeedback)
 
   return (
-    <>
-      <div className={`flex h-full min-h-0 flex-col ${session ? 'overflow-y-auto' : 'overflow-hidden'}`} data-testid="review-page">
-        {!session ? <ReviewSetup boardId={boardId} boards={boards} reviewMode={reviewMode} orderType={orderType} recapEnabled={recapEnabled} noBoardSelected={noBoardSelected} noDueWords={noDueWords} isStarting={startSessionMutation.isPending} hasStartError={startSessionMutation.isError} onBoardChange={setBoardId} onModeChange={setReviewMode} onOrderChange={setOrderType} onRecapChange={setRecapEnabled} onStart={() => void startReview()} /> : null}
-
-        {session && session.words.length === 0 ? <section className="review-summary" data-testid="review-summary"><CheckCircle2 size={38} /><span className="preview-label">All clear</span><h1>{session.boardName}</h1><p>No words are available in the remaining queue for this session.</p><button className="primary-button review-summary__done" type="button" onClick={resetToLanding}>Finish</button></section> : null}
-
-        {session && currentWord && !completed ? (
-          <section className={`review-session ${usesLargeSessionLayout ? 'learning-session--focused' : ''}`}>
-            <ReviewProgress orderLabel={session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'} currentIndex={currentIndex} totalWords={words.length} focused={Boolean(usesLargeSessionLayout)} />
-            <article className={`review-card review-card--${currentWord.mode} ${feedback ? `review-card--feedback-${feedback}` : ''} ${usesLargeSessionLayout ? 'learning-card--focused' : ''}`} data-testid="active-review-card">
-              {feedback ? <div className={`review-feedback review-feedback--${feedback}`} role="status" aria-live="polite">{feedback === 'correct' ? 'Correct' : 'Wrong'}</div> : showRecap ? <ReviewRecap word={currentWord} isLastWord={currentIndex + 1 >= words.length} onContinue={moveToNextWord} /> : <ReviewModeSurface mode={currentWord.mode === 'random' ? 'dictation' : currentWord.mode} word={currentWord} typedAnswer={typedAnswer} usesLargeAnswerLayout={Boolean(usesLargeAnswerLayout)} isAutoAdvancing={isAutoAdvancing} isSubmitting={submitReviewMutation.isPending} isRecording={isRecording} isAssessmentPending={pronunciationMutation.isPending} recordingSupported={recordingSupported} pronunciationAttempts={pronunciationAttempts} pronunciationFailed={pronunciationFailed} pronunciationError={pronunciationError} onPlayAudio={() => speakWord(currentWord.word, currentLanguage)} onAnswerChange={setTypedAnswer} onCheckAnswer={checkTypedAnswer} onSkip={() => void submitOutcome(false)} onStartRecording={() => void startRecording()} onStopRecording={() => void recordingRef.current?.stop()} />}
-            </article>
-            {!feedback ? <ShortcutGuide mode={showRecap ? 'recap' : currentWord.mode === 'random' ? 'dictation' : currentWord.mode} /> : null}
-            {submitReviewMutation.isError ? <p className="flashcard-status flashcard-status--error">Unable to record this answer. Try again.</p> : null}
-          </section>
-        ) : null}
-
-        {completed && session ? <ReviewCompletion orderLabel={session.orderType === 'shuffle' ? 'Shuffle' : 'Sequential'} totalWords={words.length} boardName={session.boardName} correctCount={correctCount} wrongCount={wrongCount} elapsedSeconds={completedElapsedSeconds} onDone={resetToLanding} /> : null}
-
-      </div>
-    </>
+    <ReviewSessionFrame onExit={finishSession}>
+      <section className="review-figma-session__session-content">
+        <ReviewProgress mode={itemForExercise.mode} currentWord={progressCurrentWord} totalWords={session.totalWords} />
+        <article className="review-figma-session__card" data-testid="active-review-card">
+          <ReviewModeSurface
+            item={itemForExercise}
+            typedAnswer={typedAnswer}
+            feedback={outcomeFeedback}
+            isBusy={isBusy}
+            isRecording={isRecording}
+            recordingSupported={recordingSupported}
+            pronunciationError={pronunciationError}
+            onPlayAudio={playCurrentWord}
+            onAnswerChange={setTypedAnswer}
+            onCheckAnswer={() => submitTypedAnswer(typedAnswer)}
+            onSkip={() => submitTypedAnswer('')}
+            onContinue={continueAfterFeedback}
+            onToggleRecording={() => isRecording ? stopRecording() : void startRecording()}
+          />
+        </article>
+        <ReviewShortcutGuide mode={itemForExercise.mode} feedback={outcomeFeedback} />
+        {answerMutation.isError ? <p className="review-figma-session__error" role="alert">Unable to save this answer. Try again.</p> : null}
+      </section>
+    </ReviewSessionFrame>
   )
 }

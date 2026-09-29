@@ -106,7 +106,7 @@ describe('DashboardPage', () => {
     adapters.listByDate.mockResolvedValue([])
     adapters.listHabits.mockResolvedValue([])
     adapters.listCountdowns.mockResolvedValue([])
-    adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 0 })
+    adapters.getReviewDashboard.mockResolvedValue({ localDate: '2026-07-14', dueCount: 0 })
     adapters.listBoards.mockResolvedValue([])
     adapters.getPomodoroCurrent.mockResolvedValue({ state: 'Idle', phase: 'Work', remainingSeconds: 0, durationSeconds: 0 })
     adapters.getPomodoroToday.mockResolvedValue({ completedWorkSessions: 0 })
@@ -153,7 +153,7 @@ describe('DashboardPage', () => {
       createdAt: '2026-07-14T01:00:00Z',
       updatedAt: '2026-07-14T01:00:00Z',
     }])
-    adapters.getReviewDashboard.mockResolvedValue({ overdue: 2, dueToday: 3, newCards: 4 })
+    adapters.getReviewDashboard.mockResolvedValue({ localDate: '2026-07-14', dueCount: 5 })
 
     renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
@@ -164,20 +164,18 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('dashboard-review-due-badge')).toHaveTextContent('5 due')
     expect(within(screen.getByTestId('dashboard-review-due-ring')).getByText('5')).toBeInTheDocument()
     expect(within(screen.getByTestId('dashboard-review-count')).getByText('5')).toBeInTheDocument()
-    expect(within(screen.getByTestId('dashboard-learning-count')).getByText('4')).toBeInTheDocument()
   })
 
-  it('keeps new learning words out of the Due Today count', async () => {
-    adapters.getReviewDashboard.mockResolvedValue({ overdue: 0, dueToday: 0, newCards: 7 })
+  it('shows only the Review due count', async () => {
+    adapters.getReviewDashboard.mockResolvedValue({ localDate: '2026-07-14', dueCount: 0 })
 
     renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
     const ring = await screen.findByTestId('dashboard-review-due-ring')
-    expect(ring).toHaveAttribute('aria-label', '0 words due for review today. 7 new words available to learn.')
+    expect(ring).toHaveAttribute('aria-label', '0 words due for review today.')
     expect(within(ring).getByText('0')).toBeInTheDocument()
     expect(screen.getByTestId('dashboard-review-due-badge')).toHaveTextContent('0 due')
     expect(within(screen.getByTestId('dashboard-review-count')).getByText('0')).toBeInTheDocument()
-    expect(within(screen.getByTestId('dashboard-learning-count')).getByText('7')).toBeInTheDocument()
     expect(screen.getByText('No reviews due today.')).toBeInTheDocument()
   })
 

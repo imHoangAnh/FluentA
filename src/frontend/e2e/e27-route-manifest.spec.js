@@ -20,7 +20,6 @@ const protectedRoutes = [
   ['/vocabulary', 'Vocabulary', 'Vocabulary'],
   ['/todo', 'Todo', 'Todo'],
   ['/countdowns', 'Countdowns', 'Countdowns'],
-  ['/flashcards', 'Flashcards', 'Flashcard'],
   ['/practice', 'Practice', 'Practice'],
   ['/habits', 'Habits', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
@@ -30,10 +29,7 @@ const protectedRoutes = [
   ['/notifications', 'Notifications', null],
   ['/settings', 'Settings', 'Settings'],
   ['/profile', 'Profile', null],
-  ['/settings/practice', 'Settings', 'Settings'],
-  ['/settings/level5', 'Settings', 'Settings'],
   ['/review', 'Review', 'Review'],
-  ['/flashcards/pages/route-proof', 'Flashcard viewer', 'Flashcard'],
   ['/practice/route-proof', 'Practice', 'Practice'],
 ]
 
@@ -55,17 +51,8 @@ async function mockReleaseApis(page, authState) {
         body: JSON.stringify({
           data: {
             profile: { ...user, bio: '' },
-            practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
           },
         }),
-      })
-      return
-    }
-    if (path === '/api/v1/practice/settings') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] } }),
       })
       return
     }
@@ -103,7 +90,7 @@ for (const viewport of [
     await page.screenshot({ path: `test-results/e27-new-password-${viewport.name}.png`, fullPage: true })
 
     authState.enabled = false
-    await page.goto('/practice/route-proof?order=shuffle')
+    await page.goto('/practice/route-proof')
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
     authState.enabled = true
@@ -123,10 +110,10 @@ for (const viewport of [
     }
 
     await page.goto('/settings/review')
-    await expect(page).toHaveURL(/\/settings\/practice$/)
+    await expect(page).toHaveURL(/\/review\?review=open$/)
 
-    await page.goto('/practice?deck=route-proof&order=shuffle')
-    await expect(page).toHaveURL(/\/practice\?deck=route-proof&order=shuffle$/)
+    await page.goto('/practice')
+    await expect(page).toHaveURL('/practice')
 
     await page.goto('/not-a-real-route')
     await expect(page).toHaveURL(/\/$/)

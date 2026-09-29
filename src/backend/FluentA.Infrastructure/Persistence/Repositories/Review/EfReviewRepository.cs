@@ -1,4 +1,6 @@
-using System.Globalization;
+using System.Data;
+using System.Text.Json;
+using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
@@ -96,374 +98,502 @@ public sealed class EfReviewRepository : IReviewRepository
         return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
     }
 
-    public async Task<ReviewSessionCreatedDto?> CreateReviewSessionAsync(
+    public async Task<ReviewSessionDto> CreateReviewSessionAsync(
         Guid userId,
-        Guid boardId,
-        string orderType,
-        string mode,
         TimeZoneInfo timeZone,
         DateTime utcNow,
-        Guid sessionId,
         CancellationToken cancellationToken = default)
     {
-        var board = await _dbContext.Boards
-            .AsNoTracking()
-            .Where(item => item.Id == boardId && item.UserId == userId && item.DeletedAt == null)
-            .Select(item => new
-            {
-                item.Id,
-                item.Name,
-                item.Language,
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (board is null)
-        {
-            return null;
-        }
-
         var localToday = ReviewTime.LocalDate(utcNow, timeZone);
-        var sessionDate = localToday;
         var activeSessions = await _dbContext.ReviewSessions
             .Where(session => session.UserId == userId
-                && session.BoardId == boardId
                 && session.Status == ReviewSessionStatus.Active
                 && session.DeletedAt == null)
             .ToListAsync(cancellationToken);
         foreach (var activeSession in activeSessions)
         {
-            activeSession.Replace();
+            activeSession.Abandon(utcNow);
         }
 
         var dueWords = await (
             from state in _dbContext.WordReviewStates
             join word in _dbContext.Words on state.WordId equals word.Id
             join page in _dbContext.Pages on word.PageId equals page.Id
-            join boardEntity in _dbContext.Boards on page.BoardId equals boardEntity.Id
-            where page.BoardId == boardId
-                && state.UserId == userId
-                && boardEntity.UserId == userId
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where state.UserId == userId
+                && board.UserId == userId
                 && state.DeletedAt == null
                 && state.Status == WordReviewStatus.Active
                 && word.DeletedAt == null
                 && page.DeletedAt == null
-                && boardEntity.DeletedAt == null
+                && board.DeletedAt == null
                 && state.NextReviewDate <= localToday
             select new
             {
-                state,
                 WordId = word.Id,
-                word.Word,
-                WordClass = word.Class,
-                word.IpaPronunciation,
-                MeaningVn = word.MeaningVn,
-                MeaningEn = word.Definition,
-                word.Example,
-                Thesaurus = word.Synonyms,
-                Collocation = word.Antonyms,
-                word.Note,
-                word.CreatedAt
+                Language = board.Language,
+                state.NextReviewDate,
+                Word = word.Word,
+                Meaning = word.Meaning,
+                IpaPronunciation = word.IpaPronunciation,
+                Type = word.Type,
+                Context = word.Context,
+                Example = word.Example,
+                Synonyms = word.Synonyms,
+                Antonyms = word.Antonyms,
+                WordCreatedAt = word.CreatedAt,
             })
-            .OrderBy(item => item.state.NextReviewDate)
-            .ThenBy(item => item.CreatedAt)
+            .OrderBy(item => item.NextReviewDate)
+            .ThenBy(item => item.WordCreatedAt)
+            .ThenBy(item => item.WordId)
             .ToListAsync(cancellationToken);
 
-        var kept = orderType == "shuffle"
-            ? dueWords.OrderBy(_ => Random.Shared.Next()).ToList()
-            : dueWords;
+        var session = ReviewSession.CreateActive(userId, timeZone.Id, localToday, utcNow);
+        var items = dueWords
+            .Select((item, position) => ReviewSessionItem.Create(
+                session.Id,
+                item.WordId,
+                position,
+                PickRandomReviewMode(),
+                item.Language,
+                item.Word,
+                item.Meaning,
+                item.IpaPronunciation,
+                item.Type.ToString(),
+                item.Context,
+                item.Example,
+                item.Synonyms,
+                item.Antonyms))
+            .ToArray();
 
-        var reviewSession = ReviewSession.CreateActive(
-            userId,
-            board.Id,
-            orderType,
-            sessionDate,
-            utcNow);
-        if (kept.Count == 0)
+        if (items.Length == 0)
         {
-            reviewSession.Complete(utcNow);
+            session.Complete(utcNow);
         }
 
-        await _dbContext.ReviewSessions.AddAsync(reviewSession, cancellationToken);
+        _dbContext.ReviewSessions.Add(session);
+        _dbContext.ReviewSessionItems.AddRange(items);
+        // One SaveChanges keeps prior-session abandonment and the new persisted queue together.
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        foreach (var item in kept)
-        {
-            await _dbContext.ReviewSessionItems.AddAsync(
-                ReviewSessionItem.Create(reviewSession.Id, item.WordId),
-                cancellationToken);
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        var assignedModes = kept.Select(item => new ReviewSessionWordDto(
-            item.WordId,
-            item.Word,
-            item.WordClass.ToString(),
-            item.IpaPronunciation,
-            item.MeaningVn,
-            item.MeaningEn,
-            item.Example,
-            item.Thesaurus,
-            item.Collocation,
-            item.Note,
-            mode == "random" ? PickRandomReviewMode() : mode)).ToList();
-
-        return new ReviewSessionCreatedDto(
-            reviewSession.Id,
-            board.Id,
-            board.Name,
-            orderType,
-            mode,
-            reviewSession.StartedAt,
-            assignedModes.Count,
-            assignedModes);
+        return await BuildSessionDtoAsync(session, items, cancellationToken);
     }
 
-    public async Task<FlashcardDashboardDto?> GetDashboardAsync(
+    public async Task<ReviewDashboardDto> GetDashboardAsync(
         Guid userId,
-        Guid? boardId,
         TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        string? boardName = null;
-        if (boardId.HasValue)
-        {
-            boardName = await _dbContext.Boards
-                .AsNoTracking()
-                .Where(board => board.Id == boardId.Value && board.UserId == userId && board.DeletedAt == null)
-                .Select(board => board.Name)
-                .SingleOrDefaultAsync(cancellationToken);
-
-            if (boardName is null)
-            {
-                return null;
-            }
-        }
-
         var localToday = ReviewTime.LocalDate(utcNow, timeZone);
-        var activeWords = _dashboardQueries.QueryActiveBoardWords(userId, boardId);
-        var reviewStates = _dashboardQueries.QueryActiveReviewStates(userId, boardId);
-        var reviews = _dashboardQueries.QueryActiveReviewHistories(userId, boardId);
+        var dueCount = await _dashboardQueries
+            .QueryActiveReviewStates(userId)
+            .CountAsync(state => state.NextReviewDate <= localToday, cancellationToken);
 
-        var totalCards = await activeWords.CountAsync(cancellationToken);
-        var reviewStateCount = await reviewStates.CountAsync(cancellationToken);
-        var overdue = await reviewStates.CountAsync(state => state.NextReviewDate < localToday, cancellationToken);
-        var dueToday = await reviewStates.CountAsync(state => state.NextReviewDate == localToday, cancellationToken);
-        var reviewSummary = await reviews
-            .GroupBy(_ => 1)
-            .Select(group => new
-            {
-                Total = group.Count(),
-                Correct = group.Count(review => review.Result == FluentAsrsReviewResult.Correct)
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        var totalReviews = reviewSummary?.Total ?? 0;
-        var retained = reviewSummary?.Correct ?? 0;
-        var retentionRate = totalReviews == 0
-            ? 0
-            : (int)Math.Round((double)retained / totalReviews * 100, MidpointRounding.AwayFromZero);
-        var streak = await _dashboardQueries.CountCurrentStreakAsync(
-            reviews,
-            localToday.ToDateTime(TimeOnly.MinValue),
-            timeZone,
-            cancellationToken);
-
-        var forecast = new List<DashboardForecastPointDto>(capacity: 7);
-        for (var offset = 0; offset < 7; offset++)
-        {
-            var day = localToday.AddDays(offset);
-            var count = await reviewStates.CountAsync(state => state.NextReviewDate == day, cancellationToken);
-            forecast.Add(new DashboardForecastPointDto(
-                day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                count));
-        }
-
-        return new FlashcardDashboardDto(
-            boardId,
-            boardName,
-            totalCards,
-            totalReviews,
-            streak,
-            retentionRate,
-            overdue,
-            dueToday,
-            Math.Max(0, totalCards - reviewStateCount),
-            forecast);
+        return new ReviewDashboardDto(localToday, dueCount);
     }
 
-    public async Task<ReviewResultDto?> AddReviewAsync(
+    public async Task<ReviewSessionDto?> GetSessionAsync(
         Guid userId,
         Guid sessionId,
-        Guid wordId,
-        bool correct,
-        int timeSpentSeconds,
-        TimeZoneInfo timeZone,
         CancellationToken cancellationToken = default)
     {
-        var owned = await (
-            from word in _dbContext.Words
-            join page in _dbContext.Pages on word.PageId equals page.Id
-            join board in _dbContext.Boards on page.BoardId equals board.Id
-            where word.Id == wordId
-                && board.UserId == userId
-                && word.DeletedAt == null
-                && page.DeletedAt == null
-                && board.DeletedAt == null
-            select new
-            {
-                WordId = word.Id,
-                BoardId = board.Id,
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (owned is null)
-        {
-            return null;
-        }
-
-        var reviewSession = await _dbContext.ReviewSessions
+        var session = await _dbContext.ReviewSessions
             .SingleOrDefaultAsync(
-                session => session.Id == sessionId
-                    && session.UserId == userId
-                    && session.Status == ReviewSessionStatus.Active
-                    && session.DeletedAt == null,
-                cancellationToken);
-        if (reviewSession is null)
-        {
-            return null;
-        }
-
-        var sessionItem = await _dbContext.ReviewSessionItems
-            .SingleOrDefaultAsync(
-                item => item.ReviewSessionId == sessionId
-                    && item.VocabWordId == wordId
-                    && !item.IsReviewed
+                item => item.Id == sessionId
+                    && item.UserId == userId
                     && item.DeletedAt == null,
                 cancellationToken);
-        if (sessionItem is null)
+        if (session is null)
         {
             return null;
         }
 
-        var reviewedAt = DateTime.UtcNow;
-        var reviewedOn = ReviewTime.LocalDate(reviewedAt, timeZone);
-        var reviewState = await _dbContext.WordReviewStates
-            .SingleOrDefaultAsync(
-                state => state.UserId == userId
-                    && state.WordId == owned.WordId
-                    && state.DeletedAt == null
-                    && state.Status == WordReviewStatus.Active,
-                cancellationToken);
-        if (reviewState is null || reviewState.NextReviewDate > reviewedOn)
-        {
-            return null;
-        }
-
-        var levelBefore = reviewState.Level;
-        var schedule = correct
-            ? FluentAsrsScheduler.ApplyCorrect(reviewState.Level, reviewState.LapseCount)
-            : FluentAsrsScheduler.ApplyWrong(reviewState.Level, reviewState.LapseCount);
-        var nextReviewDate = ReviewTime.NextReviewDate(reviewedAt, schedule.IntervalDays, timeZone);
-        reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedOn);
-
-        var review = WordReviewHistory.Create(
-            userId,
-            owned.WordId,
-            sessionId,
-            timeSpentSeconds,
-            reviewedAt,
-            correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong);
-        await _dbContext.WordReviewHistories.AddAsync(review, cancellationToken);
-        sessionItem.MarkReviewed();
-
-        var remainingItems = await _dbContext.ReviewSessionItems
-            .CountAsync(
-                item => item.ReviewSessionId == sessionId
-                    && !item.IsReviewed
-                    && item.DeletedAt == null,
-                cancellationToken);
-        if (remainingItems == 0)
-        {
-            reviewSession.Complete(reviewedAt);
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return new ReviewResultDto(
-            owned.WordId,
-            review.Id,
-            correct ? "correct" : "wrong",
-            levelBefore,
-            schedule.LevelAfter,
-            schedule.LapseCountAfter,
-            nextReviewDate);
+        var items = await _dbContext.ReviewSessionItems
+            .Where(item => item.ReviewSessionId == sessionId && item.DeletedAt == null)
+            .OrderBy(item => item.Position)
+            .ToListAsync(cancellationToken);
+        return await BuildSessionDtoAsync(session, items, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<LevelFiveReviewItemDto>> ListLevelFiveWordsAsync(
+    public async Task<ReviewAnswerTargetDto?> GetAnswerTargetAsync(
         Guid userId,
+        Guid sessionId,
+        Guid itemId,
         CancellationToken cancellationToken = default)
     {
         return await (
-            from state in _dbContext.WordReviewStates.AsNoTracking()
-            join word in _dbContext.Words.AsNoTracking() on state.WordId equals word.Id
-            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
-            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
-            where state.UserId == userId
-                && state.DeletedAt == null
-                && state.Level == 5
-                && state.Status == WordReviewStatus.Active
-                && word.DeletedAt == null
-                && page.DeletedAt == null
-                && board.DeletedAt == null
-            orderby state.Status == WordReviewStatus.Active descending, state.LastReviewedAt descending
-            select new LevelFiveReviewItemDto(
-                word.Id,
-                word.Word,
-                board.Id,
-                board.Name,
-                page.Id,
-                page.Name,
-                state.Status == WordReviewStatus.Active ? "active" : "inactive",
-                state.LastReviewedAt))
-            .ToListAsync(cancellationToken);
+            from session in _dbContext.ReviewSessions.AsNoTracking()
+            join item in _dbContext.ReviewSessionItems.AsNoTracking() on session.Id equals item.ReviewSessionId
+            where session.Id == sessionId
+                && session.UserId == userId
+                && session.Status == ReviewSessionStatus.Active
+                && session.DeletedAt == null
+                && item.Id == itemId
+                && !item.IsReviewed
+                && item.DeletedAt == null
+            select new ReviewAnswerTargetDto(item.VocabWordId, item.Mode, item.WordSnapshot, item.LanguageSnapshot))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<int> RemoveLevelFiveWordsAsync(
+    public async Task<ReviewAnswerResultDto?> SubmitTypedAnswerAsync(
         Guid userId,
-        IReadOnlyList<Guid> wordIds,
+        Guid sessionId,
+        Guid itemId,
+        string answerText,
+        bool correct,
+        int timeSpentSeconds,
+        DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var ids = wordIds.Distinct().ToList();
-        var states = await _dbContext.WordReviewStates
-            .Where(state =>
-                state.UserId == userId
-                && state.DeletedAt == null
-                && state.Level == 5
-                && state.Status == WordReviewStatus.Active
-                && ids.Contains(state.WordId))
-            .ToListAsync(cancellationToken);
-
-        foreach (var state in states)
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var session = await GetActiveSessionAsync(userId, sessionId, cancellationToken);
+        if (session is null)
         {
-            state.Deactivate();
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return states.Count;
-    }
-
-    private static string PickRandomReviewMode()
-    {
-        var value = Random.Shared.Next(0, 3);
-        return value switch
+        var item = await GetOpenItemAsync(sessionId, itemId, cancellationToken);
+        if (item is null || item.Mode is not (ReviewMode.Dictation or ReviewMode.MeaningToWord))
         {
-            0 => "dictation",
-            1 => "pronunciation",
-            _ => "meaningToWord",
-        };
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
+        if (reviewState is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        CompleteItem(session, item, reviewState, correct, utcNow);
+        _dbContext.Set<ReviewAttempt>().Add(ReviewAttempt.CreateTyped(
+            item.Id,
+            item.Mode,
+            answerText,
+            correct,
+            timeSpentSeconds,
+            utcNow));
+        await SaveFinalAttemptAsync(session, item, userId, timeSpentSeconds, utcNow, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return await BuildAnswerResultAsync(session, item, attemptsUsed: 1, attemptsRemaining: 0, assessment: null, correct, cancellationToken);
     }
 
+    public async Task<ReviewAnswerResultDto?> AddPronunciationAttemptAsync(
+        Guid userId,
+        Guid sessionId,
+        Guid itemId,
+        PronunciationAssessmentDto assessment,
+        int timeSpentSeconds,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var session = await GetActiveSessionAsync(userId, sessionId, cancellationToken);
+        if (session is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
 
+        var item = await GetOpenItemAsync(sessionId, itemId, cancellationToken);
+        if (item is null || item.Mode != ReviewMode.ListenAndRepeat)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var attempts = _dbContext.Set<ReviewAttempt>()
+            .Where(attempt => attempt.ReviewSessionItemId == itemId && attempt.DeletedAt == null);
+        var attemptsUsedBefore = await attempts.CountAsync(cancellationToken);
+        if (attemptsUsedBefore >= 2)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var attemptNumber = attemptsUsedBefore + 1;
+        var timeSpentBefore = await attempts.SumAsync(attempt => (int?)attempt.TimeSpentSeconds, cancellationToken) ?? 0;
+        var feedbackJson = JsonSerializer.Serialize(assessment);
+        _dbContext.Set<ReviewAttempt>().Add(ReviewAttempt.CreatePronunciation(
+            item.Id,
+            attemptNumber,
+            assessment.Correct,
+            assessment.AccuracyScore,
+            assessment.CompletenessScore,
+            assessment.FeedbackMode,
+            feedbackJson,
+            timeSpentSeconds,
+            utcNow));
+
+        var attemptsUsed = attemptNumber;
+        if (assessment.Correct || attemptsUsed == 2)
+        {
+            var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
+            if (reviewState is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return null;
+            }
+
+            CompleteItem(
+                session,
+                item,
+                reviewState,
+                assessment.Correct,
+                utcNow);
+            await SaveFinalAttemptAsync(
+                session,
+                item,
+                userId,
+                timeSpentBefore + timeSpentSeconds,
+                utcNow,
+                cancellationToken);
+        }
+        else
+        {
+            // Save the successful provider assessment; provider failures never reach this method.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return await BuildAnswerResultAsync(
+            session,
+            item,
+            attemptsUsed,
+            Math.Max(0, 2 - attemptsUsed),
+            assessment,
+            assessment.Correct,
+            cancellationToken);
+    }
+
+    private async Task<ReviewSession?> GetActiveSessionAsync(
+        Guid userId,
+        Guid sessionId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.ReviewSessions.SingleOrDefaultAsync(
+            session => session.Id == sessionId
+                && session.UserId == userId
+                && session.Status == ReviewSessionStatus.Active
+                && session.DeletedAt == null,
+            cancellationToken);
+
+    private async Task<ReviewSessionItem?> GetOpenItemAsync(
+        Guid sessionId,
+        Guid itemId,
+        CancellationToken cancellationToken) =>
+        await _dbContext.ReviewSessionItems.SingleOrDefaultAsync(
+            item => item.Id == itemId
+                && item.ReviewSessionId == sessionId
+                && !item.IsReviewed
+                && item.DeletedAt == null,
+            cancellationToken);
+
+    private async Task<WordReviewState?> GetDueStateAsync(
+        Guid userId,
+        ReviewSession session,
+        Guid wordId,
+        DateTime utcNow,
+        CancellationToken cancellationToken)
+    {
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(session.TimeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return null;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return null;
+        }
+
+        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
+        var state = await _dbContext.WordReviewStates.SingleOrDefaultAsync(
+            item => item.UserId == userId
+                && item.WordId == wordId
+                && item.Status == WordReviewStatus.Active
+                && item.DeletedAt == null,
+            cancellationToken);
+        return state is { } && state.NextReviewDate <= localToday ? state : null;
+    }
+
+    private static void CompleteItem(
+        ReviewSession session,
+        ReviewSessionItem item,
+        WordReviewState reviewState,
+        bool correct,
+        DateTime utcNow)
+    {
+        var levelBefore = reviewState.Level;
+        var nextReviewDateBefore = reviewState.NextReviewDate;
+        var schedule = correct
+            ? FluentAsrsScheduler.ApplyCorrect(reviewState.Level, reviewState.LapseCount)
+            : FluentAsrsScheduler.ApplyWrong(reviewState.Level, reviewState.LapseCount);
+
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(session.TimeZoneId);
+        }
+        catch (TimeZoneNotFoundException exception)
+        {
+            throw new InvalidOperationException("Review session timezone is no longer available.", exception);
+        }
+        catch (InvalidTimeZoneException exception)
+        {
+            throw new InvalidOperationException("Review session timezone is no longer available.", exception);
+        }
+
+        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, schedule.IntervalDays, timeZone);
+        var reviewedOn = ReviewTime.LocalDate(utcNow, timeZone);
+        reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedOn);
+        item.Complete(
+            correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong,
+            levelBefore,
+            schedule.LevelAfter,
+            nextReviewDateBefore,
+            nextReviewDate,
+            utcNow);
+    }
+
+    private async Task SaveFinalAttemptAsync(
+        ReviewSession session,
+        ReviewSessionItem item,
+        Guid userId,
+        int totalTimeSpentSeconds,
+        DateTime reviewedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var openItemCount = await _dbContext.ReviewSessionItems.CountAsync(
+            candidate => candidate.ReviewSessionId == session.Id
+                && !candidate.IsReviewed
+                && candidate.DeletedAt == null,
+            cancellationToken);
+        if (openItemCount <= 1)
+        {
+            session.Complete(reviewedAtUtc);
+        }
+
+        var result = item.Result!.Value;
+        await _dbContext.WordReviewHistories.AddAsync(
+            WordReviewHistory.Create(userId, item.VocabWordId, session.Id, totalTimeSpentSeconds, reviewedAtUtc, result),
+            cancellationToken);
+
+        // One SaveChanges keeps the attempt, item result, history, word state, and session status atomic.
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<ReviewSessionDto> BuildSessionDtoAsync(
+        ReviewSession session,
+        IReadOnlyCollection<ReviewSessionItem> items,
+        CancellationToken cancellationToken)
+    {
+        var itemIds = items.Select(item => item.Id).ToArray();
+        var attemptCounts = itemIds.Length == 0
+            ? new Dictionary<Guid, int>()
+            : await _dbContext.Set<ReviewAttempt>()
+                .AsNoTracking()
+                .Where(attempt => itemIds.Contains(attempt.ReviewSessionItemId)
+                    && attempt.Mode == ReviewMode.ListenAndRepeat
+                    && attempt.DeletedAt == null)
+                .GroupBy(attempt => attempt.ReviewSessionItemId)
+                .Select(group => new { ItemId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(row => row.ItemId, row => row.Count, cancellationToken);
+
+        var itemDtos = items
+            .OrderBy(item => item.Position)
+            .Select(item => ToSessionItemDto(item, attemptCounts.GetValueOrDefault(item.Id)))
+            .ToArray();
+        return new ReviewSessionDto(
+            session.Id,
+            session.SessionDate,
+            session.StartedAt,
+            session.CompletedAt,
+            ToStatus(session.Status),
+            itemDtos.Length,
+            itemDtos.Count(item => item.IsReviewed),
+            itemDtos.FirstOrDefault(item => !item.IsReviewed)?.Position,
+            itemDtos);
+    }
+
+    private async Task<ReviewAnswerResultDto> BuildAnswerResultAsync(
+        ReviewSession session,
+        ReviewSessionItem item,
+        int attemptsUsed,
+        int attemptsRemaining,
+        PronunciationAssessmentDto? assessment,
+        bool correct,
+        CancellationToken cancellationToken)
+    {
+        var sessionDto = await GetSessionAsync(session.UserId, session.Id, cancellationToken);
+        var itemDto = sessionDto!.Items.Single(candidate => candidate.ItemId == item.Id);
+        return new ReviewAnswerResultDto(
+            item.Id,
+            item.VocabWordId,
+            correct,
+            attemptsUsed,
+            attemptsRemaining,
+            itemDto.IsReviewed,
+            itemDto.Result,
+            itemDto.LevelBefore,
+            itemDto.LevelAfter,
+            itemDto.NextReviewDateBefore,
+            itemDto.NextReviewDateAfter,
+            sessionDto.CompletedWords,
+            sessionDto.CurrentItemIndex,
+            sessionDto.Status,
+            assessment);
+    }
+
+    private static ReviewSessionItemDto ToSessionItemDto(ReviewSessionItem item, int pronunciationAttemptCount) =>
+        new(
+            item.Id,
+            item.VocabWordId,
+            item.Position,
+            item.Mode,
+            item.LanguageSnapshot,
+            item.WordSnapshot,
+            item.MeaningSnapshot,
+            item.IpaPronunciationSnapshot,
+            item.TypeSnapshot,
+            item.ContextSnapshot,
+            item.ExampleSnapshot,
+            item.SynonymsSnapshot,
+            item.AntonymsSnapshot,
+            item.IsReviewed,
+            item.Result.HasValue ? ToResult(item.Result.Value) : null,
+            item.LevelBefore,
+            item.LevelAfter,
+            item.NextReviewDateBefore,
+            item.NextReviewDateAfter,
+            pronunciationAttemptCount);
+
+    private static string ToStatus(ReviewSessionStatus status) => status switch
+    {
+        ReviewSessionStatus.Active => "active",
+        ReviewSessionStatus.Completed => "completed",
+        ReviewSessionStatus.Abandoned => "abandoned",
+        _ => throw new ArgumentOutOfRangeException(nameof(status)),
+    };
+
+    private static string ToResult(FluentAsrsReviewResult result) => result switch
+    {
+        FluentAsrsReviewResult.Correct => "correct",
+        FluentAsrsReviewResult.Wrong => "wrong",
+        _ => throw new ArgumentOutOfRangeException(nameof(result)),
+    };
+
+    private static string PickRandomReviewMode() => Random.Shared.Next(ReviewMode.All.Count) switch
+    {
+        0 => ReviewMode.Dictation,
+        1 => ReviewMode.MeaningToWord,
+        _ => ReviewMode.ListenAndRepeat,
+    };
 }

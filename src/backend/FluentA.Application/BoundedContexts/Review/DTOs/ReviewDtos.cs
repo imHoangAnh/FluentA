@@ -1,72 +1,71 @@
+using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
+
 namespace FluentA.Application.BoundedContexts.Review.DTOs;
 
-public sealed record ReviewSessionWordDto(
-    Guid WordId,
-    string Word,
-    string WordClass,
-    string IpaPronunciation,
-    string MeaningVn,
-    string MeaningEn,
-    string Example,
-    string? Thesaurus,
-    string? Collocation,
-    string? Note,
-    string Mode);
+public sealed record ReviewDashboardDto(
+    DateOnly LocalDate,
+    int DueCount);
 
 public sealed record CreateReviewSessionRequest(
-    Guid BoardId,
-    string OrderType,
-    string Mode,
     string TimeZoneId);
 
-public sealed record ReviewSessionCreatedDto(
+public sealed record ReviewSessionDto(
     Guid SessionId,
-    Guid BoardId,
-    string BoardName,
-    string OrderType,
-    string Mode,
+    DateOnly LocalDate,
     DateTime StartedAt,
+    DateTime? CompletedAt,
+    string Status,
     int TotalWords,
-    IReadOnlyList<ReviewSessionWordDto> Words);
+    int CompletedWords,
+    int? CurrentItemIndex,
+    IReadOnlyList<ReviewSessionItemDto> Items);
 
-public sealed record DashboardForecastPointDto(string Date, int DueCount);
+public sealed record ReviewSessionItemDto(
+    Guid ItemId,
+    Guid WordId,
+    int Position,
+    string Mode,
+    string Language,
+    string Word,
+    string Meaning,
+    string IpaPronunciation,
+    string Type,
+    string? Context,
+    string Example,
+    string? Synonyms,
+    string? Antonyms,
+    bool IsReviewed,
+    string? Result,
+    int? LevelBefore,
+    int? LevelAfter,
+    DateOnly? NextReviewDateBefore,
+    DateOnly? NextReviewDateAfter,
+    int PronunciationAttemptCount);
 
-public sealed record FlashcardDashboardDto(
-    Guid? BoardId,
-    string? BoardName,
-    int TotalCards,
-    int TotalReviews,
-    int StreakDays,
-    int RetentionRate,
-    int Overdue,
-    int DueToday,
-    int NewCards,
-    IReadOnlyList<DashboardForecastPointDto> Forecast);
+public sealed record SubmitReviewAnswerRequest(
+    Guid ItemId,
+    string AnswerText,
+    int TimeSpentSeconds);
 
-public sealed record SubmitReviewRequest(
-    Guid SessionId,
+public sealed record ReviewAnswerTargetDto(
+    Guid WordId,
+    string Mode,
+    string ExpectedAnswer,
+    string Language);
+
+public sealed record ReviewAnswerResultDto(
+    Guid ItemId,
     Guid WordId,
     bool Correct,
-    int TimeSpentSeconds,
-    string TimeZoneId);
-
-public sealed record ReviewResultDto(
-    Guid WordId,
-    Guid ReviewHistoryId,
-    string Result,
-    int LevelBefore,
-    int LevelAfter,
-    int LapseCount,
-    DateOnly NextReviewDate);
-
-public sealed record LevelFiveReviewItemDto(
-    Guid WordId,
-    string Word,
-    Guid BoardId,
-    string BoardName,
-    Guid PageId,
-    string PageName,
-    string Status,
-    DateOnly? LastReviewDate);
-
-public sealed record RemoveLevelFiveWordsRequest(IReadOnlyList<Guid> WordIds);
+    int AttemptsUsed,
+    int AttemptsRemaining,
+    bool IsReviewed,
+    string? Result,
+    int? LevelBefore,
+    int? LevelAfter,
+    DateOnly? NextReviewDateBefore,
+    DateOnly? NextReviewDateAfter,
+    int CompletedWords,
+    int? CurrentItemIndex,
+    string SessionStatus,
+    PronunciationAssessmentDto? Assessment);

@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import { appShellRoute } from '@/shared/components/layout/app-shell-route'
-import { SettingsLayout } from './pages/SettingsLayout'
 
 function lazySettingsPage<T extends Record<string, unknown>>(load: () => Promise<T>, name: keyof T) {
   return async () => ({ Component: (await load())[name] as ComponentType })
@@ -9,25 +8,18 @@ function lazySettingsPage<T extends Record<string, unknown>>(load: () => Promise
 
 export const settingsRoutes: RouteObject[] = [
   {
-    path: 'profile',
+    path: 'settings',
     handle: appShellRoute({
-      title: 'Profile',
+      title: 'Settings',
       description: 'Manage your account profile.',
     }),
     lazy: lazySettingsPage(() => import('./pages/SettingsPage'), 'SettingsPage'),
   },
   {
-    path: 'settings',
-    handle: appShellRoute({
-      title: 'Settings',
-      contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
-    }),
-    Component: SettingsLayout,
-    children: [
-      { index: true, element: <Navigate to="practice" replace /> },
-      { path: 'practice', lazy: lazySettingsPage(() => import('./pages/SettingsPracticePage'), 'SettingsPracticePage') },
-      { path: 'level5', lazy: lazySettingsPage(() => import('./pages/LevelFiveSettingsPage'), 'LevelFiveSettingsPage') },
-      { path: 'review', element: <Navigate to="/settings/practice" replace /> },
-    ],
+    path: 'profile',
+    element: <Navigate to="/settings" replace />,
   },
+  { path: 'settings/practice', element: <Navigate to="/settings" replace /> },
+  { path: 'settings/level5', element: <Navigate to="/review?review=open" replace /> },
+  { path: 'settings/review', element: <Navigate to="/review?review=open" replace /> },
 ]

@@ -1,77 +1,109 @@
 import { Mic, Square, Volume2 } from 'lucide-react'
-import type { ReviewSessionWord } from '../../api/review.api'
-import type { ReviewMode } from '../../api/review.api'
+import type { ReviewSessionItem } from '../../api/review.api'
 import { formatIpa, hasText } from './reviewFormatters'
 
-type ReviewRenderMode = Exclude<ReviewMode, 'random'>
+export type ReviewFeedback = {
+  kind: 'correct' | 'wrong' | 'retry'
+  title: string
+  message: string
+  item: ReviewSessionItem
+}
 
 type ReviewModeSurfaceProps = {
-  mode: ReviewRenderMode
-  word: ReviewSessionWord
+  item: ReviewSessionItem
   typedAnswer: string
-  usesLargeAnswerLayout: boolean
-  isAutoAdvancing: boolean
-  isSubmitting: boolean
+  feedback: ReviewFeedback | null
+  isBusy: boolean
   isRecording: boolean
-  isAssessmentPending: boolean
   recordingSupported: boolean
-  pronunciationAttempts: number
-  pronunciationFailed: boolean
   pronunciationError: string | null
   onPlayAudio: () => void
   onAnswerChange: (value: string) => void
   onCheckAnswer: () => void
   onSkip: () => void
-  onStartRecording: () => void
-  onStopRecording: () => void
+  onContinue: () => void
+  onToggleRecording: () => void
 }
 
-const prompts: Record<ReviewRenderMode, string> = {
-  dictation: 'Listen carefully, then type the word you hear',
-  meaningToWord: 'What word matches this meaning?',
-  pronunciation: 'Say the word naturally',
-}
+const prompts = {
+  dictation: 'Listen to the audio, type the word, then press Enter.',
+  meaningToWord: 'Read the meaning and context, type the word, then press Enter.',
+  listenAndRepeat: 'Listen to the word, then record your pronunciation.',
+} satisfies Record<ReviewSessionItem['mode'], string>
 
-export function ReviewModeSurface({ mode, word, typedAnswer, usesLargeAnswerLayout, isAutoAdvancing, isSubmitting, isRecording, isAssessmentPending, recordingSupported, pronunciationAttempts, pronunciationFailed, pronunciationError, onPlayAudio, onAnswerChange, onCheckAnswer, onSkip, onStartRecording, onStopRecording }: ReviewModeSurfaceProps) {
-  const isPronunciation = mode === 'pronunciation'
+export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecording, recordingSupported, pronunciationError, onPlayAudio, onAnswerChange, onCheckAnswer, onSkip, onContinue, onToggleRecording }: ReviewModeSurfaceProps) {
+  const isPronunciation = item.mode === 'listenAndRepeat'
+  const contextText = hasText(item.context) ? item.context : item.example
 
   return (
-    <div className="review-exercise">
-      <h2 className="review-exercise__prompt">{prompts[mode]}</h2>
+    <div className="review-figma-session__mode-surface">
+      <h2 className="review-figma-session__prompt">{prompts[item.mode]}</h2>
 
-      {mode === 'dictation' ? (
-        <div className="review-exercise__stage review-exercise__stage--dictation">
-          <div className="practice-dictation-audio-control">
-            <button className="review-audio-action" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio}><Volume2 size={32} /></button>
-            <span>Play</span>
+      <div className={`review-figma-session__exercise-content${feedback ? ' review-figma-session__exercise-content--feedback' : ''}`}>
+        {item.mode === 'dictation' ? (
+          <div className="review-figma-session__dictation-prompt">
+            <button className="review-figma-session__audio-disc" type="button" aria-label="Play word" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio} disabled={isBusy}>
+              <Volume2 size={32} strokeWidth={2.26667} color="var(--review-green)" aria-hidden="true" />
+            </button>
+            <strong>Play word</strong>
+            <span>Listen again whenever you need.</span>
           </div>
-        </div>
-      ) : mode === 'meaningToWord' ? (
-        <div className="review-exercise__stage review-meaning-card">
-          {word.meaningVn ? <strong>{word.meaningVn}</strong> : null}
-          {word.meaningEn ? <p>{word.meaningEn}</p> : null}
-        </div>
-      ) : (
-        <div className="review-exercise__stage review-pronunciation-stage">
-          <div className="review-pronunciation-target"><strong>{word.word}</strong>{hasText(word.ipaPronunciation) ? <span>{formatIpa(word.ipaPronunciation)}</span> : null}</div>
-          <div className="review-pronunciation-controls">
-            <button className="review-pronunciation-play-button" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio}><Volume2 size={20} /></button>
-            <button className={`review-record-button ${isRecording ? 'review-record-button--active' : ''}`} type="button" aria-label="Start recording" title="Record (R)" onClick={onStartRecording} disabled={isAutoAdvancing || isRecording || isAssessmentPending || pronunciationAttempts >= 2 || !recordingSupported}><Mic size={22} /></button>
-            <button className="review-stop-button" type="button" aria-label="Stop recording" title="Stop (Space)" onClick={onStopRecording} disabled={!isRecording}><Square size={18} fill="currentColor" /></button>
-          </div>
-          <span className="review-pronunciation-attempt">Attempt {Math.min(pronunciationAttempts + 1, 2)} of 2</span>
-          {pronunciationError ? <p className="flashcard-status flashcard-status--error">{pronunciationError}</p> : null}
-        </div>
-      )}
+        ) : null}
 
-      {!isPronunciation ? (
-        <div className="review-answer-form">
-          {mode === 'meaningToWord' ? <label htmlFor="review-answer-input">Type the word</label> : null}
+        {item.mode === 'meaningToWord' ? (
+          <div className="review-figma-session__meaning-card">
+            <span className="review-figma-session__meaning-label">Meaning</span>
+            <strong className="review-figma-session__meaning-value">{hasText(item.meaning) ? item.meaning : 'No meaning was saved for this word.'}</strong>
+            {hasText(contextText) ? (
+              <>
+                <span className="review-figma-session__meaning-label">Usage context</span>
+                <p className="review-figma-session__meaning-context">{contextText}</p>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isPronunciation ? (
+          <div className="review-figma-session__pronunciation-content">
+            <strong className="review-figma-session__pronunciation-word">{item.word}</strong>
+            {hasText(item.ipaPronunciation) || hasText(item.type) ? (
+              <span className="review-figma-session__pronunciation-details">
+                {hasText(item.ipaPronunciation) ? formatIpa(item.ipaPronunciation ?? '') : ''}
+                {hasText(item.ipaPronunciation) && hasText(item.type) ? '  ·  ' : ''}
+                {hasText(item.type) ? item.type : ''}
+              </span>
+            ) : null}
+            <div className="review-figma-session__pronunciation-controls">
+              <button className="review-figma-session__listen-button" type="button" aria-label="Listen to pronunciation" aria-keyshortcuts="Tab" title="Listen (Tab)" onClick={onPlayAudio} disabled={isBusy}>
+                <span>Listen</span>
+                <Volume2 size={20} strokeWidth={1.41667} color="var(--review-green)" aria-hidden="true" />
+              </button>
+              <button
+                className={`review-figma-session__record-button${isRecording ? ' review-figma-session__record-button--recording' : ''}`}
+                type="button"
+                aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+                aria-keyshortcuts={isRecording ? 'Space' : 'R'}
+                title={isRecording ? 'Stop recording (Space)' : 'Record (R)'}
+                onClick={onToggleRecording}
+                disabled={isBusy || (!isRecording && (!recordingSupported || item.pronunciationAttemptCount >= 2))}
+              >
+                {isRecording ? <><Square size={16} fill="currentColor" aria-hidden="true" /> Stop</> : <><Mic size={18} aria-hidden="true" /> Record</>}
+              </button>
+            </div>
+            <span className="review-figma-session__attempt">Attempt {Math.min(item.pronunciationAttemptCount + 1, 2)} of 2</span>
+            {pronunciationError ? <p className="review-figma-session__error" role="alert">{pronunciationError}</p> : null}
+          </div>
+        ) : null}
+
+        {!isPronunciation ? (
           <input
             id="review-answer-input"
+            className="review-figma-session__answer-input"
+            aria-label={item.mode === 'meaningToWord' ? 'Type the word' : 'Type the word you hear'}
+            autoComplete="off"
             value={typedAnswer}
-            disabled={isAutoAdvancing || isSubmitting}
-            placeholder={mode === 'meaningToWord' ? 'Type the word...' : 'Type your answer...'}
+            disabled={isBusy || Boolean(feedback)}
+            placeholder={item.mode === 'meaningToWord' ? 'Type the word...' : 'Type the word you hear...'}
             onChange={(event) => onAnswerChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && typedAnswer.trim().length > 0) {
@@ -81,17 +113,28 @@ export function ReviewModeSurface({ mode, word, typedAnswer, usesLargeAnswerLayo
               }
             }}
           />
-          <div className="review-exercise__actions">
-            <button className={usesLargeAnswerLayout ? 'practice-dictation-submit' : 'primary-button review-submit-button'} type="button" title="Submit answer (Enter)" onClick={onCheckAnswer} disabled={typedAnswer.trim().length === 0 || isAutoAdvancing || isSubmitting}>{mode === 'dictation' ? 'Submit Answer' : 'Submit'}</button>
-            <button className={usesLargeAnswerLayout ? 'practice-dictation-skip' : 'review-skip-button'} type="button" onClick={onSkip} disabled={isAutoAdvancing || isSubmitting}>Skip</button>
-          </div>
+        ) : null}
+
+      </div>
+
+      {feedback ? (
+        <div className={`review-figma-session__feedback review-figma-session__feedback--${feedback.kind === 'correct' ? 'correct' : 'wrong'}`} role="status" aria-live="polite">
+          <strong>{feedback.title}</strong>
+          <span>{feedback.message}</span>
         </div>
-      ) : (
-        <div className="review-exercise__actions">
-          {pronunciationFailed ? <p className="practice-wrong-message" role="status" aria-live="polite">Wrong</p> : null}
-          <button className="practice-dictation-skip" type="button" onClick={onSkip} disabled={isAutoAdvancing || isRecording || isAssessmentPending || isSubmitting}>Skip</button>
-        </div>
-      )}
+      ) : null}
+
+      <div className="review-figma-session__exercise-actions">
+        {!isPronunciation && !feedback ? <button className="review-figma-session__action-button learning-touch-submit" type="button" onClick={onCheckAnswer} disabled={isBusy || !typedAnswer.trim()}>Check answer</button> : null}
+        {feedback ? (
+          <button className="review-figma-session__action-button" type="button" onClick={onContinue}>Continue</button>
+        ) : !isPronunciation ? (
+          <>
+            <button className="review-figma-session__submit-button" type="button" onClick={onCheckAnswer} disabled={isBusy || typedAnswer.trim().length === 0}>Check answer</button>
+            <button className="review-figma-session__action-button" type="button" title="Skip this word (Esc)" onClick={onSkip} disabled={isBusy}>Skip</button>
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
-import { ArrowRight, BookOpenCheck, CheckCircle2, Circle, FolderKanban, GraduationCap, Repeat2, Timer } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { ArrowRight, BookOpenCheck, CheckCircle2, Circle, FolderKanban, Repeat2, Timer } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { CardContent } from '@/shared/components/ui/card'
@@ -12,10 +12,9 @@ import { HabitIconGlyph } from '@/features/habits'
 
 type ReviewQueueWidgetProps = {
   dueReview: number
-  learningCards: number
 }
 
-export function ReviewQueueWidget({ dueReview, learningCards }: ReviewQueueWidgetProps) {
+export function ReviewQueueWidget({ dueReview }: ReviewQueueWidgetProps) {
   const hasDueReview = dueReview > 0
   return (
     <CardContent className="grid gap-4 p-4 sm:grid-cols-[136px_minmax(0,1fr)] sm:gap-5 sm:p-5">
@@ -23,7 +22,7 @@ export function ReviewQueueWidget({ dueReview, learningCards }: ReviewQueueWidge
         <div
           data-testid="dashboard-review-due-ring"
           className="relative grid size-28 shrink-0 place-items-center rounded-full bg-[radial-gradient(circle_at_center,var(--ds-card)_58%,var(--ds-secondary)_100%)] sm:mx-auto sm:size-32"
-          aria-label={`${dueReview} ${dueReview === 1 ? 'word' : 'words'} due for review today. ${learningCards} new ${learningCards === 1 ? 'word' : 'words'} available to learn.`}
+          aria-label={`${dueReview} ${dueReview === 1 ? 'word' : 'words'} due for review today.`}
         >
           <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="44" fill="none" stroke="var(--ds-muted)" strokeWidth="7" />
@@ -38,17 +37,10 @@ export function ReviewQueueWidget({ dueReview, learningCards }: ReviewQueueWidge
       </div>
       <div className="flex min-w-0 flex-col gap-3">
         <Badge data-testid="dashboard-review-due-badge" variant={hasDueReview ? 'default' : 'outline'} className="w-fit shrink-0">{dueReview} due</Badge>
-        <div className="grid grid-cols-2 gap-2.5 max-[380px]:grid-cols-1">
-          <div data-testid="dashboard-review-count" className="rounded-lg border border-primary/15 bg-secondary/65 p-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-secondary-foreground"><BookOpenCheck className="size-4" aria-hidden="true" />Review</div>
-            <p className="m-0 mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground">{dueReview}</p>
-            <p className="m-0 mt-0.5 text-xs text-muted-foreground">Scheduled words</p>
-          </div>
-          <div data-testid="dashboard-learning-count" className="rounded-lg border border-border bg-muted/45 p-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><GraduationCap className="size-4" aria-hidden="true" />Learning</div>
-            <p className="m-0 mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground">{learningCards}</p>
-            <p className="m-0 mt-0.5 text-xs text-muted-foreground">New words</p>
-          </div>
+        <div data-testid="dashboard-review-count" className="rounded-lg border border-primary/15 bg-secondary/65 p-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-secondary-foreground"><BookOpenCheck className="size-4" aria-hidden="true" />Review</div>
+          <p className="m-0 mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground">{dueReview}</p>
+          <p className="m-0 mt-0.5 text-xs text-muted-foreground">Scheduled words</p>
         </div>
         <p className="m-0 text-sm text-muted-foreground">{hasDueReview ? `${dueReview} ${dueReview === 1 ? 'word is' : 'words are'} ready for spaced review.` : 'No reviews due today.'}</p>
       </div>
@@ -156,7 +148,15 @@ export function PomodoroWidget({ current, today }: PomodoroWidgetProps) {
 }
 
 export function ReviewQueueAction() {
-  return <Button asChild className="w-full justify-between"><Link to="/review">Open Review<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
+  const [searchParams, setSearchParams] = useSearchParams()
+  function openReview() {
+    if (searchParams.get('review') === 'open') return
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.set('review', 'open')
+    setSearchParams(nextSearchParams)
+  }
+
+  return <Button type="button" className="w-full justify-between" onClick={openReview}>Open Review<ArrowRight className="size-4" aria-hidden="true" /></Button>
 }
 
 export function TodoAction() {

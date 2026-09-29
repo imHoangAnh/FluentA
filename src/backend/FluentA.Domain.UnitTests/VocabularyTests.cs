@@ -38,20 +38,19 @@ public sealed class VocabularyTests
             " mitigate ",
             " giam nhe ",
             " /mItIgeIt/ ",
-            WordClass.Verb,
+            WordType.Verb,
             " reduce harm ",
             " Mitigate the risk. ",
-            " formal ",
             " reduce ",
             null);
 
-        word.Update("mitigation", "su giam nhe", "/mItI'geISn/", WordClass.Noun, null, "Risk mitigation matters.", null, "reduction", "aggravation");
+        word.Update("mitigation", "su giam nhe", "/mItI'geISn/", WordType.Noun, null, "Risk mitigation matters.", "reduction", "aggravation");
 
         Assert.Equal("mitigation", word.Word);
         Assert.Equal("/mItI'geISn/", word.IpaPronunciation);
         Assert.Equal("reduction", word.Synonyms);
         Assert.Equal("aggravation", word.Antonyms);
-        Assert.Null(word.Definition);
+        Assert.Null(word.Context);
     }
 
     [Fact]
@@ -60,12 +59,12 @@ public sealed class VocabularyTests
         var preference = VocabBoardPreference.Create(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            [" definition ", "note", "definition"],
-            ["word", "meaningVn", "ipaPronunciation"],
+            [" context ", "synonyms", "context"],
+            ["word", "meaning", "ipaPronunciation"],
             new Dictionary<string, int> { [" word "] = 240 });
 
-        Assert.Equal(["definition", "note"], preference.HiddenColumns);
-        Assert.Equal(["word", "meaningVn", "ipaPronunciation"], preference.ColumnOrder);
+        Assert.Equal(["context", "synonyms"], preference.HiddenColumns);
+        Assert.Equal(["word", "meaning", "ipaPronunciation"], preference.ColumnOrder);
         Assert.Equal(240, preference.ColumnWidths["word"]);
     }
 

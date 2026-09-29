@@ -6,13 +6,12 @@ type PracticeDictationModeProps = {
 
 export function PracticeDictationMode({ onPlayAudio }: PracticeDictationModeProps) {
   return (
-    <div className="review-exercise__stage review-exercise__stage--dictation">
-      <div className="practice-dictation-audio-control">
-        <button className="review-audio-action" type="button" aria-label="Play pronunciation" aria-keyshortcuts="Tab" onClick={onPlayAudio}>
-          <Volume2 size={28} />
-        </button>
-        <span>Play</span>
-      </div>
+    <div className="practice-dictation-audio">
+      <button className="practice-dictation-audio__play" type="button" aria-label="Play word" aria-keyshortcuts="Tab" onClick={onPlayAudio}>
+        <Volume2 aria-hidden="true" size={32} className="practice-dictation-audio__icon" />
+      </button>
+      <span>Play word</span>
+      <p>Listen again whenever you need.</p>
     </div>
   )
 }

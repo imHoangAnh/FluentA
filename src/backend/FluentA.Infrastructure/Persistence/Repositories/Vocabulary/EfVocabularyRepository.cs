@@ -31,13 +31,16 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             .FirstOrDefaultAsync(board => board.Id == boardId && board.UserId == userId && board.DeletedAt == null, cancellationToken);
     }
 
-    public async Task<VocabPage?> GetPageAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
-    {
-        var board = await GetBoardAsync(userId, boardId, cancellationToken);
-        return board?.Pages.FirstOrDefault(page => page.Id == pageId && page.DeletedAt is null);
-    }
+    public Task<VocabPage?> GetPageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default) =>
+        (from page in _dbContext.Pages
+         join board in _dbContext.Boards on page.BoardId equals board.Id
+         where page.Id == pageId
+             && page.DeletedAt == null
+             && board.UserId == userId
+             && board.DeletedAt == null
+         select page).FirstOrDefaultAsync(cancellationToken);
 
-    public Task<VocabWord?> GetWordAsync(Guid userId, Guid boardId, Guid wordId, CancellationToken cancellationToken = default)
+    public Task<VocabWord?> GetWordAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
     {
         return (
             from word in _dbContext.Words
@@ -46,7 +49,6 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             where word.Id == wordId
                 && word.DeletedAt == null
                 && page.DeletedAt == null
-                && board.Id == boardId
                 && board.UserId == userId
                 && board.DeletedAt == null
             select word)
@@ -75,7 +77,7 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             .FirstOrDefaultAsync(preference => preference.UserId == userId && preference.BoardId == boardId && preference.DeletedAt == null, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid boardId, Guid pageId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
     {
         return await (
             from word in _dbContext.Words
@@ -84,7 +86,6 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
             where word.PageId == pageId
                 && word.DeletedAt == null
                 && page.DeletedAt == null
-                && board.Id == boardId
                 && board.UserId == userId
                 && board.DeletedAt == null
             orderby word.CreatedAt
@@ -161,45 +162,6 @@ public sealed class EfVocabularyRepository : IVocabularyRepository
     {
         _dbContext.VocabBoardPreferences.Update(preference);
         return Task.CompletedTask;
-    }
-
-    public async Task UpdateFixedCellAsync(VocabWord word, string columnKey, CancellationToken cancellationToken = default)
-    {
-        var key = columnKey.Trim().ToLowerInvariant();
-        var wordQuery = _dbContext.Words.Where(item => item.Id == word.Id);
-        switch (key)
-        {
-            case "word":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Word, word.Word).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "meaningvn":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.MeaningVn, word.MeaningVn).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "ipapronunciation":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IpaPronunciation, word.IpaPronunciation).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "definition":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Definition, word.Definition).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "class":
-                var wordClass = word.Class;
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Class, wordClass).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "example":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Example, word.Example).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "note":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Note, word.Note).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "synonyms":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Synonyms, word.Synonyms).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            case "antonyms":
-                await wordQuery.ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Antonyms, word.Antonyms).SetProperty(item => item.UpdatedAt, word.UpdatedAt), cancellationToken);
-                break;
-            default:
-                throw new InvalidOperationException("Unsupported fixed vocabulary cell.");
-        }
     }
 
     public async Task SoftDeleteBoardAsync(VocabBoard board, DateTime trashedAt, CancellationToken cancellationToken = default)

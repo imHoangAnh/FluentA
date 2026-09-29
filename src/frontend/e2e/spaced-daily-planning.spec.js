@@ -1,55 +1,36 @@
-import { expect, test } from '@playwright/test';
-import { loginSeededUser } from './support/auth-fixture.js';
+import { expect, test } from '@playwright/test'
+import { loginSeededUser } from './support/auth-fixture.js'
 
-test('dashboard counts aggregate page decks after review settings removal', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.speechSynthesis.speak = () => undefined;
-    window.speechSynthesis.cancel = () => undefined;
-  });
+test('Review modal reports the due count for all owned vocabulary boards', async ({ page }) => {
+  const { headers } = await loginSeededUser(page, { prefix: 'spaced-daily-planning' })
 
-  const { token, headers } = await loginSeededUser(page, { prefix: 'spaced-daily-planning' });
-
-  await page.goto('/settings/review');
-  await expect(page).toHaveURL(/\/settings\/practice$/);
-  await expect(page.getByRole('heading', { name: 'Practice', exact: true })).toBeVisible();
-
-  const board = (await (await page.request.post('https://localhost:7000/api/v1/boards', {
+  const boardResponse = await page.request.post('https://localhost:7000/api/v1/vocabs/boards', {
     headers,
     data: { name: 'Daily Planning', language: 'en' },
-  })).json()).data;
-  const vocabPage = (await (await page.request.post(`https://localhost:7000/api/v1/boards/${board.id}/pages`, {
+  })
+  expect(boardResponse.status()).toBe(201)
+  const board = (await boardResponse.json()).data
+  const pageResponse = await page.request.post(`https://localhost:7000/api/v1/vocabs/boards/${board.id}/pages`, {
     headers,
     data: { name: 'Today' },
-  })).json()).data;
+  })
+  expect(pageResponse.status()).toBe(201)
+  const vocabPage = (await pageResponse.json()).data
   for (const word of ['first', 'second']) {
-    await page.request.post(`https://localhost:7000/api/v1/boards/${board.id}/pages/${vocabPage.id}/words`, {
+    const response = await page.request.post(`https://localhost:7000/api/v1/vocabs/pages/${vocabPage.id}/words`, {
       headers,
-      data: { word, meaningVn: word, meaningEn: word, class: 'other', example: `${word} example` },
-    });
+      data: { word, meaning: word, ipaPronunciation: `/${word}/`, type: 'other', example: `${word} example` },
+    })
+    expect(response.status()).toBe(201)
   }
 
-  const secondBoard = (await (await page.request.post('https://localhost:7000/api/v1/boards', {
-    headers,
-    data: { name: 'Second Daily Board', language: 'en' },
-  })).json()).data;
-  const secondPage = (await (await page.request.post(`https://localhost:7000/api/v1/boards/${secondBoard.id}/pages`, {
-    headers,
-    data: { name: 'Tomorrow' },
-  })).json()).data;
-  await page.request.post(`https://localhost:7000/api/v1/boards/${secondBoard.id}/pages/${secondPage.id}/words`, {
-    headers,
-    data: { word: 'third', meaningVn: 'third', meaningEn: 'third', class: 'other', example: 'third example' },
-  });
+  const dashboardResponse = await page.request.get('https://localhost:7000/api/v1/review/dashboard?timeZoneId=UTC', { headers })
+  expect(dashboardResponse.status()).toBe(200)
+  const dashboard = (await dashboardResponse.json()).data
+  expect(dashboard).toEqual(expect.objectContaining({ localDate: expect.any(String), dueCount: expect.any(Number) }))
 
-  await page.getByRole('link', { name: 'Flashcard' }).click();
-  await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible();
-
-  const dashboardResponse = await page.request.get('https://localhost:7000/api/v1/review/dashboard?timeZoneId=UTC', { headers });
-  expect(dashboardResponse.status()).toBe(200);
-  const dashboard = (await dashboardResponse.json()).data;
-  expect(dashboard.totalCards).toBeGreaterThanOrEqual(0);
-  expect(dashboard.newCards).toBeGreaterThanOrEqual(0);
-  expect(dashboard.totalReviews).toBeGreaterThanOrEqual(0);
-  expect(dashboard.overdue).toBeGreaterThanOrEqual(0);
-  expect(dashboard.dueToday).toBe(0);
-});
+  await page.getByRole('button', { name: 'Review', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByTestId('review-due-count')).toHaveText(String(dashboard.dueCount))
+  await expect(page.getByRole('button', { name: 'Start review' })).toBeDisabled()
+})
