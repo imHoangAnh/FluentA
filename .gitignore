@@ -33,7 +33,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node / frontend build cache
+# Node/frontend build 
 node_modules/
 dist/
 dist-ssr/
@@ -42,7 +42,7 @@ coverage/
 test-results/
 docs/decisions
 
-# .NET build output
+# .NET build 
 bin/
 !deploy/production/bin/
 !deploy/production/bin/*.sh
@@ -50,5 +50,5 @@ obj/
 TestResults/
 *.user
 
-# Rust / generic build output
+# Rust / generic build 
 target/
