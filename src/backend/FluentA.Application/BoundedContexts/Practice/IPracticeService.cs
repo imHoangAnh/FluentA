@@ -35,7 +35,8 @@ public interface IPracticeService
         Guid itemId,
         ReadOnlyMemory<byte> wavAudio,
         long durationMs,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null);
 
     Task<OperationResult<PracticeReviewLevelResultDto>> SetReviewLevelAsync(
         Guid userId,

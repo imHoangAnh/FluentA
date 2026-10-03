@@ -13,6 +13,11 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
     private readonly IReviewRepository _repository;
     private readonly IPronunciationService _pronunciation;
 
+    public Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
+        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
+        int initialLevel, CancellationToken cancellationToken = default) =>
+        _repository.StagePracticeWordEnrollmentAsync(userId, pageId, wordId, timeZone, utcNow, initialLevel, cancellationToken);
+
     public ReviewService(IReviewRepository repository, IPronunciationService pronunciation)
     {
         _repository = repository;

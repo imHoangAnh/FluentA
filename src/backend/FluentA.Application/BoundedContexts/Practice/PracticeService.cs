@@ -13,6 +13,7 @@ public sealed class PracticeService : IPracticeService
     private readonly IPracticeSessionRepository? _sessionRepository;
     private readonly IReviewEnrollmentPort _reviewEnrollment;
     private readonly IPronunciationService? _pronunciation;
+    private readonly IPracticeTransaction? _transaction;
 
     // Kept for existing internal callers and unit-test doubles that exercise
     // only the legacy summary/enrollment helpers.
@@ -30,6 +31,13 @@ public sealed class PracticeService : IPracticeService
         : this(repository, reviewEnrollment)
     {
         _pronunciation = pronunciation;
+    }
+
+    public PracticeService(IPracticeRepository repository, IReviewEnrollmentPort reviewEnrollment,
+        IPronunciationService pronunciation, IPracticeTransaction transaction)
+        : this(repository, reviewEnrollment, pronunciation)
+    {
+        _transaction = transaction;
     }
 
     public async Task<OperationResult<PracticeDeckPageDto>> GetDecksAsync(
@@ -134,6 +142,8 @@ public sealed class PracticeService : IPracticeService
             errors["durationMs"] = ["Duration must be 0 or greater."];
         }
 
+        if (request.RequestId == Guid.Empty) errors["requestId"] = ["Request id cannot be empty."];
+
         if (TryParseStep(request.Step, out step))
         {
             if (request.Skip)
@@ -176,18 +186,22 @@ public sealed class PracticeService : IPracticeService
             return OperationResult<PracticeAnswerResultDto>.Failure(PracticeError.Validation(errors));
         }
 
-        var result = await Sessions.SubmitAnswerAsync(
-            userId,
-            sessionId,
-            request.ItemId,
-            step,
-            request.AnswerText?.Trim(),
-            request.AnswerSlotId,
-            request.Skip,
-            request.DurationMs,
-            DateTime.UtcNow,
-            cancellationToken);
-        return MapRepositoryResult(result);
+        return await Transaction.ExecuteAsync(userId, sessionId, async token =>
+        {
+            var result = await Sessions.SubmitAnswerAsync(
+                userId,
+                sessionId,
+                request.ItemId,
+                step,
+                request.AnswerText?.Trim(),
+                request.AnswerSlotId,
+                request.Skip,
+                request.DurationMs,
+                DateTime.UtcNow,
+                token,
+                request.RequestId);
+            return MapRepositoryResult(result);
+        }, cancellationToken);
     }
 
     public async Task<OperationResult<PracticePronunciationAttemptResultDto>> SubmitPronunciationAttemptAsync(
@@ -196,8 +210,12 @@ public sealed class PracticeService : IPracticeService
         Guid itemId,
         ReadOnlyMemory<byte> wavAudio,
         long durationMs,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null)
     {
+        if (requestId == Guid.Empty)
+            return OperationResult<PracticePronunciationAttemptResultDto>.Failure(PracticeError.Validation(
+                new Dictionary<string, string[]> { ["requestId"] = ["Request id cannot be empty."] }));
         if (itemId == Guid.Empty || durationMs < 0)
         {
             return OperationResult<PracticePronunciationAttemptResultDto>.Failure(PracticeError.Validation(new Dictionary<string, string[]>
@@ -206,6 +224,8 @@ public sealed class PracticeService : IPracticeService
             }));
         }
 
+        var replay = await Sessions.GetPronunciationReplayAsync(userId, sessionId, itemId, requestId, cancellationToken);
+        if (replay is not null) return MapRepositoryResult(replay);
         var target = await Sessions.GetPronunciationTargetAsync(userId, sessionId, itemId, cancellationToken);
         if (target.Status != PracticeRepositoryOperationStatus.Success || target.Value is null)
         {
@@ -230,15 +250,19 @@ public sealed class PracticeService : IPracticeService
             return OperationResult<PracticePronunciationAttemptResultDto>.Failure(assessment.Error!);
         }
 
-        var result = await Sessions.RecordPronunciationAttemptAsync(
-            userId,
-            sessionId,
-            itemId,
-            assessment.Value!,
-            durationMs,
-            DateTime.UtcNow,
-            cancellationToken);
-        return MapRepositoryResult(result);
+        return await Transaction.ExecuteAsync(userId, sessionId, async token =>
+        {
+            var result = await Sessions.RecordPronunciationAttemptAsync(
+                userId,
+                sessionId,
+                itemId,
+                assessment.Value!,
+                durationMs,
+                DateTime.UtcNow,
+                token,
+                requestId);
+            return MapRepositoryResult(result);
+        }, cancellationToken);
     }
 
     public async Task<OperationResult<PracticeReviewLevelResultDto>> SetReviewLevelAsync(
@@ -269,34 +293,42 @@ public sealed class PracticeService : IPracticeService
             return OperationResult<PracticeReviewLevelResultDto>.Failure(PracticeError.Validation(errors));
         }
 
-        var context = await Sessions.GetReviewEnrollmentContextAsync(userId, sessionId, wordId, cancellationToken);
-        if (context.Status != PracticeRepositoryOperationStatus.Success || context.Value is null)
+        return await Transaction.ExecuteAsync(userId, sessionId, async token =>
         {
-            return MapRepositoryResult<PracticeReviewLevelResultDto>(context.Status, null);
-        }
+            var context = await Sessions.GetReviewEnrollmentContextAsync(userId, sessionId, wordId, token);
+            if (context.Status != PracticeRepositoryOperationStatus.Success || context.Value is null)
+            {
+                return MapRepositoryResult<PracticeReviewLevelResultDto>(context.Status, null);
+            }
 
-        var enrollment = await _reviewEnrollment.EnrollMissingPracticeWordsAsync(
-            userId,
-            context.Value.PageId,
-            context.Value.WordId,
-            timeZone!,
-            DateTime.UtcNow,
-            request.Level,
-            cancellationToken);
-        if (enrollment is null)
-        {
-            return OperationResult<PracticeReviewLevelResultDto>.Failure(PracticeError.DeckOrCardNotFound());
-        }
+            if (context.Value.CompletedResult is not null)
+                return OperationResult<PracticeReviewLevelResultDto>.Success(context.Value.CompletedResult);
 
-        var advanced = await Sessions.AdvanceAfterReviewEnrollmentAsync(
-            userId,
-            sessionId,
-            wordId,
-            request.Level,
-            string.Equals(enrollment.Status, "alreadyInReview", StringComparison.Ordinal),
-            DateTime.UtcNow,
-            cancellationToken);
-        return MapRepositoryResult(advanced);
+            var enrollment = await _reviewEnrollment.StagePracticeWordEnrollmentAsync(
+                userId,
+                context.Value.PageId,
+                context.Value.WordId,
+                timeZone!,
+                DateTime.UtcNow,
+                request.Level,
+                token);
+            if (enrollment is null)
+            {
+                return OperationResult<PracticeReviewLevelResultDto>.Failure(PracticeError.DeckOrCardNotFound());
+            }
+
+            var advanced = await Sessions.AdvanceAfterReviewEnrollmentAsync(
+                userId,
+                sessionId,
+                wordId,
+                request.Level,
+                string.Equals(enrollment.Status, "alreadyInReview", StringComparison.Ordinal),
+                DateTime.UtcNow,
+                token);
+            if (advanced.Status == PracticeRepositoryOperationStatus.Success)
+                await Transaction.SaveChangesAsync(token);
+            return MapRepositoryResult(advanced);
+        }, cancellationToken);
     }
 
     public async Task<OperationResult<PracticeSessionDto>> CompleteSessionAsync(
@@ -313,8 +345,8 @@ public sealed class PracticeService : IPracticeService
             }));
         }
 
-        var result = await Sessions.CompleteSessionAsync(userId, sessionId, DateTime.UtcNow, cancellationToken);
-        return MapRepositoryResult(result);
+        return await Transaction.ExecuteAsync(userId, sessionId, async token =>
+            MapRepositoryResult(await Sessions.CompleteSessionAsync(userId, sessionId, DateTime.UtcNow, token)), cancellationToken);
     }
 
     public async Task<OperationResult<PracticeSessionSummaryDto>> CreatePracticeSessionSummaryAsync(
@@ -436,6 +468,9 @@ public sealed class PracticeService : IPracticeService
 
     private IPracticeSessionRepository Sessions => _sessionRepository
         ?? throw new InvalidOperationException("The registered Practice repository does not support persisted sessions.");
+
+    private IPracticeTransaction Transaction => _transaction
+        ?? throw new InvalidOperationException("Persisted Practice mutations require a transaction boundary.");
 
     private static OperationResult<T> MapRepositoryResult<T>(PracticeRepositoryOperationResult<T> result) =>
         MapRepositoryResult(result.Status, result.Value);

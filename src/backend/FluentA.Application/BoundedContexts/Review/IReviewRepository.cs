@@ -6,6 +6,11 @@ namespace FluentA.Application.BoundedContexts.Review;
 
 public interface IReviewRepository
 {
+    Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
+        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
+        int initialLevel, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Review repository must support staged enrollment.");
+
     // Practice still uses this enrollment contract; keep both overloads stable.
     Task<AddPracticeWordsToReviewDto?> AddPracticeWordsToReviewAsync(
         Guid userId,

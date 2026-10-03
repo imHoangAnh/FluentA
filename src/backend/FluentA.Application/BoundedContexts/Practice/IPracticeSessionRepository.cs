@@ -35,7 +35,11 @@ public interface IPracticeSessionRepository
         bool skip,
         long durationMs,
         DateTime utcNow,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null);
+
+    Task<PracticeRepositoryOperationResult<PracticePronunciationAttemptResultDto>?> GetPronunciationReplayAsync(
+        Guid userId, Guid sessionId, Guid itemId, Guid? requestId, CancellationToken cancellationToken = default);
 
     Task<PracticeRepositoryOperationResult<PracticePronunciationTargetDto>> GetPronunciationTargetAsync(
         Guid userId,
@@ -50,7 +54,8 @@ public interface IPracticeSessionRepository
         PronunciationAssessmentDto assessment,
         long durationMs,
         DateTime utcNow,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null);
 
     Task<PracticeRepositoryOperationResult<PracticeReviewEnrollmentContextDto>> GetReviewEnrollmentContextAsync(
         Guid userId,

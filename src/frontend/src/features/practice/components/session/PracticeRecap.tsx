@@ -15,11 +15,13 @@ type PracticeRecapProps = {
   reviewStatus: PracticeReviewStatus | null
   isSaving: boolean
   saveError: boolean
+  selectedLevel?: PracticeReviewLevel | null
+  onRetry?: () => void
   onSelectLevel: (level: PracticeReviewLevel) => void
   onSkip: () => void
 }
 
-export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelectLevel, onSkip }: PracticeRecapProps) {
+export function PracticeRecap({ item, reviewStatus, isSaving, saveError, selectedLevel, onRetry, onSelectLevel, onSkip }: PracticeRecapProps) {
   const activeInReview = reviewStatus === 'alreadyInReview' || item.alreadyInReview
   const levelsDisabled = isSaving || activeInReview || reviewStatus === 'added'
   const wordDetails = [hasText(item.type) ? formatWordType(item.type) : '', hasText(item.ipaPronunciation) ? formatIpa(item.ipaPronunciation) : '']
@@ -53,7 +55,7 @@ export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelec
               type="button"
               onClick={() => onSelectLevel(level)}
               disabled={levelsDisabled}
-              aria-pressed={item.selectedLevel === level}
+              aria-pressed={(selectedLevel ?? item.selectedLevel) === level}
               data-level={level}
               data-testid={`practice-review-level-${level}`}
               title={`Add to Review as ${label}`}
@@ -74,6 +76,7 @@ export function PracticeRecap({ item, reviewStatus, isSaving, saveError, onSelec
       </section>
 
       <div className="practice-session-recap__actions" data-testid="practice-recap-actions" aria-busy={isSaving}>
+        {saveError && selectedLevel != null && onRetry ? <button type="button" onClick={onRetry} disabled={isSaving}>Try again</button> : null}
         <button type="button" onClick={onSkip} disabled={isSaving} aria-label="Skip recap">Skip</button>
       </div>
 

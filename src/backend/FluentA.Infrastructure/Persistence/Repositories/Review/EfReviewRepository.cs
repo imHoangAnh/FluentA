@@ -47,7 +47,31 @@ public sealed class EfReviewRepository : IReviewRepository
         int initialLevel,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = _dbContext.Database.CurrentTransaction is null
+            ? await _dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        var result = await StagePracticeWordEnrollmentAsync(userId, pageId, wordId, timeZone, utcNow, initialLevel, cancellationToken);
+        if (result is not null) await _dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
+        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
+        int initialLevel, CancellationToken cancellationToken = default)
+    {
         var intervalDays = FluentAsrsScheduler.IntervalDaysForLevel(initialLevel);
+
+        if (_dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Practice Review enrollment must be staged inside a transaction.");
+        // Different Practice sessions can contain the same word. Serialize
+        // enrollment so an inactive state cannot overwrite a newly active one.
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT 1 FROM vocab_words w
+            JOIN vocab_pages p ON p.id = w.page_id
+            JOIN vocab_boards b ON b.id = p.board_id
+            WHERE w.id = {wordId} AND p.id = {pageId} AND b.user_id = {userId}
+            FOR UPDATE OF w
+            """, cancellationToken);
 
         var pageWord = await (
             from word in _dbContext.Words
@@ -87,14 +111,12 @@ public sealed class EfReviewRepository : IReviewRepository
             }
 
             existingState.ReactivateAtLevel(initialLevel, nextReviewDate);
-            await _dbContext.SaveChangesAsync(cancellationToken);
             return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
         }
 
         var state = WordReviewState.CreateAtLevel(userId, pageWord.WordId, initialLevel, nextReviewDate);
 
         await _dbContext.WordReviewStates.AddAsync(state, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
         return new AddPracticeWordsToReviewDto(pageWord.Id, pageWord.WordId, "added", nextReviewDate);
     }
 

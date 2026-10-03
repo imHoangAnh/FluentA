@@ -4,7 +4,7 @@ import type { PronunciationAssessment } from '@/features/pronunciation'
 
 export type PracticeStep = 'dictation' | 'wordToMeaning' | 'pronunciation' | 'recap'
 export type PracticeAnswerStep = PracticeStep
-export type PracticeSessionStatus = 'active' | 'completed'
+export type PracticeSessionStatus = 'active' | 'completed' | 'abandoned'
 export type PracticeReviewLevel = 0 | 1 | 2 | 3 | 4 | 5
 export type PracticeReviewStatus = 'added' | 'alreadyInReview'
 
@@ -45,6 +45,9 @@ export type PracticeSessionItem = {
   answerSlots: PracticeAnswerSlot[]
   selectedLevel: PracticeReviewLevel | null
   isCompleted: boolean
+  attemptCount?: number
+  pronunciationAttemptCount?: number
+  lastAttempt?: { requestId: string; step: PracticeStep; correctness: boolean; isSkip: boolean; attemptNumber: number | null; assessment: PronunciationAssessment | null } | null
 }
 
 export type PracticeSession = {
@@ -68,6 +71,7 @@ export type SubmitPracticeAnswerInput = {
   answerSlotId?: string
   skip?: boolean
   durationMs?: number
+  requestId?: string
 }
 
 export type SubmitPracticeAnswerResult = {
@@ -112,8 +116,8 @@ export async function createPracticeSession(input: { pageId: string }) {
   return response.data.data!
 }
 
-export async function getPracticeSession(sessionId: string) {
-  const response = await apiClient.get<ApiEnvelope<PracticeSession>>(`/practice/sessions/${sessionId}`)
+export async function getPracticeSession(sessionId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<ApiEnvelope<PracticeSession>>(`/practice/sessions/${sessionId}`, { signal })
   return response.data.data!
 }
 
@@ -127,11 +131,13 @@ export async function submitPracticePronunciationAttempt(input: {
   itemId: string
   audio: Blob
   durationMs: number
+  requestId?: string
 }) {
   const formData = new FormData()
   formData.append('itemId', input.itemId)
   formData.append('audio', input.audio, 'practice.wav')
   formData.append('durationMs', String(input.durationMs))
+  if (input.requestId) formData.append('requestId', input.requestId)
 
   const response = await apiClient.post<ApiEnvelope<SubmitPracticePronunciationResult>>(
     `/practice/sessions/${input.sessionId}/pronunciation-attempts`,

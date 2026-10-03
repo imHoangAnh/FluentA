@@ -72,8 +72,11 @@ public sealed class PracticeAttempt : BaseEntity
         double? accuracyScore,
         double? completenessScore,
         string? assessmentJson,
-        DateTime createdAt) =>
-        new(
+        DateTime createdAt,
+        Guid? requestId = null)
+    {
+        if (requestId == Guid.Empty) throw new ArgumentException("Request id cannot be empty.", nameof(requestId));
+        var attempt = new PracticeAttempt(
             sessionId,
             itemId,
             step,
@@ -87,4 +90,7 @@ public sealed class PracticeAttempt : BaseEntity
             completenessScore,
             assessmentJson,
             createdAt);
+        if (requestId.HasValue) attempt.Id = requestId.Value;
+        return attempt;
+    }
 }

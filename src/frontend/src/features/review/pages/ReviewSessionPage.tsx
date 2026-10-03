@@ -1,4 +1,5 @@
 import { CheckCircle2, LoaderCircle } from 'lucide-react'
+import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -10,6 +11,12 @@ import { ReviewCompletion } from '../components/session/ReviewCompletion'
 import { ReviewModeSurface, type ReviewFeedback } from '../components/session/ReviewModeSurface'
 import { ReviewProgress } from '../components/session/ReviewProgress'
 import '../components/session/review-session.css'
+
+function isUnavailableReviewItemError(error: unknown) {
+  if (!axios.isAxiosError(error)) return false
+  const errors = (error.response?.data as { errors?: { code?: string }[] } | undefined)?.errors
+  return errors?.some((item) => item.code === 'REVIEW_ITEM_NOT_FOUND') ?? false
+}
 
 function speakWord(word: string, language: string) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return
@@ -130,18 +137,25 @@ export function ReviewSessionPage() {
 
   const answerMutation = useMutation({
     mutationFn: reviewApi.submitReviewAnswer,
-    onSuccess: (result, variables) => {
+    onError: async (error, variables) => {
+      if (!isUnavailableReviewItemError(error)) return
+      setTypedAnswer('')
+      setOutcomeFeedback(null)
+      await queryClient.invalidateQueries({ queryKey: reviewKeys.session(variables.sessionId) })
+    },
+    onSuccess: async (result, variables) => {
       const queryKey = reviewKeys.session(variables.sessionId)
       const current = queryClient.getQueryData<reviewApi.ReviewSession>(queryKey)
       const answeredItem = current?.items.find((item) => item.itemId === result.itemId)
       queryClient.setQueryData<reviewApi.ReviewSession>(queryKey, (cached) => cached ? withAnswerResult(cached, result) : cached)
       if (answeredItem) setOutcomeFeedback(feedbackFor(itemWithAnswerResult(answeredItem, result), result))
       setPronunciationError(null)
+      await queryClient.invalidateQueries({ queryKey, exact: true })
     },
   })
   const pronunciationMutation = useMutation({
     mutationFn: reviewApi.submitReviewPronunciation,
-    onSuccess: (result, variables) => {
+    onSuccess: async (result, variables) => {
       const queryKey = reviewKeys.session(variables.sessionId)
       const current = queryClient.getQueryData<reviewApi.ReviewSession>(queryKey)
       const answeredItem = current?.items.find((item) => item.itemId === result.itemId)
@@ -149,9 +163,15 @@ export function ReviewSessionPage() {
       cardStartedAt.current = Date.now()
       setPronunciationError(null)
       if (answeredItem) setOutcomeFeedback(feedbackFor(itemWithAnswerResult(answeredItem, result), result))
+      await queryClient.invalidateQueries({ queryKey, exact: true })
     },
-    onError: (error) => {
+    onError: async (error, variables) => {
       cardStartedAt.current = Date.now()
+      if (isUnavailableReviewItemError(error)) {
+        setPronunciationError(null)
+        await queryClient.invalidateQueries({ queryKey: reviewKeys.session(variables.sessionId) })
+        return
+      }
       setPronunciationError(getPronunciationAssessmentErrorMessage(error))
     },
   })
@@ -353,7 +373,7 @@ export function ReviewSessionPage() {
           />
         </article>
         <ReviewShortcutGuide mode={itemForExercise.mode} feedback={outcomeFeedback} />
-        {answerMutation.isError ? <p className="review-figma-session__error" role="alert">Unable to save this answer. Try again.</p> : null}
+        {answerMutation.isError && answerMutation.variables?.itemId === currentItem?.itemId ? <p className="review-figma-session__error" role="alert">Unable to save this answer. Try again.</p> : null}
       </section>
     </ReviewSessionFrame>
   )

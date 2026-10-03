@@ -7,6 +7,7 @@ using FluentA.Infrastructure.Persistence.Repositories.Practice;
 using FluentA.Infrastructure.Persistence.Repositories.Pronunciation;
 using FluentA.Infrastructure.Persistence.Repositories.Review;
 using FluentA.Infrastructure.Persistence.Repositories.Vocabulary;
+using FluentA.Infrastructure.Persistence.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentA.Infrastructure;
@@ -18,6 +19,7 @@ internal static class LearningServiceRegistrationExtensions
         PronunciationAssessmentOptions pronunciationOptions)
     {
         services.AddScoped<IPracticeRepository, EfPracticeRepository>();
+        services.AddScoped<IPracticeTransaction, EfPracticeTransaction>();
         services.AddScoped<IPracticeSessionRepository>(provider =>
             provider.GetRequiredService<IPracticeRepository>() as IPracticeSessionRepository
             ?? throw new InvalidOperationException("Practice repository must implement session persistence."));

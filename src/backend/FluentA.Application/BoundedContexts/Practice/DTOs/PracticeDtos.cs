@@ -79,7 +79,13 @@ public sealed record PracticeSessionItemDto(
     bool AlreadyInReview,
     IReadOnlyList<PracticeAnswerSlotDto> AnswerSlots,
     int? SelectedLevel,
-    bool IsCompleted);
+    bool IsCompleted,
+    int AttemptCount = 0,
+    int PronunciationAttemptCount = 0,
+    PracticeSavedAttemptDto? LastAttempt = null);
+
+public sealed record PracticeSavedAttemptDto(Guid RequestId, string Step, bool Correctness,
+    bool IsSkip, int? AttemptNumber, PronunciationAssessmentDto? Assessment);
 
 public sealed record PracticeSessionDto(
     Guid SessionId,
@@ -100,7 +106,8 @@ public sealed record SubmitPracticeAnswerRequest(
     string? AnswerText = null,
     Guid? AnswerSlotId = null,
     bool Skip = false,
-    long DurationMs = 0);
+    long DurationMs = 0,
+    Guid? RequestId = null);
 
 public sealed record PracticeAnswerResultDto(
     Guid ItemId,
@@ -125,7 +132,7 @@ public sealed record PracticePronunciationTargetDto(string Word, string Language
 
 public sealed record SetPracticeReviewLevelRequest(int Level, string TimeZoneId);
 
-public sealed record PracticeReviewEnrollmentContextDto(Guid PageId, Guid WordId);
+public sealed record PracticeReviewEnrollmentContextDto(Guid PageId, Guid WordId, PracticeReviewLevelResultDto? CompletedResult = null);
 
 public sealed record PracticeReviewLevelResultDto(
     string Status,

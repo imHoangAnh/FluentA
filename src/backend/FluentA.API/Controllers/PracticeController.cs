@@ -73,7 +73,8 @@ public sealed class PracticeController : ApiControllerBase
         [FromForm] Guid itemId,
         [FromForm] IFormFile? audio,
         [FromForm] long durationMs,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromForm] Guid? requestId = null)
     {
         if (audio is null || audio.Length == 0 || audio.Length > PronunciationAudioValidator.MaxAudioBytes)
         {
@@ -89,7 +90,8 @@ public sealed class PracticeController : ApiControllerBase
             itemId,
             wavAudio,
             durationMs,
-            cancellationToken);
+            cancellationToken,
+            requestId);
         return result.IsSuccess
             ? Ok(ApiEnvelope<PracticePronunciationAttemptResultDto>.Ok(result.Value!))
             : ToErrorResult(result);

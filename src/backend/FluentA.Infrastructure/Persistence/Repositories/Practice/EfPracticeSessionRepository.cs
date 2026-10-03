@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Data;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
@@ -163,6 +164,7 @@ public sealed partial class EfPracticeRepository
         Guid sessionId,
         CancellationToken cancellationToken = default)
     {
+        await using var snapshot = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         var session = await _dbContext.Set<PracticeSession>()
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == sessionId && item.UserId == userId && item.DeletedAt == null, cancellationToken);
@@ -177,7 +179,13 @@ public sealed partial class EfPracticeRepository
             .OrderBy(item => item.Position)
             .ToArrayAsync(cancellationToken);
         var activeReviewWordIds = await GetActiveReviewWordIdsAsync(userId, items.Select(item => item.WordId), cancellationToken);
-        return Succeeded(BuildSessionDto(session, items, activeReviewWordIds));
+        var attempts = await _dbContext.PracticeAttempts.AsNoTracking()
+            .Where(attempt => attempt.PracticeSessionId == sessionId && attempt.DeletedAt == null)
+            .OrderBy(attempt => attempt.CreatedAt).ThenBy(attempt => attempt.Id)
+            .ToArrayAsync(cancellationToken);
+        var result = Succeeded(BuildSessionDto(session, items, activeReviewWordIds, attempts));
+        await snapshot.CommitAsync(cancellationToken);
+        return result;
     }
 
     public async Task<PracticeRepositoryOperationResult<PracticeAnswerResultDto>> SubmitAnswerAsync(
@@ -190,12 +198,32 @@ public sealed partial class EfPracticeRepository
         bool skip,
         long durationMs,
         DateTime utcNow,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null)
     {
         var session = await FindOwnedSessionAsync(userId, sessionId, cancellationToken);
         if (session is null)
         {
             return Failed<PracticeAnswerResultDto>(PracticeRepositoryOperationStatus.NotFound);
+        }
+
+        if (requestId.HasValue)
+        {
+            var previous = await _dbContext.PracticeAttempts.AsNoTracking()
+                .SingleOrDefaultAsync(attempt => attempt.Id == requestId.Value, cancellationToken);
+            if (previous is not null)
+            {
+                if (session.Status == PracticeSessionStatus.Abandoned || previous.PracticeSessionId != sessionId
+                    || previous.PracticeSessionItemId != itemId || previous.Step != submittedStep
+                    || previous.Kind != (skip ? PracticeAttemptKind.Skip : PracticeAttemptKind.Answer)
+                    || previous.SubmittedAnswer != answerText || previous.AnswerSlotId != answerSlotId)
+                    return Failed<PracticeAnswerResultDto>(PracticeRepositoryOperationStatus.Conflict);
+                var current = await _dbContext.PracticeSessionItems.AsNoTracking()
+                    .SingleOrDefaultAsync(item => item.PracticeSessionId == sessionId && item.Position == session.CurrentItemIndex, cancellationToken);
+                return Succeeded(new PracticeAnswerResultDto(itemId, StepName(submittedStep), previous.Correctness,
+                    !skip && !previous.Correctness && current?.Id == itemId && current.CurrentStep == submittedStep,
+                    current is null ? null : StepName(current.CurrentStep), session.CurrentItemIndex, SessionStatusName(session.Status)));
+            }
         }
 
         var itemResult = await FindCurrentItemAsync(session, itemId, cancellationToken);
@@ -228,7 +256,7 @@ public sealed partial class EfPracticeRepository
                     accuracyScore: null,
                     completenessScore: null,
                     assessmentJson: null,
-                    utcNow),
+                    utcNow, requestId),
                 cancellationToken);
 
             if (item.IsCompleted)
@@ -270,7 +298,7 @@ public sealed partial class EfPracticeRepository
                     accuracyScore: null,
                     completenessScore: null,
                     assessmentJson: null,
-                    utcNow),
+                    utcNow, requestId),
                 cancellationToken);
         }
 
@@ -283,6 +311,25 @@ public sealed partial class EfPracticeRepository
             NextStep: skip ? StepName(item.CurrentStep) : correctness ? StepName(item.CurrentStep) : StepName(submittedStep),
             session.CurrentItemIndex,
             SessionStatusName(session.Status)));
+    }
+
+    public async Task<PracticeRepositoryOperationResult<PracticePronunciationAttemptResultDto>?> GetPronunciationReplayAsync(
+        Guid userId, Guid sessionId, Guid itemId, Guid? requestId, CancellationToken cancellationToken = default)
+    {
+        if (!requestId.HasValue) return null;
+        var session = await FindOwnedSessionAsync(userId, sessionId, cancellationToken);
+        if (session is null) return Failed<PracticePronunciationAttemptResultDto>(PracticeRepositoryOperationStatus.NotFound);
+        var attempt = await _dbContext.PracticeAttempts.AsNoTracking().SingleOrDefaultAsync(a => a.Id == requestId.Value, cancellationToken);
+        if (attempt is null) return null;
+        if (session.Status == PracticeSessionStatus.Abandoned || attempt.PracticeSessionId != sessionId
+            || attempt.PracticeSessionItemId != itemId || attempt.Kind != PracticeAttemptKind.PronunciationAssessment)
+            return Failed<PracticePronunciationAttemptResultDto>(PracticeRepositoryOperationStatus.Conflict);
+        var current = await _dbContext.PracticeSessionItems.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.PracticeSessionId == sessionId && item.Position == session.CurrentItemIndex, cancellationToken);
+        return Succeeded(new PracticePronunciationAttemptResultDto(itemId,
+            JsonSerializer.Deserialize<PronunciationAssessmentDto>(attempt.AssessmentJson!)!, attempt.Correctness,
+            attempt.AttemptNumber!.Value, null, current is null ? null : StepName(current.CurrentStep),
+            session.CurrentItemIndex, SessionStatusName(session.Status)));
     }
 
     public async Task<PracticeRepositoryOperationResult<PracticePronunciationTargetDto>> GetPronunciationTargetAsync(
@@ -325,8 +372,11 @@ public sealed partial class EfPracticeRepository
         PronunciationAssessmentDto assessment,
         long durationMs,
         DateTime utcNow,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? requestId = null)
     {
+        var replay = await GetPronunciationReplayAsync(userId, sessionId, itemId, requestId, cancellationToken);
+        if (replay is not null) return replay;
         var session = await FindOwnedSessionAsync(userId, sessionId, cancellationToken);
         if (session is null)
         {
@@ -368,7 +418,7 @@ public sealed partial class EfPracticeRepository
                 assessment.AccuracyScore,
                 assessment.CompletenessScore,
                 JsonSerializer.Serialize(assessment),
-                utcNow),
+                utcNow, requestId),
             cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -394,6 +444,14 @@ public sealed partial class EfPracticeRepository
         {
             return Failed<PracticeReviewEnrollmentContextDto>(PracticeRepositoryOperationStatus.NotFound);
         }
+
+        var completed = await _dbContext.PracticeSessionItems.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.PracticeSessionId == sessionId && item.WordId == wordId
+                && item.Position < session.CurrentItemIndex && item.IsCompleted && item.DeletedAt == null, cancellationToken);
+        if (session.Status != PracticeSessionStatus.Abandoned && completed is not null
+            && (completed.SelectedLevel.HasValue || completed.AlreadyInReview))
+            return Succeeded(new PracticeReviewEnrollmentContextDto(session.PageId, wordId,
+                new PracticeReviewLevelResultDto(completed.AlreadyInReview ? "alreadyInReview" : "added", true, session.CurrentItemIndex)));
 
         var item = await _dbContext.Set<PracticeSessionItem>()
             .SingleOrDefaultAsync(candidate => candidate.PracticeSessionId == sessionId
@@ -443,7 +501,6 @@ public sealed partial class EfPracticeRepository
 
         item.SetReviewEnrollment(selectedLevel, alreadyActive, utcNow);
         session.AdvanceFrom(session.CurrentItemIndex, utcNow);
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Succeeded(new PracticeReviewLevelResultDto(
             alreadyActive ? "alreadyInReview" : "added",
@@ -574,7 +631,8 @@ public sealed partial class EfPracticeRepository
     private static PracticeSessionDto BuildSessionDto(
         PracticeSession session,
         IReadOnlyList<PracticeSessionItem> items,
-        IReadOnlySet<Guid> activeReviewWordIds) =>
+        IReadOnlySet<Guid> activeReviewWordIds,
+        IReadOnlyList<PracticeAttempt>? attempts = null) =>
         new(
             session.Id,
             session.PageId,
@@ -605,9 +663,16 @@ public sealed partial class EfPracticeRepository
                     new PracticeAnswerSlotDto(item.Choice4SlotId, item.Choice4Meaning),
                 ],
                 item.SelectedLevel,
-                item.IsCompleted)).ToArray(),
+                item.IsCompleted,
+                attempts?.Count(a => a.PracticeSessionItemId == item.Id) ?? 0,
+                attempts?.Count(a => a.PracticeSessionItemId == item.Id && a.Kind == PracticeAttemptKind.PronunciationAssessment) ?? 0,
+                ToSavedAttempt(attempts?.LastOrDefault(a => a.PracticeSessionItemId == item.Id)))).ToArray(),
             session.StartedAt,
             session.CompletedAt);
+
+    private static PracticeSavedAttemptDto? ToSavedAttempt(PracticeAttempt? attempt) => attempt is null ? null :
+        new(attempt.Id, StepName(attempt.Step), attempt.Correctness, attempt.Kind == PracticeAttemptKind.Skip,
+            attempt.AttemptNumber, attempt.AssessmentJson is null ? null : JsonSerializer.Deserialize<PronunciationAssessmentDto>(attempt.AssessmentJson));
 
     private static (IReadOnlyList<string?> Choices, int CorrectIndex) BuildAnswerChoices(
         string word,
