@@ -1,172 +1,172 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import { VocabTable } from '@/features/vocabulary/components/VocabTable'
 import * as vocabularyApi from '@/features/vocabulary/api/vocabulary.api'
+import { vocabularyKeys } from '@/features/vocabulary/api/vocabulary.queries'
+import { toast } from '@/shared/lib/toast'
 
-vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
-  const actual = await vi.importActual<typeof import('@/features/vocabulary/api/vocabulary.api')>('@/features/vocabulary/api/vocabulary.api')
-  return {
-    ...actual,
-    listWords: vi.fn(),
-    updateWordCell: vi.fn(),
-    createWord: vi.fn(),
-    deleteWord: vi.fn(),
-  }
-})
-
+vi.mock('@/features/vocabulary/api/vocabulary.api', async () => ({
+  ...await vi.importActual<typeof vocabularyApi>('@/features/vocabulary/api/vocabulary.api'),
+  listWords: vi.fn(), updateWord: vi.fn(), createWord: vi.fn(), deleteWord: vi.fn(),
+}))
+vi.mock('@/shared/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('@dnd-kit/core', async () => ({
+  ...await vi.importActual('@dnd-kit/core'),
+  DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd: (event: unknown) => void }) => <><button onClick={() => onDragEnd({ active: { id: 'word' }, over: { id: 'example' } })}>Move Word after Example</button>{children}</>,
+}))
 const word: vocabularyApi.Word = {
-  id: 'word-1',
-  pageId: 'page-1',
-  word: 'mitigate',
-  meaning: 'giam nhe',
-  ipaPronunciation: '/mItIgeIt/',
-  context: 'reduce harm',
-  type: 'verb',
-  example: 'Mitigate risk.',
-  synonyms: 'reduce',
-  antonyms: 'worsen',
-  createdAt: '',
-  updatedAt: '',
+  id: 'word-1', pageId: 'page-1', word: 'mitigate', meaning: 'giam nhe',
+  ipaPronunciation: '/mItIgeIt/', context: 'reduce harm', type: 'verb',
+  example: 'Mitigate risk.', synonyms: 'reduce', antonyms: 'worsen', createdAt: '', updatedAt: '',
 }
-
-const preferences: vocabularyApi.BoardPreferences = {
-  hiddenColumns: [],
-  columnOrder: [...vocabularyApi.DEFAULT_VOCAB_COLUMN_ORDER],
-  columnWidths: {},
+const preferences: vocabularyApi.BoardPreferences = { hiddenColumns: [], columnOrder: [...vocabularyApi.DEFAULT_VOCAB_COLUMN_ORDER], columnWidths: {} }
+const page = (id: string): vocabularyApi.Page => ({ id, boardId: 'board-1', name: id, createdAt: '', updatedAt: '' })
+function renderTable(prefs = preferences, onPreferencesChange = vi.fn().mockResolvedValue(undefined)) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  const view = (id: string, config = prefs) => <QueryClientProvider client={client}><VocabTable page={page(id)} preferences={config} onPreferencesChange={onPreferencesChange} /></QueryClientProvider>
+  return { ...render(view('page-1')), client, view }
 }
-
-function renderTable(overridePreferences: vocabularyApi.BoardPreferences = preferences, onPreferencesChange = vi.fn().mockResolvedValue(undefined)) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <VocabTable
-        page={{ id: 'page-1', boardId: 'board-1', name: 'Page One', createdAt: '', updatedAt: '' }}
-        preferences={overridePreferences}
-        onPreferencesChange={onPreferencesChange}
-      />
-    </QueryClientProvider>,
-  )
+async function edit() { await userEvent.setup().click(await screen.findByRole('button', { name: 'Edit mitigate' })) }
+function fillBlank() {
+  for (const [label, value] of [['Word', 'alpha'], ['Meaning', 'first'], ['IPA', '/a/'], ['Example', 'Alpha example.']]) {
+    fireEvent.change(screen.getByLabelText(`${label} for new word`), { target: { value } })
+  }
 }
-
-describe('VocabTable', () => {
+describe('VocabTable row drafts and saved preferences', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(vocabularyApi.listWords).mockResolvedValue([word])
-    vi.mocked(vocabularyApi.createWord).mockResolvedValue(word)
+    vi.mocked(vocabularyApi.listWords).mockImplementation(async id => id === 'page-1' ? [word] : [])
+    vi.mocked(vocabularyApi.createWord).mockResolvedValue({ ...word, id: 'created' })
+    vi.mocked(vocabularyApi.updateWord).mockResolvedValue(word)
     vi.mocked(vocabularyApi.deleteWord).mockResolvedValue({ id: 'trash-word' } as never)
   })
-
-  it('hides nullable fixed columns from board preferences', async () => {
-    renderTable({
-      ...preferences,
-      hiddenColumns: ['context'],
-    })
-
-    expect(await screen.findByLabelText('IPA for word')).toBeInTheDocument()
+  it('hides optional columns in read and edit rows', async () => {
+    renderTable({ ...preferences, hiddenColumns: ['context'] })
+    await edit()
+    expect(screen.getByLabelText('IPA for word')).toBeInTheDocument()
     expect(screen.queryByLabelText('Context for word')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Synonyms for word')).toBeInTheDocument()
   })
-
-  it('autosaves IPA values on Tab and preserves slash characters', async () => {
-    const user = userEvent.setup()
-    vi.mocked(vocabularyApi.updateWordCell).mockResolvedValue({ ...word, ipaPronunciation: '/mItI' })
+  it('preserves IPA slashes and saves the explicit row only when requested', async () => {
     renderTable()
-
-    const input = await screen.findByLabelText('IPA for word')
-    await user.clear(input)
-    await user.type(input, '/mItI/')
-    await user.tab()
-
-    expect(vocabularyApi.updateWordCell).toHaveBeenCalledWith('word-1', 'ipaPronunciation', '/mItI/')
+    await edit()
+    fireEvent.change(screen.getByLabelText('IPA for word'), { target: { value: '/mItI/' } })
+    fireEvent.blur(screen.getByLabelText('IPA for word'))
+    expect(vocabularyApi.updateWord).not.toHaveBeenCalled()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Update mitigate' }))
+    await waitFor(() => expect(vocabularyApi.updateWord).toHaveBeenCalledWith('word-1', expect.objectContaining({ ipaPronunciation: '/mItI/' })))
   })
-
-  it('shows all extended Word classes with readable labels and stable API values', async () => {
-    renderTable()
-
-    const typeSelect = await screen.findByLabelText('Type for word')
-    await userEvent.setup().click(typeSelect)
-    const options = await screen.findAllByRole('option')
-
-    expect(options.map((option) => option.textContent)).toEqual([
-      'Noun', 'Verb', 'Adjective', 'Adverb', 'Phrase', 'Collocation',
-      'Phrasal Verb', 'Idiom', 'Proverb', 'Noun Phrase', 'Verb Phrase', 'Other',
-    ])
+  it('renders word classes using their stable API values', async () => {
+    renderTable(); await edit()
+    await userEvent.setup().click(screen.getByLabelText('Type for word'))
+    expect((await screen.findAllByRole('option')).map(option => option.textContent)).toEqual(vocabularyApi.WORD_TYPE_OPTIONS.map(option => option.label))
     expect(screen.getByRole('option', { name: 'Phrasal Verb' })).toHaveAttribute('data-value', 'phrasalverb')
-    expect(screen.getByRole('option', { name: 'Noun Phrase' })).toHaveAttribute('data-value', 'nounphrase')
-    expect(screen.getByRole('option', { name: 'Verb Phrase' })).toHaveAttribute('data-value', 'verbphrase')
   })
-
-  it('retains a failed draft and retries it inline', async () => {
-    const user = userEvent.setup()
-    vi.mocked(vocabularyApi.updateWordCell)
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce({ ...word, context: 'harm reduction' })
+  it('retains a failed edit for an explicit retry', async () => {
+    vi.mocked(vocabularyApi.updateWord).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ ...word, context: 'new context' })
+    renderTable(); await edit()
+    fireEvent.change(screen.getByLabelText('Context for word'), { target: { value: 'new context' } })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Update mitigate' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update')
+    expect(screen.getByLabelText('Context for word')).toHaveValue('new context')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Update mitigate' }))
+    await waitFor(() => expect(vocabularyApi.updateWord).toHaveBeenCalledTimes(2))
+  })
+  it('keeps add drafts on their originating page and restores them on return', async () => {
+    const { rerender, view } = renderTable()
+    await userEvent.setup().click(screen.getByTestId('add-vocabulary-row-trigger'))
+    fillBlank()
+    rerender(view('page-2'))
+    expect(await screen.findByTestId('add-vocabulary-row-trigger')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Word for new word')).not.toBeInTheDocument()
+    rerender(view('page-1'))
+    expect(await screen.findByLabelText('Word for new word')).toHaveValue('alpha')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add word' }))
+    await waitFor(() => expect(vocabularyApi.createWord).toHaveBeenCalledWith('page-1', expect.objectContaining({ word: 'alpha' })))
+  })
+  it('keeps edit drafts across unmount and preference changes without writing browser storage', async () => {
+    const storage = vi.spyOn(Storage.prototype, 'setItem')
+    const { rerender, view } = renderTable(); await edit()
+    fireEvent.change(screen.getByLabelText('Meaning for word'), { target: { value: 'draft A' } })
+    rerender(view('page-2')); await screen.findByTestId('add-vocabulary-row-trigger')
+    rerender(view('page-1', { ...preferences, updatedAt: 'new', hiddenColumns: ['context'] }))
+    expect(await screen.findByLabelText('Meaning for word')).toHaveValue('draft A')
+    expect(storage).not.toHaveBeenCalled()
+    storage.mockRestore()
+  })
+  it('a new app QueryClient starts without unsaved drafts', async () => {
+    const first = renderTable()
+    await userEvent.setup().click(screen.getByTestId('add-vocabulary-row-trigger')); fillBlank()
+    first.unmount()
     renderTable()
-
-    const input = await screen.findByLabelText('Context for word')
-    await user.clear(input)
-    await user.type(input, 'harm reduction')
-    await user.tab()
-
-    expect(await screen.findByText('Save failed.')).toBeInTheDocument()
-    expect(input).toHaveValue('harm reduction')
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(vocabularyApi.updateWordCell).toHaveBeenCalledTimes(2)
+    expect(await screen.findByTestId('add-vocabulary-row-trigger')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Word for new word')).not.toBeInTheDocument()
   })
-
-  it('moves from the final saved cell to the blank row on Enter', async () => {
-    const user = userEvent.setup()
-    vi.mocked(vocabularyApi.updateWordCell).mockResolvedValue(word)
-    renderTable({
-      ...preferences,
-      hiddenColumns: ['context', 'synonyms', 'antonyms'],
-    })
-
-    const finalCell = await screen.findByLabelText('Example for mitigate')
-    await user.click(finalCell)
-    await user.keyboard('{Enter}')
-
-    await waitFor(() => expect(screen.getByLabelText('New word')).toHaveFocus())
+  it('a delayed create targets the original cache and clears its draft after switching pages', async () => {
+    let resolve!: (value: vocabularyApi.Word) => void
+    vi.mocked(vocabularyApi.createWord).mockImplementation(() => new Promise(r => { resolve = r }))
+    const { rerender, view, client } = renderTable()
+    await userEvent.setup().click(screen.getByTestId('add-vocabulary-row-trigger')); fillBlank()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add word' }))
+    rerender(view('page-2')); await screen.findByTestId('add-vocabulary-row-trigger')
+    await act(async () => resolve({ ...word, id: 'created', word: 'alpha' }))
+    await waitFor(() => expect(client.getQueryData<vocabularyApi.Word[]>(vocabularyKeys.words('page-1'))?.map(item => item.id)).toContain('created'))
+    expect(client.getQueryData(vocabularyKeys.words('page-2'))).toEqual([])
+    rerender(view('page-1'))
+    expect(await screen.findByTestId('add-vocabulary-row-trigger')).toBeInTheDocument()
   })
-
-  it('renders the horizontal scroll container and resize handles for wide boards', async () => {
-    renderTable()
-
-    expect(await screen.findByTestId('vocab-table-scroll')).toBeInTheDocument()
-    expect(screen.getByLabelText('Resize Word')).toBeInTheDocument()
+  it('a delayed edit updates the original page without altering the new page', async () => {
+    let resolve!: (value: vocabularyApi.Word) => void
+    vi.mocked(vocabularyApi.updateWord).mockImplementation(() => new Promise(r => { resolve = r }))
+    const { rerender, view, client } = renderTable(); await edit()
+    fireEvent.change(screen.getByLabelText('Meaning for word'), { target: { value: 'saved A' } })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Update mitigate' }))
+    rerender(view('page-2')); await screen.findByTestId('add-vocabulary-row-trigger')
+    await act(async () => resolve({ ...word, meaning: 'saved A' }))
+    await waitFor(() => expect(client.getQueryData<vocabularyApi.Word[]>(vocabularyKeys.words('page-1'))?.[0].meaning).toBe('saved A'))
+    expect(client.getQueryData(vocabularyKeys.words('page-2'))).toEqual([])
+  })
+  it('reorders visible columns while preserving all hidden keys', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    renderTable({ ...preferences, hiddenColumns: ['context', 'synonyms'] }, save)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Move Word after Example' }))
+    expect(save.mock.calls[0][0].columnOrder).toEqual(['meaning', 'ipaPronunciation', 'type', 'context', 'example', 'word', 'synonyms', 'antonyms'])
+    expect(new Set(save.mock.calls[0][0].columnOrder).size).toBe(8)
+  })
+  it('rolls back failed resize settings with an error', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('offline'))
+    renderTable(preferences, save)
+    const header = screen.getByLabelText('Resize Word').parentElement!
+    fireEvent.mouseDown(screen.getByLabelText('Resize Word'), { clientX: 100 })
+    fireEvent.mouseMove(window, { clientX: 180 }); fireEvent.mouseUp(window)
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(save.mock.calls[0][0].columnWidths.word).toBe(300)
+    expect(header).toHaveStyle({ width: '220px' })
+  })
+  it('restores the latest successful order after a later reorder fails', async () => {
+    const save = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('offline'))
+    renderTable(preferences, save)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Move Word after Example' }))
+    const confirmed: string[] = save.mock.calls[0][0].columnOrder
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Move Word after Example' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(screen.getAllByRole('button').filter(button => button.textContent?.includes('Word'))[1].textContent).toBe('Word')
+    const labels = screen.getAllByRole('button').filter(button => ['Word', 'Meaning', 'IPA', 'Context', 'Type', 'Example', 'Synonyms', 'Antonyms'].includes(button.textContent ?? '')).map(button => button.textContent)
+    expect(labels).toEqual(confirmed.map(key => ({ ipaPronunciation: 'IPA' } as Record<string,string>)[key] ?? key[0].toUpperCase()+key.slice(1)))
+  })
+  it('keeps scroll, wrapping and action controls available', async () => {
+    renderTable(); await edit()
+    expect(screen.getByTestId('vocab-table-scroll')).toBeInTheDocument()
     expect(screen.getByLabelText('Resize Example')).toBeInTheDocument()
+    expect(screen.getByTestId('sticky-actions-header')).toHaveClass('sticky', 'right-0')
+    expect(screen.getByTestId('sticky-word-actions')).toHaveClass('sticky', 'right-0')
+    expect(screen.getByLabelText('Context for word')).toHaveClass('overflow-hidden', 'whitespace-pre-wrap')
   })
-
-  it('keeps the Add and Delete action column pinned to the right while data columns scroll', async () => {
-    renderTable()
-
-    await screen.findByLabelText('Delete mitigate')
-
-    expect(screen.getByTestId('sticky-actions-header')).toHaveClass('sticky', 'right-0', 'bg-muted')
-    expect(screen.getByTestId('sticky-word-actions')).toHaveClass('sticky', 'right-0', 'bg-card')
-    expect(screen.getByTestId('sticky-create-actions')).toHaveClass('sticky', 'right-0', 'bg-secondary')
-  })
-
-  it('uses independently sized wrapped editors with visible column dividers', async () => {
-    renderTable()
-
-    const wordEditor = await screen.findByLabelText('Word for word')
-    const contextEditor = screen.getByLabelText('Context for word')
-
-    expect(wordEditor.tagName).toBe('TEXTAREA')
-    expect(contextEditor.tagName).toBe('TEXTAREA')
-    expect(wordEditor).toHaveClass('overflow-hidden')
-    expect(contextEditor).toHaveClass('overflow-hidden')
-    expect(screen.getByLabelText('Resize Word').parentElement).toHaveClass('border-foreground/70')
-  })
-
-  it('moves a Word to Trash immediately without a confirmation dialog', async () => {
-    const user = userEvent.setup()
-    renderTable()
-
-    await user.click(await screen.findByRole('button', { name: 'Delete mitigate' }))
+  it('moves a word to Trash immediately from its edit row', async () => {
+    renderTable(); await edit()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Delete mitigate' }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(vocabularyApi.deleteWord).toHaveBeenCalledWith('word-1'))
   })

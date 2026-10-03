@@ -359,13 +359,13 @@ export function WorkspacePage() {
   })
 
   const updatePreferences = useMutation({
-    mutationFn: (input: vocabularyApi.BoardPreferences) => vocabularyApi.updateBoardPreferences(activeBoardId!, {
-      hiddenColumns: input.hiddenColumns,
-      columnOrder: input.columnOrder,
-      columnWidths: input.columnWidths,
+    mutationFn: (input: { boardId: string; preferences: vocabularyApi.BoardPreferences }) => vocabularyApi.updateBoardPreferences(input.boardId, {
+      hiddenColumns: input.preferences.hiddenColumns,
+      columnOrder: input.preferences.columnOrder,
+      columnWidths: input.preferences.columnWidths,
     }),
-    onSuccess: (preferences) => {
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(activeBoardId), (current) => current ? { ...current, preferences } : current)
+    onSuccess: (preferences, input) => {
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(input.boardId), (current) => current ? { ...current, preferences } : current)
     },
   })
 
@@ -636,11 +636,12 @@ export function WorkspacePage() {
             </Card>
           ) : activeBoard && activePage ? (
             <VocabTable
-              key={`${activeBoard.id}:${activeBoard.preferences.updatedAt ?? 'default'}`}
+              key={activePage.id}
               page={activePage}
               preferences={activeBoard.preferences}
               searchTerm={wordSearch}
-              onPreferencesChange={async (preferences) => { await updatePreferences.mutateAsync(preferences) }}
+              preferencesBusy={updatePreferences.isPending || updateBoard.isPending}
+              onPreferencesChange={async (preferences) => { await updatePreferences.mutateAsync({ boardId: activeBoard.id, preferences }) }}
             />
           ) : activeBoard ? (
             <Card className="grid min-h-0 flex-1 place-content-center text-center">
@@ -702,7 +703,7 @@ export function WorkspacePage() {
           initialName={boardUpdateTarget.name}
           initialLanguage={boardUpdateTarget.language}
           initialIncludedOptionalColumns={boardUpdateTarget.includedOptionalColumns}
-          pending={updateBoard.isPending}
+          pending={updateBoard.isPending || updatePreferences.isPending}
           error={updateBoard.isError ? 'Could not update the board right now.' : null}
           onOpenChange={(open) => { if (!open) { setBoardUpdateTarget(null); updateBoard.reset() } }}
           onConfirm={(name, language, includedOptionalColumns) => updateBoard.mutate({ target: boardUpdateTarget, name, language, includedOptionalColumns })}

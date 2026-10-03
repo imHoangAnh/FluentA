@@ -38,6 +38,7 @@ type VocabTableProps = {
   page: vocabularyApi.Page
   preferences: vocabularyApi.BoardPreferences
   searchTerm?: string
+  preferencesBusy?: boolean
   onPreferencesChange: (preferences: vocabularyApi.BoardPreferences) => Promise<void>
 }
 
@@ -100,18 +101,85 @@ function SortableHeader({
   )
 }
 
-export function VocabTable({ page, preferences, searchTerm = '', onPreferencesChange }: VocabTableProps) {
+function EditableCell({ column, rowId, value, onChange, onEscape, register, disabled }: {
+  column: Column; rowId: string; value: vocabularyApi.WordInput;
+  onChange: (update: (value: vocabularyApi.WordInput) => vocabularyApi.WordInput) => void; onEscape: () => void;
+  register: (element: HTMLElement | null) => void; disabled: boolean;
+}) {
+    const cellValue = column.value(value)
+    const updateValue = (nextValue: string) => onChange(current => column.update(current, nextValue))
+    const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onEscape()
+      } else if (column.type === 'text' && event.key === 'Enter') {
+        event.preventDefault()
+      }
+    }
+
+    if (column.type === 'select') {
+      return (
+        <SelectMenu
+          aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
+          value={cellValue}
+          disabled={disabled}
+          onChange={updateValue}
+          buttonRef={register}
+          buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
+          options={vocabularyApi.WORD_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+        />
+      )
+    }
+
+    return (
+      <textarea
+        ref={(element) => {
+          register(element)
+          resizeTextarea(element)
+        }}
+        className={textCellClassName}
+        aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
+        value={cellValue}
+        disabled={disabled}
+        required={column.required}
+        onChange={(event) => updateValue(event.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={column.label}
+        rows={1}
+      />
+    )
+}
+
+type PageDraft = { newWord: vocabularyApi.WordInput; isAddingWord: boolean; editingWordId: string | null; editingWord: vocabularyApi.WordInput | null; saving: boolean }
+const emptyDraft = (): PageDraft => ({ newWord: emptyWord(), isAddingWord: false, editingWordId: null, editingWord: null, saving: false })
+const draftKey = (pageId: string) => ['vocabulary', 'draft', pageId] as const
+
+export function VocabTable(props: VocabTableProps) {
+  return <PageVocabTable key={props.page.id} {...props} />
+}
+
+function PageVocabTable({ page, preferences, searchTerm = '', preferencesBusy = false, onPreferencesChange }: VocabTableProps) {
   const queryClient = useQueryClient()
-  const [newWord, setNewWord] = useState<vocabularyApi.WordInput>(emptyWord)
-  const [isAddingWord, setIsAddingWord] = useState(false)
-  const [editingWordId, setEditingWordId] = useState<string | null>(null)
-  const [editingWord, setEditingWord] = useState<vocabularyApi.WordInput | null>(null)
+  // QueryClient is memory-only and is cleared by the authentication boundary.
+  const { data: draft } = useQuery({ queryKey: draftKey(page.id), queryFn: () => queryClient.getQueryData<PageDraft>(draftKey(page.id)) ?? emptyDraft(), initialData: emptyDraft, enabled: false, gcTime: Infinity })
+  const { newWord, isAddingWord, editingWordId, editingWord } = draft
+  const setDraftField = <K extends keyof PageDraft>(key: K, value: PageDraft[K] | ((current: PageDraft[K]) => PageDraft[K])) => {
+    queryClient.setQueryData<PageDraft>(draftKey(page.id), (current = emptyDraft()) => ({ ...current, [key]: typeof value === 'function' ? value(current[key]) : value }))
+  }
+  const setNewWord = (value: vocabularyApi.WordInput | ((current: vocabularyApi.WordInput) => vocabularyApi.WordInput)) => setDraftField('newWord', value)
+  const setIsAddingWord = (value: boolean) => setDraftField('isAddingWord', value)
+  const setEditingWordId = (value: string | null) => setDraftField('editingWordId', value)
+  const setEditingWord = (value: vocabularyApi.WordInput | null | ((current: vocabularyApi.WordInput) => vocabularyApi.WordInput)) => setDraftField('editingWord', current => typeof value === 'function' ? value(current ?? emptyWord()) : value)
+  const [savingPreferences, setSavingPreferences] = useState(false)
+  const preferenceSaveRef = useRef(false)
+  const confirmedPreferences = useRef(preferences)
   const [columnOrder, setColumnOrder] = useState<string[]>(preferences.columnOrder)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS,
     ...preferences.columnWidths,
   })
   const cellRefs = useRef<Record<string, HTMLElement | null>>({})
+  const columnWidthsRef = useRef(columnWidths)
   const resizeRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
   const tableFocusRef = useRef<HTMLDivElement>(null)
   const addRowTriggerRef = useRef<HTMLButtonElement>(null)
@@ -153,22 +221,24 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   const firstKey = columns[0]?.key
 
   const createWord = useMutation({
-    mutationFn: (input: vocabularyApi.WordInput) => vocabularyApi.createWord(page.id, input),
-    onSuccess: (word) => {
-      queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => [...current, word])
-      setNewWord(emptyWord())
-      setIsAddingWord(false)
+    mutationFn: (input: { pageId: string; word: vocabularyApi.WordInput }) => vocabularyApi.createWord(input.pageId, input.word),
+    onMutate: input => queryClient.setQueryData<PageDraft>(draftKey(input.pageId), current => current ? { ...current, saving: true } : current),
+    onSettled: (_data, _error, input) => queryClient.setQueryData<PageDraft>(draftKey(input.pageId), current => current ? { ...current, saving: false } : current),
+    onSuccess: (word, input) => {
+      queryClient.setQueryData<vocabularyApi.Word[]>(vocabularyKeys.words(input.pageId), (current = []) => [...current.filter(item => item.id !== word.id), word])
+      queryClient.setQueryData<PageDraft>(draftKey(input.pageId), (current = emptyDraft()) => current.newWord === input.word ? { ...current, newWord: emptyWord(), isAddingWord: false } : current)
       requestAnimationFrame(() => addRowTriggerRef.current?.focus())
       toast.success('Word created successfully')
     },
   })
 
   const updateWord = useMutation({
-    mutationFn: (input: { id: string; word: vocabularyApi.WordInput }) => vocabularyApi.updateWord(input.id, input.word),
-    onSuccess: (updatedWord) => {
-      queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.map((word) => word.id === updatedWord.id ? updatedWord : word))
-      setEditingWordId(null)
-      setEditingWord(null)
+    mutationFn: (input: { pageId: string; id: string; word: vocabularyApi.WordInput }) => vocabularyApi.updateWord(input.id, input.word),
+    onMutate: input => queryClient.setQueryData<PageDraft>(draftKey(input.pageId), current => current ? { ...current, saving: true } : current),
+    onSettled: (_data, _error, input) => queryClient.setQueryData<PageDraft>(draftKey(input.pageId), current => current ? { ...current, saving: false } : current),
+    onSuccess: (updatedWord, input) => {
+      queryClient.setQueryData<vocabularyApi.Word[]>(vocabularyKeys.words(input.pageId), (current = []) => current.map((word) => word.id === updatedWord.id ? updatedWord : word))
+      queryClient.setQueryData<PageDraft>(draftKey(input.pageId), (current = emptyDraft()) => current.editingWord === input.word ? { ...current, editingWordId: null, editingWord: null } : current)
       toast.success('Word updated successfully')
     },
   })
@@ -197,10 +267,38 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   })
 
   useEffect(() => {
+    confirmedPreferences.current = preferences
+    if (!preferenceSaveRef.current) {
+      setColumnOrder(preferences.columnOrder)
+      setColumnWidths({ ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS, ...preferences.columnWidths })
+      columnWidthsRef.current = { ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS, ...preferences.columnWidths }
+    }
+  }, [preferences])
+
+  async function savePreferences(next: vocabularyApi.BoardPreferences) {
+    if (preferenceSaveRef.current || preferencesBusy) return
+    preferenceSaveRef.current = true
+    setSavingPreferences(true)
+    try {
+      await onPreferencesChange(next)
+      confirmedPreferences.current = next
+    } catch {
+      setColumnOrder(confirmedPreferences.current.columnOrder)
+      setColumnWidths({ ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS, ...confirmedPreferences.current.columnWidths })
+      columnWidthsRef.current = { ...vocabularyApi.DEFAULT_VOCAB_COLUMN_WIDTHS, ...confirmedPreferences.current.columnWidths }
+      toast.error('Could not save column settings. Your last saved settings have been restored.')
+    } finally {
+      preferenceSaveRef.current = false
+      setSavingPreferences(false)
+    }
+  }
+
+  useEffect(() => {
     function onMouseMove(event: MouseEvent) {
       if (!resizeRef.current) return
       const nextWidth = Math.max(80, Math.min(1200, resizeRef.current.startWidth + event.clientX - resizeRef.current.startX))
-      setColumnWidths((current) => ({ ...current, [resizeRef.current!.key]: nextWidth }))
+      columnWidthsRef.current = { ...columnWidthsRef.current, [resizeRef.current.key]: nextWidth }
+      setColumnWidths(columnWidthsRef.current)
     }
 
     function onMouseUp() {
@@ -208,10 +306,10 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
       const nextPreferences = {
         ...preferences,
         columnOrder,
-        columnWidths,
+        columnWidths: columnWidthsRef.current,
       }
       resizeRef.current = null
-      void onPreferencesChange(nextPreferences)
+      void savePreferences(nextPreferences)
     }
 
     window.addEventListener('mousemove', onMouseMove)
@@ -220,7 +318,7 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
-  }, [columnOrder, columnWidths, onPreferencesChange, preferences])
+  })
 
   function focus(rowId: string, key: string | undefined) {
     if (key) requestAnimationFrame(() => cellRefs.current[`${rowId}:${key}`]?.focus())
@@ -228,12 +326,17 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id || preferenceSaveRef.current || preferencesBusy) return
 
     const currentOrder = columns.map((column) => column.key)
-    const nextOrder = arrayMove(currentOrder, currentOrder.indexOf(active.id as string), currentOrder.indexOf(over.id as string))
+    const from = currentOrder.indexOf(active.id as string)
+    const to = currentOrder.indexOf(over.id as string)
+    if (from < 0 || to < 0) return
+    const visibleOrder = arrayMove(currentOrder, from, to)
+    let visibleIndex = 0
+    const nextOrder = columnOrder.map(key => hidden.has(key) ? key : visibleOrder[visibleIndex++])
     setColumnOrder(nextOrder)
-    void onPreferencesChange({
+    void savePreferences({
       ...preferences,
       columnOrder: nextOrder,
       columnWidths,
@@ -241,6 +344,7 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   }
 
   function handleResizeStart(event: React.MouseEvent<HTMLButtonElement>, key: string) {
+    if (savingPreferences || preferencesBusy) return
     event.preventDefault()
     event.stopPropagation()
     resizeRef.current = {
@@ -251,8 +355,8 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   }
 
   async function createFromBlank() {
-    if (createWord.isPending) return
-    await createWord.mutateAsync(newWord)
+    if (createWord.isPending || queryClient.getQueryData<PageDraft>(draftKey(page.id))?.saving) return
+    try { await createWord.mutateAsync({ pageId: page.id, word: newWord }) } catch { /* Draft remains available for manual retry. */ }
   }
 
   function submitBlank(event: FormEvent) {
@@ -271,6 +375,7 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   }
 
   function cancelAddingWord() {
+    if (draft.saving) return
     setNewWord(emptyWord())
     setIsAddingWord(false)
     requestAnimationFrame(() => addRowTriggerRef.current?.focus())
@@ -286,6 +391,7 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
   }
 
   function cancelEditingWord() {
+    if (draft.saving) return
     setEditingWordId(null)
     setEditingWord(null)
     updateWord.reset()
@@ -293,58 +399,8 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
 
   function submitEditedWord(event: FormEvent, wordId: string) {
     event.preventDefault()
-    if (!editingWord || editingWordId !== wordId || updateWord.isPending) return
-    updateWord.mutate({ id: wordId, word: editingWord })
-  }
-
-  function renderEditableCell(
-    column: Column,
-    rowId: string,
-    value: vocabularyApi.WordInput,
-    onChange: (nextValue: vocabularyApi.WordInput) => void,
-    onEscape: () => void,
-  ): ReactNode {
-    const cellValue = column.value(value)
-    const register = (element: HTMLElement | null) => { cellRefs.current[`${rowId}:${column.key}`] = element }
-    const updateValue = (nextValue: string) => onChange(column.update(value, nextValue))
-    const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onEscape()
-      } else if (column.type === 'text' && event.key === 'Enter') {
-        event.preventDefault()
-      }
-    }
-
-    if (column.type === 'select') {
-      return (
-        <SelectMenu
-          aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
-          value={cellValue}
-          onChange={updateValue}
-          buttonRef={register}
-          buttonClassName={`${cellClassName} min-h-9 justify-between px-2 py-1.5 text-sm font-normal`}
-          options={vocabularyApi.WORD_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-        />
-      )
-    }
-
-    return (
-      <textarea
-        ref={(element) => {
-          register(element)
-          resizeTextarea(element)
-        }}
-        className={textCellClassName}
-        aria-label={`${column.label} for ${rowId === 'new' ? 'new word' : 'word'}`}
-        value={cellValue}
-        required={column.required}
-        onChange={(event) => updateValue(event.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={column.label}
-        rows={1}
-      />
-    )
+    if (!editingWord || editingWordId !== wordId || updateWord.isPending || queryClient.getQueryData<PageDraft>(draftKey(page.id))?.saving) return
+    updateWord.mutate({ pageId: page.id, id: wordId, word: editingWord })
   }
 
   function renderReadOnlyCell(column: Column, word: vocabularyApi.Word): ReactNode {
@@ -383,14 +439,14 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
           <form className="grid min-h-12 items-start border-b border-border bg-primary/5 py-1" style={{ gridTemplateColumns }} onSubmit={submitBlank}>
             {columns.map((column) => (
               <div className="min-w-0 self-start border-r border-border px-1 last:border-r-0" key={column.key}>
-                {renderEditableCell(column, 'new', newWord, setNewWord, cancelAddingWord)}
+                <EditableCell column={column} rowId="new" value={newWord} onChange={setNewWord} onEscape={cancelAddingWord} disabled={draft.saving} register={element => { cellRefs.current[`new:${column.key}`] = element }} />
               </div>
             ))}
             <div className="sticky right-0 z-[5] flex min-h-10 items-center justify-center gap-1 border-l border-border bg-primary/10 px-1" data-testid="sticky-create-actions">
-              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={createWord.isPending} data-testid="create-word-button" title="Add word" aria-label="Add word">
+              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={draft.saving || createWord.isPending} data-testid="create-word-button" title="Add word" aria-label="Add word">
                 <CheckCircle2 className="size-4" aria-hidden="true" />
               </button>
-              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-accent" type="button" title="Cancel adding word" aria-label="Cancel adding word" onClick={cancelAddingWord}>
+              <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-accent" type="button" disabled={draft.saving} title="Cancel adding word" aria-label="Cancel adding word" onClick={cancelAddingWord}>
                 <X className="size-4" aria-hidden="true" />
               </button>
             </div>
@@ -417,14 +473,14 @@ export function VocabTable({ page, preferences, searchTerm = '', onPreferencesCh
             <form className="grid min-h-12 items-start border-b border-border bg-primary/5 py-1" style={{ gridTemplateColumns }} key={word.id} onSubmit={(event) => submitEditedWord(event, word.id)}>
               {columns.map((column) => (
                 <div className="min-w-0 self-start border-r border-border px-1" key={column.key}>
-                  {renderEditableCell(column, word.id, editingWord, (nextWord) => setEditingWord(nextWord), cancelEditingWord)}
+                  <EditableCell column={column} rowId={word.id} value={editingWord} onChange={setEditingWord} onEscape={cancelEditingWord} disabled={draft.saving} register={element => { cellRefs.current[`${word.id}:${column.key}`] = element }} />
                 </div>
               ))}
               <div className="sticky right-0 z-[5] flex min-h-10 items-center justify-center gap-1 border-l border-border bg-primary/10 px-1" data-testid="sticky-word-actions">
-                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={updateWord.isPending || deleteWord.isPending} aria-label={`Update ${word.word}`} title="Update word">
+                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={draft.saving || updateWord.isPending || deleteWord.isPending} aria-label={`Update ${word.word}`} title="Update word">
                   <Check className="size-4" aria-hidden="true" />
                 </button>
-                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={updateWord.isPending || deleteWord.isPending} aria-label={`Delete ${word.word}`} title="Delete word" onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}>
+                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={draft.saving || updateWord.isPending || deleteWord.isPending} aria-label={`Delete ${word.word}`} title="Delete word" onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </button>
               </div>

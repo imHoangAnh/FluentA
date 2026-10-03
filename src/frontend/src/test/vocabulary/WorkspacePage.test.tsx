@@ -20,6 +20,7 @@ vi.mock('@/features/vocabulary/api/vocabulary.api', async () => {
     deleteBoard: vi.fn(),
     deletePage: vi.fn(),
     listWords: vi.fn(),
+    updateBoardPreferences: vi.fn(),
   }
 })
 
@@ -47,12 +48,13 @@ function renderWorkspace() {
   client.setQueryData(['vocab', 'boards'], [newestBoard, olderBoard])
   client.setQueryData(['vocab', 'boards', newestBoard.id], newestBoard)
   client.setQueryData(['vocab', 'boards', olderBoard.id], olderBoard)
-  return render(<AppProviders queryClient={client}><MemoryRouter><WorkspacePage /></MemoryRouter></AppProviders>)
+  return { client, ...render(<AppProviders queryClient={client}><MemoryRouter><WorkspacePage /></MemoryRouter></AppProviders>) }
 }
 
 describe('WorkspacePage board and page context actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
     vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue({ id: 'trash-board' } as never)
     vi.mocked(vocabularyApi.deletePage).mockResolvedValue({ id: 'trash-page' } as never)
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([])
@@ -69,9 +71,9 @@ describe('WorkspacePage board and page context actions', () => {
   it('keeps Add page before every Page in the active Board', async () => {
     renderWorkspace()
 
-    const addPage = await screen.findByRole('button', { name: 'Add page' })
-    const newestPage = screen.getByRole('button', { name: 'Newest page' })
-    const earlierPage = screen.getByRole('button', { name: 'Earlier page' })
+    const addPage = await screen.findByRole('button', { name: 'New page' })
+    const newestPage = screen.getByRole('tab', { name: 'Newest page' })
+    const earlierPage = screen.getByRole('tab', { name: 'Earlier page' })
 
     expect(addPage.compareDocumentPosition(newestPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(addPage.compareDocumentPosition(earlierPage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -80,13 +82,13 @@ describe('WorkspacePage board and page context actions', () => {
   it('ellipsizes long Board and Page labels without changing their accessible names', async () => {
     renderWorkspace()
 
-    const boardButton = await screen.findByRole('button', { name: /Newest board/ })
-    const pageButton = screen.getByRole('button', { name: 'Newest page' })
+    const boardButton = await screen.findByRole('tab', { name: /Newest board/ })
+    const pageButton = screen.getByRole('tab', { name: 'Newest page' })
 
-    expect(boardButton).toHaveClass('min-w-0', 'overflow-hidden')
-    expect(within(boardButton).getByText('Newest board')).toHaveClass('min-w-0', 'flex-1', 'truncate')
-    expect(pageButton).toHaveClass('min-w-0', 'overflow-hidden')
-    expect(within(pageButton).getByText('Newest page')).toHaveClass('min-w-0', 'flex-1', 'truncate')
+    expect(boardButton).toHaveClass('max-w-44')
+    expect(within(boardButton).getByText('Newest board')).toHaveClass('truncate')
+    expect(pageButton).toHaveClass('max-w-44')
+    expect(within(pageButton).getByText('Newest page')).toHaveClass('truncate')
   })
 
   it('creates a Board from a modal and Escape cancels without a request', async () => {
@@ -94,19 +96,19 @@ describe('WorkspacePage board and page context actions', () => {
     renderWorkspace()
 
     expect(screen.queryByLabelText('Board name')).not.toBeInTheDocument()
-    await user.click(await screen.findByRole('button', { name: 'Create new board' }))
+    await user.click(await screen.findByRole('button', { name: 'New board' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Create board')
     fireEvent.change(screen.getByLabelText('Board name'), { target: { value: 'Ignored board' } })
     await user.keyboard('{Escape}')
     expect(vocabularyApi.createBoard).not.toHaveBeenCalled()
     expect(screen.queryByLabelText('Board name')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Create new board' }))
+    await user.click(screen.getByRole('button', { name: 'New board' }))
     fireEvent.change(screen.getByLabelText('Board name'), { target: { value: '  Expressions  ' } })
     await user.click(screen.getByRole('button', { name: 'Create board' }))
 
     await waitFor(() => expect(vocabularyApi.createBoard).toHaveBeenCalledWith(
-      { name: 'Expressions', language: 'en' },
+      { name: 'Expressions', language: 'en', includedOptionalColumns: [] },
       expect.anything(),
     ))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -120,13 +122,13 @@ describe('WorkspacePage board and page context actions', () => {
     renderWorkspace()
 
     expect(screen.queryByLabelText('Page name')).not.toBeInTheDocument()
-    await user.click(await screen.findByRole('button', { name: 'Add page' }))
+    await user.click(await screen.findByRole('button', { name: 'New page' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Add a vocabulary page to “Newest board”.')
     fireEvent.change(screen.getByLabelText('Page name'), { target: { value: 'Ignored page' } })
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(vocabularyApi.createPage).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Add page' }))
+    await user.click(screen.getByRole('button', { name: 'New page' }))
     fireEvent.change(screen.getByLabelText('Page name'), { target: { value: '  Fresh page  ' } })
     await user.click(screen.getByRole('button', { name: 'Create page' }))
 
@@ -138,7 +140,7 @@ describe('WorkspacePage board and page context actions', () => {
     const user = userEvent.setup()
     renderWorkspace()
 
-    const boardButton = await screen.findByRole('button', { name: /Newest board/ })
+    const boardButton = await screen.findByRole('tab', { name: /Newest board/ })
     fireEvent.contextMenu(boardButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
 
@@ -151,12 +153,12 @@ describe('WorkspacePage board and page context actions', () => {
     const user = userEvent.setup()
     renderWorkspace()
 
-    const pageButton = await screen.findByRole('button', { name: 'Newest page' })
+    const pageButton = await screen.findByRole('tab', { name: 'Newest page' })
     fireEvent.contextMenu(pageButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
-    await waitFor(() => expect(vocabularyApi.deletePage).toHaveBeenCalledWith('board-new', 'page-new'))
+    await waitFor(() => expect(vocabularyApi.deletePage).toHaveBeenCalledWith('page-new'))
     expect(await screen.findByRole('heading', { name: 'Earlier page' })).toBeInTheDocument()
   })
 
@@ -165,24 +167,21 @@ describe('WorkspacePage board and page context actions', () => {
     vi.mocked(vocabularyApi.updateBoard).mockResolvedValue({ ...newestBoard, name: 'Renamed board' })
     renderWorkspace()
 
-    fireEvent.contextMenu(await screen.findByRole('button', { name: /Newest board/ }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Rename Board' }))
+    fireEvent.contextMenu(await screen.findByRole('tab', { name: /Newest board/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Update Board' }))
     const input = screen.getByLabelText('Board name')
     await user.clear(input)
     await user.type(input, 'Renamed board')
-    await user.click(screen.getByRole('button', { name: 'Rename' }))
+    await user.click(screen.getByRole('button', { name: 'Update board' }))
 
-    await waitFor(() => expect(vocabularyApi.updateBoard).toHaveBeenCalledWith('board-new', { name: 'Renamed board', language: 'en' }))
-    expect(await screen.findByRole('button', { name: /Renamed board/ })).toBeInTheDocument()
+    await waitFor(() => expect(vocabularyApi.updateBoard).toHaveBeenCalledWith('board-new', { name: 'Renamed board', language: 'en', includedOptionalColumns: ['context', 'synonyms', 'antonyms'] }))
+    expect(await screen.findByRole('tab', { name: /Renamed board/ })).toBeInTheDocument()
   })
 
-  it('shows each Board language beside its Page count instead of in the header', async () => {
+  it('keeps the board name accessible as a selectable tab', async () => {
     renderWorkspace()
-
-    const newestBoardButton = await screen.findByRole('button', { name: /Newest board/ })
-    expect(newestBoardButton).toHaveTextContent('1en')
-    expect(screen.getAllByText('en')[0]).toHaveClass('uppercase')
-    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Newest board' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Older board' })).toHaveAttribute('aria-selected', 'false')
   })
 
   it('renames the exact right-clicked Page', async () => {
@@ -190,14 +189,39 @@ describe('WorkspacePage board and page context actions', () => {
     vi.mocked(vocabularyApi.updatePage).mockResolvedValue({ ...newestBoard.pages[0], name: 'Renamed page' })
     renderWorkspace()
 
-    fireEvent.contextMenu(await screen.findByRole('button', { name: 'Newest page' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Rename Page' }))
+    fireEvent.contextMenu(await screen.findByRole('tab', { name: 'Newest page' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Update Page' }))
     const input = screen.getByLabelText('Page name')
     await user.clear(input)
     await user.type(input, 'Renamed page')
     await user.click(screen.getByRole('button', { name: 'Rename' }))
 
-    await waitFor(() => expect(vocabularyApi.updatePage).toHaveBeenCalledWith('board-new', 'page-new', { name: 'Renamed page' }))
-    expect(await screen.findByRole('button', { name: 'Renamed page' })).toBeInTheDocument()
+    await waitFor(() => expect(vocabularyApi.updatePage).toHaveBeenCalledWith('page-new', { name: 'Renamed page' }))
+    expect(await screen.findByRole('tab', { name: 'Renamed page' })).toBeInTheDocument()
+  })
+
+  it('keeps add drafts separate when switching actual page tabs', async () => {
+    renderWorkspace()
+    const user = userEvent.setup()
+    await user.click(await screen.findByTestId('add-vocabulary-row-trigger'))
+    await user.type(screen.getByLabelText('Word for new word'), 'page A draft')
+    await user.click(screen.getByRole('tab', { name: 'Earlier page' }))
+    expect(await screen.findByTestId('add-vocabulary-row-trigger')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Newest page' }))
+    expect(await screen.findByLabelText('Word for new word')).toHaveValue('page A draft')
+  })
+
+  it('a delayed preference save updates the original board after changing boards', async () => {
+    let resolve!: (preferences: vocabularyApi.BoardPreferences) => void
+    vi.mocked(vocabularyApi.updateBoardPreferences).mockImplementation(() => new Promise(r => { resolve = r }))
+    const { client } = renderWorkspace()
+    fireEvent.mouseDown(await screen.findByLabelText('Resize Word'), { clientX: 100 })
+    fireEvent.mouseMove(window, { clientX: 180 })
+    fireEvent.mouseUp(window)
+    await waitFor(() => expect(vocabularyApi.updateBoardPreferences).toHaveBeenCalled())
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Older board' }))
+    resolve({ ...preferences, columnWidths: { word: 300 } })
+    await waitFor(() => expect(client.getQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', 'board-new'])?.preferences.columnWidths.word).toBe(300))
+    expect(client.getQueryData<vocabularyApi.BoardDetail>(['vocab', 'boards', 'board-old'])?.preferences.columnWidths).toEqual({})
   })
 })
