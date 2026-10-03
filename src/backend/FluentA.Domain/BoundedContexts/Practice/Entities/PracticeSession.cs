@@ -85,4 +85,15 @@ public sealed class PracticeSession : BaseEntity
         CompletedAt = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
         UpdatedAt = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
     }
+
+    public void Abandon(DateTime utcNow)
+    {
+        if (Status != PracticeSessionStatus.Active)
+        {
+            return;
+        }
+
+        Status = PracticeSessionStatus.Abandoned;
+        UpdatedAt = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
+    }
 }

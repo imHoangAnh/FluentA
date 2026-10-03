@@ -23,7 +23,6 @@ internal static class LearningServiceRegistrationExtensions
             ?? throw new InvalidOperationException("Practice repository must implement session persistence."));
         services.AddScoped<IPronunciationWordRepository, EfPronunciationWordRepository>();
         services.AddScoped<IReviewRepository, EfReviewRepository>();
-        services.AddScoped<ILevelFiveTrashRepository, EfLevelFiveTrashRepository>();
         services.AddScoped<IPracticeService, PracticeService>();
         services.AddScoped<IPronunciationService, PronunciationService>();
         services.AddScoped<IReviewService, ReviewService>();
@@ -32,7 +31,7 @@ internal static class LearningServiceRegistrationExtensions
         services.AddScoped<IReviewEnrollmentPort>(provider => provider.GetRequiredService<IReviewService>() as IReviewEnrollmentPort
             ?? throw new InvalidOperationException("Review service must implement review enrollment."));
         services.AddScoped<IVocabularyReviewCleanupPort, EfVocabularyReviewCleanupPort>();
-        services.AddScoped<IVocabularyRepository, EfVocabularyRepository>();
+        services.AddScoped<IVocabularyRepository, VocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
         return services;
     }

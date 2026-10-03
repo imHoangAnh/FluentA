@@ -3,6 +3,7 @@ using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Note.DTOs;
 using FluentA.Application.BoundedContexts.Trash;
+using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
@@ -486,6 +487,10 @@ public sealed class NoteServiceTests
 
     private sealed class InlineTrashTransaction : ITrashTransaction
     {
+        public Task<OperationResult<T>> ExecuteOperationAsync<T>(
+            Func<CancellationToken, Task<OperationResult<T>>> action,
+            CancellationToken cancellationToken = default) => action(cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default) => action(cancellationToken);
     }
 

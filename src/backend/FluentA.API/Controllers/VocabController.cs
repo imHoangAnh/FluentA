@@ -1,10 +1,8 @@
-using System.Security.Claims;
 using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 using FluentA.Application.BoundedContexts.Trash;
-using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,7 +24,9 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> ListBoards(CancellationToken cancellationToken)
     {
         var result = await _vocabulary.ListBoardsAsync(CurrentUserId(), cancellationToken);
-        return Ok(ApiEnvelope<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!));
+        return result.IsSuccess
+            ? Ok(ApiEnvelope<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!))
+            : ToErrorResult(result);
     }
 
     [HttpPost("boards")]
@@ -142,5 +142,4 @@ public sealed class VocabController : ApiControllerBase
         var result = await _vocabulary.UpdateBoardPreferencesAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess ? Ok(ApiEnvelope<BoardPreferencesDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
-
 }

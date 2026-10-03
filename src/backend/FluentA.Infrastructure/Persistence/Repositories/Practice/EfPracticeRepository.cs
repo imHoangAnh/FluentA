@@ -40,6 +40,7 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
             select new
             {
                 pageEntity.Id,
+                pageEntity.Name,
                 board.UserId,
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -68,6 +69,7 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
             summary = PracticeSessionSummary.Create(
                 page.UserId,
                 page.Id,
+                page.Name,
                 mode,
                 totalCards,
                 correctCards,
@@ -77,7 +79,7 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
         }
         else
         {
-            summary.UpdateCompletion(mode, totalCards, correctCards, wrongCards, utcNow);
+            summary.UpdateCompletion(page.Name, mode, totalCards, correctCards, wrongCards, utcNow);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -88,6 +90,7 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
                 summary.Id,
                 summary.UserId,
                 summary.PageId,
+                summary.PageName,
                 summary.Mode switch
                 {
                     PracticeMode.Dictation => "dictation",

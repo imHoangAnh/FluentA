@@ -930,8 +930,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BoardId");
-
                     b.HasIndex("PageId", "StartedAt");
 
                     b.HasIndex("UserId", "StartedAt");
@@ -1123,6 +1121,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PageId")
                         .HasColumnType("uuid")
                         .HasColumnName("page_id");
+
+                    b.Property<string>("PageName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("page_name");
 
                     b.Property<int>("TotalCards")
                         .HasColumnType("integer")
@@ -1601,6 +1605,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("result");
 
+                    b.Property<Guid?>("ReviewSessionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_session_item_id");
+
                     b.Property<DateTime>("ReviewedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reviewed_at");
@@ -1626,6 +1634,8 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnName("word_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ReviewSessionItemId");
 
                     b.HasIndex("UserId", "ReviewedAt")
                         .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
@@ -2213,18 +2223,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSession", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
-                        .WithMany()
-                        .HasForeignKey("BoardId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", null)
-                        .WithMany()
-                        .HasForeignKey("PageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -2243,12 +2241,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", null)
-                        .WithMany()
-                        .HasForeignKey("PageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -2308,21 +2300,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ReviewSessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
-                        .WithMany()
-                        .HasForeignKey("VocabWordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
+                    b.HasOne("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSessionItem", null)
                         .WithMany()
-                        .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ReviewSessionItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewState", b =>

@@ -138,18 +138,39 @@ internal static class VocabularyRequestValidator
     public static Dictionary<string, string[]> ValidatePreferences(UpdateBoardPreferencesRequest request)
     {
         var errors = new Dictionary<string, string[]>();
-        var hiddenColumns = request.HiddenColumns
-            .Select(key => key.Trim())
+        var hiddenColumnsInput = request.HiddenColumns ?? [];
+        var columnOrderInput = request.ColumnOrder ?? [];
+        var columnWidthsInput = request.ColumnWidths ?? new Dictionary<string, int>();
+        if (request.HiddenColumns is null)
+        {
+            errors["hiddenColumns"] = ["Hidden columns are required."];
+        }
+        if (request.ColumnOrder is null)
+        {
+            errors["columnOrder"] = ["Column order is required."];
+        }
+        if (request.ColumnWidths is null)
+        {
+            errors["columnWidths"] = ["Column widths are required."];
+        }
+        if (errors.Count > 0)
+        {
+            return errors;
+        }
+
+        var hiddenColumns = hiddenColumnsInput
+            .Select(key => key?.Trim() ?? string.Empty)
             .Where(key => key.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (hiddenColumns.Any(key => !HideableColumns.Contains(key)))
+        if (hiddenColumnsInput.Any(string.IsNullOrWhiteSpace)
+            || hiddenColumns.Any(key => !HideableColumns.Contains(key)))
         {
             errors["hiddenColumns"] = ["Only nullable fixed columns may be hidden."];
         }
 
-        var columnOrder = request.ColumnOrder
-            .Select(key => key.Trim())
+        var columnOrder = columnOrderInput
+            .Select(key => key?.Trim() ?? string.Empty)
             .Where(key => key.Length > 0)
             .ToList();
         if (columnOrder.Count != FixedColumnOrder.Count
@@ -160,7 +181,8 @@ internal static class VocabularyRequestValidator
             errors["columnOrder"] = ["Column order must include each fixed column exactly once."];
         }
 
-        if (request.ColumnWidths.Any(pair =>
+        if (columnWidthsInput.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count() != columnWidthsInput.Count
+            || columnWidthsInput.Any(pair =>
                 !FixedColumnOrder.Contains(pair.Key, StringComparer.OrdinalIgnoreCase)
                 || pair.Value < 80
                 || pair.Value > 1200))

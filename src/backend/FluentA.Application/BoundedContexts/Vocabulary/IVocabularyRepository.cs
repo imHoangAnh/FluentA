@@ -11,17 +11,14 @@ public interface IVocabularyRepository
     Task<VocabBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default);
     Task<VocabPage?> GetTrashedPageAsync(Guid userId, Guid pageId, DateTime trashedAt, CancellationToken cancellationToken = default);
     Task<VocabWord?> GetTrashedWordAsync(Guid userId, Guid wordId, DateTime trashedAt, CancellationToken cancellationToken = default);
+    Task<VocabBoard?> GetTrashedBoardForPermanentDeletionAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default);
+    Task<VocabPage?> GetTrashedPageForPermanentDeletionAsync(Guid userId, Guid pageId, DateTime trashedAt, CancellationToken cancellationToken = default);
+    Task<VocabWord?> GetTrashedWordForPermanentDeletionAsync(Guid userId, Guid wordId, DateTime trashedAt, CancellationToken cancellationToken = default);
     Task<VocabBoardPreference?> GetBoardPreferenceAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VocabWord>> ListWordsAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VocabWord>> ListTrashedWordsAsync(IReadOnlyCollection<Guid> pageIds, DateTime trashedAt, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VocabWord>> ListWordsForPagesAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken = default);
     Task AddBoardAsync(VocabBoard board, CancellationToken cancellationToken = default);
-    async Task AddBoardWithPreferencesAsync(VocabBoard board, VocabBoardPreference preference, CancellationToken cancellationToken = default)
-    {
-        await AddBoardAsync(board, cancellationToken);
-        await AddBoardPreferenceAsync(preference, cancellationToken);
-        await SaveChangesAsync(cancellationToken);
-    }
     Task AddPageAsync(VocabPage page, CancellationToken cancellationToken = default);
     Task AddWordAsync(VocabWord word, CancellationToken cancellationToken = default);
     Task AddBoardPreferenceAsync(VocabBoardPreference preference, CancellationToken cancellationToken = default);

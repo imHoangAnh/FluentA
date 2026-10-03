@@ -1,5 +1,4 @@
 using FluentA.Domain.BoundedContexts.Review.Entities;
-using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -43,16 +42,12 @@ public sealed class ReviewSessionItemConfiguration : IEntityTypeConfiguration<Re
             .HasForeignKey(item => item.ReviewSessionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne<VocabWord>()
-            .WithMany()
-            .HasForeignKey(item => item.VocabWordId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasIndex(item => new { item.ReviewSessionId, item.VocabWordId })
             .IsUnique()
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(item => new { item.ReviewSessionId, item.Position })
             .IsUnique()
             .HasFilter("deleted_at IS NULL");
+        builder.HasIndex(item => item.VocabWordId);
     }
 }

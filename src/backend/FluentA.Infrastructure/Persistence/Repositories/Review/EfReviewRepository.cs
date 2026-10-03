@@ -213,6 +213,33 @@ public sealed class EfReviewRepository : IReviewRepository
             .Where(item => item.ReviewSessionId == sessionId && item.DeletedAt == null)
             .OrderBy(item => item.Position)
             .ToListAsync(cancellationToken);
+
+        var openItemIds = items
+            .Where(item => !item.IsReviewed)
+            .Select(item => item.Id)
+            .ToArray();
+        if (openItemIds.Length > 0)
+        {
+            var availableOpenItemIds = await (
+                from item in _dbContext.ReviewSessionItems.AsNoTracking()
+                join word in _dbContext.Words.AsNoTracking() on item.VocabWordId equals word.Id
+                join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+                join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+                where openItemIds.Contains(item.Id)
+                    && item.ReviewSessionId == sessionId
+                    && item.DeletedAt == null
+                    && word.DeletedAt == null
+                    && page.DeletedAt == null
+                    && board.UserId == session.UserId
+                    && board.DeletedAt == null
+                select item.Id)
+                .ToHashSetAsync(cancellationToken);
+
+            items = items
+                .Where(item => item.IsReviewed || availableOpenItemIds.Contains(item.Id))
+                .ToList();
+        }
+
         return await BuildSessionDtoAsync(session, items, cancellationToken);
     }
 
@@ -225,6 +252,9 @@ public sealed class EfReviewRepository : IReviewRepository
         return await (
             from session in _dbContext.ReviewSessions.AsNoTracking()
             join item in _dbContext.ReviewSessionItems.AsNoTracking() on session.Id equals item.ReviewSessionId
+            join word in _dbContext.Words.AsNoTracking() on item.VocabWordId equals word.Id
+            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
             where session.Id == sessionId
                 && session.UserId == userId
                 && session.Status == ReviewSessionStatus.Active
@@ -232,6 +262,10 @@ public sealed class EfReviewRepository : IReviewRepository
                 && item.Id == itemId
                 && !item.IsReviewed
                 && item.DeletedAt == null
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.UserId == userId
+                && board.DeletedAt == null
             select new ReviewAnswerTargetDto(item.VocabWordId, item.Mode, item.WordSnapshot, item.LanguageSnapshot))
             .SingleOrDefaultAsync(cancellationToken);
     }
@@ -306,6 +340,13 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
+        var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
+        if (reviewState is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
         var attempts = _dbContext.Set<ReviewAttempt>()
             .Where(attempt => attempt.ReviewSessionItemId == itemId && attempt.DeletedAt == null);
         var attemptsUsedBefore = await attempts.CountAsync(cancellationToken);
@@ -332,13 +373,6 @@ public sealed class EfReviewRepository : IReviewRepository
         var attemptsUsed = attemptNumber;
         if (assessment.Correct || attemptsUsed == 2)
         {
-            var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
-            if (reviewState is null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return null;
-            }
-
             CompleteItem(
                 session,
                 item,
@@ -415,12 +449,21 @@ public sealed class EfReviewRepository : IReviewRepository
         }
 
         var localToday = ReviewTime.LocalDate(utcNow, timeZone);
-        var state = await _dbContext.WordReviewStates.SingleOrDefaultAsync(
-            item => item.UserId == userId
+        var state = await (
+            from item in _dbContext.WordReviewStates
+            join word in _dbContext.Words on item.WordId equals word.Id
+            join page in _dbContext.Pages on word.PageId equals page.Id
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where item.UserId == userId
                 && item.WordId == wordId
                 && item.Status == WordReviewStatus.Active
-                && item.DeletedAt == null,
-            cancellationToken);
+                && item.DeletedAt == null
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.UserId == userId
+                && board.DeletedAt == null
+            select item)
+            .SingleOrDefaultAsync(cancellationToken);
         return state is { } && state.NextReviewDate <= localToday ? state : null;
     }
 
@@ -471,11 +514,20 @@ public sealed class EfReviewRepository : IReviewRepository
         DateTime reviewedAtUtc,
         CancellationToken cancellationToken)
     {
-        var openItemCount = await _dbContext.ReviewSessionItems.CountAsync(
-            candidate => candidate.ReviewSessionId == session.Id
+        var openItemCount = await (
+            from candidate in _dbContext.ReviewSessionItems
+            join word in _dbContext.Words on candidate.VocabWordId equals word.Id
+            join page in _dbContext.Pages on word.PageId equals page.Id
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where candidate.ReviewSessionId == session.Id
                 && !candidate.IsReviewed
-                && candidate.DeletedAt == null,
-            cancellationToken);
+                && candidate.DeletedAt == null
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.UserId == userId
+                && board.DeletedAt == null
+            select candidate.Id)
+            .CountAsync(cancellationToken);
         if (openItemCount <= 1)
         {
             session.Complete(reviewedAtUtc);
@@ -483,7 +535,7 @@ public sealed class EfReviewRepository : IReviewRepository
 
         var result = item.Result!.Value;
         await _dbContext.WordReviewHistories.AddAsync(
-            WordReviewHistory.Create(userId, item.VocabWordId, session.Id, totalTimeSpentSeconds, reviewedAtUtc, result),
+            WordReviewHistory.Create(userId, item.VocabWordId, session.Id, item.Id, totalTimeSpentSeconds, reviewedAtUtc, result),
             cancellationToken);
 
         // One SaveChanges keeps the attempt, item result, history, word state, and session status atomic.
@@ -511,6 +563,7 @@ public sealed class EfReviewRepository : IReviewRepository
             .OrderBy(item => item.Position)
             .Select(item => ToSessionItemDto(item, attemptCounts.GetValueOrDefault(item.Id)))
             .ToArray();
+        var currentItemIndex = Array.FindIndex(itemDtos, item => !item.IsReviewed);
         return new ReviewSessionDto(
             session.Id,
             session.SessionDate,
@@ -519,7 +572,7 @@ public sealed class EfReviewRepository : IReviewRepository
             ToStatus(session.Status),
             itemDtos.Length,
             itemDtos.Count(item => item.IsReviewed),
-            itemDtos.FirstOrDefault(item => !item.IsReviewed)?.Position,
+            currentItemIndex >= 0 ? currentItemIndex : null,
             itemDtos);
     }
 

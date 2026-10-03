@@ -28,6 +28,7 @@ public sealed record PracticeSessionSummaryDto(
     Guid Id,
     Guid UserId,
     Guid PageId,
+    string PageName,
     string Mode,
     int TotalCards,
     int CorrectCards,

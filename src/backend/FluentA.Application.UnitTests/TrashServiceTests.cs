@@ -1,7 +1,7 @@
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.BoundedContexts.Review;
-using FluentA.Domain.BoundedContexts.Review.Entities;
+using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Enums;
 using FluentA.Domain.BoundedContexts.Trash.Entities;
@@ -68,47 +68,12 @@ public sealed class TrashServiceTests
         Assert.True(moved.IsSuccess);
     }
 
-    [Fact]
-    public async Task LevelFiveTrash_RestoreStartsAtLevelZeroTomorrow_AndPermanentDeleteKeepsSourceWord()
-    {
-        var userId = Guid.NewGuid();
-        var wordId = Guid.NewGuid();
-        var state = WordReviewState.CreateLevelZero(userId, wordId, new DateOnly(2026, 7, 1));
-        state.ApplyResult(5, new DateOnly(2026, 7, 29), lapseCountAfter: 2, reviewedOn: new DateOnly(2026, 7, 28));
-        var review = new FakeLevelFiveTrashRepository(state, "resilient", "English / Unit 1");
-        var participant = new LevelFiveTrashParticipant(review);
-        var movedAt = new DateTime(2026, 7, 28, 18, 0, 0, DateTimeKind.Utc);
-
-        var moved = await participant.MoveToTrashAsync(userId, wordId, movedAt, TimeSpan.FromDays(30));
-
-        Assert.True(moved.IsSuccess);
-        Assert.Equal(WordReviewStatus.Inactive, state.Status);
-        Assert.Equal(5, state.Level);
-        var restored = await participant.RestoreAsync(
-            moved.Value!,
-            movedAt,
-            TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"));
-
-        Assert.True(restored);
-        Assert.True(review.SourceWordStillExists);
-        Assert.Equal(WordReviewStatus.Active, state.Status);
-        Assert.Equal(0, state.Level);
-        Assert.Equal(new DateOnly(2026, 7, 30), state.NextReviewDate);
-        Assert.Equal(2, state.LapseCount);
-        Assert.Null(state.LastReviewedAt);
-
-        state.ApplyResult(5, new DateOnly(2026, 8, 1), lapseCountAfter: 2, reviewedOn: new DateOnly(2026, 7, 31));
-        var trashedAgain = await participant.MoveToTrashAsync(userId, wordId, movedAt, TimeSpan.FromDays(30));
-        var deleted = await participant.PermanentlyDeleteAsync(trashedAgain.Value!, movedAt);
-
-        Assert.True(deleted);
-        Assert.True(review.SourceWordStillExists);
-        Assert.Null(review.State);
-        Assert.True(review.ProgressDeleted);
-    }
-
     private sealed class InlineTrashTransaction : ITrashTransaction
     {
+        public Task<OperationResult<T>> ExecuteOperationAsync<T>(
+            Func<CancellationToken, Task<OperationResult<T>>> action,
+            CancellationToken cancellationToken = default) => action(cancellationToken);
+
         public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default) => action(cancellationToken);
     }
 
@@ -151,46 +116,6 @@ public sealed class TrashServiceTests
             Entries.Remove(entry);
             return Task.CompletedTask;
         }
-    }
-
-    private sealed class FakeLevelFiveTrashRepository : ILevelFiveTrashRepository
-    {
-        private readonly string _word;
-        private readonly string _location;
-
-        public FakeLevelFiveTrashRepository(WordReviewState state, string word, string location)
-        {
-            State = state;
-            _word = word;
-            _location = location;
-        }
-
-        public WordReviewState? State { get; private set; }
-        public bool SourceWordStillExists { get; } = true;
-        public bool ProgressDeleted { get; private set; }
-
-        public Task<LevelFiveTrashSource?> GetActiveAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(State is { Status: WordReviewStatus.Active, Level: 5 } state && state.UserId == userId && state.WordId == wordId
-                ? new LevelFiveTrashSource(state, _word, _location)
-                : null);
-
-        public Task<WordReviewState?> GetTrashedAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(State is { Status: WordReviewStatus.Inactive, Level: 5 } state && state.UserId == userId && state.WordId == wordId
-                ? state
-                : null);
-
-        public Task DeleteProgressAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
-        {
-            if (State is { } state && state.UserId == userId && state.WordId == wordId)
-            {
-                State = null;
-                ProgressDeleted = true;
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeTodoRepository(params TodoItem[] initial) : ITodoRepository

@@ -1,4 +1,3 @@
-using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
 using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
@@ -9,17 +8,12 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 public sealed class VocabularyService : IVocabularyService
 {
     private readonly IVocabularyRepository _repository;
-    private readonly IVocabularyReviewCleanupPort _reviewCleanup;
-    private readonly ITrashService? _trashService;
+    private readonly ITrashService _trashService;
 
-    public VocabularyService(
-        IVocabularyRepository repository,
-        IVocabularyReviewCleanupPort? reviewCleanup = null,
-        ITrashService? trashService = null)
+    public VocabularyService(IVocabularyRepository repository, ITrashService trashService)
     {
-        _repository = repository;
-        _reviewCleanup = reviewCleanup ?? NullVocabularyReviewCleanupPort.Instance;
-        _trashService = trashService;
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _trashService = trashService ?? throw new ArgumentNullException(nameof(trashService));
     }
 
     public async Task<OperationResult<IReadOnlyList<BoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -46,11 +40,14 @@ public sealed class VocabularyService : IVocabularyService
                 VocabularyRequestValidator.GetHiddenOptionalColumns(request.IncludedOptionalColumns),
                 VocabularyRequestValidator.FixedColumnOrder,
                 new Dictionary<string, int>());
-            await _repository.AddBoardWithPreferencesAsync(board, preferences, cancellationToken);
+            await _repository.AddBoardAsync(board, cancellationToken);
+            await _repository.AddBoardPreferenceAsync(preferences, cancellationToken);
+            await _repository.SaveChangesAsync(cancellationToken);
             return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, preferences));
         }
 
         await _repository.AddBoardAsync(board, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, null));
     }
 
@@ -98,38 +95,29 @@ public sealed class VocabularyService : IVocabularyService
             else
             {
                 var current = VocabularyDtoMapper.ToPreferences(preference);
-                preference.Update(hiddenColumns, current.ColumnOrder, current.ColumnWidths);
+                var newlyVisible = current.ColumnOrder
+                    .Where(key => current.HiddenColumns.Contains(key) && !hiddenColumns.Contains(key))
+                    .ToArray();
+                var order = current.ColumnOrder.Where(key => !newlyVisible.Contains(key)).Concat(newlyVisible);
+                preference.Update(hiddenColumns, order, current.ColumnWidths);
                 await _repository.UpdateBoardPreferenceAsync(preference, cancellationToken);
             }
         }
 
         await _repository.UpdateBoardAsync(board, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         var preferences = await _repository.GetBoardPreferenceAsync(userId, boardId, cancellationToken);
         return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, preferences));
     }
 
     public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null) return await _trashService.TrashVocabularyAsync(userId, boardId, cancellationToken);
-        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
-        if (board is null)
+        if (await _repository.GetBoardAsync(userId, boardId, cancellationToken) is null)
         {
             return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
         }
 
-        var activePages = board.Pages.Where(page => page.DeletedAt is null).ToList();
-        var words = new List<VocabWord>();
-        foreach (var page in activePages)
-        {
-            var pageWords = await _repository.ListWordsAsync(userId, page.Id, cancellationToken);
-            words.AddRange(pageWords);
-        }
-
-        await _repository.SoftDeleteBoardAsync(board, DateTime.UtcNow, cancellationToken);
-        var wordIds = words.Select(word => word.Id).ToList();
-        await _reviewCleanup.RemoveWordProgressAsync(wordIds, cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Vocabulary", board.Id, board.Name, "Vocabulary", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
+        return await _trashService.TrashVocabularyAsync(userId, boardId, cancellationToken);
     }
 
     public async Task<OperationResult<PageDto>> CreatePageAsync(Guid userId, Guid boardId, CreatePageRequest request, CancellationToken cancellationToken = default)
@@ -174,19 +162,12 @@ public sealed class VocabularyService : IVocabularyService
 
     public async Task<OperationResult<TrashEntryDto>> DeletePageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null) return await _trashService.TrashVocabularyAsync(userId, pageId, cancellationToken);
-        var page = await _repository.GetPageAsync(userId, pageId, cancellationToken);
-        if (page is null)
+        if (await _repository.GetPageAsync(userId, pageId, cancellationToken) is null)
         {
             return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
         }
 
-        var words = await _repository.ListWordsAsync(userId, pageId, cancellationToken);
-        await _repository.SoftDeletePageAsync(page, DateTime.UtcNow, cancellationToken);
-        var wordIds = words.Select(word => word.Id).ToList();
-        await _reviewCleanup.RemoveWordProgressAsync(wordIds, cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Vocabulary", page.Id, page.Name, "Vocabulary", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
+        return await _trashService.TrashVocabularyAsync(userId, pageId, cancellationToken);
     }
 
     public async Task<OperationResult<IReadOnlyList<WordDto>>> ListWordsAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
@@ -272,17 +253,12 @@ public sealed class VocabularyService : IVocabularyService
 
     public async Task<OperationResult<TrashEntryDto>> DeleteWordAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null) return await _trashService.TrashVocabularyAsync(userId, wordId, cancellationToken);
-        var word = await _repository.GetWordAsync(userId, wordId, cancellationToken);
-        if (word is null)
+        if (await _repository.GetWordAsync(userId, wordId, cancellationToken) is null)
         {
             return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
         }
 
-        await _repository.SoftDeleteWordAsync(word, DateTime.UtcNow, cancellationToken);
-        await _reviewCleanup.RemoveWordProgressAsync([word.Id], cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Vocabulary", word.Id, word.Word, "Vocabulary", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
+        return await _trashService.TrashVocabularyAsync(userId, wordId, cancellationToken);
     }
 
     public async Task<OperationResult<BoardPreferencesDto>> UpdateBoardPreferencesAsync(Guid userId, Guid boardId, UpdateBoardPreferencesRequest request, CancellationToken cancellationToken = default)
@@ -307,7 +283,9 @@ public sealed class VocabularyService : IVocabularyService
         }
         else
         {
-            preference.Update(request.HiddenColumns, request.ColumnOrder, request.ColumnWidths);
+            var newlyVisible = preference.HiddenColumns.Where(key => !request.HiddenColumns.Contains(key)).ToArray();
+            var order = request.ColumnOrder.Where(key => !newlyVisible.Contains(key)).Concat(newlyVisible);
+            preference.Update(request.HiddenColumns, order, request.ColumnWidths);
             await _repository.UpdateBoardPreferenceAsync(preference, cancellationToken);
         }
 

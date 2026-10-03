@@ -473,6 +473,11 @@ public sealed partial class EfPracticeRepository
             return Succeeded(BuildSessionDto(session, items, currentActiveIds));
         }
 
+        if (session.Status == PracticeSessionStatus.Abandoned)
+        {
+            return Failed<PracticeSessionDto>(PracticeRepositoryOperationStatus.Conflict);
+        }
+
         if (items.Length == 0
             || session.CurrentItemIndex < items.Length
             || items.Any(item => !item.IsCompleted))
@@ -493,6 +498,7 @@ public sealed partial class EfPracticeRepository
             summary = PracticeSessionSummary.Create(
                 session.UserId,
                 session.PageId,
+                session.PageName,
                 PracticeMode.FixedSequence,
                 items.Length,
                 correctCount,
@@ -503,6 +509,7 @@ public sealed partial class EfPracticeRepository
         else
         {
             summary.UpdateCompletion(
+                session.PageName,
                 PracticeMode.FixedSequence,
                 items.Length,
                 correctCount,
@@ -665,6 +672,7 @@ public sealed partial class EfPracticeRepository
     {
         PracticeSessionStatus.Active => "active",
         PracticeSessionStatus.Completed => "completed",
+        PracticeSessionStatus.Abandoned => "abandoned",
         _ => throw new InvalidOperationException("Unknown practice session status."),
     };
 

@@ -1,6 +1,5 @@
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
-using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -32,15 +31,6 @@ public sealed class PracticeSessionConfiguration : IEntityTypeConfiguration<Prac
             .WithMany()
             .HasForeignKey(session => session.UserId)
             .OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<VocabPage>()
-            .WithMany()
-            .HasForeignKey(session => session.PageId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<VocabBoard>()
-            .WithMany()
-            .HasForeignKey(session => session.BoardId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasIndex(session => new { session.UserId, session.StartedAt });
         builder.HasIndex(session => new { session.PageId, session.StartedAt });
     }

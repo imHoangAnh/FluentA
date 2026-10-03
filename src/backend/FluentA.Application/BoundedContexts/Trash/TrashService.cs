@@ -1,5 +1,4 @@
 using FluentA.Application.Common;
-using FluentA.Application.BoundedContexts.Review;
 using FluentA.Domain.BoundedContexts.Trash.Entities;
 using FluentA.Domain.BoundedContexts.Trash.Enums;
 
@@ -32,45 +31,6 @@ public sealed class TrashService : ITrashService
 
     public Task<OperationResult<TrashEntryDto>> TrashVocabularyAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default) =>
         MoveToTrashAsync(userId, TrashEntityKind.Vocabulary, entityId, cancellationToken);
-
-    public Task<OperationResult<TrashEntryDto>> TrashLevelFiveAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default) =>
-        MoveToTrashAsync(userId, TrashEntityKind.LevelFive, wordId, cancellationToken);
-
-    public async Task<OperationResult<IReadOnlyList<TrashEntryDto>>> TrashLevelFiveBatchAsync(
-        Guid userId,
-        IReadOnlyList<Guid> wordIds,
-        CancellationToken cancellationToken = default)
-    {
-        var ids = wordIds.Distinct().ToArray();
-        if (ids.Length == 0 || ids.Length > 100 || ids.Any(id => id == Guid.Empty))
-        {
-            return OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(TrashError.Validation());
-        }
-
-        var participant = FindParticipant(TrashEntityKind.LevelFive);
-        if (participant is null)
-        {
-            return OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(TrashError.NotFound());
-        }
-
-        return await _transaction.ExecuteAsync(async token =>
-        {
-            var entries = new List<TrashEntryDto>(ids.Length);
-            foreach (var wordId in ids)
-            {
-                var result = await participant.MoveToTrashAsync(userId, wordId, DateTime.UtcNow, Retention, token);
-                if (!result.IsSuccess)
-                {
-                    return OperationResult<IReadOnlyList<TrashEntryDto>>.Failure(result.Error!);
-                }
-
-                await _trash.AddAsync(result.Value!, token);
-                entries.Add(ToDto(result.Value!));
-            }
-
-            return OperationResult<IReadOnlyList<TrashEntryDto>>.Success(entries);
-        }, cancellationToken);
-    }
 
     public Task<OperationResult<TrashEntryDto>> TrashCountdownAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default) =>
         MoveToTrashAsync(userId, TrashEntityKind.Countdown, countdownId, cancellationToken);
@@ -177,7 +137,7 @@ public sealed class TrashService : ITrashService
 
     private Task<OperationResult<bool>> RestoreOrDeleteAsync(Guid userId, Guid entryId, bool restore, string? timeZoneId, CancellationToken cancellationToken)
     {
-        return _transaction.ExecuteAsync(async token =>
+        return _transaction.ExecuteOperationAsync(async token =>
         {
             var claim = restore ? TrashEntryState.Restoring : TrashEntryState.Purging;
             var entry = await _trash.ClaimOwnedAsync(userId, entryId, claim, DateTime.UtcNow, token);
@@ -188,15 +148,8 @@ public sealed class TrashService : ITrashService
 
             if (restore)
             {
-                var timeZone = ResolveRestoreTimeZone(entry.EntityKind, timeZoneId);
-                if (entry.EntityKind == TrashEntityKind.LevelFive && timeZone is null)
-                {
-                    entry.Reactivate(DateTime.UtcNow);
-                    await _trash.UpdateAsync(entry, token);
-                    return OperationResult<bool>.Failure(TrashError.Validation());
-                }
                 var participant = FindParticipant(entry.EntityKind);
-                if (participant is null || !await participant.RestoreAsync(entry, DateTime.UtcNow, timeZone, token))
+                if (participant is null || !await participant.RestoreAsync(entry, DateTime.UtcNow, null, token))
                 {
                     entry.Reactivate(DateTime.UtcNow);
                     await _trash.UpdateAsync(entry, token);
@@ -222,7 +175,7 @@ public sealed class TrashService : ITrashService
             return OperationResult<TrashEntryDto>.Failure(TrashError.NotFound());
         }
 
-        return await _transaction.ExecuteAsync(async token =>
+        return await _transaction.ExecuteOperationAsync(async token =>
         {
             var result = await participant.MoveToTrashAsync(userId, entityId, DateTime.UtcNow, Retention, token);
             if (!result.IsSuccess)
@@ -270,16 +223,6 @@ public sealed class TrashService : ITrashService
 
     private ITrashParticipant? FindParticipant(TrashEntityKind entityKind) =>
         _participants.GetValueOrDefault(entityKind);
-
-    private static TimeZoneInfo? ResolveRestoreTimeZone(TrashEntityKind entityKind, string? timeZoneId)
-    {
-        if (entityKind != TrashEntityKind.LevelFive)
-        {
-            return null;
-        }
-
-        return ReviewTime.TryFindTimeZone(timeZoneId, out var timeZone) ? timeZone : null;
-    }
 
     private static bool TryParseKind(string? value, out TrashEntityKind? kind)
     {
