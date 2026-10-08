@@ -52,5 +52,3 @@ export const shellSettingsNavigation: ShellNavigationItem = {
   label: 'Settings',
   icon: Settings,
 }
-
-export const shellNotificationsPath = '/notifications'

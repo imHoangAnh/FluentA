@@ -122,10 +122,6 @@ export function PomodoroPage() {
       onSuccess: () => {
         const audio = new Audio('data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAACA////gP///4D///+A////')
         void audio.play().catch(() => undefined)
-        if ('Notification' in window) {
-          if (Notification.permission === 'granted') new Notification('Pomodoro phase complete')
-          else if (Notification.permission === 'default') void Notification.requestPermission()
-        }
       },
     })
   }, [completeTimer, current, shownSeconds, timerCommandPending])

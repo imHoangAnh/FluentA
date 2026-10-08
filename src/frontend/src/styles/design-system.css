@@ -5363,27 +5363,6 @@
   margin: 0;
 }
 
-.pomodoro-header-actions .notification-icon {
-  position: relative;
-  color: var(--ds-muted-foreground);
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.pomodoro-header-actions .notification-icon:hover {
-  color: var(--ds-primary);
-}
-
-.notification-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: #ef4444;
-  border-radius: 50%;
-}
-
 .pomodoro-workspace-canvas {
   flex-grow: 1;
   padding: 0;

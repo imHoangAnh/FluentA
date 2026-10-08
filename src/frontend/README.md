@@ -85,7 +85,6 @@ Output production được tạo trong thư mục `dist/`.
    - `/todo`, `/habits`, `/countdowns`: quản lý kế hoạch cá nhân.
    - `/project`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
    - `/journal`, `/notes`: lưu nhật ký và ghi chú.
-   - `/notifications`: xem thông báo.
    - `/settings`: cập nhật hồ sơ và thiết lập học tập.
 4. Khi phát triển giao diện, đặt code theo feature trong `src/features` và chỉ
    đặt thành phần dùng chung thực sự trong `src/shared`.

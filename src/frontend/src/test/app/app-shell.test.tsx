@@ -13,7 +13,6 @@ const shellEnvironment = {
   logout: vi.fn(async () => undefined),
   navigationSections: [{ label: 'Main', items: [{ to: '/', label: 'Home', icon: Home, end: true }] }],
   settingsNavigation: { to: '/settings', label: 'Settings', icon: Settings },
-  notificationsPath: '/notifications',
 }
 
 function routesWithoutShellMetadata(routes: RouteObject[], inherited = false, parent = 'protected'): string[] {
@@ -40,7 +39,6 @@ describe('AppShell environment', () => {
           logout,
           navigationSections: [{ label: 'Main', items: [{ to: '/', label: 'Home', icon: Home, end: true }] }],
           settingsNavigation: { to: '/settings', label: 'Settings', icon: Settings },
-          notificationsPath: '/notifications',
         }}>
           <AppShell title="Test page"><p>Content</p></AppShell>
         </ShellEnvironmentProvider>
@@ -54,9 +52,9 @@ describe('AppShell environment', () => {
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Test page' })).toHaveClass('sr-only')
 
-    const applicationLinks = screen.getAllByRole('link')
-    expect(applicationLinks.indexOf(screen.getByRole('link', { name: 'Notifications' })))
-      .toBeLessThan(applicationLinks.indexOf(screen.getByRole('link', { name: 'Settings' })))
+    expect(screen.queryByRole('link', { name: 'Notifications' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
 
     expect(screen.queryByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).not.toBeInTheDocument()
     expect(screen.getByRole('tooltip')).toHaveTextContent('Log out')

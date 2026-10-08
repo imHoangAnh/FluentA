@@ -70,10 +70,12 @@ public sealed class EfHabitRepositorySoftDeleteTests
             Assert.Equal(originalEntries[index].UpdatedAt, entries[index].UpdatedAt);
             Assert.Null(entries[index].DeletedAt);
         }
-        Assert.Empty(await verify.Notifications.ToListAsync());
-
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
+        await using var notificationTableCheck = connection.CreateCommand();
+        notificationTableCheck.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'notifications')";
+        Assert.False((bool)(await notificationTableCheck.ExecuteScalarAsync())!);
+
         await using var schemaCheck = connection.CreateCommand();
         schemaCheck.CommandText = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'habits'";
         await using var reader = await schemaCheck.ExecuteReaderAsync();

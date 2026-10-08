@@ -1,4 +1,3 @@
-import { Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/shared/lib/utils'
 import { useShellEnvironment } from '../ShellEnvironment'
@@ -14,12 +13,9 @@ export function AppSidebar() {
     avatarImageUrl,
     logout,
     navigationSections,
-    notificationsMenu,
-    notificationsPath,
     settingsNavigation,
   } = useShellEnvironment()
   const SettingsIcon = settingsNavigation.icon
-  const notificationsActive = location.pathname === notificationsPath || location.pathname.startsWith(`${notificationsPath}/`)
   const settingsActive = location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`)
 
   return (
@@ -34,17 +30,6 @@ export function AppSidebar() {
       <SidebarNavigation navigationSections={navigationSections} pathname={location.pathname} />
 
       <div className="mt-4 grid gap-2 border-t border-border pt-4">
-        {notificationsMenu ? notificationsMenu(notificationsActive) : (
-          <Link
-            to={notificationsPath}
-            aria-label="Notifications"
-            aria-current={notificationsActive ? 'page' : undefined}
-            className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground', notificationsActive && 'bg-secondary text-secondary-foreground', 'max-[1100px]:justify-center max-[1100px]:px-0')}
-          >
-            <Bell className="size-[18px]" aria-hidden="true" />
-            <span className="max-[1100px]:sr-only">Notifications</span>
-          </Link>
-        )}
         <Link
           to={settingsNavigation.to}
           aria-label="Settings"

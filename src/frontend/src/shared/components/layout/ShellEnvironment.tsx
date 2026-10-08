@@ -29,8 +29,6 @@ export type ShellEnvironmentValue = {
   logout: () => Promise<void>
   navigationSections: ShellNavigationSection[]
   settingsNavigation: ShellNavigationItem
-  notificationsPath: string
-  notificationsMenu?: (active: boolean) => ReactNode
 }
 
 const ShellEnvironmentContext = createContext<ShellEnvironmentValue | null>(null)

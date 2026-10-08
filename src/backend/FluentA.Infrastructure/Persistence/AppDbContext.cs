@@ -4,7 +4,6 @@ using FluentA.Infrastructure.Persistence.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Domain.BoundedContexts.Note.Entities;
-using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
@@ -14,7 +13,6 @@ using Microsoft.EntityFrameworkCore;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
 using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
 using HabitEntryEntity = FluentA.Domain.BoundedContexts.Habit.Entities.HabitEntry;
-using NotificationEntity = FluentA.Domain.BoundedContexts.Notification.Entities.Notification;
 
 namespace FluentA.Infrastructure.Persistence;
 
@@ -55,7 +53,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<ProjectCard> ProjectCards => Set<ProjectCard>();
     public DbSet<PomodoroConfig> PomodoroConfigs => Set<PomodoroConfig>();
     public DbSet<PomodoroSession> PomodoroSessions => Set<PomodoroSession>();
-    public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

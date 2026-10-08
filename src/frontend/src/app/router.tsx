@@ -1,7 +1,6 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, type RouteObject } from 'react-router-dom'
 import { authRoutes } from '@/features/auth'
 import { dashboardRoutes } from '@/features/dashboard'
-import { notificationsRoutes } from '@/features/notifications'
 import { settingsRoutes } from '@/features/settings'
 import { vocabularyRoutes } from '@/features/vocabulary'
 import { practiceRoutes } from '@/features/practice'
@@ -27,7 +26,6 @@ const publicRoutes = authRoutes.map((route) => ({
 export const protectedAppRoutes: RouteObject[] = [
   ...dashboardRoutes,
   ...settingsRoutes,
-  ...notificationsRoutes,
   ...vocabularyRoutes,
   ...practiceRoutes,
   ...reviewRoutes,

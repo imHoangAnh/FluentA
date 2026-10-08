@@ -30,7 +30,7 @@ default AWS credential chain.
 - Synchronized flashcards, practice modes, review sessions, and spaced
   repetition scheduling.
 - Daily and weekly todos, habit tracking, countdowns, Project, and Pomodoro.
-- Rich-text journal entries, notes, notifications, and profile settings.
+- Rich-text journal entries, notes, and profile settings.
 - Email/password authentication, account recovery, and Google OAuth.
 - Realtime updates across authenticated browser sessions.
 
