@@ -128,9 +128,9 @@ credential chain.
 
 ### 5.2. Realtime
 
-Client đã xác thực kết nối tới SignalR hub `/hubs/sync`. Hub thông báo các thay
-đổi cần đồng bộ cho todo, notification, Project và Pomodoro giữa các
-phiên trình duyệt.
+Client đã xác thực kết nối tới SignalR hub `/hubs/sync`. Hub thông báo thay đổi
+cho notification và Pomodoro giữa các phiên trình duyệt. Project không còn dùng
+realtime; thao tác thay đổi dữ liệu cập nhật trang hiện tại qua query refresh.
 
 ### 5.3. Background job
 

@@ -10,12 +10,10 @@ public sealed class ProjectService : IProjectService
 {
     private const string DateFormat = "yyyy-MM-dd";
     private readonly IProjectRepository _repository;
-    private readonly IProjectSyncNotifier _syncNotifier;
 
-    public ProjectService(IProjectRepository repository, IProjectSyncNotifier? syncNotifier = null)
+    public ProjectService(IProjectRepository repository)
     {
         _repository = repository;
-        _syncNotifier = syncNotifier ?? NullProjectSyncNotifier.Instance;
     }
 
     public async Task<OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -239,10 +237,8 @@ public sealed class ProjectService : IProjectService
             return OperationResult<ProjectCardDto>.Failure(ProjectError.NotFound());
         }
 
-        var fromColumnId = card.ColumnId;
         card.MoveToColumn(request.ColumnId, request.SortOrder);
         await _repository.UpdateCardAsync(card, cancellationToken);
-        await _syncNotifier.CardMovedAsync(userId, targetColumn.BoardId, card.Id, fromColumnId, request.ColumnId, request.SortOrder, cancellationToken);
         return OperationResult<ProjectCardDto>.Success(ProjectDtoMapper.ToCardDto(card));
     }
 
@@ -259,6 +255,4 @@ public sealed class ProjectService : IProjectService
         await _repository.UpdateCardAsync(card, cancellationToken);
         return OperationResult<bool>.Success(true);
     }
-
-
 }

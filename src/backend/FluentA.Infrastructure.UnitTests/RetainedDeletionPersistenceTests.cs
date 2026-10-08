@@ -162,7 +162,7 @@ public sealed class RetainedDeletionPersistenceTests
             var assets = new EfAssetRepository(db);
             var notes = new NoteService(new EfNoteRepository(db), new NoteContentProcessor(assets), assets, new UnusedStorage());
             var journals = new JournalService(new EfJournalRepository(db), new JournalContentProcessor());
-            var projects = new ProjectService(new EfProjectRepository(db), new UnusedNotifier());
+            var projects = new ProjectService(new EfProjectRepository(db));
             Assert.False((await notes.DeleteBoardAsync(Guid.NewGuid(), noteId)).IsSuccess);
             Assert.False((await journals.DeleteAsync(Guid.NewGuid(), journalId)).IsSuccess);
             Assert.False((await projects.DeleteBoardAsync(Guid.NewGuid(), projectId)).IsSuccess);
@@ -247,11 +247,6 @@ public sealed class RetainedDeletionPersistenceTests
         public Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
-    private sealed class UnusedNotifier : IProjectSyncNotifier
-    {
-        public Task CardMovedAsync(Guid userId, Guid boardId, Guid cardId, Guid fromColumnId, Guid toColumnId, int sortOrder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    }
-
     private sealed class DeletionPostgresTheoryAttribute : TheoryAttribute
     {
         public DeletionPostgresTheoryAttribute() { if (string.IsNullOrWhiteSpace(DeletionDatabase.RawConnectionString)) Skip = "Set FLUENTA_DELETION_VALIDATION_POSTGRES for isolated PostgreSQL proof."; }
