@@ -18,11 +18,6 @@ public sealed class TrashService : ITrashService
         _transaction = transaction;
     }
 
-    public Task<OperationResult<TrashEntryDto>> TrashTodoAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
-    {
-        return MoveToTrashAsync(userId, TrashEntityKind.Todo, todoId, cancellationToken);
-    }
-
     public Task<OperationResult<TrashEntryDto>> TrashNoteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default) =>
         MoveToTrashAsync(userId, TrashEntityKind.Note, boardId, cancellationToken);
 

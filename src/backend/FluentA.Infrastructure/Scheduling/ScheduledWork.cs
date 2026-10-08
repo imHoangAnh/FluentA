@@ -6,9 +6,9 @@ namespace FluentA.Infrastructure.Scheduling;
 /// A single business occurrence that the polling service may dispatch.
 /// </summary>
 /// <remarks>
-/// The business database is authoritative. The revision and occurrence values
-/// The execution adapter rechecks the current business tuple before sending
-/// anything. Revision is retained for compatibility with existing callers.
+/// The business database is authoritative. The execution adapter rechecks
+/// the current business tuple before sending anything. Revision is retained
+/// for compatibility with existing callers.
 /// </remarks>
 public sealed record ScheduledOccurrence(
     ScheduledOccurrenceKind Kind,
@@ -26,7 +26,6 @@ public sealed record ScheduledOccurrence(
 
 public enum ScheduledOccurrenceKind
 {
-    TodoReminder = 1,
     HabitReminder = 3,
 }
 

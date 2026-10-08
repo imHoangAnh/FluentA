@@ -1,6 +1,5 @@
 using FluentA.Application.BoundedContexts.Notification;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
-using FluentA.Domain.BoundedContexts.Todo.Services;
 using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Scheduling;
 using Microsoft.EntityFrameworkCore;
@@ -13,8 +12,8 @@ namespace FluentA.Infrastructure.BackgroundJobs;
 /// Executes one persisted productivity occurrence.
 ///
 /// The polling service finds due work. This adapter owns the business
-/// revalidation at delivery time: a changed reminder, a completed item, or an
-/// expired Vietnam calendar day makes the trigger a no-op. Every successful
+/// revalidation at delivery time: a changed habit reminder or an expired
+/// Vietnam calendar day makes the trigger a no-op. Every successful
 /// claim and notification insert is committed in one
 /// transaction while the business row is locked.
 /// </summary>
@@ -40,9 +39,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
     {
         switch (occurrence.Kind)
         {
-            case ScheduledOccurrenceKind.TodoReminder:
-                await ExecuteTodoReminderAsync(occurrence.SourceId, occurrence.ScheduledAtUtcNormalized, cancellationToken);
-                break;
             case ScheduledOccurrenceKind.HabitReminder:
                 await ExecuteHabitReminderAsync(occurrence.SourceId, occurrence.OccurrenceDateUtc,
                     occurrence.ScheduledAtUtcNormalized, cancellationToken);
@@ -50,70 +46,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
             default:
                 throw new ArgumentOutOfRangeException(nameof(occurrence));
         }
-    }
-
-    /// <summary>
-    /// Executes a todo reminder occurrence using the current clock.
-    /// </summary>
-    public Task ExecuteTodoReminderAsync(
-        Guid todoId,
-        DateTime scheduledAtUtc,
-        CancellationToken cancellationToken = default) =>
-        ExecuteTodoReminderAsync(todoId, scheduledAtUtc, DateTime.UtcNow, cancellationToken);
-
-    /// <summary>
-    /// Executes a todo reminder occurrence at an explicit instant.  The
-    /// explicit clock is intentionally public so the scheduler and tests can
-    /// prove missed-delivery behavior without relying on machine time.
-    /// </summary>
-    public async Task ExecuteTodoReminderAsync(
-        Guid todoId,
-        DateTime scheduledAtUtc,
-        DateTime nowUtc,
-        CancellationToken cancellationToken = default)
-    {
-        if (todoId == Guid.Empty || !IsUtc(scheduledAtUtc) || !IsUtc(nowUtc))
-        {
-            return;
-        }
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var item = await LockTodoAsync(todoId, cancellationToken);
-        if (item is null
-            || item.DeletedAt is not null
-            || item.IsCompleted
-            || item.ReminderSentAtUtc is not null
-            || item.ReminderScheduledAtUtc != scheduledAtUtc
-            || scheduledAtUtc > nowUtc)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return;
-        }
-
-        var deduplicationKey = ScheduledProductivityJobKeys.TodoReminder(item.Id, scheduledAtUtc);
-        var created = await AddNotificationIfMissingAsync(
-            item.UserId,
-            "TodoReminder",
-            "Todo reminder",
-            item.Title,
-            deduplicationKey,
-            $"/todo?taskId={item.Id}",
-            cancellationToken);
-
-        item.MarkReminderSent(nowUtc);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        if (created)
-        {
-            await NotifyChangedAsync(item.UserId, cancellationToken);
-        }
-
-        _logger.LogInformation(
-            "Todo reminder occurrence {TodoId} at {ScheduledAtUtc} was claimed; notificationCreated={NotificationCreated}.",
-            item.Id,
-            scheduledAtUtc,
-            created);
     }
 
     /// <summary>
@@ -284,20 +216,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
                 "Notification sync push failed for user {UserId}; the persisted notification remains authoritative.",
                 userId);
         }
-    }
-
-    private async Task<FluentA.Domain.BoundedContexts.Todo.Entities.TodoItem?> LockTodoAsync(
-        Guid todoId,
-        CancellationToken cancellationToken)
-    {
-        if (UsesPostgres())
-        {
-            return await _dbContext.TodoItems
-                .FromSqlInterpolated($"SELECT * FROM todo_items WHERE id = {todoId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-
-        return await _dbContext.TodoItems.SingleOrDefaultAsync(item => item.Id == todoId, cancellationToken);
     }
 
     private async Task<FluentA.Domain.BoundedContexts.Habit.Entities.Habit?> LockHabitAsync(

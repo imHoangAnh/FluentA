@@ -1,18 +1,7 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 export type TodoRepeatPattern = 'Daily' | 'Weekdays' | 'Weekly' | 'Monthly' | 'Yearly'
-
-export type TodoReminderInput = {
-  time: string
-  timeZoneId: string
-  scheduledAtUtc: string
-}
-
-export type TodoReminder = TodoReminderInput & {
-  sentAtUtc?: string | null
-}
 
 export type TodoItem = {
   id: string
@@ -23,11 +12,10 @@ export type TodoItem = {
   isCompleted: boolean
   isImportant: boolean
   repeatPattern?: TodoRepeatPattern | null
-  reminder?: TodoReminder | null
   completedAt?: string | null
   createdAt: string
   updatedAt: string
-  warningCode?: 'recurrence-next-retained' | 'reminder-cleared-after-date-change' | null
+  warningCode?: 'recurrence-next-retained' | null
 }
 
 export type CreateTodoInput = {
@@ -36,7 +24,6 @@ export type CreateTodoInput = {
   note?: string | null
   isImportant?: boolean
   repeatPattern?: TodoRepeatPattern | null
-  reminder?: TodoReminderInput | null
 }
 
 export type UpdateTodoInput = {
@@ -45,7 +32,6 @@ export type UpdateTodoInput = {
   isCompleted?: boolean
   isImportant?: boolean
   repeatPattern?: TodoRepeatPattern | null
-  reminder?: TodoReminderInput | null
   date?: string
   sortOrder?: number
 }
@@ -81,6 +67,5 @@ export async function duplicateTodo(id: string) {
 }
 
 export async function deleteTodo(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/todos/${id}`)
-  return response.data.data!
+  await apiClient.delete<ApiEnvelope<{ deleted: boolean }>>(`/todos/${id}`)
 }

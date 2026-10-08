@@ -347,10 +347,8 @@ public sealed class VocabularyServiceTests
                 Guid.NewGuid(), "Vocabulary", entityId, "Vocabulary", "", DateTime.UtcNow, DateTime.UtcNow.AddDays(30))));
         }
 
-        public Task<OperationResult<TrashEntryDto>> TrashTodoAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashNoteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashNotePageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<OperationResult<TrashEntryDto>> TrashCountdownAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashHabitAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashJournalAsync(Guid userId, Guid journalId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashProjectAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

@@ -40,7 +40,7 @@ describe('NotificationsPage', () => {
     vi.clearAllMocks()
     api.list.mockResolvedValue([{
       id: 'notification-1',
-      type: 'TodoReminder',
+      type: 'HabitReminder',
       title: 'Todo reminder',
       message: 'Review vocabulary',
       actionPath: '/todo?taskId=todo-1',
@@ -66,7 +66,7 @@ describe('NotificationsPage', () => {
   it('does not navigate to an unsafe stored action path', async () => {
     api.list.mockResolvedValueOnce([{
       id: 'notification-2',
-      type: 'TodoReminder',
+      type: 'HabitReminder',
       title: 'Unsafe reminder',
       message: 'Do not leave the app',
       actionPath: '//example.com/todo',

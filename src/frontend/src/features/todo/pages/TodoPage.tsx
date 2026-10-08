@@ -6,7 +6,6 @@ import { todayInAppTimeZone } from '@/shared/lib/timezone'
 import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import * as todoApi from '../api/todo.api'
 import { todoKeys } from '../api/todo.queries'
-import { restoreTrashEntry } from '@/features/trash'
 import { MyDayView } from '../components/MyDayView'
 import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
@@ -103,8 +102,6 @@ export function TodoPage() {
       queryClient.setQueryData(todoKeys.item(updated.id), updated)
       if (updated.warningCode === 'recurrence-next-retained') {
         toast.warning('The edited next occurrence was kept. Both tasks now exist.')
-      } else if (updated.warningCode === 'reminder-cleared-after-date-change') {
-        toast.warning('The task moved, but its reminder was cleared because that time is already past.')
       }
     },
     onError: (_error, _variables, context) => {
@@ -128,7 +125,7 @@ export function TodoPage() {
 
   const deleteTodo = useMutation({
     mutationFn: todoApi.deleteTodo,
-    onSuccess: async (entry, deletedId) => {
+    onSuccess: async (_result, deletedId) => {
       queryClient.setQueriesData<todoApi.TodoItem[]>({ queryKey: todoKeys.all }, (items = []) =>
         items.filter((item) => item.id !== deletedId),
       )
@@ -136,17 +133,7 @@ export function TodoPage() {
       queryClient.removeQueries({ queryKey: todoKeys.item(deletedId) })
       setDeletingTask(null)
       await refresh()
-      toast.success('Moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(refresh)
-              .then(() => toast.success('Task restored. Its reminder was not restored.'))
-              .catch(() => toast.error('Could not restore the task.'))
-          },
-        },
-      })
+      toast.success('Task deleted.')
     },
     onError: () => toast.error('Could not delete the task.'),
   })
@@ -305,7 +292,7 @@ export function TodoPage() {
         <AlertDialogContent>
           <AlertDialogTitle>Delete Task</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete <strong>"{deletingTask?.title}"</strong>? The task will be moved to Trash.
+            Delete <strong>"{deletingTask?.title}"</strong> from your Todo lists? Any future tasks already created from it will also disappear.
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancelButton disabled={deleteTodo.isPending}>Cancel</AlertDialogCancelButton>

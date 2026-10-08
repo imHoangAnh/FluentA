@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
-import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
+import { todayInAppTimeZone } from '@/shared/lib/timezone'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
 import { formatWeekRange, weekDates } from '../model/todo-date'
 import { TodoPage } from './TodoPage'
@@ -23,16 +23,6 @@ vi.mock('../api/todo.api', async (importOriginal) => ({
   ...api,
 }))
 
-vi.mock('../lib/todo-reminder', () => ({
-  createBrowserReminder: vi.fn((_date: string, time: string) => ({
-    reminder: {
-      time,
-      timeZoneId: APP_TIME_ZONE,
-      scheduledAtUtc: '2035-07-22T03:30:00.000Z',
-    },
-  })),
-}))
-
 let items: TodoItem[]
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
@@ -45,7 +35,6 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     isCompleted: false,
     isImportant: false,
     repeatPattern: null,
-    reminder: null,
     completedAt: null,
     createdAt: '2026-07-22T01:00:00Z',
     updatedAt: '2026-07-22T01:00:00Z',
@@ -97,15 +86,6 @@ describe('TodoPage My Day workspace', () => {
     })
     api.deleteTodo.mockImplementation(async (id: string) => {
       items = items.filter((item) => item.id !== id)
-      return {
-        id: 'trash-todo-1',
-        entityKind: 'Todo',
-        entityId: id,
-        displayName: 'Review vocabulary',
-        originalLocation: todayInAppTimeZone(),
-        trashedAt: '2026-07-28T00:00:00Z',
-        purgeAfterAt: '2026-08-27T00:00:00Z',
-      }
     })
   })
 
@@ -195,26 +175,6 @@ describe('TodoPage My Day workspace', () => {
     await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
   })
 
-  it('sets and clears one optional time-only reminder from details', async () => {
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reminder: Not set' }))
-    fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '10:30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', {
-      reminder: {
-        time: '10:30',
-        timeZoneId: APP_TIME_ZONE,
-        scheduledAtUtc: '2035-07-22T03:30:00.000Z',
-      },
-    }))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Reminder: 10:30' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { reminder: null }))
-  })
-
   it('opens an owned deep-linked task outside My Day and handles unavailable ids safely', async () => {
     const outsideToday = todo({ id: 'outside-task', title: 'Next week task', date: '2035-07-29' })
     api.getTodo.mockResolvedValueOnce(outsideToday)
@@ -228,7 +188,7 @@ describe('TodoPage My Day workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This task is unavailable or no longer exists.')
   })
 
-  it('moves a task to Trash after confirming the delete dialog', async () => {
+  it('soft-deletes a task after confirming the delete dialog', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete task' }))
@@ -261,11 +221,6 @@ describe('TodoPage My Day workspace', () => {
       note: 'Only visible in details',
       isImportant: true,
       repeatPattern: 'Weekly',
-      reminder: {
-        time: '10:30',
-        timeZoneId: APP_TIME_ZONE,
-        scheduledAtUtc: '2035-07-22T03:30:00.000Z',
-      },
     })]
     const dates = weekDates(todayInAppTimeZone())
     renderPage()
@@ -291,7 +246,6 @@ describe('TodoPage My Day workspace', () => {
     expect(within(row).getByRole('button', { name: 'Remove importance from Review vocabulary' })).toBeInTheDocument()
     expect(within(row).queryByText('Only visible in details')).not.toBeInTheDocument()
     expect(within(row).queryByText('Weekly')).not.toBeInTheDocument()
-    expect(within(row).queryByText('10:30')).not.toBeInTheDocument()
 
     fireEvent.click(within(row).getByRole('button', { name: 'Review vocabulary' }))
     expect(await screen.findByLabelText('Details for Review vocabulary')).toBeInTheDocument()

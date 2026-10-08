@@ -1703,23 +1703,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("note");
 
-                    b.Property<DateTime?>("ReminderScheduledAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reminder_scheduled_at_utc");
-
-                    b.Property<DateTime?>("ReminderSentAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reminder_sent_at_utc");
-
-                    b.Property<TimeOnly?>("ReminderTime")
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("reminder_time");
-
-                    b.Property<string>("ReminderTimeZoneId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("reminder_time_zone_id");
-
                     b.Property<string>("RepeatPattern")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
@@ -1748,9 +1731,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("GeneratedFromTodoId")
                         .IsUnique()
                         .HasFilter("generated_from_todo_id IS NOT NULL AND deleted_at IS NULL");
-
-                    b.HasIndex("ReminderScheduledAtUtc")
-                        .HasFilter("reminder_scheduled_at_utc IS NOT NULL AND reminder_sent_at_utc IS NULL AND is_completed = FALSE AND deleted_at IS NULL");
 
                     b.HasIndex("UserId", "Date", "SortOrder");
 

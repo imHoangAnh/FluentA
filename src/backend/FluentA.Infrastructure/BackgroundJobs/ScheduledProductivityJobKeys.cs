@@ -14,9 +14,6 @@ internal static class ScheduledProductivityJobKeys
         throw new InvalidOperationException("The Vietnam timezone is not available on this host.");
     }
 
-    public static string TodoReminder(Guid todoId, DateTime scheduledAtUtc) =>
-        $"todo:{todoId}:reminder:{scheduledAtUtc.ToUniversalTime():yyyyMMddTHHmmssfffffffZ}";
-
     public static string HabitReminder(Guid habitId, DateTime vietnamDate) =>
         $"habit:{habitId}:{vietnamDate:yyyy-MM-dd}";
 

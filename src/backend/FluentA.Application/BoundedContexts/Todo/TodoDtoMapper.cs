@@ -7,7 +7,6 @@ namespace FluentA.Application.BoundedContexts.Todo;
 internal static class TodoDtoMapper
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const string TimeFormat = "HH:mm";
     public static TodoItemDto ToDto(TodoItem item, string? warningCode = null)
     {
         return new TodoItemDto(
@@ -19,15 +18,6 @@ internal static class TodoDtoMapper
             item.IsCompleted,
             item.IsImportant,
             item.RepeatPattern?.ToString(),
-            item.ReminderTime is not null
-                && item.ReminderTimeZoneId is not null
-                && item.ReminderScheduledAtUtc is not null
-                ? new TodoReminderDto(
-                    item.ReminderTime.Value.ToString(TimeFormat, CultureInfo.InvariantCulture),
-                    item.ReminderTimeZoneId,
-                    item.ReminderScheduledAtUtc.Value,
-                    item.ReminderSentAtUtc)
-                : null,
             item.CompletedAt,
             item.CreatedAt,
             item.UpdatedAt,

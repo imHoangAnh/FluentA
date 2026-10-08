@@ -4,7 +4,6 @@ using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.BoundedContexts.Vocabulary;
-using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Infrastructure.Persistence.Repositories.Trash;
 using FluentA.Infrastructure.Persistence.Transactions;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +16,6 @@ internal static class TrashServiceRegistrationExtensions
     {
         services.AddScoped<ITrashRepository, EfTrashRepository>();
         services.AddScoped<ITrashTransaction, EfTrashTransaction>();
-        services.AddScoped<ITrashParticipant, TodoTrashParticipant>();
         services.AddScoped<ITrashParticipant, NoteTrashParticipant>();
         services.AddScoped<ITrashParticipant, VocabularyTrashParticipant>();
         services.AddScoped<ITrashParticipant, HabitTrashParticipant>();

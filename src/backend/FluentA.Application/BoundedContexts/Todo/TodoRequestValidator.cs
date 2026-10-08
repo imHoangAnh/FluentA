@@ -1,20 +1,16 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
-using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Enums;
-using FluentA.Domain.BoundedContexts.Todo.Services;
 
 namespace FluentA.Application.BoundedContexts.Todo;
 
 internal static class TodoRequestValidator
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const string TimeFormat = "HH:mm";
     public static (
         Dictionary<string, string[]> Errors,
         DateTime Date,
-        TodoRepeatPattern? RepeatPattern,
-        ValidatedReminder? Reminder) ValidateCreate(CreateTodoItemRequest request)
+        TodoRepeatPattern? RepeatPattern) ValidateCreate(CreateTodoItemRequest request)
     {
         var errors = ValidateTitleAndNote(request.Title, request.Note);
         if (!TryParseDate(request.Date, "date", out var date, out var dateErrors))
@@ -23,22 +19,13 @@ internal static class TodoRequestValidator
         }
 
         var repeatPattern = ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors);
-        var reminder = errors.ContainsKey("date")
-            ? null
-            : ValidateReminder(request.Reminder, date, DateTime.UtcNow, errors);
-
-        return (errors, date, repeatPattern, reminder);
+        return (errors, date, repeatPattern);
     }
 
     public static (
         Dictionary<string, string[]> Errors,
         DateTime? Date,
-        TodoRepeatPattern? RepeatPattern,
-        ValidatedReminder? Reminder) ValidateUpdate(
-            UpdateTodoItemRequest request,
-            DateTime currentDate,
-            bool currentIsCompleted,
-            DateTime nowUtc)
+        TodoRepeatPattern? RepeatPattern) ValidateUpdate(UpdateTodoItemRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
@@ -76,76 +63,7 @@ internal static class TodoRequestValidator
         var repeatPattern = request.IsRepeatPatternSpecified
             ? ParseRepeatPattern(request.RepeatPattern, "repeatPattern", errors)
             : null;
-        var reminder = request.IsReminderSpecified && !errors.ContainsKey("date")
-            ? ValidateReminder(request.Reminder, parsedDate ?? currentDate, nowUtc, errors)
-            : null;
-        if (request.IsReminderSpecified
-            && request.Reminder is not null
-            && (request.IsCompleted ?? currentIsCompleted))
-        {
-            errors["reminder"] = ["Reopen the task before setting a reminder."];
-            reminder = null;
-        }
-
-        return (errors, parsedDate, repeatPattern, reminder);
-    }
-
-    private static ValidatedReminder? ValidateReminder(
-        TodoReminderRequest? request,
-        DateTime taskDate,
-        DateTime nowUtc,
-        Dictionary<string, string[]> errors)
-    {
-        if (request is null)
-        {
-            return null;
-        }
-
-        if (!TimeOnly.TryParseExact(request.Time, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
-        {
-            errors["reminder.time"] = ["Reminder time must use HH:mm format."];
-        }
-
-        TimeZoneInfo? timeZone = null;
-        var timeZoneId = request.TimeZoneId?.Trim() ?? string.Empty;
-        if (timeZoneId.Length is < 1 or > 100)
-        {
-            errors["reminder.timeZoneId"] = ["Reminder timezone id is required and must be at most 100 characters."];
-        }
-        else
-        {
-            try
-            {
-                timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
-            }
-            catch (InvalidTimeZoneException)
-            {
-                errors["reminder.timeZoneId"] = ["Reminder timezone id is not supported."];
-            }
-        }
-
-        if (request.ScheduledAtUtc.Kind != DateTimeKind.Utc)
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder scheduled instant must be UTC."];
-        }
-        else if (request.ScheduledAtUtc <= nowUtc)
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder must be scheduled in the future."];
-        }
-        else if (!errors.ContainsKey("reminder.time")
-            && timeZone is not null
-            && !TodoReminderSchedule.Matches(taskDate, time, request.ScheduledAtUtc, timeZone))
-        {
-            errors["reminder.scheduledAtUtc"] = ["Reminder date, time, timezone, and UTC instant do not match."];
-        }
-
-        return errors.Keys.Any(key => key.StartsWith("reminder.", StringComparison.Ordinal))
-            ? null
-            : new ValidatedReminder(time, timeZoneId, request.ScheduledAtUtc);
+        return (errors, parsedDate, repeatPattern);
     }
 
     private static Dictionary<string, string[]> ValidateTitleAndNote(string title, string? note)
@@ -202,5 +120,4 @@ internal static class TodoRequestValidator
 
         return parsed;
     }
-    internal sealed record ValidatedReminder(TimeOnly Time, string TimeZoneId, DateTime ScheduledAtUtc);
 }

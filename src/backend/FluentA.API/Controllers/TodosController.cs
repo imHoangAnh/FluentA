@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -85,13 +84,13 @@ public sealed class TodosController : ApiControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Moves an owned todo item and its already-created future occurrences to Trash.</summary>
+    /// <summary>Hides an owned todo and its already-created future occurrences.</summary>
     [HttpDelete("{todoId:guid}")]
     public async Task<IActionResult> Delete(Guid todoId, CancellationToken cancellationToken)
     {
         var result = await _todos.DeleteAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<bool>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

@@ -1,10 +1,8 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useEffect, useRef, useState } from 'react'
-import { Bell, Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
+import { Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
-import { formatVietnamTime } from '@/shared/lib/timezone'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
-import { createBrowserReminder } from '../lib/todo-reminder'
 
 const repeatOptions: Array<{ value: TodoRepeatPattern | null; label: string }> = [
   { value: null, label: 'Does not repeat' },
@@ -38,24 +36,12 @@ export function TodoDetailsEmptyState() {
   )
 }
 
-function reminderDisplayTime(item: TodoItem) {
-  if (!item.reminder) return ''
-  try {
-    return formatVietnamTime(item.reminder.scheduledAtUtc)
-  } catch {
-    return item.reminder.time
-  }
-}
-
 export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }: TodoDetailsPanelProps) {
   const [title, setTitle] = useState(item.title)
   const [note, setNote] = useState(item.note ?? '')
   const savedTitle = useRef(item.title)
   const savedNote = useRef(item.note ?? '')
   const titleInputRef = useRef<HTMLInputElement>(null)
-  const [reminderEditorOpen, setReminderEditorOpen] = useState(false)
-  const [reminderTime, setReminderTime] = useState(() => reminderDisplayTime(item))
-  const [reminderError, setReminderError] = useState<string | null>(null)
 
   useEffect(() => {
     const input = titleInputRef.current
@@ -104,33 +90,6 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
     }
   }
 
-  async function saveReminder() {
-    const result = createBrowserReminder(item.date, reminderTime)
-    if (result.error) {
-      setReminderError(result.error)
-      return
-    }
-
-    setReminderError(null)
-    try {
-      await onUpdate(item.id, { reminder: result.reminder })
-      setReminderEditorOpen(false)
-    } catch {
-      setReminderError('Could not save the reminder.')
-    }
-  }
-
-  async function clearReminder() {
-    setReminderError(null)
-    try {
-      await onUpdate(item.id, { reminder: null })
-      setReminderTime('')
-      setReminderEditorOpen(false)
-    } catch {
-      setReminderError('Could not clear the reminder.')
-    }
-  }
-
   return (
     <aside className="todo-details" aria-label={`Details for ${item.title}`} aria-busy={pending}>
 
@@ -176,51 +135,6 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
           </button>
         </div>
         <div className="todo-details__fields">
-          <button
-            className="todo-details__field"
-            type="button"
-            aria-label={`Reminder: ${item.reminder ? reminderDisplayTime(item) : 'Not set'}`}
-            aria-expanded={reminderEditorOpen}
-            disabled={pending}
-            onClick={() => {
-              setReminderTime(item.reminder ? reminderDisplayTime(item) : '')
-              setReminderEditorOpen((open) => !open)
-              setReminderError(null)
-            }}
-          >
-            <Bell aria-hidden="true" />
-            <span>
-              <small>Reminder</small>
-              <strong>{item.reminder ? reminderDisplayTime(item) : 'Not set'}</strong>
-            </span>
-            <ChevronRight aria-hidden="true" />
-          </button>
-          {reminderEditorOpen ? (
-            <div className="todo-details__reminder-editor">
-              <label htmlFor={`todo-reminder-${item.id}`}>Reminder time</label>
-              <input
-                id={`todo-reminder-${item.id}`}
-                type="time"
-                value={reminderTime}
-                onChange={(event) => {
-                  setReminderTime(event.target.value)
-                  setReminderError(null)
-                }}
-              />
-              {reminderError ? <p role="alert">{reminderError}</p> : null}
-              {item.isCompleted ? <p className="todo-details__reminder-help">Reopen this task before setting a reminder.</p> : null}
-              <div>
-                <button type="button" disabled={pending || item.isCompleted || !reminderTime} onClick={() => void saveReminder()}>
-                  Save
-                </button>
-                {item.reminder ? (
-                  <button type="button" disabled={pending} onClick={() => void clearReminder()}>
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
           <Menu as="div" className="relative inline-block">
               <MenuButton
                 className="todo-details__field"
