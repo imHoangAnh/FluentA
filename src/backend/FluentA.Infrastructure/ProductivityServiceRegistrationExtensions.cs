@@ -31,7 +31,6 @@ internal static class ProductivityServiceRegistrationExtensions
         services.AddScoped<ScheduledProductivityJobs>();
         services.AddScoped<IScheduledProductivityJobs>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
         services.AddScoped<IScheduledMaintenanceExecutor>(provider => provider.GetRequiredService<ScheduledProductivityJobs>());
-        services.AddScoped<IScheduledOccurrenceExecutor, ScheduledProductivityExecution>();
         services.AddScoped<ScheduledMaintenanceJobs>();
         services.AddScoped<ITodoRepository, EfTodoRepository>();
         services.AddScoped<ITodoService, TodoService>();

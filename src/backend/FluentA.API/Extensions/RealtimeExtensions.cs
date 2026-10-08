@@ -1,5 +1,4 @@
 using FluentA.API.Hubs;
-using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Notification;
 using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Project;
@@ -11,7 +10,6 @@ public static class RealtimeExtensions
     public static IServiceCollection AddFluentARealtime(this IServiceCollection services)
     {
         services.AddSignalR();
-        services.AddScoped<IHabitSyncNotifier, SignalRHabitSyncNotifier>();
         services.AddScoped<INotificationSyncNotifier, SignalRNotificationSyncNotifier>();
         services.AddScoped<IProjectSyncNotifier, SignalRProjectSyncNotifier>();
         services.AddScoped<IPomodoroSyncNotifier, SignalRPomodoroSyncNotifier>();

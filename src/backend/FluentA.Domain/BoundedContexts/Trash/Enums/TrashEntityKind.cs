@@ -6,6 +6,6 @@ public enum TrashEntityKind
     Vocabulary = 2,
     // Value 3 belonged to the retired Level Five Trash kind.
     Journal = 4,
-    Habit,
-    Project
+    // Value 5 belonged to Habit before retained soft deletion.
+    Project = 6
 }

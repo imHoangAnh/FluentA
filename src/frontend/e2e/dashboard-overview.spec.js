@@ -54,7 +54,6 @@ test('Dashboard Overview is the default authenticated home with actionable widge
       frequency: 'Daily',
       startDate: today,
       goalDays: null,
-      reminderTime: '20:00',
       timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   });

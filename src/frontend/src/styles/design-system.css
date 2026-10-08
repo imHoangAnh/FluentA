@@ -2812,18 +2812,6 @@
   font-weight: 500;
 }
 
-.habit-modal-form .habit-reminder-toggle {
-  align-items: center;
-  flex-direction: row;
-  gap: 8px;
-}
-
-.habit-reminder-toggle input {
-  accent-color: var(--ds-primary);
-  height: 16px;
-  width: 16px;
-}
-
 .habit-form-error {
   color: var(--ds-destructive);
   font-size: 12px;

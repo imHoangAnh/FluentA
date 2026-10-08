@@ -3,7 +3,7 @@ import { type MouseEvent, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as habitApi from '../api/habit.api'
 import { habitKeys } from '../api/habit.queries'
-import { restoreTrashEntry } from '@/features/trash'
+import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { toast } from '@/shared/lib/toast'
 import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
 import { HabitDetailsPanel } from '../components/HabitDetailsPanel'
@@ -30,6 +30,7 @@ export function HabitPage() {
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(parseDateInput(today))))
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null)
   const [formHabitId, setFormHabitId] = useState<'new' | string | null>(null)
+  const [deletingHabit, setDeletingHabit] = useState<habitApi.Habit | null>(null)
   const formTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const weekDates = useMemo<HabitWeekDay[]>(() => {
@@ -117,22 +118,13 @@ export function HabitPage() {
   })
   const deleteHabit = useMutation({
     mutationFn: habitApi.deleteHabit,
-    onSuccess: async (entry) => {
+    onSuccess: async () => {
+      setDeletingHabit(null)
       setSelectedHabitId(null)
       await refresh()
-      toast.success('Habit moved to Trash. Its reminder was removed.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(refresh)
-              .then(() => toast.success('Habit restored without a reminder.'))
-              .catch(() => toast.error('Could not restore the habit.'))
-          },
-        },
-      })
+      toast.success('Habit deleted.')
     },
-    onError: () => toast.error('Could not move the habit to Trash.'),
+    onError: () => toast.error('Could not delete the habit. Please try again.'),
   })
   const toggleEntry = useMutation({
     mutationFn: ({ habitId, date }: { habitId: string; date: string }) => habitApi.toggleHabitEntry(habitId, date, timeZoneId),
@@ -201,13 +193,30 @@ export function HabitPage() {
             onNextMonth={() => setSelectedMonth((month) => shiftMonth(month, 1))}
             onToggle={(date) => toggleEntry.mutate({ habitId: selectedHabit.id, date })}
             onEdit={() => openEdit(selectedHabit.id)}
-            onDelete={() => deleteHabit.mutate(selectedHabit.id)}
+            onDelete={() => setDeletingHabit(selectedHabit)}
           />
         ) : (
           <div className="habit-tracker-empty-state"><CalendarClock size={80} /><p>Select a habit to view your progress</p></div>
         )}
       </section>
 
+      <AlertDialog open={Boolean(deletingHabit)} onOpenChange={(open) => { if (!open && !deleteHabit.isPending) setDeletingHabit(null) }}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete Habit</AlertDialogTitle>
+          <AlertDialogDescription>
+            Delete “{deletingHabit?.name}” from your Habit list? It will no longer appear here.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancelButton disabled={deleteHabit.isPending}>Cancel</AlertDialogCancelButton>
+            <AlertDialogActionButton disabled={deleteHabit.isPending} onClick={(event) => {
+              event.preventDefault()
+              if (deletingHabit) deleteHabit.mutate(deletingHabit.id)
+            }}>
+              {deleteHabit.isPending ? 'Deleting...' : 'Delete Habit'}
+            </AlertDialogActionButton>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {formHabitId ? (
         <HabitFormDialog
           key={formHabitId}

@@ -8,7 +8,6 @@ namespace FluentA.Application.BoundedContexts.Habit;
 internal static class HabitStatisticsCalculator
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const string TimeFormat = "HH:mm";
     public static HabitDto ToDto(
         HabitEntity habit,
         DateTime localToday,
@@ -38,10 +37,8 @@ internal static class HabitStatisticsCalculator
             habit.Icon.ToString(),
             habit.Frequency.ToString(),
             habit.ScheduledCustomDays.Select(day => day.ToString()).ToList(),
-            habit.ReminderEnabled,
             FormatDate(habit.StartDate),
             habit.GoalDays,
-            habit.ReminderTime.ToString(TimeFormat, CultureInfo.InvariantCulture),
             CurrentStreak(habit, completedDates, streakAsOf),
             LongestStreak(habit, completedDates, streakAsOf),
             totalCheckIns,

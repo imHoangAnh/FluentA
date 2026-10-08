@@ -1,33 +1,4 @@
-using System.Globalization;
-
 namespace FluentA.Infrastructure.Scheduling;
-
-/// <summary>
-/// A single business occurrence that the polling service may dispatch.
-/// </summary>
-/// <remarks>
-/// The business database is authoritative. The execution adapter rechecks
-/// the current business tuple before sending anything. Revision is retained
-/// for compatibility with existing callers.
-/// </remarks>
-public sealed record ScheduledOccurrence(
-    ScheduledOccurrenceKind Kind,
-    Guid SourceId,
-    DateTime OccurrenceDate,
-    DateTime ScheduledAtUtc,
-    long Revision)
-{
-    public DateTime OccurrenceDateUtc => DateTime.SpecifyKind(OccurrenceDate.Date, DateTimeKind.Utc);
-
-    public DateTime ScheduledAtUtcNormalized => DateTime.SpecifyKind(ScheduledAtUtc, DateTimeKind.Utc);
-
-    public string RevisionToken => Revision.ToString(CultureInfo.InvariantCulture);
-}
-
-public enum ScheduledOccurrenceKind
-{
-    HabitReminder = 3,
-}
 
 /// <summary>
 /// A recurring operational task. These preserve the established maintenance
@@ -43,17 +14,6 @@ public enum ScheduledMaintenanceKind
     ArchivedAssetPurge = 3,
     TrashPurge = 4,
     DatabaseCleanup = 5,
-}
-
-/// <summary>
-/// Business-owned occurrence execution boundary. Implementations must reload
-/// the source row and recheck the current schedule, eligibility and duplicate
-/// notification state before writing anything. A stale trigger is safe because
-/// execution is idempotent and the current business tuple remains authoritative.
-/// </summary>
-public interface IScheduledOccurrenceExecutor
-{
-    Task ExecuteAsync(ScheduledOccurrence occurrence, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -6,15 +6,18 @@ namespace FluentA.Domain.UnitTests;
 public sealed class HabitTests
 {
     [Fact]
-    public void Habit_ReminderCanBeDisabledAndReenabled()
+    public void SoftDelete_PreservesTrackingDetailsAndOriginalDeletionTime()
     {
-        var habit = Habit.Create(Guid.NewGuid(), "Read", null, HabitIcon.Default, HabitFrequency.Daily, null);
+        var habit = Habit.Create(Guid.NewGuid(), "Read", null, HabitIcon.Book, HabitFrequency.Daily, null, goalDays: 21);
+        var deletedAt = new DateTime(2026, 10, 8, 10, 0, 0, DateTimeKind.Utc);
+        habit.SoftDelete(deletedAt);
+        habit.SoftDelete(deletedAt.AddMinutes(1));
 
-        habit.SetReminderEnabled(false);
-        Assert.False(habit.ReminderEnabled);
-
-        habit.SetReminderEnabled(true);
-        Assert.True(habit.ReminderEnabled);
+        Assert.Equal(deletedAt, habit.DeletedAt);
+        Assert.Equal(deletedAt, habit.UpdatedAt);
+        Assert.Equal(21, habit.GoalDays);
+        Assert.Equal("Read", habit.Name);
+        Assert.Equal(HabitFrequency.Daily, habit.Frequency);
     }
     [Fact]
     public void Create_DailyHabit_CleansFieldsAndSchedulesEveryDay()
@@ -61,7 +64,7 @@ public sealed class HabitTests
     }
 
     [Fact]
-    public void Create_WithStartGoalAndReminder_PersistsDateOnlyInvariants()
+    public void Create_WithStartAndGoal_PersistsDateOnlyInvariants()
     {
         var habit = Habit.Create(
             Guid.NewGuid(),
@@ -71,12 +74,10 @@ public sealed class HabitTests
             HabitFrequency.Daily,
             null,
             new DateTime(2026, 7, 21, 18, 30, 0, DateTimeKind.Local),
-            21,
-            new TimeOnly(7, 45));
+            21);
 
         Assert.Equal(new DateTime(2026, 7, 21, 0, 0, 0, DateTimeKind.Utc), habit.StartDate);
         Assert.Equal(21, habit.GoalDays);
-        Assert.Equal(new TimeOnly(7, 45), habit.ReminderTime);
         Assert.False(habit.IsEligibleOn(new DateTime(2026, 7, 20)));
         Assert.True(habit.IsEligibleOn(new DateTime(2026, 7, 21)));
     }
@@ -92,8 +93,7 @@ public sealed class HabitTests
             HabitFrequency.Daily,
             null,
             new DateTime(2026, 7, 21),
-            21,
-            new TimeOnly(20, 0));
+            21);
 
         Assert.Throws<InvalidOperationException>(() => habit.Update(
             habit.Name,
@@ -103,7 +103,6 @@ public sealed class HabitTests
             habit.ScheduledCustomDays,
             new DateTime(2026, 7, 22),
             habit.GoalDays,
-            habit.ReminderTime,
             entryCount: 1));
 
         Assert.Throws<ArgumentException>(() => habit.Update(
@@ -114,7 +113,6 @@ public sealed class HabitTests
             habit.ScheduledCustomDays,
             habit.StartDate,
             goalDays: 1,
-            reminderTime: habit.ReminderTime,
             entryCount: 1));
     }
 }

@@ -1,4 +1,3 @@
-using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Project;
@@ -18,7 +17,6 @@ internal static class TrashServiceRegistrationExtensions
         services.AddScoped<ITrashTransaction, EfTrashTransaction>();
         services.AddScoped<ITrashParticipant, NoteTrashParticipant>();
         services.AddScoped<ITrashParticipant, VocabularyTrashParticipant>();
-        services.AddScoped<ITrashParticipant, HabitTrashParticipant>();
         services.AddScoped<ITrashParticipant, JournalTrashParticipant>();
         services.AddScoped<ITrashParticipant, ProjectTrashParticipant>();
         services.AddScoped<ITrashService, TrashService>();

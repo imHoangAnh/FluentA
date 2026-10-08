@@ -173,8 +173,8 @@ Open `https://localhost:5173`.
 3. Add words and use the synchronized flashcards for practice or scheduled
    review.
 4. Plan learning with todos, habits, Project, countdowns, and Pomodoro sessions.
-5. Capture longer-form content in Journal or Notes and review reminders in the
-   notification inbox.
+5. Capture longer-form content in Journal or Notes and track Habit progress
+   through daily check-ins.
 
 ## Testing
 

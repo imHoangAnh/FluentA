@@ -295,26 +295,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("Default")
                         .HasColumnName("icon");
 
-                    b.Property<DateTime?>("LastReminderSentOn")
-                        .HasColumnType("date")
-                        .HasColumnName("last_reminder_sent_on");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
-
-                    b.Property<bool>("ReminderEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("reminder_enabled");
-
-                    b.Property<TimeOnly>("ReminderTime")
-                        .HasPrecision(0)
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("reminder_time");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("date")
@@ -333,9 +318,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.HasIndex("UserId", "Name");
-
-                    b.HasIndex("ReminderEnabled", "ReminderTime", "LastReminderSentOn")
-                        .HasDatabaseName("ix_habits_reminder_due");
 
                     b.ToTable("habits", null, t =>
                         {

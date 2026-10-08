@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -61,7 +60,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.DeleteAsync(CurrentUserId(), habitId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = true }))
             : ToErrorResult(result);
     }
 

@@ -13,11 +13,11 @@ test('final SPEC1 preferences and notification ownership', async ({ page }) => {
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('No reminder habit');
-  await page.getByRole('checkbox', { name: 'Reminder', exact: true }).uncheck();
+  await expect(page.getByRole('checkbox', { name: 'Reminder', exact: true })).toHaveCount(0);
   await page.getByTestId('save-habit-button').click();
   await expect(page.getByRole('heading', { name: 'No reminder habit' })).toBeVisible();
   const habits = await (await page.request.get(`https://localhost:7000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers })).json();
-  expect(habits.data.find((habit) => habit.name === 'No reminder habit').reminderEnabled).toBe(false);
+  expect(habits.data.find((habit) => habit.name === 'No reminder habit')).not.toHaveProperty('reminderEnabled');
 
   await page.getByRole('link', { name: 'Go to overview' }).click();
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();

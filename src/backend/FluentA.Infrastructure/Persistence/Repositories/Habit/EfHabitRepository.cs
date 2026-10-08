@@ -34,15 +34,6 @@ public sealed class EfHabitRepository : IHabitRepository
                 cancellationToken);
     }
 
-    public Task<HabitEntity?> GetTrashedAsync(Guid userId, Guid habitId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.Habits.FirstOrDefaultAsync(
-            habit => habit.Id == habitId
-                && habit.UserId == userId
-                && habit.DeletedAt == trashedAt,
-            cancellationToken);
-    }
-
     public async Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
         Guid habitId,
         DateTime startDate,
@@ -91,14 +82,25 @@ public sealed class EfHabitRepository : IHabitRepository
 
     public async Task UpdateAsync(HabitEntity habit, CancellationToken cancellationToken = default)
     {
-        _dbContext.Habits.Update(habit);
+        // GetAsync returns a tracked entity. Save only changed fields so an edit
+        // loaded before deletion cannot write an old null DeletedAt back.
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveAsync(HabitEntity habit, CancellationToken cancellationToken = default)
+    public async Task<bool> SoftDeleteAsync(Guid userId, Guid habitId, DateTime nowUtc, CancellationToken cancellationToken = default)
     {
-        _dbContext.Habits.Remove(habit);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        // Share the parent-row lock with ToggleEntryAsync. A check-in cannot
+        // change retained history after deletion has committed.
+        var habit = await _dbContext.Habits
+            .FromSqlInterpolated($"SELECT * FROM habits WHERE id = {habitId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (habit is null) return false;
+
+        habit.SoftDelete(nowUtc);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<HabitEntryMutationResult> ToggleEntryAsync(

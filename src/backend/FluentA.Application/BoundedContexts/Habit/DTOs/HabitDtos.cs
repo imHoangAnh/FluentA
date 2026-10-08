@@ -8,10 +8,8 @@ public sealed record CreateHabitRequest(
     string Icon = "Default",
     string Frequency = "Daily",
     IReadOnlyList<string>? CustomDays = null,
-    bool ReminderEnabled = true,
     string? StartDate = null,
     int? GoalDays = null,
-    string ReminderTime = "20:00",
     string? TimeZoneId = null);
 
 public sealed record UpdateHabitRequest
@@ -23,7 +21,6 @@ public sealed record UpdateHabitRequest
     public string? Icon { get; init; }
     public string? Frequency { get; init; }
     public IReadOnlyList<string>? CustomDays { get; init; }
-    public bool? ReminderEnabled { get; init; }
     public string? StartDate { get; init; }
     public int? GoalDays
     {
@@ -34,7 +31,6 @@ public sealed record UpdateHabitRequest
             GoalDaysSpecified = true;
         }
     }
-    public string? ReminderTime { get; init; }
     public string? TimeZoneId { get; init; }
 
     [JsonIgnore]
@@ -50,10 +46,8 @@ public sealed record HabitDto(
     string Icon,
     string Frequency,
     IReadOnlyList<string> CustomDays,
-    bool ReminderEnabled,
     string StartDate,
     int? GoalDays,
-    string ReminderTime,
     int CurrentStreak,
     int LongestStreak,
     int TotalCheckIns,

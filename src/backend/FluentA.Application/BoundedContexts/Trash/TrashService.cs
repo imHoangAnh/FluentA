@@ -27,9 +27,6 @@ public sealed class TrashService : ITrashService
     public Task<OperationResult<TrashEntryDto>> TrashVocabularyAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default) =>
         MoveToTrashAsync(userId, TrashEntityKind.Vocabulary, entityId, cancellationToken);
 
-    public Task<OperationResult<TrashEntryDto>> TrashHabitAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default) =>
-        MoveToTrashAsync(userId, TrashEntityKind.Habit, habitId, cancellationToken);
-
     public Task<OperationResult<TrashEntryDto>> TrashJournalAsync(Guid userId, Guid journalId, CancellationToken cancellationToken = default) =>
         MoveToTrashAsync(userId, TrashEntityKind.Journal, journalId, cancellationToken);
 

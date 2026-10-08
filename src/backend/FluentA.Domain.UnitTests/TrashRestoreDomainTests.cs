@@ -1,8 +1,6 @@
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
-using FluentA.Domain.BoundedContexts.Habit.Entities;
-using FluentA.Domain.BoundedContexts.Habit.Enums;
 
 namespace FluentA.Domain.UnitTests;
 
@@ -46,20 +44,4 @@ public sealed class TrashRestoreDomainTests
         Assert.Null(asset.PurgeAfterAt);
     }
 
-    [Fact]
-    public void Habit_RestoreKeepsCheckInDataButDoesNotRestoreReminder()
-    {
-        var habit = Habit.Create(
-            Guid.NewGuid(), "Read", null, HabitIcon.Book, HabitFrequency.Daily, null,
-            reminderTime: new TimeOnly(7, 30));
-        var trashedAt = new DateTime(2026, 7, 28, 10, 0, 0, DateTimeKind.Utc);
-
-        habit.MoveToTrash(trashedAt);
-        habit.RestoreFromTrash(trashedAt.AddMinutes(1));
-
-        Assert.Null(habit.DeletedAt);
-        Assert.False(habit.ReminderEnabled);
-        Assert.Null(habit.LastReminderSentOn);
-        Assert.Equal(new TimeOnly(7, 30), habit.ReminderTime);
-    }
 }

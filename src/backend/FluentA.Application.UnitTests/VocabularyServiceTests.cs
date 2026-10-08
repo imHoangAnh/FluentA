@@ -349,7 +349,6 @@ public sealed class VocabularyServiceTests
 
         public Task<OperationResult<TrashEntryDto>> TrashNoteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashNotePageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<OperationResult<TrashEntryDto>> TrashHabitAsync(Guid userId, Guid habitId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashJournalAsync(Guid userId, Guid journalId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashEntryDto>> TrashProjectAsync(Guid userId, Guid entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<TrashListDto>> ListAsync(Guid userId, string? kind, string? search, int limit, CancellationToken cancellationToken = default) => throw new NotSupportedException();

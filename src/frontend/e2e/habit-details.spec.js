@@ -46,6 +46,7 @@ test('main Habit details owns stats, goal progress, scrolling description, and r
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await page.getByRole('button', { name: 'Delete Read Details' }).click();
+  await page.getByRole('button', { name: 'Delete Habit', exact: true }).click();
   await expect(page.getByText("No habits yet. Let's build a new one!")).toBeVisible();
 
   await page.evaluate(() => {

@@ -1,6 +1,5 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
 
 export type HabitFrequency = 'Daily' | 'Custom'
 export type HabitIcon = 'Default' | 'Book' | 'Exercise' | 'Water' | 'Meditation' | 'Study' | 'Work' | 'Health'
@@ -12,10 +11,8 @@ export type Habit = {
   icon: HabitIcon
   frequency: HabitFrequency
   customDays: string[]
-  reminderEnabled: boolean
   startDate: string
   goalDays: number | null
-  reminderTime: string
   currentStreak: number
   longestStreak: number
   totalCheckIns: number
@@ -47,10 +44,8 @@ export type CreateHabitInput = {
   icon?: HabitIcon
   frequency: HabitFrequency
   customDays?: string[] | null
-  reminderEnabled?: boolean
   startDate: string
   goalDays?: number | null
-  reminderTime?: string
   timeZoneId: string
 }
 
@@ -72,7 +67,7 @@ export async function updateHabit(id: string, input: UpdateHabitInput) {
 }
 
 export async function deleteHabit(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/habits/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<{ deleted: boolean }>>(`/habits/${id}`)
   return response.data.data!
 }
 

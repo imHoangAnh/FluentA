@@ -31,7 +31,7 @@ Status: implemented locally on 2026-10-08. Todo is independent of Project.
 Todo no longer stores or sends reminders. Its API, UI, scheduler branch, and
 database reminder columns are removed by `TodoSimplification`. Todo no longer
 subscribes to realtime events; changes appear after ordinary query refresh.
-Habit reminder/realtime behavior is separate and awaits its own migration.
+Habit migration is documented separately in [Habit](habit.md).
 
 ## Validation
 
