@@ -39,10 +39,10 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
   const titleInput = editorHeader.getByLabel('Journal title');
   const dateDisplay = editorHeader.getByTestId('journal-date-display');
   const actions = editorHeader.getByTestId('journal-editor-actions');
-  const saveButton = actions.getByTestId('save-journal-button');
-  const deleteButton = actions.getByRole('button', { name: `Delete journal ${title}` });
+  await expect(actions.getByTestId('save-journal-button')).toHaveCount(0);
+  await expect(actions.getByRole('button', { name: `Delete journal ${title}` })).toBeVisible();
   const editorBody = page.getByTestId('journal-editor-body');
-  const toolbar = editorHeader.getByTestId('journal-toolbar-host').getByRole('toolbar', { name: 'Journal formatting tools' });
+  const toolbar = page.getByTestId('journal-toolbar-host').getByRole('toolbar', { name: 'Journal formatting tools' });
   const writingSurface = editorBody.getByLabel('Journal rich text editor');
 
   await expect(titleInput).toHaveValue(title);

@@ -153,9 +153,10 @@ public sealed class AssetService : IAssetService
         var value = assetType?.Trim() ?? "avatar";
         if (!string.Equals(value, "avatar", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(value, "countdown-cover", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(value, "note-image", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(value, "note-image", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(value, "journal-image", StringComparison.OrdinalIgnoreCase))
         {
-            errors["assetType"] = ["Supported asset types are avatar, countdown-cover, and note-image."];
+            errors["assetType"] = ["Supported asset types are avatar, countdown-cover, note-image, and journal-image."];
         }
 
         return errors;
@@ -168,6 +169,7 @@ public sealed class AssetService : IAssetService
             "avatar" => AssetType.Avatar,
             "countdown-cover" => AssetType.CountdownCover,
             "note-image" => AssetType.NoteImage,
+            "journal-image" => AssetType.JournalImage,
             _ => throw new InvalidOperationException("Unsupported asset type."),
         };
     }
@@ -186,6 +188,7 @@ public sealed class AssetService : IAssetService
         {
             AssetType.Avatar => $"avatars/users/{userId:N}/avatar-{assetId:N}.{extension}",
             AssetType.NoteImage => $"note-images/users/{userId:N}/image-{assetId:N}.{extension}",
+            AssetType.JournalImage => $"journal-images/users/{userId:N}/image-{assetId:N}.{extension}",
             AssetType.CountdownCover => $"countdown-covers/users/{userId:N}/cover-{assetId:N}.{extension}",
             _ => throw new InvalidOperationException("Unsupported asset type.")
         };
@@ -258,6 +261,7 @@ public sealed class AssetService : IAssetService
             AssetType.Avatar => "avatar",
             AssetType.CountdownCover => "countdown-cover",
             AssetType.NoteImage => "note-image",
+            AssetType.JournalImage => "journal-image",
             _ => throw new InvalidOperationException("Unsupported asset type."),
         };
     }

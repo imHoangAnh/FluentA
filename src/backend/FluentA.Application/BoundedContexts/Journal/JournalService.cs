@@ -1,4 +1,6 @@
 using System.Globalization;
+using FluentA.Application.BoundedContexts.Assets;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
@@ -13,10 +15,15 @@ public sealed class JournalService : IJournalService
     private readonly IJournalRepository _repository;
     private readonly IJournalContentProcessor _contentProcessor;
 
-    public JournalService(IJournalRepository repository, IJournalContentProcessor contentProcessor)
+    private readonly IAssetRepository _assets;
+    private readonly IAssetObjectStorage _storage;
+
+    public JournalService(IJournalRepository repository, IJournalContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage)
     {
         _repository = repository;
         _contentProcessor = contentProcessor;
+        _assets = assets;
+        _storage = storage;
     }
 
     public async Task<OperationResult<IReadOnlyList<JournalEntrySummaryDto>>> ListAsync(
@@ -73,7 +80,7 @@ public sealed class JournalService : IJournalService
         var entry = await _repository.GetAsync(userId, journalId, cancellationToken);
         return entry is null
             ? OperationResult<JournalEntryDto>.Failure(JournalError.NotFound())
-            : OperationResult<JournalEntryDto>.Success(ToDto(entry));
+            : OperationResult<JournalEntryDto>.Success(await ToDtoAsync(userId, entry, cancellationToken));
     }
 
     public async Task<OperationResult<JournalEntryDto>> CreateAsync(
@@ -87,10 +94,21 @@ public sealed class JournalService : IJournalService
             return OperationResult<JournalEntryDto>.Failure(JournalError.Validation(validation.Errors));
         }
 
-        var content = _contentProcessor.Process(request.Content);
+        if (await _repository.DateExistsAsync(userId, validation.Date, cancellationToken: cancellationToken))
+            return OperationResult<JournalEntryDto>.Failure(JournalError.DateConflict());
+        JournalProcessedContent content;
+        try { content = await _contentProcessor.ProcessAsync(userId, request.Content, cancellationToken); }
+        catch (JournalContentValidationException exception) { return OperationResult<JournalEntryDto>.Failure(JournalError.Validation(exception.Errors)); }
+        if (content.Html.Length > 100_000)
+            return OperationResult<JournalEntryDto>.Failure(ContentTooLong());
+        if ((await _repository.GetAttachedAssetEntryIdsAsync(content.ReferencedAssetIds.ToArray(), cancellationToken)).Count > 0)
+            return OperationResult<JournalEntryDto>.Failure(ImageAlreadyAttached());
         var entry = JournalEntry.Create(userId, request.Title, validation.Date, content.Html);
         await _repository.AddAsync(entry, cancellationToken);
-        return OperationResult<JournalEntryDto>.Success(ToDto(entry));
+        await _repository.ReplaceEntryAssetLinksAsync(entry.Id, content.ReferencedAssetIds, cancellationToken);
+        if (!await _repository.SaveChangesAsync(cancellationToken))
+            return OperationResult<JournalEntryDto>.Failure(JournalError.DateConflict());
+        return OperationResult<JournalEntryDto>.Success(await ToDtoAsync(userId, entry, cancellationToken));
     }
 
     public async Task<OperationResult<JournalEntryDto>> UpdateAsync(
@@ -111,24 +129,30 @@ public sealed class JournalService : IJournalService
             return OperationResult<JournalEntryDto>.Failure(JournalError.Validation(validation.Errors));
         }
 
-        if (request.Title is not null)
-        {
-            entry.Rename(request.Title);
-        }
-
+        if (validation.Date is not null && await _repository.DateExistsAsync(userId, validation.Date.Value, journalId, cancellationToken))
+            return OperationResult<JournalEntryDto>.Failure(JournalError.DateConflict());
         if (request.Content is not null)
         {
-            var content = _contentProcessor.Process(request.Content);
-            entry.UpdateContent(content.Html);
+            JournalProcessedContent processed;
+            try { processed = await _contentProcessor.ProcessAsync(userId, request.Content, cancellationToken); }
+            catch (JournalContentValidationException exception) { return OperationResult<JournalEntryDto>.Failure(JournalError.Validation(exception.Errors)); }
+            if (processed.Html.Length > 100_000)
+                return OperationResult<JournalEntryDto>.Failure(ContentTooLong());
+            var attached = await _repository.GetAttachedAssetEntryIdsAsync(processed.ReferencedAssetIds.ToArray(), cancellationToken);
+            if (attached.Any(link => link.Value != entry.Id))
+                return OperationResult<JournalEntryDto>.Failure(ImageAlreadyAttached());
+            var oldIds = await _repository.GetEntryAssetIdsAsync(entry.Id, cancellationToken);
+            entry.UpdateContent(processed.Html);
+            await _repository.ReplaceEntryAssetLinksAsync(entry.Id, processed.ReferencedAssetIds, cancellationToken);
+            foreach (var asset in await _assets.GetOwnedAsync(userId, oldIds.Except(processed.ReferencedAssetIds).ToArray(), cancellationToken))
+                asset.MarkDeleted(DateTime.UtcNow);
         }
-
-        if (validation.Date is not null)
-        {
-            entry.UpdateDate(validation.Date.Value);
-        }
-
+        if (request.Title is not null) entry.Rename(request.Title);
+        if (validation.Date is not null) entry.UpdateDate(validation.Date.Value);
         await _repository.UpdateAsync(entry, cancellationToken);
-        return OperationResult<JournalEntryDto>.Success(ToDto(entry));
+        if (!await _repository.SaveChangesAsync(cancellationToken))
+            return OperationResult<JournalEntryDto>.Failure(JournalError.DateConflict());
+        return OperationResult<JournalEntryDto>.Success(await ToDtoAsync(userId, entry, cancellationToken));
     }
 
     public async Task<OperationResult<bool>> DeleteAsync(
@@ -144,8 +168,19 @@ public sealed class JournalService : IJournalService
 
         entry.SoftDelete();
         await _repository.UpdateAsync(entry, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }
+
+    private static JournalError ContentTooLong() => JournalError.Validation(new Dictionary<string, string[]>
+    {
+        ["content"] = ["Content must be at most 100000 characters after formatting cleanup."]
+    });
+
+    private static JournalError ImageAlreadyAttached() => JournalError.Validation(new Dictionary<string, string[]>
+    {
+        ["content"] = ["An image can belong to only one journal."]
+    });
 
     private static (Dictionary<string, string[]> Errors, DateTime Date) ValidateCreate(CreateJournalEntryRequest request)
     {
@@ -228,12 +263,20 @@ public sealed class JournalService : IJournalService
         }
     }
 
-    private static JournalEntryDto ToDto(JournalEntry entry)
+    private async Task<JournalEntryDto> ToDtoAsync(Guid userId, JournalEntry entry, CancellationToken cancellationToken)
     {
+        var ids = await _repository.GetEntryAssetIdsAsync(entry.Id, cancellationToken);
+        var urls = new Dictionary<Guid, string>();
+        foreach (var asset in await _assets.GetOwnedAsync(userId, ids.ToArray(), cancellationToken))
+        {
+            if (asset.Type != AssetType.JournalImage || asset.Status != AssetStatus.Ready) continue;
+            try { urls[asset.Id] = _storage.CreatePresignedDownload(new AssetDownloadRequest(asset.ObjectKey, TimeSpan.FromMinutes(5))).Url; }
+            catch (AssetStorageUnavailableException) { /* Return durable references when storage is unavailable. */ }
+        }
         return new JournalEntryDto(
             entry.Id,
             entry.Title,
-            entry.Content,
+            _contentProcessor.HydrateImageSources(entry.Content, urls),
             entry.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
             entry.CreatedAt,
             entry.UpdatedAt);

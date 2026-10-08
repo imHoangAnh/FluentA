@@ -10,7 +10,7 @@ public sealed class JournalServiceTests
     public async Task CreateListGetUpdateDelete_UsesOwnedEntriesNewestFirst()
     {
         var repository = new FakeJournalRepository();
-        var service = new JournalService(repository, new FakeJournalContentProcessor());
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
         var userId = Guid.NewGuid();
 
         var first = await service.CreateAsync(userId, new CreateJournalEntryRequest("First", "2026-06-10", "Xin chao"));
@@ -34,7 +34,7 @@ public sealed class JournalServiceTests
     public async Task ForeignMissingAndDeletedEntries_ReturnJournalNotFound()
     {
         var repository = new FakeJournalRepository();
-        var service = new JournalService(repository, new FakeJournalContentProcessor());
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
         var ownerId = Guid.NewGuid();
         var entry = await service.CreateAsync(ownerId, new CreateJournalEntryRequest("Private", "2026-06-10"));
 
@@ -49,7 +49,7 @@ public sealed class JournalServiceTests
     [Fact]
     public async Task CreateAndUpdate_RejectInvalidFields()
     {
-        var service = new JournalService(new FakeJournalRepository(), new FakeJournalContentProcessor());
+        var service = new JournalService(new FakeJournalRepository(), new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
         var userId = Guid.NewGuid();
 
         var invalidCreate = await service.CreateAsync(userId, new CreateJournalEntryRequest(" ", "June-11"));
@@ -61,10 +61,32 @@ public sealed class JournalServiceTests
     }
 
     [Fact]
+    public async Task FormattingBeyondContentLimit_ReturnsValidationWithoutChangingEntry()
+    {
+        var repository = new FakeJournalRepository();
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
+        var userId = Guid.NewGuid();
+        // The processor adds paragraph markup, taking this valid raw input above the stored limit.
+        var nearLimit = new string('a', 99_999);
+
+        var rejectedCreate = await service.CreateAsync(userId, new("Too long after processing", "2026-10-08", nearLimit));
+        Assert.Equal("VALIDATION_ERROR", rejectedCreate.Error!.Code);
+        Assert.Empty((await service.ListAsync(userId)).Value!);
+
+        var created = await service.CreateAsync(userId, new("Original", "2026-10-08", "Original content"));
+        var rejectedUpdate = await service.UpdateAsync(userId, created.Value!.Id, new(Title: "Changed", Content: nearLimit));
+
+        Assert.Equal("VALIDATION_ERROR", rejectedUpdate.Error!.Code);
+        var unchanged = (await service.GetAsync(userId, created.Value.Id)).Value!;
+        Assert.Equal("Original", unchanged.Title);
+        Assert.Equal("<p>Original content</p>", unchanged.Content);
+    }
+
+    [Fact]
     public async Task Search_ValidatesQueryAndBuildsTitleHighlightRanges()
     {
         var repository = new FakeJournalRepository();
-        var service = new JournalService(repository, new FakeJournalContentProcessor());
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
         var userId = Guid.NewGuid();
         await service.CreateAsync(userId, new CreateJournalEntryRequest(
             "Vietnamese practice",
@@ -86,7 +108,7 @@ public sealed class JournalServiceTests
     public async Task Calendar_GroupsOwnedActiveDatesAndValidatesMonth()
     {
         var repository = new FakeJournalRepository();
-        var service = new JournalService(repository, new FakeJournalContentProcessor());
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
         var ownerId = Guid.NewGuid();
         var foreignId = Guid.NewGuid();
         var first = await service.CreateAsync(ownerId, new CreateJournalEntryRequest("First", "2026-06-12", "One"));
@@ -101,9 +123,26 @@ public sealed class JournalServiceTests
 
         var day = Assert.Single(calendar.Value!);
         Assert.Equal("2026-06-12", day.Date);
-        Assert.Equal(2, day.Count);
+        Assert.Equal(1, day.Count);
         Assert.Equal("VALIDATION_ERROR", ((JournalError)invalid.Error!).Code);
         Assert.True(first.IsSuccess);
+    }
+
+    [Fact]
+    public async Task OneActiveJournalPerDate_RejectsDuplicatesAndDateMoves_ButAllowsRecreationAfterDelete()
+    {
+        var repository = new FakeJournalRepository();
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
+        var owner = Guid.NewGuid();
+        var entry = await service.CreateAsync(owner, new("One", "2026-10-08"));
+        var duplicate = await service.CreateAsync(owner, new("Two", "2026-10-08"));
+        Assert.Equal("JOURNAL_DATE_CONFLICT", duplicate.Error!.Code);
+        Assert.Equal(409, duplicate.Error.StatusCode);
+        var second = await service.CreateAsync(owner, new("Next", "2026-10-09"));
+        Assert.Equal("JOURNAL_DATE_CONFLICT", (await service.UpdateAsync(owner, second.Value!.Id, new(Date: "2026-10-08"))).Error!.Code);
+        Assert.True((await service.CreateAsync(Guid.NewGuid(), new("Other owner", "2026-10-08"))).IsSuccess);
+        await service.DeleteAsync(owner, entry.Value!.Id);
+        Assert.True((await service.CreateAsync(owner, new("Replacement", "2026-10-08"))).IsSuccess);
     }
 
     private sealed class FakeJournalRepository : IJournalRepository
@@ -168,6 +207,13 @@ public sealed class JournalServiceTests
                 .ToList());
         }
 
+        public Task<bool> DateExistsAsync(Guid userId, DateTime date, Guid? excludingId = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_entries.Any(entry => entry.UserId == userId && entry.Date == date && entry.Id != excludingId && entry.DeletedAt is null));
+        public Task<IReadOnlySet<Guid>> GetEntryAssetIdsAsync(Guid entryId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetAttachedAssetEntryIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(new Dictionary<Guid, Guid>());
+        public Task ReplaceEntryAssetLinksAsync(Guid entryId, IReadOnlySet<Guid> assetIds, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
         public Task AddAsync(JournalEntry entry, CancellationToken cancellationToken = default)
         {
             _entries.Add(entry);
@@ -183,10 +229,12 @@ public sealed class JournalServiceTests
 
     private sealed class FakeJournalContentProcessor : IJournalContentProcessor
     {
-        public JournalProcessedContent Process(string? content)
+        public Task<JournalProcessedContent> ProcessAsync(Guid userId, string? content, CancellationToken cancellationToken = default)
         {
-            var plainText = content ?? string.Empty;
-            return new JournalProcessedContent(string.IsNullOrEmpty(plainText) ? string.Empty : $"<p>{plainText}</p>", plainText);
+            var text = content ?? string.Empty;
+            return Task.FromResult(new JournalProcessedContent(string.IsNullOrEmpty(text) ? string.Empty : $"<p>{text}</p>", new HashSet<Guid>()));
         }
+        public IReadOnlySet<Guid> ExtractReferencedAssetIds(string? content) => new HashSet<Guid>();
+        public string HydrateImageSources(string? content, IReadOnlyDictionary<Guid, string> assetUrls) => content ?? "";
     }
 }

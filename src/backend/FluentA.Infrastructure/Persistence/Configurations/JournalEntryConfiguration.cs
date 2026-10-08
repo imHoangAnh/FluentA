@@ -22,6 +22,7 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
         builder.Property(entry => entry.DeletedAt).HasColumnName("deleted_at");
 
         builder.HasIndex(entry => new { entry.UserId, entry.CreatedAt });
-        builder.HasIndex(entry => new { entry.UserId, entry.Date });
+        builder.HasIndex(entry => new { entry.UserId, entry.Date })
+            .IsUnique().HasFilter("deleted_at IS NULL").HasDatabaseName("ux_journal_user_date_active");
     }
 }

@@ -2,6 +2,7 @@ using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FluentA.Infrastructure.Persistence.Repositories.Journal;
 
@@ -87,14 +88,66 @@ public sealed class EfJournalRepository : IJournalRepository
     public async Task AddAsync(JournalEntry entry, CancellationToken cancellationToken = default)
     {
         await _dbContext.JournalEntries.AddAsync(entry, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
     }
 
-    public async Task UpdateAsync(JournalEntry entry, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(JournalEntry entry, CancellationToken cancellationToken = default)
     {
         if (_dbContext.Entry(entry).State == EntityState.Detached)
             _dbContext.JournalEntries.Update(entry);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
+
+    public Task<bool> DateExistsAsync(Guid userId, DateTime date, Guid? excludingId = null, CancellationToken cancellationToken = default) =>
+        _dbContext.JournalEntries.AnyAsync(entry => entry.UserId == userId && entry.Date == date && entry.DeletedAt == null && entry.Id != excludingId, cancellationToken);
+
+    public async Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try { await _dbContext.SaveChangesAsync(cancellationToken); return true; }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_journal_user_date_active" })
+        {
+            _dbContext.ChangeTracker.Clear();
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlySet<Guid>> GetEntryAssetIdsAsync(Guid entryId, CancellationToken cancellationToken = default)
+    {
+        return (await _dbContext.JournalEntryAssets
+                .Where(link => link.JournalEntryId == entryId && link.DeletedAt == null)
+                .Select(link => link.AssetId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, Guid>> GetAttachedAssetEntryIdsAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return new Dictionary<Guid, Guid>();
+        }
+
+        return await _dbContext.JournalEntryAssets
+            .Where(link => link.DeletedAt == null && assetIds.Contains(link.AssetId))
+            .ToDictionaryAsync(link => link.AssetId, link => link.JournalEntryId, cancellationToken);
+    }
+
+    public async Task ReplaceEntryAssetLinksAsync(Guid entryId, IReadOnlySet<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        var currentLinks = await _dbContext.JournalEntryAssets
+            .Where(link => link.JournalEntryId == entryId && link.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+        var currentAssetIds = currentLinks.Select(link => link.AssetId).ToHashSet();
+
+        foreach (var link in currentLinks.Where(link => !assetIds.Contains(link.AssetId)))
+        {
+            link.SoftDelete(DateTime.UtcNow);
+        }
+        var additions = assetIds
+            .Where(assetId => !currentAssetIds.Contains(assetId))
+            .Select(assetId => JournalEntryAsset.Create(entryId, assetId));
+        await _dbContext.JournalEntryAssets.AddRangeAsync(additions, cancellationToken);
+    }
+
 
 }

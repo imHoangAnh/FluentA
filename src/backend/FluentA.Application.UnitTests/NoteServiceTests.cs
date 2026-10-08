@@ -129,7 +129,7 @@ public sealed class NoteServiceTests
         var userId = Guid.NewGuid();
         var board = await service.CreateBoardAsync(userId, new CreateNoteBoardRequest("Board"));
         var page = await service.CreatePageAsync(userId, board.Value!.Id, new CreateNotePageRequest("Page"));
-        var rawContent = $"<p>{string.Concat(Enumerable.Repeat("<span style=\"color:red\">word</span>", 5_000))}</p>";
+        var rawContent = $"<p>{string.Concat(Enumerable.Repeat("<span style=\"position:absolute\">word</span>", 5_000))}</p>";
 
         var updated = await service.UpdatePageAsync(userId, page.Value!.Id, new UpdateNotePageRequest(Content: rawContent));
         var stored = repository.GetStoredPage(page.Value.Id);

@@ -1,3 +1,4 @@
+import '@/test/rich-text-dom'
 import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -91,13 +92,13 @@ describe('JournalPage workspace redesign', () => {
     const titleInput = within(editorHeader).getByLabelText('Journal title')
     const dateDisplay = within(editorHeader).getByTestId('journal-date-display')
     const actions = within(editorHeader).getByTestId('journal-editor-actions')
-    const saveButton = within(actions).getByTestId('save-journal-button')
+    expect(within(actions).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     const deleteButton = within(actions).getByRole('button', { name: `Delete journal ${journalEntry.title}` })
 
     expect(titleInput).toHaveValue(journalEntry.title)
     expect(dateDisplay).toHaveAttribute('data-date', journalEntry.date)
     expect(within(editorHeader).queryByLabelText('Journal date')).not.toBeInTheDocument()
-    expect(saveButton.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(deleteButton).toBeInTheDocument()
     expect(within(actions).getByTestId('journal-save-status')).toHaveTextContent('Saved')
 
     const editorBody = screen.getByTestId('journal-editor-body')
@@ -108,17 +109,37 @@ describe('JournalPage workspace redesign', () => {
     expect(document.querySelector('.journal-editor-footer')).not.toBeInTheDocument()
   })
 
-  it('uses Save for a new entry while keeping the date read-only', async () => {
+  it('auto-saves a new entry without a Save button and keeps its date read-only', async () => {
+    vi.mocked(journalApi.createJournalEntry).mockImplementation(async input => ({ ...journalEntry, title: input.title, date: input.date, content: input.content ?? '' }))
     renderPage()
-
-    const createButton = await screen.findByTestId('create-journal-button')
-    await userEvent.click(createButton)
-
-    const saveButton = await screen.findByTestId('save-journal-button')
-    expect(saveButton).toHaveTextContent('Save')
-    expect(saveButton).not.toHaveTextContent('Create')
-    expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+    const create = await screen.findByTestId('create-journal-button')
+    await waitFor(() => expect(create).toBeEnabled())
+    fireEvent.click(create)
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    vi.useFakeTimers()
+    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'New daily entry' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    expect(journalApi.createJournalEntry).toHaveBeenCalledWith(expect.objectContaining({ title: 'New daily entry', date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }))
+    expect(screen.getByTestId('journal-save-status')).toHaveTextContent('Saved')
     expect(screen.queryByTestId('journal-date-input')).not.toBeInTheDocument()
+  })
+
+  it('warns before leaving an unsaved draft and only discards after confirmation', async () => {
+    const second = { ...journalEntry, id: 'journal-2', title: 'Another day', date: '2026-07-23' }
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry, second])
+    vi.mocked(journalApi.getJournalEntry).mockImplementation(async id => id === second.id ? second : journalEntry)
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
+    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'Unsaved draft' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open journal Another day' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('may be lost')
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    expect(screen.getByLabelText('Journal title')).toHaveValue('Unsaved draft')
+    fireEvent.click(screen.getByRole('button', { name: 'Open journal Another day' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(second.title))
+    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
   })
 
   it('renders the recent journals empty state with a New Journal action', async () => {
@@ -133,6 +154,27 @@ describe('JournalPage workspace redesign', () => {
     await userEvent.click(newJournalButton)
 
     expect(screen.getByLabelText('Journal title')).toHaveValue('New Journal')
+  })
+
+  it('keeps editing disabled when opening another entry fails instead of saving the previous content into it', async () => {
+    const second = { ...journalEntry, id: 'journal-2', title: 'Unavailable entry', date: '2026-07-23' }
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry, second])
+    vi.mocked(journalApi.getJournalEntry).mockImplementation(async id => {
+      if (id === second.id) throw new Error('Network failed')
+      return journalEntry
+    })
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
+
+    fireEvent.click(screen.getByRole('button', { name: `Open journal ${second.title}` }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open journal.')
+    expect(screen.getByLabelText('Journal title')).toBeDisabled()
+    const editor = await screen.findByRole('textbox', { name: 'Journal rich text editor' })
+    await waitFor(() => expect(editor).toHaveAttribute('contenteditable', 'false'))
+    expect(editor).not.toHaveTextContent('Reviewed vocabulary')
+    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
   })
 
   it('keeps the two-second autosave behavior for persisted entries', async () => {

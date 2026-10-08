@@ -4,5 +4,6 @@ public enum AssetType
 {
     Avatar = 1,
     CountdownCover = 2,
-    NoteImage = 3
+    NoteImage = 3,
+    JournalImage = 4
 }

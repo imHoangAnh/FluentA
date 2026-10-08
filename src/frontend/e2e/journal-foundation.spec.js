@@ -17,9 +17,17 @@ test('Journal foundation CRUD, Unicode, ordering, and ownership smoke', async ({
   expect(firstResponse.status()).toBe(201);
   const first = (await firstResponse.json()).data;
 
+  const duplicateResponse = await page.request.post(apiUrl('/journal'), {
+    headers,
+    data: { title: 'Duplicate date', content: '<p>Rejected</p>', date: today },
+  });
+  expect(duplicateResponse.status()).toBe(409);
+  expect((await duplicateResponse.json()).errors[0].code).toBe('JOURNAL_DATE_CONFLICT');
+  const previousDate = new Date(`${today}T12:00:00Z`);
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
   const secondResponse = await page.request.post(apiUrl('/journal'), {
     headers,
-    data: { title: 'Second entry', content: '<p>Newest note</p>', date: today },
+    data: { title: 'Second entry', content: '<p>Newest note</p>', date: previousDate.toISOString().slice(0, 10) },
   });
   expect(secondResponse.status()).toBe(201);
   const second = (await secondResponse.json()).data;

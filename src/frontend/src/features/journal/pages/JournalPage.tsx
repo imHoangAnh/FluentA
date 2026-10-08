@@ -1,12 +1,15 @@
 import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
-import { BookOpen, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
-import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { BookOpen, Plus, Search, Trash2, X } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
 import { journalKeys } from '../api/journal.queries'
 import { toast } from '@/shared/lib/toast'
 import { Calendar } from '@/shared/components/ui/calendar'
 import { cn } from '@/shared/lib/utils'
+import { uploadAsset } from '@/features/assets'
+import { UnsavedChangesDialog } from '@/shared/components/UnsavedChangesDialog'
+import { RouteDraftGuard, useIsDataRouter, useUnsavedNavigation } from '@/shared/components/rich-text/useUnsavedNavigation'
 
 const JournalRichTextEditor = lazy(() =>
   import('@/shared/components/rich-text/RichTextEditor').then((module) => ({ default: module.RichTextEditor })),
@@ -67,6 +70,23 @@ export function JournalPage() {
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null)
   const openRequestRef = useRef(0)
   const draftVersionRef = useRef(0)
+  const sessionRef = useRef(0)
+  const [editorSession, setEditorSession] = useState(0)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const objectUrls = useRef<string[]>([])
+  useEffect(() => () => objectUrls.current.forEach(url => URL.revokeObjectURL(url)), [])
+  const navigation = useUnsavedNavigation(isDirty || uploadingImage)
+  const isDataRouter = useIsDataRouter()
+  function discardDraft() { sessionRef.current++; setEditorSession(value => value + 1); setIsDirty(false); setUploadingImage(false); setImageError(null) }
+  async function uploadJournalImages(files: File[]) {
+    return Promise.all(files.map(async file => {
+      const asset = await uploadAsset(file, 'journal-image')
+      const url = URL.createObjectURL(file)
+      objectUrls.current.push(url)
+      return { id: asset.id, displayUrl: url, alt: file.name }
+    }))
+  }
 
   const entriesQuery = useQuery({
     queryKey: journalKeys.entries,
@@ -110,6 +130,7 @@ export function JournalPage() {
   }, [calendarMonth])
 
   const clearEditor = () => {
+    discardDraft()
     openRequestRef.current += 1
     setOpeningId(null)
     setOpenFailed(false)
@@ -123,6 +144,7 @@ export function JournalPage() {
   }
 
   const prepareEntryForDate = (date: string) => {
+    discardDraft()
     openRequestRef.current += 1
     setOpeningId(null)
     setOpenFailed(false)
@@ -136,6 +158,7 @@ export function JournalPage() {
   }
 
   const selectEntry = (entry: journalApi.JournalEntry) => {
+    discardDraft()
     setSelectedId(entry.id)
     setIsEditorActive(true)
     setTitle(entry.title)
@@ -152,11 +175,16 @@ export function JournalPage() {
   }
 
   const openEntry = async (entry: journalApi.JournalEntrySummary) => {
+    discardDraft()
     const requestId = openRequestRef.current + 1
     openRequestRef.current = requestId
     setOpeningId(entry.id)
     setOpenFailed(false)
     setSelectedId(entry.id)
+    setIsEditorActive(false)
+    setTitle(entry.title)
+    setContent('')
+    setEntryDate(entry.date)
     try {
       const fullEntry = await queryClient.fetchQuery({
         queryKey: journalKeys.entry(entry.id),
@@ -164,13 +192,16 @@ export function JournalPage() {
       })
       if (openRequestRef.current === requestId) selectEntry(fullEntry)
     } catch {
-      if (openRequestRef.current === requestId) setOpenFailed(true)
+      if (openRequestRef.current === requestId) {
+        setSelectedId(null)
+        setOpenFailed(true)
+      }
     } finally {
       if (openRequestRef.current === requestId) setOpeningId(null)
     }
   }
 
-  const openCalendarDate = (date: string) => {
+  const openCalendarDateNow = (date: string) => {
     const [year, month] = date.split('-')
     const dateMonth = `${year}-${month}`
     if (dateMonth !== calendarMonth) {
@@ -186,36 +217,43 @@ export function JournalPage() {
     prepareEntryForDate(date)
   }
 
+  const openCalendarDate = (date: string) => {
+    if (date === entryDate && (isEditorActive || selectedId)) return
+    navigation.request(() => { discardDraft(); openCalendarDateNow(date) })
+  }
+  function startWriting() {
+    if (entriesQuery.isLoading || entriesQuery.isError) return
+    const existing = (entriesQuery.data ?? []).find(entry => entry.date === entryDate)
+    if (existing) { void openEntry(existing); return }
+    setIsEditorActive(true)
+    setTitle('New Journal')
+    markChanged()
+  }
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: journalKeys.all })
   }
 
-  const createEntry = useMutation({
-    mutationFn: journalApi.createJournalEntry,
-    onSuccess: async (entry) => {
-      queryClient.setQueryData(journalKeys.entry(entry.id), entry)
-      selectEntry(entry)
-      await refresh()
-    },
-  })
-
-  const updateEntry = useMutation({
-    mutationFn: (input: { id: string; patch: journalApi.UpdateJournalEntryInput; version: number }) =>
-      journalApi.updateJournalEntry(input.id, input.patch),
+  type SaveInput = { id: string | null; patch: { title: string; content: string; date: string }; version: number; session: number }
+  const autosave = useMutation({
+    mutationFn: (input: SaveInput) => input.id
+      ? journalApi.updateJournalEntry(input.id, input.patch)
+      : journalApi.createJournalEntry(input.patch),
     onMutate: () => setSaveStatus('saving'),
     onSuccess: async (entry, input) => {
       queryClient.setQueryData(journalKeys.entry(entry.id), entry)
-      if (draftVersionRef.current === input.version) {
-        setIsDirty(false)
-        setSaveStatus('saved')
+      if (sessionRef.current === input.session) {
+        setSelectedId(entry.id)
+        if (draftVersionRef.current === input.version) { setIsDirty(false); setSaveStatus('saved') }
+        else setSaveStatus('idle')
       }
       await refresh()
     },
-    onError: () => setSaveStatus('error'),
+    onError: (error, input) => {
+      if (sessionRef.current === input.session) setSaveStatus(draftVersionRef.current === input.version ? 'error' : 'idle')
+      if ((error as { response?: { status: number } }).response?.status === 409) void refresh()
+    },
   })
-  const saveEntry = updateEntry.mutate
-  const isUpdatePending = updateEntry.isPending
-
+  const saveEntry = autosave.mutate
   const deleteEntry = useMutation({
     mutationFn: (id: string) => journalApi.deleteJournalEntry(id),
     onSuccess: async (_, id) => {
@@ -227,31 +265,16 @@ export function JournalPage() {
     },
   })
 
-  const isSaving = createEntry.isPending || isUpdatePending
   const isOpening = openingId !== null
-
   useEffect(() => {
-    if (!selectedId || !isDirty || isOpening || !title.trim() || isUpdatePending) return
-
+    if (!isEditorActive || !isDirty || isOpening || !title.trim() || autosave.isPending || uploadingImage || saveStatus === 'error' || navigation.open) return
     const version = draftVersionRef.current
+    const session = sessionRef.current
     const timer = window.setTimeout(() => {
-      saveEntry({ id: selectedId, patch: { title, content, date: entryDate }, version })
+      saveEntry({ id: selectedId, patch: { title, content, date: entryDate }, version, session })
     }, 2_000)
-
     return () => window.clearTimeout(timer)
-  }, [content, entryDate, isDirty, isOpening, isUpdatePending, saveEntry, selectedId, title])
-
-  function submitEntry(event: FormEvent) {
-    event.preventDefault()
-    if (!title.trim()) return
-
-    if (selectedId) {
-      saveEntry({ id: selectedId, patch: { title, content, date: entryDate }, version: draftVersionRef.current })
-      return
-    }
-
-    createEntry.mutate({ title, content, date: entryDate })
-  }
+  }, [content, entryDate, isDirty, isEditorActive, isOpening, autosave.isPending, saveEntry, selectedId, title, uploadingImage, saveStatus, navigation.open])
 
   return (
     <div className="journal-page">
@@ -359,11 +382,10 @@ export function JournalPage() {
                 {!isSearching ? (
                   <button
                     className="journal-empty-create-button"
+                    disabled={entriesQuery.isLoading || entriesQuery.isError}
                     type="button"
                     onClick={() => {
-                      setIsEditorActive(true)
-                      setTitle('New Journal')
-                      markChanged()
+                      navigation.request(startWriting)
                     }}
                   >
                     <Plus size={15} aria-hidden="true" />
@@ -379,7 +401,7 @@ export function JournalPage() {
                   className={selectedId === entry.id ? 'journal-entry-card journal-entry-card--active' : 'journal-entry-card'}
                   type="button"
                   key={entry.id}
-                  onClick={() => void openEntry(entry)}
+                  onClick={() => { if (entry.id !== selectedId) navigation.request(() => void openEntry(entry)) }}
                   aria-label={`Open journal ${entry.title}`}
                 >
                   <div className="journal-entry-card-top">
@@ -400,10 +422,9 @@ export function JournalPage() {
                 type="button"
                 className="primary-button m-0 min-h-9 w-auto px-5 gap-2 shadow-sm"
                 onClick={() => {
-                  setIsEditorActive(true)
-                  setTitle('New Journal')
-                  markChanged()
+                  navigation.request(startWriting)
                 }}
+                disabled={entriesQuery.isLoading || entriesQuery.isError}
                 data-testid="create-journal-button"
               >
                 <Plus size={16} aria-hidden="true" />
@@ -414,7 +435,7 @@ export function JournalPage() {
 
           <form
             className={cn('flex flex-col h-full min-h-0 min-w-0', !isEditorActive && !selectedId && 'journal-editor-blurred')}
-            onSubmit={submitEntry}
+            onSubmit={event => event.preventDefault()}
           >
             <div className="journal-editor-header" data-testid="journal-editor-header">
               <div className="journal-editor-heading">
@@ -438,26 +459,8 @@ export function JournalPage() {
 
               <div className="journal-editor-actions" data-testid="journal-editor-actions">
                 <small data-testid="journal-save-status">
-                  {selectedId
-                    ? saveStatus === 'saving'
-                      ? 'Saving...'
-                      : saveStatus === 'saved'
-                        ? 'Saved'
-                        : saveStatus === 'error'
-                          ? 'Save failed'
-                          : isDirty
-                            ? 'Unsaved changes'
-                            : 'Saved'
-                    : isDirty ? 'Unsaved changes' : 'Draft'}
+                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed — edit to try again' : isDirty ? 'Unsaved changes' : selectedId ? 'Saved' : 'Draft'}
                 </small>
-                <button
-                  className="primary-button m-0 min-h-9 w-auto px-4"
-                  type="submit"
-                  disabled={isSaving || isOpening || !title.trim() || (!isEditorActive && !selectedId)}
-                  data-testid="save-journal-button"
-                >
-                  {isSaving || isOpening ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {selectedId && saveStatus === 'error' ? 'Retry' : 'Save'}
-                </button>
                 {selectedId ? (
                   <button
                     className="journal-delete-button"
@@ -479,9 +482,13 @@ export function JournalPage() {
               <div className="journal-editor-inner">
                 <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
                   <JournalRichTextEditor
+                    key={`${entryDate}:${editorSession}`}
                     disabled={isOpening || (!isEditorActive && !selectedId)}
                     content={content}
                     toolbarHost={toolbarHost}
+                    onImageFiles={uploadJournalImages}
+                    onImageUploadingChange={setUploadingImage}
+                    onImageUploadError={message => { setImageError(message) }}
                     onChange={(html) => {
                       setContent(html)
                       markChanged()
@@ -491,14 +498,16 @@ export function JournalPage() {
               </div>
             </div>
 
-            {(openFailed || createEntry.isError || updateEntry.isError || deleteEntry.isError) && (
+            {(openFailed || saveStatus === 'error' || imageError || deleteEntry.isError) && (
               <div className="journal-editor-error" role="alert">
-                The journal entry could not be saved.
+                {imageError ?? (openFailed ? 'Could not open journal.' : 'The journal entry could not be saved. Edit to try again.')}
               </div>
             )}
           </form>
         </div>
       </div>
+      <UnsavedChangesDialog open={navigation.open} onStay={navigation.stay} onDiscard={navigation.discard} />
+      {isDataRouter && <RouteDraftGuard dirty={isDirty || uploadingImage} onDiscard={discardDraft} render={(open, stay, discard) => <UnsavedChangesDialog open={open} onStay={stay} onDiscard={discard} />} />}
       <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteEntry.isPending} error={deleteEntry.isError}
         onCancel={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) deleteEntry.mutate(deleteTarget.id) }} />
     </div>

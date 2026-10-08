@@ -34,7 +34,7 @@ public sealed class NoteContentProcessorTests
             userId,
             $"<p><img src=\"https://wrong.example.com/1.png\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>");
 
-        Assert.Contains($"data-note-asset-id=\"{asset.Id}\"", result.Html);
+        Assert.Contains($"data-asset-id=\"{asset.Id}\"", result.Html);
         Assert.DoesNotContain("src=", result.Html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("wrong.example.com", result.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(asset.Id, result.ReferencedAssetIds);

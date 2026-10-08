@@ -6,16 +6,22 @@ async function registerAndLogin(page, prefix) {
   return identity;
 }
 
-async function createJournal(page, headers, title, content) {
+function dateInput(daysAgo = 0) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return date.toISOString().slice(0, 10);
+}
+
+async function createJournal(page, headers, title, content, date = dateInput()) {
   const response = await page.request.post('https://localhost:7000/api/v1/journal', {
     headers,
-    data: { title, content, date: new Date().toISOString().slice(0, 10) },
+    data: { title, content, date },
   });
   expect(response.status()).toBe(201);
   return (await response.json()).data;
 }
 
-test('Journal Unicode content search highlights owned active matches', async ({ context, page }, testInfo) => {
+test('Journal Unicode title search highlights owned active matches', async ({ context, page }, testInfo) => {
   const { token } = await registerAndLogin(page, 'journal-search');
   const headers = { Cookie: `access_token=${token}` };
   const matching = await createJournal(
@@ -24,8 +30,8 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
     'Xin chào greeting practice',
     '<p>Today I practiced Xin chào with a friend. Later I wrote xin chào again.</p>',
   );
-  await createJournal(page, headers, 'Grammar review', '<p>Past tense and sentence order.</p>');
-  const deleted = await createJournal(page, headers, 'Deleted private match', '<p>xin chào deleted</p>');
+  await createJournal(page, headers, 'Grammar review', '<p>Past tense and sentence order.</p>', dateInput(1));
+  const deleted = await createJournal(page, headers, 'xin chào deleted private match', '<p>xin chào deleted</p>', dateInput(2));
   await page.request.delete(`https://localhost:7000/api/v1/journal/${deleted.id}`, { headers });
 
   const foreignPage = await context.newPage();
@@ -33,7 +39,7 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
   await createJournal(
     foreignPage,
     { Cookie: `access_token=${foreignToken}` },
-    'Foreign private match',
+    'xin chào foreign private match',
     '<p>xin chào foreign</p>',
   );
   await foreignPage.close();
@@ -47,7 +53,7 @@ test('Journal Unicode content search highlights owned active matches', async ({ 
   expect(apiMatches[0].highlights).toHaveLength(1);
 
   const invalidSearch = await page.request.get('https://localhost:7000/api/v1/journal/search?q=%20', { headers });
-  expect(invalidSearch.status()).toBe(422);
+  expect(invalidSearch.status()).toBe(400);
 
   await page.getByRole('link', { name: 'Journal' }).click();
   await page.getByTestId('journal-search-input').fill('xin chào');

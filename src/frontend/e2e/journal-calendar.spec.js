@@ -30,7 +30,6 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   const deletedDate = dateInput(13);
   const emptyDate = dateInput(20);
 
-  await createJournal(page, headers, 'First calendar note', populatedDate);
   const newest = await createJournal(page, headers, 'Newest calendar note', populatedDate);
   const deleted = await createJournal(page, headers, 'Deleted calendar note', deletedDate);
   await page.request.delete(`https://localhost:7000/api/v1/journal/${deleted.id}`, { headers });
@@ -44,14 +43,14 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   const calendarResponse = await page.request.get(`https://localhost:7000/api/v1/journal/calendar?month=${monthInput()}`, { headers });
   expect(calendarResponse.status()).toBe(200);
   const calendarDays = (await calendarResponse.json()).data;
-  expect(calendarDays).toEqual([{ date: populatedDate, count: 2 }]);
+  expect(calendarDays).toEqual([{ date: populatedDate, count: 1 }]);
   const invalidResponse = await page.request.get('https://localhost:7000/api/v1/journal/calendar?month=June', { headers });
-  expect(invalidResponse.status()).toBe(422);
+  expect(invalidResponse.status()).toBe(400);
 
   await page.getByRole('link', { name: 'Journal' }).click();
   const populatedButton = page.getByTestId(`journal-calendar-day-${populatedDate}`);
-  await expect(populatedButton).toHaveAccessibleName(`${populatedDate}, 2 journal entries`);
-  await expect(populatedButton.locator('small')).toHaveText('2');
+  await expect(populatedButton).toHaveAccessibleName(`${populatedDate}, 1 journal entry`);
+  await expect(populatedButton.locator('small')).toHaveText('1');
   await expect(page.getByTestId(`journal-calendar-day-${deletedDate}`).locator('small')).toHaveCount(0);
 
   await populatedButton.click();
@@ -59,8 +58,10 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
 
   await page.getByTestId(`journal-calendar-day-${emptyDate}`).click();
   await expect(page.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate);
-  await expect(page.getByTestId('journal-title-input')).toHaveValue(`Learning notes for ${emptyDate}`);
-  await page.getByTestId('save-journal-button').click();
+  await page.getByTestId('create-journal-button').click();
+  await page.getByTestId('journal-title-input').fill(`Learning notes for ${emptyDate}`);
+  await expect(page.getByTestId('save-journal-button')).toHaveCount(0);
+  await expect(page.getByTestId('journal-save-status')).toHaveText('Saved', { timeout: 10_000 });
   await expect(page.getByRole('button', { name: `Open journal Learning notes for ${emptyDate}` })).toBeVisible();
   await expect(page.getByTestId(`journal-calendar-day-${emptyDate}`).locator('small')).toHaveText('1');
 

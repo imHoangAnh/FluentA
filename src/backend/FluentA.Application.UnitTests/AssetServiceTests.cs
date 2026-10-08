@@ -26,6 +26,29 @@ public sealed class AssetServiceTests
     }
 
     [Fact]
+    public async Task JournalImage_PresignAndFinalize_UseOwnedJournalStoragePath()
+    {
+        var repository = new FakeAssetRepository();
+        var storage = new FakeAssetObjectStorage();
+        var service = new AssetService(repository, storage);
+        var userId = Guid.NewGuid();
+
+        var presign = await service.PresignAsync(userId, new PresignAssetRequest("journal-image", "image/png", "journal.png", 1024));
+
+        Assert.True(presign.IsSuccess);
+        var asset = Assert.Single(repository.Assets);
+        Assert.Equal(AssetType.JournalImage, asset.Type);
+        Assert.Equal($"journal-images/users/{userId:N}/image-{asset.Id:N}.png", asset.ObjectKey);
+        storage.Metadata = new AssetObjectMetadata(asset.ObjectKey, 1024, "image/png", "etag");
+
+        var finalized = await service.FinalizeAsync(userId, new FinalizeAssetRequest(asset.Id));
+
+        Assert.True(finalized.IsSuccess);
+        Assert.Equal("journal-image", finalized.Value!.AssetType);
+        Assert.Equal("ready", finalized.Value.Status);
+    }
+
+    [Fact]
     public async Task Presign_RejectsUnsupportedContentType()
     {
         var service = new AssetService(new FakeAssetRepository(), new FakeAssetObjectStorage());

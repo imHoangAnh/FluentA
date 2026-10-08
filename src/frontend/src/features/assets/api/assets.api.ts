@@ -6,6 +6,7 @@ const uploadErrorMessages: Record<AssetType, string> = {
   avatar: 'Avatar upload could not be completed.',
   'countdown-cover': 'Countdown cover upload could not be completed.',
   'note-image': 'Note image upload could not be completed.',
+  'journal-image': 'Journal image upload could not be completed.',
 }
 
 export async function uploadAsset(file: File, assetType: AssetType) {

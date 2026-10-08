@@ -394,9 +394,49 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "CreatedAt");
 
-                    b.HasIndex("UserId", "Date");
+                    b.HasIndex("UserId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("ux_journal_user_date_active")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("journal", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntryAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("JournalEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("journal_entry_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId")
+                        .IsUnique();
+
+                    b.HasIndex("JournalEntryId", "DeletedAt");
+
+                    b.ToTable("journal_entry_assets", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
@@ -1919,6 +1959,21 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasOne("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", null)
                         .WithMany()
                         .HasForeignKey("HabitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntryAsset", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

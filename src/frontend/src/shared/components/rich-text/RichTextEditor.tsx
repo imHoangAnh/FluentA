@@ -1,24 +1,12 @@
-import {
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  Bold,
-  Heading1,
-  Heading2,
-  Heading3,
-  Heading4,
-  Highlighter,
-  Italic,
-  List,
-  ListChecks,
-  ListOrdered,
-  Redo2,
-  Underline,
-  Undo2,
-} from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Highlighter, ImagePlus, Italic, List, ListOrdered, Minus, Redo2, Strikethrough, Underline, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { Color, TextStyle } from '@tiptap/extension-text-style'
+import TextAlign from '@tiptap/extension-text-align'
+import Highlight from '@tiptap/extension-highlight'
+import { BlockImage } from './BlockImage'
 import { cn } from '@/shared/lib/utils'
 
 type RichTextEditorProps = {
@@ -29,261 +17,117 @@ type RichTextEditorProps = {
   onBlur?: () => void
   onImageFiles?: (files: File[]) => Promise<Array<{ id: string; displayUrl: string; alt?: string }>>
   onImageUploadError?: (message: string) => void
+  onImageUploadingChange?: (uploading: boolean) => void
   shellClassName?: string
   toolbarAriaLabel?: string
   toolbarClassName?: string
   toolbarHost?: HTMLElement | null
 }
 
-function runCommand(command: string, value?: string) {
-  if (typeof document.execCommand !== 'function') {
-    return false
-  }
+const COLORS = [{ name: 'Default', value: '' }, { name: 'Teal', value: '#0f9f8f' }, { name: 'Red', value: '#ef4444' }, { name: 'Orange', value: '#f97316' }, { name: 'Amber', value: '#f59e0b' }, { name: 'Green', value: '#10b981' }, { name: 'Blue', value: '#3b82f6' }, { name: 'Indigo', value: '#6366f1' }, { name: 'Purple', value: '#a855f7' }, { name: 'Pink', value: '#ec4899' }, { name: 'Gray', value: '#6b7280' }]
 
-  return document.execCommand(command, false, value)
-}
+export function RichTextEditor(props: RichTextEditorProps) {
+  const { content, disabled = false, toolbarHost, toolbarAriaLabel = 'Journal formatting tools' } = props
+  const latest = useRef(props)
+  latest.current = props
+  const fileInput = useRef<HTMLInputElement>(null)
+  const uploading = useRef(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [colorPicker, setColorPicker] = useState(false)
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ link: false, code: false, codeBlock: false, blockquote: false, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
+      TextStyle, Color, Highlight.configure({ multicolor: true }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }), BlockImage,
+    ],
+    content,
+    editable: !disabled,
+    shouldRerenderOnTransaction: true,
+    editorProps: {
+      attributes: { class: cn('journal-rich-text-content', props.contentClassName), 'aria-label': 'Journal rich text editor', role: 'textbox', 'aria-multiline': 'true' },
+      handleDOMEvents: {
+        paste: (_view, event) => {
+          const files = Array.from(event.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'))
+          if (!files.length) return false
+          event.preventDefault()
+          void insertImages(files)
+          return true
+        },
+        drop: (_view, event) => {
+          const files = Array.from(event.dataTransfer?.files ?? []).filter(file => file.type.startsWith('image/'))
+          if (!files.length) return false
+          event.preventDefault()
+          void insertImages(files)
+          return true
+        },
+      },
+    },
+    onUpdate: ({ editor: instance }) => latest.current.onChange(instance.getHTML()),
+    onBlur: () => latest.current.onBlur?.(),
+  })
 
-const COLOR_PALETTE = [
-  { name: 'Default', value: 'inherit', bg: 'var(--ds-foreground)' },
-  { name: 'Teal', value: '#0f9f8f', bg: '#0f9f8f' },
-  { name: 'Red', value: '#ef4444', bg: '#ef4444' },
-  { name: 'Orange', value: '#f97316', bg: '#f97316' },
-  { name: 'Amber', value: '#f59e0b', bg: '#f59e0b' },
-  { name: 'Green', value: '#10b981', bg: '#10b981' },
-  { name: 'Blue', value: '#3b82f6', bg: '#3b82f6' },
-  { name: 'Indigo', value: '#6366f1', bg: '#6366f1' },
-  { name: 'Purple', value: '#a855f7', bg: '#a855f7' },
-  { name: 'Pink', value: '#ec4899', bg: '#ec4899' },
-  { name: 'Gray', value: '#6b7280', bg: '#6b7280' },
-  { name: 'Dark Gray', value: '#1f2937', bg: '#1f2937' },
-]
-
-function TextColorIcon({ color = '#0f9f8f', size = 16 }: { color?: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m4 16 6-12 6 12" />
-      <path d="M7 11h6" />
-      <line x1="3" y1="20" x2="21" y2="20" stroke={color} strokeWidth="3.5" />
-    </svg>
-  )
-}
-
-export function RichTextEditor({
-  contentClassName,
-  disabled = false,
-  content,
-  onChange,
-  onBlur,
-  onImageFiles,
-  onImageUploadError,
-  shellClassName,
-  toolbarAriaLabel = 'Journal formatting tools',
-  toolbarClassName,
-  toolbarHost,
-}: RichTextEditorProps) {
-  const editorRef = useRef<HTMLDivElement | null>(null)
-  const colorPickerRef = useRef<HTMLDivElement | null>(null)
-  const [activeColor, setActiveColor] = useState<string>('#0f9f8f')
-  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
-
+  useEffect(() => { if (editor && !editor.isDestroyed) editor.setEditable(!disabled, false) }, [editor, disabled])
   useEffect(() => {
-    if (!isColorPickerOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
-        setIsColorPickerOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isColorPickerOpen])
+    if (editor && !editor.isDestroyed && editor.schema && content !== editor.getHTML()) editor.commands.setContent(content, { emitUpdate: false })
+  }, [content, editor])
 
-  useEffect(() => {
-    const element = editorRef.current
-    if (!element) return
-    if (element.innerHTML !== content) {
-      element.innerHTML = content
-    }
-  }, [content])
-
-  function focusEditor() {
-    editorRef.current?.focus()
-  }
-
-  function apply(command: string, value?: string) {
-    focusEditor()
-    if (command === 'hiliteColor') {
-      if (!runCommand('hiliteColor', value)) {
-        runCommand('backColor', value)
-      }
-    } else {
-      runCommand(command, value)
-    }
-    onChange(editorRef.current?.innerHTML ?? '')
-  }
-
-  function insertHtml(html: string) {
-    focusEditor()
-    const inserted = runCommand('insertHTML', html)
-    if (!inserted && editorRef.current) {
-      editorRef.current.innerHTML = `${editorRef.current.innerHTML}${html}`
-    }
-
-    onChange(editorRef.current?.innerHTML ?? '')
-  }
-
-  async function insertUploadedImages(files: File[]) {
-    if (!onImageFiles || files.length === 0 || disabled || isUploadingImage) {
-      return
-    }
-
-    setIsUploadingImage(true)
+  async function insertImages(files: File[]) {
+    if (!editor || editor.isDestroyed || !latest.current.onImageFiles || latest.current.disabled || uploading.current) return
+    uploading.current = true
+    setIsUploading(true)
+    latest.current.onImageUploadingChange?.(true)
     try {
-      const uploads = await onImageFiles(files)
-      if (uploads.length === 0) {
-        return
-      }
-
-      const html = uploads.map((upload) =>
-        `<p><img src="${upload.displayUrl}" alt="${escapeHtml(upload.alt ?? '')}" data-note-asset-id="${upload.id}" /></p>`).join('')
-      insertHtml(html)
+      const uploads = await latest.current.onImageFiles(files)
+      if (editor.isDestroyed) return
+      editor.chain().focus().insertContent(uploads.flatMap(upload => [
+        { type: 'image', attrs: { src: upload.displayUrl, assetId: upload.id, alt: upload.alt ?? '', alignment: 'left' } },
+        { type: 'paragraph' },
+      ])).run()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Image upload failed.'
-      onImageUploadError?.(message)
+      if (!editor.isDestroyed) latest.current.onImageUploadError?.(error instanceof Error ? error.message : 'Image upload failed.')
     } finally {
-      setIsUploadingImage(false)
+      uploading.current = false
+      if (!editor.isDestroyed) { setIsUploading(false); latest.current.onImageUploadingChange?.(false) }
     }
   }
 
-  const toolbar = (
-    <div className={cn('journal-toolbar', toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel} onMouseDown={(e) => e.preventDefault()}>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 1" disabled={disabled} onClick={() => apply('formatBlock', '<H1>')}>
-          <Heading1 size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 2" disabled={disabled} onClick={() => apply('formatBlock', '<H2>')}>
-          <Heading2 size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 3" disabled={disabled} onClick={() => apply('formatBlock', '<H3>')}>
-          <Heading3 size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Heading 4" disabled={disabled} onClick={() => apply('formatBlock', '<H4>')}>
-          <Heading4 size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Bold" disabled={disabled} onClick={() => apply('bold')}>
-          <Bold size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Italic" disabled={disabled} onClick={() => apply('italic')}>
-          <Italic size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Underline" disabled={disabled} onClick={() => apply('underline')}>
-          <Underline size={16} />
-        </button>
-        <div className="journal-color-picker-wrapper" ref={colorPickerRef}>
-          <button
-            className={cn('journal-toolbar-button', isColorPickerOpen && 'journal-toolbar-button--active')}
-            type="button"
-            aria-label="Text color"
-            disabled={disabled}
-            onClick={() => setIsColorPickerOpen((prev) => !prev)}
-          >
-            <TextColorIcon color={activeColor} size={16} />
-          </button>
-
-          {isColorPickerOpen ? (
-            <div className="journal-color-picker-dropdown" role="dialog" aria-label="Choose text color">
-              {COLOR_PALETTE.map((item) => (
-                <button
-                  key={item.name}
-                  type="button"
-                  title={item.name}
-                  aria-label={`Color ${item.name}`}
-                  className="journal-color-swatch"
-                  style={{ backgroundColor: item.bg }}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setActiveColor(item.value === 'inherit' ? '#0f9f8f' : item.value)
-                    apply('foreColor', item.value)
-                    setIsColorPickerOpen(false)
-                  }}
-                >
-                  {item.value === 'inherit' ? <span className="text-[9px] font-bold text-background">A</span> : null}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <button className="journal-toolbar-button" type="button" aria-label="Highlight" disabled={disabled} onClick={() => apply('hiliteColor', '#fef08a')}>
-          <Highlighter size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Bullet list" disabled={disabled} onClick={() => apply('insertUnorderedList')}>
-          <List size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Ordered list" disabled={disabled} onClick={() => apply('insertOrderedList')}>
-          <ListOrdered size={16} />
-        </button>
-        <button
-          className="journal-toolbar-button"
-          type="button"
-          aria-label="Task list"
-          disabled={disabled}
-          onClick={() => apply('insertHTML', '<ul data-type="taskList"><li><label><input type="checkbox" /></label><div><p>Task item</p></div></li></ul>')}
-        >
-          <ListChecks size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Align left" disabled={disabled} onClick={() => apply('justifyLeft')}>
-          <AlignLeft size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Align center" disabled={disabled} onClick={() => apply('justifyCenter')}>
-          <AlignCenter size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Align right" disabled={disabled} onClick={() => apply('justifyRight')}>
-          <AlignRight size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Justify" disabled={disabled} onClick={() => apply('justifyFull')}>
-          <AlignJustify size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Undo" disabled={disabled} onClick={() => apply('undo')}>
-          <Undo2 size={16} />
-        </button>
-        <button className="journal-toolbar-button" type="button" aria-label="Redo" disabled={disabled} onClick={() => apply('redo')}>
-          <Redo2 size={16} />
-        </button>
-    </div>
+  if (!editor) return null
+  const button = (name: string, icon: React.ReactNode, action: () => void, active = false, unavailable = false) => (
+    <button key={name} type="button" aria-label={name} aria-pressed={active} className={cn('journal-toolbar-button', active && 'journal-toolbar-button--active')}
+      disabled={disabled || unavailable} onClick={action}>{icon}</button>
   )
-
-  return (
-    <div className={cn('journal-rich-text-shell', shellClassName)}>
-      {toolbarHost === undefined ? toolbar : toolbarHost ? createPortal(toolbar, toolbarHost) : null}
-
-      <div
-        ref={editorRef}
-        aria-label="Journal rich text editor"
-        className={cn('journal-rich-text-content', contentClassName)}
-        contentEditable={!disabled}
-        suppressContentEditableWarning
-        onBlur={onBlur}
-        onInput={(event) => onChange(event.currentTarget.innerHTML)}
-        onDrop={(event) => {
-          const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file.type.startsWith('image/'))
-          if (files.length === 0) return
-          event.preventDefault()
-          void insertUploadedImages(files)
-        }}
-        onPaste={(event) => {
-          const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
-          if (files.length === 0) return
-          event.preventDefault()
-          void insertUploadedImages(files)
-        }}
-      />
+  const imageSelected = editor.isActive('image')
+  const align = (value: 'left' | 'center' | 'right' | 'justify') => {
+    if (imageSelected && value !== 'justify') editor.chain().focus().updateAttributes('image', { alignment: value }).run()
+    else if (!imageSelected) editor.chain().focus().setTextAlign(value).run()
+  }
+  const toolbar = <div className={cn('journal-toolbar', props.toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel} onMouseDown={event => event.preventDefault()}>
+    {([1, 2, 3, 4, 5, 6] as const).map(level => button(`Heading ${level}`, <span>H{level}</span>, () => { editor.chain().focus().toggleHeading({ level }).run() }, editor.isActive('heading', { level })))}
+    {button('Paragraph', <span>P</span>, () => { editor.chain().focus().setParagraph().run() }, editor.isActive('paragraph'))}
+    {button('Bold', <Bold size={16} />, () => { editor.chain().focus().toggleBold().run() }, editor.isActive('bold'))}
+    {button('Italic', <Italic size={16} />, () => { editor.chain().focus().toggleItalic().run() }, editor.isActive('italic'))}
+    {button('Underline', <Underline size={16} />, () => { editor.chain().focus().toggleUnderline().run() }, editor.isActive('underline'))}
+    {button('Strike', <Strikethrough size={16} />, () => { editor.chain().focus().toggleStrike().run() }, editor.isActive('strike'))}
+    <div className="journal-color-picker-wrapper">
+      {button('Text color', <span>A</span>, () => setColorPicker(!colorPicker), colorPicker)}
+      {colorPicker && <div className="journal-color-picker-dropdown" role="dialog" aria-label="Choose text color">{COLORS.map(color => <button key={color.name} type="button" aria-label={`Color ${color.name}`} className="journal-color-swatch" style={{ backgroundColor: color.value || 'var(--ds-foreground)' }} onClick={() => { if (color.value) editor.chain().focus().setColor(color.value).run(); else editor.chain().focus().unsetColor().run(); setColorPicker(false) }} />)}</div>}
     </div>
-  )
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
+    {button('Highlight', <Highlighter size={16} />, () => { editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run() }, editor.isActive('highlight'))}
+    {button('Bullet list', <List size={16} />, () => { editor.chain().focus().toggleBulletList().run() }, editor.isActive('bulletList'))}
+    {button('Ordered list', <ListOrdered size={16} />, () => { editor.chain().focus().toggleOrderedList().run() }, editor.isActive('orderedList'))}
+    {button('Align left', <AlignLeft size={16} />, () => align('left'))}
+    {button('Align center', <AlignCenter size={16} />, () => align('center'))}
+    {button('Align right', <AlignRight size={16} />, () => align('right'))}
+    {button('Justify', <AlignJustify size={16} />, () => align('justify'), false, imageSelected)}
+    {button('Horizontal rule', <Minus size={16} />, () => { editor.chain().focus().setHorizontalRule().run() })}
+    {latest.current.onImageFiles && button('Insert image', <ImagePlus size={16} />, () => fileInput.current?.click(), false, isUploading)}
+    {button('Undo', <Undo2 size={16} />, () => { editor.chain().focus().undo().run() })}
+    {button('Redo', <Redo2 size={16} />, () => { editor.chain().focus().redo().run() })}
+    {isUploading && <span role="status">Uploading image...</span>}
+  </div>
+  return <div className={cn('journal-rich-text-shell', props.shellClassName)}>
+    {toolbarHost === undefined ? toolbar : toolbarHost ? createPortal(toolbar, toolbarHost) : null}
+    <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden aria-label="Choose images" onChange={event => { void insertImages(Array.from(event.target.files ?? [])); event.target.value = '' }} />
+    <EditorContent editor={editor} />
+  </div>
 }

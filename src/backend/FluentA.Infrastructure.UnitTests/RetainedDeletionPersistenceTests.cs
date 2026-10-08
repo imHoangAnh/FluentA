@@ -161,7 +161,7 @@ public sealed class RetainedDeletionPersistenceTests
         {
             var assets = new EfAssetRepository(db);
             var notes = new NoteService(new EfNoteRepository(db), new NoteContentProcessor(assets), assets, new UnusedStorage());
-            var journals = new JournalService(new EfJournalRepository(db), new JournalContentProcessor());
+            var journals = new JournalService(new EfJournalRepository(db), new JournalContentProcessor(assets), assets, new UnusedStorage());
             var projects = new ProjectService(new EfProjectRepository(db));
             Assert.False((await notes.DeleteBoardAsync(Guid.NewGuid(), noteId)).IsSuccess);
             Assert.False((await journals.DeleteAsync(Guid.NewGuid(), journalId)).IsSuccess);

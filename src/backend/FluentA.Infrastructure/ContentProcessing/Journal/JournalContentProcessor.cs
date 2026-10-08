@@ -1,71 +1,27 @@
-using System.Text;
-using AngleSharp.Dom;
-using AngleSharp.Html.Parser;
+using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Journal;
-using Ganss.Xss;
+using FluentA.Domain.BoundedContexts.Assets.Enums;
+using FluentA.Infrastructure.ContentProcessing.RichText;
 
 namespace FluentA.Infrastructure.ContentProcessing.Journal;
 
-public sealed class JournalContentProcessor : IJournalContentProcessor
+public sealed class JournalContentProcessor(IAssetRepository assets) : IJournalContentProcessor
 {
-    private static readonly string[] SupportedTags =
-    [
-        "p", "br", "h1", "h2", "h3", "h4", "strong", "b", "em", "i", "u", "s",
-        "ul", "ol", "li", "blockquote", "pre", "code", "mark", "a", "hr", "span"
-    ];
-    private static readonly HashSet<string> TextBoundaryTags = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "p", "br", "h1", "h2", "h3", "h4", "li", "blockquote", "pre", "hr"
-    };
+    private readonly AssetRichTextProcessor _processor = new(assets, AssetType.JournalImage);
 
-    private readonly HtmlSanitizer _sanitizer;
-    private readonly HtmlParser _parser = new();
-
-    public JournalContentProcessor()
+    public async Task<JournalProcessedContent> ProcessAsync(Guid userId, string? content, CancellationToken cancellationToken = default)
     {
-        _sanitizer = new HtmlSanitizer();
-        _sanitizer.AllowedTags.Clear();
-        foreach (var tag in SupportedTags)
+        try
         {
-            _sanitizer.AllowedTags.Add(tag);
+            var result = await _processor.ProcessAsync(userId, content, cancellationToken);
+            return new JournalProcessedContent(result.Html, result.Ids);
         }
-
-        _sanitizer.AllowedAttributes.Clear();
-        _sanitizer.AllowedAttributes.Add("href");
-        _sanitizer.AllowedAttributes.Add("target");
-        _sanitizer.AllowedAttributes.Add("rel");
-        _sanitizer.AllowedAttributes.Add("class");
+        catch (RichTextImageException exception)
+        {
+            throw new JournalContentValidationException(new Dictionary<string, string[]> { ["content"] = [exception.Message] });
+        }
     }
 
-    public JournalProcessedContent Process(string? content)
-    {
-        var sanitized = _sanitizer.Sanitize(content ?? string.Empty);
-        var document = _parser.ParseDocument($"<body>{sanitized}</body>");
-        var plainText = new StringBuilder();
-        if (document.Body is not null)
-        {
-            AppendText(document.Body, plainText);
-        }
-
-        return new JournalProcessedContent(sanitized, plainText.ToString());
-    }
-
-    private static void AppendText(INode node, StringBuilder output)
-    {
-        if (node is IText text)
-        {
-            output.Append(text.Data);
-            return;
-        }
-
-        foreach (var child in node.ChildNodes)
-        {
-            AppendText(child, output);
-        }
-
-        if (node is IElement element && TextBoundaryTags.Contains(element.LocalName))
-        {
-            output.Append(' ');
-        }
-    }
+    public IReadOnlySet<Guid> ExtractReferencedAssetIds(string? content) => _processor.ExtractIds(content);
+    public string HydrateImageSources(string? content, IReadOnlyDictionary<Guid, string> assetUrls) => _processor.Hydrate(content, assetUrls);
 }

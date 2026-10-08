@@ -30,7 +30,7 @@ internal static class ProductivityServiceRegistrationExtensions
         services.AddScoped<IHabitRepository, EfHabitRepository>();
         services.AddScoped<IHabitService, HabitService>();
         services.AddScoped<IJournalRepository, EfJournalRepository>();
-        services.AddSingleton<IJournalContentProcessor, JournalContentProcessor>();
+        services.AddScoped<IJournalContentProcessor, JournalContentProcessor>();
         services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<INoteRepository, EfNoteRepository>();
         services.AddScoped<INoteContentProcessor, NoteContentProcessor>();

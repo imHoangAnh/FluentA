@@ -1,4 +1,4 @@
-export type AssetType = 'avatar' | 'countdown-cover' | 'note-image'
+export type AssetType = 'avatar' | 'countdown-cover' | 'note-image' | 'journal-image'
 
 export type Asset = {
   id: string
