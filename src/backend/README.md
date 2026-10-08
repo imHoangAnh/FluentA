@@ -8,7 +8,7 @@
 
 FluentA Backend là backend ASP.NET Core trên .NET 10 của hệ thống FluentA. Dự
 án cung cấp REST API dưới prefix `/api/v1`, SignalR hub tại `/hubs/sync`, xử lý
-xác thực và thực thi reminder cùng background job định kỳ bằng Quartz.
+xác thực. Các background job dọn dẹp đã được bỏ.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
@@ -134,10 +134,9 @@ phiên trình duyệt.
 
 ### 5.3. Background job
 
-Quartz chạy cùng API, lưu lịch trong PostgreSQL và dùng trigger theo từng mốc
-reminder. Job bảo trì dùng cron. PostgreSQL cần sẵn sàng trước khi chạy API.
-Quy tắc giờ Việt Nam, chạy bù và chuyển môi trường được mô tả tại
-[Scheduling](SCHEDULING.md).
+Không còn Quartz hoặc background job dọn asset, Trash và database.
+Delete cập nhật `deleted_at`; bản ghi và object trên R2 được giữ lại.
+`AssetStorageStartupService` chỉ kiểm tra storage khi API khởi động.
 
 ## 6. API Response Contract
 

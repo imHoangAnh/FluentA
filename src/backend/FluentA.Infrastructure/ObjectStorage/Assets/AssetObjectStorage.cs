@@ -124,15 +124,6 @@ public sealed class AssetObjectStorage : IAssetObjectStorage
         }
     }
 
-    public async Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
-    {
-        await _operations.DeleteObjectAsync(new DeleteObjectRequest
-        {
-            BucketName = _options.Bucket,
-            Key = objectKey
-        }, cancellationToken);
-    }
-
     private static Protocol GetProtocol(string endpoint)
     {
         if (string.IsNullOrWhiteSpace(endpoint))

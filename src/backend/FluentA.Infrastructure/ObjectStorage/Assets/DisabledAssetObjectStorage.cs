@@ -29,8 +29,4 @@ public sealed class DisabledAssetObjectStorage : IAssetObjectStorage
         throw new AssetStorageUnavailableException("Asset storage is not enabled.");
     }
 
-    public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
-    {
-        throw new AssetStorageUnavailableException("Asset storage is not enabled.");
-    }
 }

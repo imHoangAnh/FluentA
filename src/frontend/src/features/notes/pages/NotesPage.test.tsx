@@ -64,14 +64,8 @@ describe('NotesPage', () => {
       },
     })
     vi.mocked(noteApi.listBoards).mockResolvedValue([])
-    vi.mocked(noteApi.deleteBoard).mockResolvedValue({
-      id: 'trash-board-1', entityKind: 'Note', entityId: 'board-1', displayName: 'Learning Notes', originalLocation: 'Notes',
-      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
-    })
-    vi.mocked(noteApi.deletePage).mockResolvedValue({
-      id: 'trash-page-1', entityKind: 'Note', entityId: 'page-1', displayName: 'Week 1 reflections', originalLocation: 'Notes',
-      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
-    })
+    vi.mocked(noteApi.deleteBoard).mockResolvedValue({ deleted: true })
+    vi.mocked(noteApi.deletePage).mockResolvedValue({ deleted: true })
     vi.mocked(noteApi.updatePage).mockResolvedValue({
       id: 'page-1',
       boardId: 'board-1',
@@ -529,10 +523,12 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedBoard).toHaveFocus())
     fireEvent.contextMenu(renamedBoard)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
+    expect(noteApi.deleteBoard).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deleteBoard).toHaveBeenCalledWith('board-1'))
     expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 
@@ -583,10 +579,12 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedPage).toHaveFocus())
     fireEvent.contextMenu(renamedPage)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
+    expect(noteApi.deletePage).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deletePage).toHaveBeenCalledWith('page-1'))
     expect(await screen.findByText('This board has no pages')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 })

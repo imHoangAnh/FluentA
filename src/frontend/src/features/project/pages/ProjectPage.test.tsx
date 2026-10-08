@@ -84,12 +84,12 @@ describe('ProjectPage project workspace', () => {
     vi.clearAllMocks()
     api.listBoards.mockResolvedValue(boards)
     api.getBoard.mockImplementation(async (id: string) => board(id))
-    api.deleteBoard.mockResolvedValue({ id: 'trash-board-1' })
+    api.deleteBoard.mockResolvedValue({ deleted: true })
     api.createColumn.mockResolvedValue({})
     api.createCard.mockResolvedValue({})
     api.updateCard.mockResolvedValue({})
-    api.deleteColumn.mockResolvedValue({ id: 'trash-column-1' })
-    api.deleteCard.mockResolvedValue({ id: 'trash-card-1' })
+    api.deleteColumn.mockResolvedValue({ deleted: true })
+    api.deleteCard.mockResolvedValue({ deleted: true })
     api.moveCard.mockResolvedValue({})
   })
 
@@ -114,7 +114,7 @@ describe('ProjectPage project workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Exam prep' })).toBeInTheDocument()
   })
 
-  it('moves the exact right-clicked project to Trash with context menu and confirmation dialog', async () => {
+  it('deletes the exact right-clicked project with context menu and confirmation dialog', async () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Study project' })
 
@@ -159,7 +159,7 @@ describe('ProjectPage project workspace', () => {
 
   it('submits only one board deletion while the move is pending', async () => {
     let resolveDelete: (() => void) | undefined
-    api.deleteBoard.mockImplementation(() => new Promise<{ id: string }>((resolve) => { resolveDelete = () => resolve({ id: 'trash-board-1' }) }))
+    api.deleteBoard.mockImplementation(() => new Promise<{ deleted: boolean }>((resolve) => { resolveDelete = () => resolve({ deleted: true }) }))
     renderPage()
     await screen.findByRole('heading', { name: 'Study project' })
 

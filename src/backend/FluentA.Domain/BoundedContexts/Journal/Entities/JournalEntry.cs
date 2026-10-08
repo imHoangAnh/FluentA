@@ -57,12 +57,6 @@ public sealed class JournalEntry : BaseEntity, IAggregateRoot
         UpdatedAt = DeletedAt.Value;
     }
 
-    public void RestoreFromTrash(DateTime nowUtc)
-    {
-        DeletedAt = null;
-        UpdatedAt = nowUtc;
-    }
-
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;

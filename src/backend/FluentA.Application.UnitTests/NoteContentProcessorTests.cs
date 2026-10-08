@@ -97,11 +97,6 @@ public sealed class NoteContentProcessorTests
                 .ToList());
         }
 
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Asset>>([]);
-        }
-
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

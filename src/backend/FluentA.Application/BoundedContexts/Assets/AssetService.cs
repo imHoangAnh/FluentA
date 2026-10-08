@@ -117,67 +117,10 @@ public sealed class AssetService : IAssetService
             return OperationResult<AssetDto>.Failure(metadataError);
         }
 
-        try
-        {
-            asset.FinalizeUpload(metadata.ContentType, metadata.SizeBytes);
-            await _assets.UpdateAsync(asset, cancellationToken);
-        }
-        catch
-        {
-            await TryDeleteUploadedObjectAsync(asset.ObjectKey, cancellationToken);
-            throw;
-        }
+        asset.FinalizeUpload(metadata.ContentType, metadata.SizeBytes);
+        await _assets.UpdateAsync(asset, cancellationToken);
 
         return OperationResult<AssetDto>.Success(ToDto(asset));
-    }
-
-    public async Task<int> CleanupExpiredPendingAsync(CancellationToken cancellationToken = default)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var assets = await _assets.ListPendingCleanupCandidatesAsync(nowUtc, cancellationToken);
-        var cleaned = 0;
-
-        foreach (var asset in assets)
-        {
-            await TryDeleteUploadedObjectAsync(asset.ObjectKey, cancellationToken);
-
-            if (asset.Status == AssetStatus.PendingUpload)
-            {
-                asset.MarkExpired(nowUtc);
-            }
-
-            asset.MarkDeleted(nowUtc);
-            await _assets.UpdateAsync(asset, cancellationToken);
-            cleaned++;
-        }
-
-        return cleaned;
-    }
-
-    public async Task<AssetPurgeResult> PurgeExpiredArchivedAsync(CancellationToken cancellationToken = default)
-    {
-        var nowUtc = DateTime.UtcNow;
-        var claimed = await _assets.ClaimDueArchivedAsync(nowUtc, 100, cancellationToken);
-        var deleted = 0;
-        var failed = 0;
-        foreach (var asset in claimed)
-        {
-            try
-            {
-                await _storage.DeleteIfExistsAsync(asset.ObjectKey, cancellationToken);
-                asset.MarkDeleted(DateTime.UtcNow);
-                await _assets.UpdateAsync(asset, cancellationToken);
-                deleted++;
-            }
-            catch (AssetStorageUnavailableException)
-            {
-                asset.RequeuePurge(DateTime.UtcNow);
-                await _assets.UpdateAsync(asset, cancellationToken);
-                failed++;
-            }
-        }
-
-        return new AssetPurgeResult(claimed.Count, deleted, failed);
     }
 
     private static Dictionary<string, string[]> ValidatePresignRequest(PresignAssetRequest request)
@@ -326,22 +269,9 @@ public sealed class AssetService : IAssetService
             AssetStatus.PendingUpload => "pending-upload",
             AssetStatus.Ready => "ready",
             AssetStatus.Failed => "failed",
-            AssetStatus.Archived => "archived",
-            AssetStatus.PendingDeletion => "pending-deletion",
             AssetStatus.Deleted => "deleted",
             _ => throw new InvalidOperationException("Unsupported asset status.")
         };
-    }
-
-    private async Task TryDeleteUploadedObjectAsync(string objectKey, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _storage.DeleteIfExistsAsync(objectKey, cancellationToken);
-        }
-        catch (AssetStorageUnavailableException)
-        {
-        }
     }
 
     private static AssetDto ToDto(Asset asset)

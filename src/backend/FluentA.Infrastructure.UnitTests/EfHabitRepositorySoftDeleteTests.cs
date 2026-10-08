@@ -70,7 +70,6 @@ public sealed class EfHabitRepositorySoftDeleteTests
             Assert.Equal(originalEntries[index].UpdatedAt, entries[index].UpdatedAt);
             Assert.Null(entries[index].DeletedAt);
         }
-        Assert.Empty(await verify.TrashEntries.ToListAsync());
         Assert.Empty(await verify.Notifications.ToListAsync());
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);

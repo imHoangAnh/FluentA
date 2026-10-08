@@ -55,8 +55,8 @@ describe('WorkspacePage board and page context actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
-    vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue({ id: 'trash-board' } as never)
-    vi.mocked(vocabularyApi.deletePage).mockResolvedValue({ id: 'trash-page' } as never)
+    vi.mocked(vocabularyApi.deleteBoard).mockResolvedValue({ deleted: true } as never)
+    vi.mocked(vocabularyApi.deletePage).mockResolvedValue({ deleted: true } as never)
     vi.mocked(vocabularyApi.listWords).mockResolvedValue([])
     vi.mocked(vocabularyApi.listBoards).mockResolvedValue([newestBoard, olderBoard])
     vi.mocked(vocabularyApi.getBoard).mockImplementation(async (boardId) => {
@@ -136,7 +136,7 @@ describe('WorkspacePage board and page context actions', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('moves the exact right-clicked Board to Trash and selects the newest replacement', async () => {
+  it('deletes the exact right-clicked Board and selects the newest replacement', async () => {
     const user = userEvent.setup()
     renderWorkspace()
 
@@ -144,7 +144,10 @@ describe('WorkspacePage board and page context actions', () => {
     fireEvent.contextMenu(boardButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
 
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(vocabularyApi.deleteBoard).not.toHaveBeenCalled()
+    expect(vocabularyApi.deletePage).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /^Delete$/ }))
     await waitFor(() => expect(vocabularyApi.deleteBoard).toHaveBeenCalledWith('board-new'))
     expect(await screen.findByRole('heading', { name: 'Older page' })).toBeInTheDocument()
   })
@@ -156,7 +159,10 @@ describe('WorkspacePage board and page context actions', () => {
     const pageButton = await screen.findByRole('tab', { name: 'Newest page' })
     fireEvent.contextMenu(pageButton)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(vocabularyApi.deleteBoard).not.toHaveBeenCalled()
+    expect(vocabularyApi.deletePage).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /^Delete$/ }))
 
     await waitFor(() => expect(vocabularyApi.deletePage).toHaveBeenCalledWith('page-new'))
     expect(await screen.findByRole('heading', { name: 'Earlier page' })).toBeInTheDocument()

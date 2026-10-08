@@ -78,12 +78,6 @@ public sealed class VocabWord : BaseEntity
         UpdatedAt = now;
     }
 
-    public void RestoreFromTrash(DateTime? nowUtc = null)
-    {
-        DeletedAt = null;
-        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
-    }
-
     private void Apply(
         string word,
         string meaning,

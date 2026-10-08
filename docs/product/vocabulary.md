@@ -19,49 +19,21 @@ failures use `OperationResult<T>` and are mapped by the API to the shared
 `ApiResponse<T>` body and matching HTTP status. Database and infrastructure
 failures remain exceptions and are handled by the API exception middleware.
 
-`DELETE /boards/{boardId}`, `DELETE /pages/{pageId}`, and
-`DELETE /words/{wordId}` move the resource to Trash and return its Trash entry.
-Permanent deletion is performed through the Trash API.
+## Deletion and retained history
 
-## Trash And Review Scheduling
+`DELETE /boards/{boardId}`, `DELETE /pages/{pageId}`, and `DELETE /words/{wordId}`
+return `{ deleted: true }` after setting `deleted_at` and `updated_at`.
+Ownership and active parent checks still apply. Board/Page deletion also hides
+active descendant pages/words. All rows stay in the database.
 
-Vocabulary is soft-deleted for the Trash retention period (30 days). Soft delete
-does not change a word's review state or due date. Review queries only include
-active Vocabulary, so a trashed word is not due or scheduled while it is in
-Trash. Restore leaves its saved due date unchanged: a date on or before today
-is due on the next Review query; a future date stays scheduled for that date.
+Related Practice/Review sessions, items, attempts, histories and Review states
+are hidden and retained. A Word deletion hides sessions containing that Word;
+a Page/Board deletion also hides sessions for its pages. Existing aggregate
+Practice summaries for affected pages are hidden. Unrelated sessions and the
+Review schedules of surviving words remain available.
 
-Trash owns the transaction for moving, restoring, and permanently deleting
-Vocabulary. A successful `OperationResult` commits; an expected failure rolls
-back; an exception rolls back and propagates. Repository methods stage
-Vocabulary mutations and do not commit normal CRUD operations themselves.
-
-Restoring a board or page restores only descendants whose `DeletedAt` matches
-that Trash entry's timestamp. A child moved to Trash separately keeps its own
-Trash entry and is not accidentally restored with its former parent.
-
-## Permanent Deletion And Learning History
-
-Permanent deletion physically removes the selected Vocabulary row and its
-descendant words/pages, board preferences, and child Trash entries. It also
-removes the words' active Review state and abandons any in-progress Review or
-Practice session that includes those words.
-
-Completed learning history and achievement records remain:
-
-- Review session items retain word/meaning snapshots, result, completion time,
-  and their Review attempts.
-- `WordReviewHistory` remains a statistics ledger and can point to its Review
-  session item. The original Word id is a historical identifier, not a
-  cascading foreign key.
-- Practice session items and attempts retain their snapshots and answers.
-- Practice sessions and summaries retain their page/board identifiers as
-  historical identifiers and store the names needed to display old results.
-
-The database migration backfills page names and links existing Review history
-to its saved session item before dropping Vocabulary foreign keys. It stops
-with a diagnostic if required snapshots, completed results/times, answer
-attempts, or historical links are missing; it does not fabricate those values.
+The service owns one `SaveChangesAsync` commit for Vocabulary and history
+changes. No Trash, restore, Undo or cleanup job remains. See [Deletion](deletion.md).
 
 ## Page Drafts And Column Preferences
 

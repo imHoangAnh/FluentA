@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export type ProjectBoardSummary = {
   id: string
@@ -76,7 +76,7 @@ export async function updateBoard(boardId: string, name: string) {
 }
 
 export async function deleteBoard(boardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/project/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/project/boards/${boardId}`)
   return response.data.data!
 }
 
@@ -91,7 +91,7 @@ export async function updateColumn(boardId: string, columnId: string, input: { n
 }
 
 export async function deleteColumn(boardId: string, columnId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/project/boards/${boardId}/columns/${columnId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/project/boards/${boardId}/columns/${columnId}`)
   return response.data.data!
 }
 
@@ -111,6 +111,6 @@ export async function moveCard(cardId: string, columnId: string, sortOrder: numb
 }
 
 export async function deleteCard(cardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/project/cards/${cardId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/project/cards/${cardId}`)
   return response.data.data!
 }

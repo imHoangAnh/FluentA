@@ -8,7 +8,7 @@ namespace FluentA.Infrastructure.UnitTests;
 public sealed class AssetObjectStorageIntegrationTests
 {
     [CloudStorageIntegrationFact]
-    public async Task Presign_put_metadata_get_and_delete_lifecycle_works_against_configured_bucket()
+    public async Task Presign_put_metadata_and_get_lifecycle_works_against_configured_bucket()
     {
         var values = new Dictionary<string, string?>
         {
@@ -35,7 +35,8 @@ public sealed class AssetObjectStorageIntegrationTests
         }
         finally
         {
-            await storage.DeleteIfExistsAsync(objectKey);
+            await provider.GetRequiredService<FluentA.Infrastructure.ObjectStorage.Assets.AssetStorageClients>().Operations.DeleteObjectAsync(
+                new Amazon.S3.Model.DeleteObjectRequest { BucketName = values["AssetStorage:Bucket"], Key = objectKey });
         }
     }
 

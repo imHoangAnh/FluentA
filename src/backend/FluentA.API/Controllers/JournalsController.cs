@@ -4,7 +4,6 @@ using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
 using FluentA.Application.Common;
-using FluentA.Application.BoundedContexts.Trash;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -88,7 +87,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.DeleteAsync(CurrentUserId(), journalId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

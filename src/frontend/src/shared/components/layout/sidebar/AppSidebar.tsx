@@ -1,4 +1,4 @@
-import { Bell, Trash2 } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/shared/lib/utils'
 import { useShellEnvironment } from '../ShellEnvironment'
@@ -20,7 +20,6 @@ export function AppSidebar() {
   } = useShellEnvironment()
   const SettingsIcon = settingsNavigation.icon
   const notificationsActive = location.pathname === notificationsPath || location.pathname.startsWith(`${notificationsPath}/`)
-  const trashActive = location.pathname === '/trash' || location.pathname.startsWith('/trash/')
   const settingsActive = location.pathname === settingsNavigation.to || location.pathname.startsWith(`${settingsNavigation.to}/`)
 
   return (
@@ -46,15 +45,6 @@ export function AppSidebar() {
             <span className="max-[1100px]:sr-only">Notifications</span>
           </Link>
         )}
-        <Link
-          to="/trash"
-          aria-label="Trash"
-          aria-current={trashActive ? 'page' : undefined}
-          className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground', trashActive && 'bg-secondary text-secondary-foreground', 'max-[1100px]:justify-center max-[1100px]:px-0')}
-        >
-          <Trash2 className="size-[18px]" aria-hidden="true" />
-          <span className="max-[1100px]:sr-only">Trash</span>
-        </Link>
         <Link
           to={settingsNavigation.to}
           aria-label="Settings"

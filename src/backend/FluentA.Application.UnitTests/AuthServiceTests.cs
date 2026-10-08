@@ -370,7 +370,6 @@ public sealed class AuthServiceTests
         public Task<Asset?> GetByIdAsync(Guid assetId, CancellationToken cancellationToken = default) => Task.FromResult<Asset?>(null);
         public Task<Asset?> GetOwnedAsync(Guid userId, Guid assetId, CancellationToken cancellationToken = default) => Task.FromResult<Asset?>(null);
         public Task<IReadOnlyList<Asset>> GetOwnedAsync(Guid userId, IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Asset>>([]);
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Asset>>([]);
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 

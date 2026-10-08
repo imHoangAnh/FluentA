@@ -316,7 +316,7 @@ public sealed partial class AuthService : IAuthService
         var selectingNew = selectedAvatarAsset is not null && selectedAvatarAsset.Id != originalAvatar;
         var nextAvatar = request.RemoveAvatar ? null : selectedAvatarAsset?.Id ?? originalAvatar;
         if (currentAvatarAsset is not null && currentAvatarAsset.Id != nextAvatar && (request.RemoveAvatar || selectingNew))
-            currentAvatarAsset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
+            currentAvatarAsset.MarkDeleted(DateTime.UtcNow);
 
         try
         {

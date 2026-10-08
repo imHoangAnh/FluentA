@@ -1,3 +1,4 @@
+import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
 import { BookOpenText, FileText, FolderPlus, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -11,9 +12,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { Input } from '@/shared/components/ui/input'
 import { toast } from '@/shared/lib/toast'
 import * as vocabularyApi from '../api/vocabulary.api'
-import { vocabularyKeys } from '../api/vocabulary.queries'
+import { vocabularyKeys, refreshLearningAfterVocabularyDeletion } from '../api/vocabulary.queries'
 import { cn } from '@/shared/lib/utils'
-import { restoreTrashEntry } from '@/features/trash'
 
 type DeleteTarget =
   | { kind: 'board'; boardId: string; name: string }
@@ -224,6 +224,7 @@ export function WorkspacePage() {
   const [isCreatingBoard, setIsCreatingBoard] = useState(false)
   const [isCreatingPage, setIsCreatingPage] = useState(false)
   const [boardUpdateTarget, setBoardUpdateTarget] = useState<BoardUpdateTarget | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [boardSearch, setBoardSearch] = useState('')
   const [pageSearch, setPageSearch] = useState('')
@@ -402,7 +403,7 @@ export function WorkspacePage() {
 
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'board' }>) => vocabularyApi.deleteBoard(target.boardId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
       const remainingBoards = newestFirst((queryClient.getQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards) ?? []).filter((board) => board.id !== target.boardId))
       const deletedBoard = queryClient.getQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(target.boardId))
       queryClient.setQueryData(vocabularyKeys.boards, remainingBoards)
@@ -411,14 +412,16 @@ export function WorkspacePage() {
       setSelectedBoardId(remainingBoards[0]?.id ?? null)
       setSelectedPageId(null)
       requestAnimationFrame(() => document.getElementById(remainingBoards[0] ? `vocabulary-board-tab-${remainingBoards[0].id}` : 'vocabulary-add-board')?.focus())
-      toast.success('Board moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id) } })
+      setDeleteTarget(null)
+      refreshLearningAfterVocabularyDeletion(queryClient)
+      toast.success('Board deleted.')
       void queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
     },
   })
 
   const deletePage = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'page' }>) => vocabularyApi.deletePage(target.pageId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
       const boardKey = vocabularyKeys.board(target.boardId)
       const current = queryClient.getQueryData<vocabularyApi.BoardDetail>(boardKey)
       const remainingPages = newestFirst((current?.pages ?? []).filter((page) => page.id !== target.pageId))
@@ -426,7 +429,9 @@ export function WorkspacePage() {
       queryClient.removeQueries({ queryKey: vocabularyKeys.words(target.pageId), exact: true })
       setSelectedPageId(remainingPages[0]?.id ?? null)
       requestAnimationFrame(() => document.getElementById(remainingPages[0] ? `vocabulary-page-tab-${remainingPages[0].id}` : 'vocabulary-add-page')?.focus())
-      toast.success('Page moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id) } })
+      setDeleteTarget(null)
+      refreshLearningAfterVocabularyDeletion(queryClient)
+      toast.success('Page deleted.')
       void queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
       void queryClient.invalidateQueries({ queryKey: boardKey })
     },
@@ -473,13 +478,6 @@ export function WorkspacePage() {
   function openCreatePageDialog() {
     createPage.reset()
     setIsCreatingPage(true)
-  }
-
-  function undo(entryId: string) {
-    void restoreTrashEntry(entryId)
-      .then(() => queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards }))
-      .then(() => toast.success('Vocabulary item restored.'))
-      .catch(() => toast.error('Could not restore the vocabulary item.'))
   }
 
   function confirmRename(name: string) {
@@ -533,7 +531,7 @@ export function WorkspacePage() {
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       <ContextMenuItem onSelect={() => { void openUpdateBoardDialog(board) }}>Update Board</ContextMenuItem>
-                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deleteBoard.mutate({ kind: 'board', boardId: board.id, name: board.name })}>Delete Board</ContextMenuItem>
+                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deleteBoard.reset(); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }) }}>Delete Board</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 ))}
@@ -586,7 +584,7 @@ export function WorkspacePage() {
                         </ContextMenuTrigger>
                         <ContextMenuContent>
                           <ContextMenuItem onSelect={() => setRenameTarget({ boardId: activeBoard.id, pageId: page.id, name: page.name })}>Update Page</ContextMenuItem>
-                          <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deletePage.mutate({ kind: 'page', boardId: activeBoard.id, pageId: page.id, name: page.name })}>Delete Page</ContextMenuItem>
+                          <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deletePage.reset(); setDeleteTarget({ kind: 'page', boardId: activeBoard.id, pageId: page.id, name: page.name }) }}>Delete Page</ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
                     ))}
@@ -721,6 +719,9 @@ export function WorkspacePage() {
           onConfirm={confirmRename}
         />
       ) : null}
+      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteBoard.isPending || deletePage.isPending}
+        error={deleteBoard.isError || deletePage.isError} onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget?.kind === 'board') deleteBoard.mutate(deleteTarget); else if (deleteTarget) deletePage.mutate(deleteTarget) }} />
     </>
   )
 }

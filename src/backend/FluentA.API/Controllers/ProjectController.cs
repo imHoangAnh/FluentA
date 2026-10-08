@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Project.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -68,7 +67,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -98,7 +97,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteColumnAsync(CurrentUserId(), boardId, columnId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -138,7 +137,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteCardAsync(CurrentUserId(), cardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

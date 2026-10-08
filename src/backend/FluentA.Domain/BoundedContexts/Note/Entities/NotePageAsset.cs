@@ -27,5 +27,12 @@ public sealed class NotePageAsset : BaseEntity
     public Guid NotePageId { get; private set; }
     public Guid AssetId { get; private set; }
 
+    public void SoftDelete(DateTime nowUtc)
+    {
+        if (DeletedAt is not null) return;
+        DeletedAt = nowUtc;
+        UpdatedAt = nowUtc;
+    }
+
     public static NotePageAsset Create(Guid notePageId, Guid assetId) => new(notePageId, assetId);
 }

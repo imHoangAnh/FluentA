@@ -193,15 +193,6 @@ public sealed class ProjectServiceTests
             return Task.FromResult(column);
         }
 
-        public Task<ProjectBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt == trashedAt));
-
-        public Task<ProjectColumn?> GetTrashedColumnAsync(Guid userId, Guid columnId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).FirstOrDefault(column => column.Id == columnId && column.DeletedAt == trashedAt));
-
-        public Task<ProjectCard?> GetTrashedCardAsync(Guid userId, Guid cardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).Where(column => column.DeletedAt is null).SelectMany(column => column.Cards).FirstOrDefault(card => card.Id == cardId && card.DeletedAt == trashedAt));
-
         public Task<int> NextColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
         {
             var sortOrder = Boards.SelectMany(board => board.Columns)
@@ -247,15 +238,6 @@ public sealed class ProjectServiceTests
 
         public Task UpdateCardAsync(ProjectCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task RemoveBoardAsync(ProjectBoard board, CancellationToken cancellationToken = default)
-        {
-            Boards.Remove(board);
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveColumnAsync(ProjectColumn column, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task RemoveCardAsync(ProjectCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class RecordingProjectSyncNotifier : IProjectSyncNotifier

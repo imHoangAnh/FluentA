@@ -6,6 +6,4 @@ public interface IAssetService
 {
     Task<OperationResult<PresignedAssetUploadDto>> PresignAsync(Guid userId, PresignAssetRequest request, CancellationToken cancellationToken = default);
     Task<OperationResult<AssetDto>> FinalizeAsync(Guid userId, FinalizeAssetRequest request, CancellationToken cancellationToken = default);
-    Task<int> CleanupExpiredPendingAsync(CancellationToken cancellationToken = default);
-    Task<AssetPurgeResult> PurgeExpiredArchivedAsync(CancellationToken cancellationToken = default);
 }

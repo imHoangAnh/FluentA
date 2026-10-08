@@ -14,36 +14,6 @@ namespace FluentA.Infrastructure.UnitTests;
 public sealed class EfReviewVocabularySafetyTests
 {
     [Fact]
-    public async Task TrashingAndRestoringWordLeavesReviewStateAndDueDateUntouched()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql("Host=127.0.0.1;Port=1;Database=review_schedule_test;Username=test;Password=test")
-            .Options;
-        await using var dbContext = new AppDbContext(options);
-        var word = VocabWord.Create(Guid.NewGuid(), "alpha", "meaning", "/alpha/", WordType.Noun, null, "Example.");
-        var dueDate = new DateOnly(2026, 10, 1);
-        var reviewState = WordReviewState.CreateAtLevel(Guid.NewGuid(), word.Id, level: 3, dueDate);
-        dbContext.Words.Attach(word);
-        dbContext.WordReviewStates.Attach(reviewState);
-        var repository = new VocabularyRepository(dbContext);
-        var trashedAt = new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
-
-        await repository.SoftDeleteWordAsync(word, trashedAt);
-        await repository.UpdateWordAsync(word);
-
-        Assert.Equal(EntityState.Modified, dbContext.Entry(word).State);
-        Assert.Equal(EntityState.Unchanged, dbContext.Entry(reviewState).State);
-        Assert.Equal(dueDate, reviewState.NextReviewDate);
-
-        word.RestoreFromTrash(trashedAt.AddMinutes(1));
-        await repository.UpdateWordAsync(word);
-
-        Assert.Equal(EntityState.Modified, dbContext.Entry(word).State);
-        Assert.Equal(EntityState.Unchanged, dbContext.Entry(reviewState).State);
-        Assert.Equal(dueDate, reviewState.NextReviewDate);
-    }
-
-    [Fact]
     public async Task ReviewDashboardCountsOnlyDueStatesForActiveVocabulary()
     {
         var interceptor = new FakePostgresInterceptor();

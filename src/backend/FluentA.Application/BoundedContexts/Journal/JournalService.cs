@@ -2,7 +2,6 @@ using System.Globalization;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
-using FluentA.Application.BoundedContexts.Trash;
 
 namespace FluentA.Application.BoundedContexts.Journal;
 
@@ -13,13 +12,11 @@ public sealed class JournalService : IJournalService
     private const int SearchQueryMaxLength = 100;
     private readonly IJournalRepository _repository;
     private readonly IJournalContentProcessor _contentProcessor;
-    private readonly ITrashService? _trash;
 
-    public JournalService(IJournalRepository repository, IJournalContentProcessor contentProcessor, ITrashService? trash = null)
+    public JournalService(IJournalRepository repository, IJournalContentProcessor contentProcessor)
     {
         _repository = repository;
         _contentProcessor = contentProcessor;
-        _trash = trash;
     }
 
     public async Task<OperationResult<IReadOnlyList<JournalEntrySummaryDto>>> ListAsync(
@@ -134,21 +131,20 @@ public sealed class JournalService : IJournalService
         return OperationResult<JournalEntryDto>.Success(ToDto(entry));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteAsync(
+    public async Task<OperationResult<bool>> DeleteAsync(
         Guid userId,
         Guid journalId,
         CancellationToken cancellationToken = default)
     {
-        if (_trash is not null) return await _trash.TrashJournalAsync(userId, journalId, cancellationToken);
         var entry = await _repository.GetAsync(userId, journalId, cancellationToken);
         if (entry is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(JournalError.NotFound());
+            return OperationResult<bool>.Failure(JournalError.NotFound());
         }
 
         entry.SoftDelete();
         await _repository.UpdateAsync(entry, cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Journal", entry.Id, entry.Title, entry.Date.ToString("yyyy-MM-dd"), DateTime.UtcNow, DateTime.UtcNow));
+        return OperationResult<bool>.Success(true);
     }
 
     private static (Dictionary<string, string[]> Errors, DateTime Date) ValidateCreate(CreateJournalEntryRequest request)

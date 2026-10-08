@@ -106,7 +106,7 @@ public sealed class AssetServiceTests
     }
 
     [Fact]
-    public async Task Finalize_DeletesUploadedObjectWhenPersistenceFails()
+    public async Task Finalize_RetainsUploadedObjectWhenPersistenceFails()
     {
         var repository = new FakeAssetRepository { FailOnUpdate = true };
         var storage = new FakeAssetObjectStorage();
@@ -118,66 +118,7 @@ public sealed class AssetServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.FinalizeAsync(userId, new FinalizeAssetRequest(presign.Value!.Asset.Id)));
 
-        Assert.Equal(repository.Assets.Single().ObjectKey, storage.DeletedObjectKey);
-    }
-
-    [Fact]
-    public async Task CleanupExpiredPending_DeletesPendingAndExpiredAssets()
-    {
-        var repository = new FakeAssetRepository();
-        var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage);
-        var userId = Guid.NewGuid();
-        var pending = Asset.CreatePending(
-            Guid.NewGuid(),
-            userId,
-            AssetType.Avatar,
-            "users/demo/pending", "image/png",
-            0,
-            DateTime.UtcNow.AddMinutes(-2));
-        var expired = Asset.CreatePending(
-            Guid.NewGuid(),
-            userId,
-            AssetType.Avatar,
-            "users/demo/expired", "image/png",
-            0,
-            DateTime.UtcNow.AddMinutes(-3));
-        expired.MarkExpired(DateTime.UtcNow.AddMinutes(-1));
-        await repository.AddAsync(pending);
-        await repository.AddAsync(expired);
-
-        var cleaned = await service.CleanupExpiredPendingAsync();
-
-        Assert.Equal(2, cleaned);
-        Assert.Equal(AssetStatus.Deleted, pending.Status);
-        Assert.Equal(AssetStatus.Deleted, expired.Status);
-        Assert.Equal(2, storage.DeletedObjectKeys.Count);
-        Assert.Contains(pending.ObjectKey, storage.DeletedObjectKeys);
-        Assert.Contains(expired.ObjectKey, storage.DeletedObjectKeys);
-    }
-
-    [Fact]
-    public async Task PurgeExpiredArchived_DeletesClaimedObjectsAndRequeuesFailures()
-    {
-        var repository = new FakeAssetRepository();
-        var storage = new FakeAssetObjectStorage();
-        var service = new AssetService(repository, storage);
-        var success = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/success");
-        var failed = CreateFinalizedAsset(Guid.NewGuid(), "avatars/users/demo/failed");
-        var due = DateTime.UtcNow.AddDays(-31);
-        success.Archive(due, TimeSpan.FromDays(30));
-        failed.Archive(due, TimeSpan.FromDays(30));
-        await repository.AddAsync(success);
-        await repository.AddAsync(failed);
-        storage.FailObjectKey = failed.ObjectKey;
-
-        var result = await service.PurgeExpiredArchivedAsync();
-
-        Assert.Equal(2, result.Claimed);
-        Assert.Equal(1, result.Deleted);
-        Assert.Equal(1, result.Failed);
-        Assert.Equal(AssetStatus.Deleted, success.Status);
-        Assert.Equal(AssetStatus.Archived, failed.Status);
+        Assert.Null(storage.DeletedObjectKey);
     }
 
     private static Asset CreateFinalizedAsset(Guid userId, string objectKey)
@@ -220,22 +161,6 @@ public sealed class AssetServiceTests
             return Task.FromResult<IReadOnlyList<Asset>>(Assets
                 .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt == null && assetIds.Contains(asset.Id))
                 .ToList());
-        }
-
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Asset>>(Assets
-                .Where(asset => asset.DeletedAt == null
-                    && (asset.Status == AssetStatus.Failed
-                        || (asset.Status == AssetStatus.PendingUpload && asset.ExpiresAt <= nowUtc)))
-                .ToList());
-        }
-
-        public Task<IReadOnlyList<Asset>> ClaimDueArchivedAsync(DateTime nowUtc, int batchSize, CancellationToken cancellationToken = default)
-        {
-            var claimed = Assets.Where(asset => asset.Status == AssetStatus.Archived && asset.PurgeAfterAt <= nowUtc).Take(batchSize).ToList();
-            foreach (var asset in claimed) asset.ClaimPurge(nowUtc);
-            return Task.FromResult<IReadOnlyList<Asset>>(claimed);
         }
 
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default)

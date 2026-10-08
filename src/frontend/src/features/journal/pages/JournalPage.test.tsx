@@ -63,9 +63,7 @@ describe('JournalPage workspace redesign', () => {
     vi.mocked(journalApi.getJournalCalendar).mockResolvedValue([{ date: journalEntry.date, count: 1 }])
     vi.mocked(journalApi.getJournalEntry).mockResolvedValue(journalEntry)
     vi.mocked(journalApi.updateJournalEntry).mockResolvedValue(journalEntry)
-    vi.mocked(journalApi.deleteJournalEntry).mockResolvedValue({
-      id: 'trash-1', entityKind: 'Journal', entityId: journalEntry.id, displayName: journalEntry.title, originalLocation: journalEntry.date, trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
-    })
+    vi.mocked(journalApi.deleteJournalEntry).mockResolvedValue({ deleted: true })
   })
 
   afterEach(() => {
@@ -159,7 +157,30 @@ describe('JournalPage workspace redesign', () => {
     })
   })
 
+  it('confirms deletion, supports cancellation and keeps a failed delete available for retry', async () => {
+    const user = userEvent.setup()
+    vi.mocked(journalApi.deleteJournalEntry).mockRejectedValueOnce(new Error('Network failed')).mockResolvedValue({ deleted: true })
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
+    await user.click(screen.getByRole('button', { name: `Delete journal ${journalEntry.title}` }))
+    expect(journalApi.deleteJournalEntry).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    expect(journalApi.deleteJournalEntry).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: `Delete journal ${journalEntry.title}` }))
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    expect(await within(screen.getByRole('alertdialog')).findByRole('alert')).toHaveTextContent('Could not delete')
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([])
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(journalApi.deleteJournalEntry).toHaveBeenCalledTimes(2)
+    expect(journalApi.deleteJournalEntry).toHaveBeenCalledWith(journalEntry.id)
+    expect(screen.queryByRole('button', { name: `Open journal ${journalEntry.title}` })).not.toBeInTheDocument()
+  })
+
   it('interacts with the shadcn UI calendar to open populated and prepare empty dates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-08T10:00:00Z'))
     renderPage()
 
     const prevMonthButton = await screen.findByRole('button', { name: /previous month/i })

@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export const DEFAULT_VOCAB_COLUMN_ORDER = [
   'word',
@@ -147,7 +147,7 @@ export async function updateBoard(boardId: string, input: UpdateBoardInput) {
 }
 
 export async function deleteBoard(boardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/vocabs/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/boards/${boardId}`)
   return response.data.data!
 }
 
@@ -162,7 +162,7 @@ export async function updatePage(pageId: string, input: { name: string }) {
 }
 
 export async function deletePage(pageId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/vocabs/pages/${pageId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/pages/${pageId}`)
   return response.data.data!
 }
 
@@ -187,7 +187,7 @@ export async function updateWordCell(wordId: string, columnKey: keyof WordInput,
 }
 
 export async function deleteWord(wordId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/vocabs/words/${wordId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/words/${wordId}`)
   return response.data.data!
 }
 

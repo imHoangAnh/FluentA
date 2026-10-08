@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export type JournalEntry = {
   id: string
@@ -80,6 +80,6 @@ export async function updateJournalEntry(id: string, input: UpdateJournalEntryIn
 }
 
 export async function deleteJournalEntry(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/journal/${id}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/journal/${id}`)
   return response.data.data!
 }

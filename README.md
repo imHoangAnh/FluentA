@@ -64,7 +64,7 @@ flows.
 | Client state and data | TanStack Query, Zustand, Axios |
 | Backend | ASP.NET Core, .NET 10, Entity Framework Core |
 | Data and infrastructure | PostgreSQL 16, MinIO for local development, AWS S3 for production, Docker Compose |
-| Realtime and jobs | SignalR, Quartz |
+| Realtime (remaining migration scope) | SignalR |
 | Testing | xUnit, Vitest, Playwright |
 
 ## Engineering Highlights

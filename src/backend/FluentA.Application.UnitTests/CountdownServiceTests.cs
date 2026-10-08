@@ -233,9 +233,6 @@ public sealed class CountdownServiceTests
                 .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
 
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Asset>>([]);
-
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 

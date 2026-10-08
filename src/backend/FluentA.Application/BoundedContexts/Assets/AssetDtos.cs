@@ -8,7 +8,6 @@ public sealed record PresignAssetRequest(
 
 public sealed record FinalizeAssetRequest(Guid AssetId);
 
-public sealed record AssetPurgeResult(int Claimed, int Deleted, int Failed);
 
 public sealed record AssetDto(
     Guid Id,

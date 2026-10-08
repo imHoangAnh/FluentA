@@ -72,32 +72,6 @@ public sealed class EfProjectRepository : IProjectRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<ProjectBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.ProjectBoards
-            .Include(board => board.Columns)
-            .ThenInclude(column => column.Cards)
-            .FirstOrDefaultAsync(board => board.Id == boardId && board.UserId == userId && board.DeletedAt == trashedAt, cancellationToken);
-    }
-
-    public Task<ProjectColumn?> GetTrashedColumnAsync(Guid userId, Guid columnId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.ProjectColumns
-            .Include(column => column.Cards)
-            .Where(column => column.Id == columnId && column.DeletedAt == trashedAt)
-            .Join(_dbContext.ProjectBoards.Where(board => board.UserId == userId && board.DeletedAt == null), column => column.BoardId, board => board.Id, (column, _) => column)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    public Task<ProjectCard?> GetTrashedCardAsync(Guid userId, Guid cardId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return (from card in _dbContext.ProjectCards
-                join column in _dbContext.ProjectColumns on card.ColumnId equals column.Id
-                join board in _dbContext.ProjectBoards on column.BoardId equals board.Id
-                where card.Id == cardId && card.DeletedAt == trashedAt && column.DeletedAt == null && board.DeletedAt == null && board.UserId == userId
-                select card).FirstOrDefaultAsync(cancellationToken);
-    }
-
     public async Task<int> NextColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
     {
         var maxSortOrder = await _dbContext.ProjectColumns
@@ -138,40 +112,23 @@ public sealed class EfProjectRepository : IProjectRepository
 
     public async Task UpdateBoardAsync(ProjectBoard board, CancellationToken cancellationToken = default)
     {
-        _dbContext.ProjectBoards.Update(board);
+        if (_dbContext.Entry(board).State == EntityState.Detached)
+            _dbContext.ProjectBoards.Update(board);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateColumnAsync(ProjectColumn column, CancellationToken cancellationToken = default)
     {
-        _dbContext.ProjectColumns.Update(column);
+        if (_dbContext.Entry(column).State == EntityState.Detached)
+            _dbContext.ProjectColumns.Update(column);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateCardAsync(ProjectCard card, CancellationToken cancellationToken = default)
     {
-        _dbContext.ProjectCards.Update(card);
+        if (_dbContext.Entry(card).State == EntityState.Detached)
+            _dbContext.ProjectCards.Update(card);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveBoardAsync(ProjectBoard board, CancellationToken cancellationToken = default)
-    {
-        _dbContext.ProjectCards.RemoveRange(board.Columns.SelectMany(column => column.Cards));
-        _dbContext.ProjectColumns.RemoveRange(board.Columns);
-        _dbContext.ProjectBoards.Remove(board);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task RemoveColumnAsync(ProjectColumn column, CancellationToken cancellationToken = default)
-    {
-        _dbContext.ProjectCards.RemoveRange(column.Cards);
-        _dbContext.ProjectColumns.Remove(column);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task RemoveCardAsync(ProjectCard card, CancellationToken cancellationToken = default)
-    {
-        _dbContext.ProjectCards.Remove(card);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
 }

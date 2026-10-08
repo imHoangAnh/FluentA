@@ -44,46 +44,6 @@ public sealed class EfAssetRepository : IAssetRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Assets
-            .Where(asset => asset.DeletedAt == null
-                && (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Failed
-                    || (asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.PendingUpload
-                        && asset.ExpiresAt.HasValue
-                        && asset.ExpiresAt.Value <= nowUtc)))
-            .OrderBy(asset => asset.CreatedAt)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<Asset>> ClaimDueArchivedAsync(DateTime nowUtc, int batchSize, CancellationToken cancellationToken = default)
-    {
-        var candidateIds = await _dbContext.Assets
-            .Where(asset => asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Archived
-                && asset.PurgeAfterAt.HasValue
-                && asset.PurgeAfterAt.Value <= nowUtc)
-            .OrderBy(asset => asset.PurgeAfterAt)
-            .Select(asset => asset.Id)
-            .Take(batchSize)
-            .ToListAsync(cancellationToken);
-
-        var claimedIds = new List<Guid>();
-        foreach (var id in candidateIds)
-        {
-            var updated = await _dbContext.Assets
-                .Where(asset => asset.Id == id
-                    && asset.Status == FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.Archived
-                    && asset.PurgeAfterAt.HasValue
-                    && asset.PurgeAfterAt.Value <= nowUtc)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(asset => asset.Status, FluentA.Domain.BoundedContexts.Assets.Enums.AssetStatus.PendingDeletion)
-                    .SetProperty(asset => asset.UpdatedAt, nowUtc), cancellationToken);
-            if (updated == 1) claimedIds.Add(id);
-        }
-
-        return await _dbContext.Assets.Where(asset => claimedIds.Contains(asset.Id)).ToListAsync(cancellationToken);
-    }
-
     public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default)
     {
         _dbContext.Assets.Update(asset);

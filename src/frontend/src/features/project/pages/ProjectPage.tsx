@@ -19,7 +19,6 @@ import { ProjectCardDetailPanel } from '../components/ProjectCardDetailPanel'
 import { type ProjectCardForm, projectPriorities } from '../components/project-card-editor'
 import * as projectApi from '../api/project.api'
 import { projectKeys } from '../api/project.queries'
-import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/shared/lib/toast'
 
 const today = new Date()
@@ -184,7 +183,7 @@ export function ProjectPage() {
 
   const deleteBoard = useMutation({
     mutationFn: (boardId: string) => projectApi.deleteBoard(boardId),
-    onSuccess: async (entry, boardId) => {
+    onSuccess: async (_, boardId) => {
       const nextBoardId = selectedBoardId === boardId
         ? boards.find((item) => item.id !== boardId)?.id ?? null
         : selectedBoardId
@@ -197,7 +196,7 @@ export function ProjectPage() {
         if (nextBoardId) boardTabRefs.current.get(nextBoardId)?.focus()
         else newBoardInputRef.current?.focus()
       })
-      toast.success('Project moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, nextBoardId) } })
+      toast.success('Project deleted.')
     },
     onError: () => {
       boardDeletePendingRef.current = false
@@ -207,17 +206,6 @@ export function ProjectPage() {
       boardDeletePendingRef.current = false
     },
   })
-
-  const undo = async (entryId: string, activeId: string | null) => {
-    try {
-      await restoreTrashEntry(entryId)
-      await refresh(activeId)
-      if (activeId) setActiveBoardId(activeId)
-      toast.success('Item restored.')
-    } catch {
-      toast.error('Could not restore the item.')
-    }
-  }
 
   const createColumn = useMutation({
     mutationFn: ({ boardId, name }: { boardId: string; name: string }) => projectApi.createColumn(boardId, name),
@@ -241,9 +229,9 @@ export function ProjectPage() {
 
   const deleteColumn = useMutation({
     mutationFn: ({ boardId, columnId }: { boardId: string; columnId: string }) => projectApi.deleteColumn(boardId, columnId),
-    onSuccess: async (entry, { boardId }) => {
+    onSuccess: async (_, { boardId }) => {
       await refresh(boardId)
-      toast.success('Column moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, boardId) } })
+      toast.success('Column deleted.')
     },
     onError: (error) => {
       const errorData = (error as { response?: { data?: { error?: { code?: string } } } }).response?.data?.error
@@ -278,10 +266,10 @@ export function ProjectPage() {
 
   const deleteCard = useMutation({
     mutationFn: ({ cardId }: { boardId: string; cardId: string }) => projectApi.deleteCard(cardId),
-    onSuccess: async (entry, { boardId }) => {
+    onSuccess: async (_, { boardId }) => {
       setCardEditor(null)
       await refresh(boardId)
-      toast.success('Card moved to Trash.', { action: { label: 'Undo', onClick: () => undo(entry.id, boardId) } })
+      toast.success('Card deleted.')
     },
     onError: () => toast.error('Could not delete card.'),
   })
@@ -712,7 +700,7 @@ export function ProjectPage() {
           <AlertDialogContent>
             <AlertDialogTitle>Delete Project</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>"{deletingBoard?.name}"</strong>? This project will be moved to Trash.
+              Are you sure you want to delete <strong>"{deletingBoard?.name}"</strong>? It will no longer appear in your workspace.
             </AlertDialogDescription>
             <AlertDialogFooter>
               <AlertDialogCancelButton disabled={deleteBoard.isPending}>Cancel</AlertDialogCancelButton>

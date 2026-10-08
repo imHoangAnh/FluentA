@@ -1,3 +1,4 @@
+import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
 import { BookOpenText, ChevronRight, FileText, FolderPlus, Layers3, Loader2, Plus, Save } from 'lucide-react'
 import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -9,7 +10,6 @@ import { cn } from '@/shared/lib/utils'
 import { uploadAsset } from '@/features/assets'
 import type { ApiEnvelope } from '@/shared/api/contracts'
 import { toast } from '@/shared/lib/toast'
-import { restoreTrashEntry } from '@/features/trash'
 import { CreateNoteDialog } from '../components/CreateNoteDialog'
 import * as noteApi from '../api/note.api'
 import { noteKeys } from '../api/note.queries'
@@ -63,6 +63,7 @@ export function NotesPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [editorError, setEditorError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<NoteEntityTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<NoteEntityTarget | null>(null)
   const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null)
   const savePromiseRef = useRef<Promise<boolean> | null>(null)
@@ -166,7 +167,7 @@ export function NotesPage() {
   })
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'board' }>) => noteApi.deleteBoard(target.boardId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
       const current = queryClient.getQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards) ?? []
       const deletedBoard = current.find((board) => board.id === target.boardId)
       const remainingBoards = newestFirst(current.filter((board) => board.id !== target.boardId))
@@ -179,23 +180,14 @@ export function NotesPage() {
       setContent('')
       setIsDirty(false)
       requestAnimationFrame(() => railFocusRef.current?.focus())
-      toast.success('Board moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
-              .then(() => toast.success('Board restored.'))
-              .catch(() => toast.error('Could not restore the board.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      toast.success('Board deleted.')
       void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
   const deletePage = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'page' }>) => noteApi.deletePage(target.pageId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
       let nextPageId: string | null = null
       queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) => current.map((board) => {
         if (board.id !== target.boardId) return board
@@ -210,17 +202,8 @@ export function NotesPage() {
       setContent('')
       setIsDirty(false)
       requestAnimationFrame(() => railFocusRef.current?.focus())
-      toast.success('Page moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
-              .then(() => toast.success('Page restored.'))
-              .catch(() => toast.error('Could not restore the page.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      toast.success('Page deleted.')
       void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
@@ -378,7 +361,7 @@ export function NotesPage() {
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'board', boardId: board.id, name: board.name })}>Rename Board</ContextMenuItem>
-                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deleteBoard.mutate({ kind: 'board', boardId: board.id, name: board.name })}>Delete Board</ContextMenuItem>
+                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deleteBoard.reset(); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }); }}>Delete Board</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                   {isActiveBoard ? (
@@ -398,7 +381,7 @@ export function NotesPage() {
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Rename Page</ContextMenuItem>
-                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deletePage.mutate({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Delete Page</ContextMenuItem>
+                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deletePage.reset(); setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name }); }}>Delete Page</ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
                       ))}
@@ -532,6 +515,9 @@ export function NotesPage() {
           onConfirm={confirmRename}
         />
       ) : null}
+      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteBoard.isPending || deletePage.isPending}
+        error={deleteBoard.isError || deletePage.isError} onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget?.kind === 'board') deleteBoard.mutate(deleteTarget); else if (deleteTarget) deletePage.mutate(deleteTarget) }} />
     </>
   )
 }

@@ -57,13 +57,6 @@ public sealed class NoteBoard : BaseEntity, IAggregateRoot
         }
     }
 
-    public void RestoreFromTrash(DateTime? nowUtc = null)
-    {
-        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
-        DeletedAt = null;
-        UpdatedAt = now;
-    }
-
     private static string CleanName(string name)
     {
         var cleaned = name.Trim();

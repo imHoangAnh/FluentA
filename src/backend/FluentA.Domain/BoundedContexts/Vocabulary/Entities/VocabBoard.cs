@@ -56,12 +56,6 @@ public sealed class VocabBoard : BaseEntity, IAggregateRoot
         UpdatedAt = now;
     }
 
-    public void RestoreFromTrash(DateTime? nowUtc = null)
-    {
-        DeletedAt = null;
-        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
-    }
-
     private static string CleanName(string name)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 120)

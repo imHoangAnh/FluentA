@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Note.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -54,7 +53,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -90,7 +89,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.DeletePageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

@@ -1,3 +1,4 @@
+import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -5,9 +6,8 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable 
 import { CSS } from '@dnd-kit/utilities'
 import { Check, CheckCircle2, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import * as vocabularyApi from '../api/vocabulary.api'
-import { vocabularyKeys } from '../api/vocabulary.queries'
+import { vocabularyKeys, refreshLearningAfterVocabularyDeletion } from '../api/vocabulary.queries'
 import { toast } from '@/shared/lib/toast'
-import { restoreTrashEntry } from '@/features/trash'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
 
 const cellClassName = 'min-h-9 w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-card focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20'
@@ -159,6 +159,7 @@ export function VocabTable(props: VocabTableProps) {
 }
 
 function PageVocabTable({ page, preferences, searchTerm = '', preferencesBusy = false, onPreferencesChange }: VocabTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const queryClient = useQueryClient()
   // QueryClient is memory-only and is cleared by the authentication boundary.
   const { data: draft } = useQuery({ queryKey: draftKey(page.id), queryFn: () => queryClient.getQueryData<PageDraft>(draftKey(page.id)) ?? emptyDraft(), initialData: emptyDraft, enabled: false, gcTime: Infinity })
@@ -245,24 +246,16 @@ function PageVocabTable({ page, preferences, searchTerm = '', preferencesBusy = 
 
   const deleteWord = useMutation({
     mutationFn: (target: { id: string; name: string }) => vocabularyApi.deleteWord(target.id),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
       queryClient.setQueryData<vocabularyApi.Word[]>(wordsKey, (current = []) => current.filter((word) => word.id !== target.id))
       if (editingWordId === target.id) {
         setEditingWordId(null)
         setEditingWord(null)
       }
       requestAnimationFrame(() => tableFocusRef.current?.focus())
-      toast.success('Word moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: wordsKey }))
-              .then(() => toast.success('Word restored.'))
-              .catch(() => toast.error('Could not restore the word.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      refreshLearningAfterVocabularyDeletion(queryClient)
+      toast.success('Word deleted.')
     },
   })
 
@@ -480,7 +473,7 @@ function PageVocabTable({ page, preferences, searchTerm = '', preferencesBusy = 
                 <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45" type="submit" disabled={draft.saving || updateWord.isPending || deleteWord.isPending} aria-label={`Update ${word.word}`} title="Update word">
                   <Check className="size-4" aria-hidden="true" />
                 </button>
-                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={draft.saving || updateWord.isPending || deleteWord.isPending} aria-label={`Delete ${word.word}`} title="Delete word" onClick={() => deleteWord.mutate({ id: word.id, name: word.word })}>
+                <button className="grid size-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-45" type="button" disabled={draft.saving || updateWord.isPending || deleteWord.isPending} aria-label={`Delete ${word.word}`} title="Delete word" onClick={() => { deleteWord.reset(); setDeleteTarget({ id: word.id, name: word.word }) }}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </button>
               </div>
@@ -516,6 +509,8 @@ function PageVocabTable({ page, preferences, searchTerm = '', preferencesBusy = 
         {wordsQuery.isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading words...</div> : null}
         {createWord.isError && isAddingWord ? <div className="border-b border-border px-4 py-2 text-sm text-destructive" role="alert">Could not create word. Check the fields and try again.</div> : null}
       </div>
+      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteWord.isPending} error={deleteWord.isError}
+        onCancel={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) deleteWord.mutate(deleteTarget) }} />
     </div>
   )
 }

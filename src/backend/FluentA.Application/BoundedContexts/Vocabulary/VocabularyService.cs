@@ -1,5 +1,4 @@
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 
@@ -8,12 +7,10 @@ namespace FluentA.Application.BoundedContexts.Vocabulary;
 public sealed class VocabularyService : IVocabularyService
 {
     private readonly IVocabularyRepository _repository;
-    private readonly ITrashService _trashService;
 
-    public VocabularyService(IVocabularyRepository repository, ITrashService trashService)
+    public VocabularyService(IVocabularyRepository repository)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-        _trashService = trashService ?? throw new ArgumentNullException(nameof(trashService));
     }
 
     public async Task<OperationResult<IReadOnlyList<BoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -110,14 +107,17 @@ public sealed class VocabularyService : IVocabularyService
         return OperationResult<BoardDetailDto>.Success(VocabularyDtoMapper.ToDetail(board, preferences));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
-        if (await _repository.GetBoardAsync(userId, boardId, cancellationToken) is null)
+        var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
+        if (board is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
+            return OperationResult<bool>.Failure(VocabularyError.NotFound());
         }
 
-        return await _trashService.TrashVocabularyAsync(userId, boardId, cancellationToken);
+        await _repository.SoftDeleteBoardAsync(board, DateTime.UtcNow, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<PageDto>> CreatePageAsync(Guid userId, Guid boardId, CreatePageRequest request, CancellationToken cancellationToken = default)
@@ -160,14 +160,17 @@ public sealed class VocabularyService : IVocabularyService
         return OperationResult<PageDto>.Success(VocabularyDtoMapper.ToPage(page));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeletePageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeletePageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
     {
-        if (await _repository.GetPageAsync(userId, pageId, cancellationToken) is null)
+        var page = await _repository.GetPageAsync(userId, pageId, cancellationToken);
+        if (page is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
+            return OperationResult<bool>.Failure(VocabularyError.NotFound());
         }
 
-        return await _trashService.TrashVocabularyAsync(userId, pageId, cancellationToken);
+        await _repository.SoftDeletePageAsync(page, DateTime.UtcNow, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<IReadOnlyList<WordDto>>> ListWordsAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default)
@@ -251,14 +254,17 @@ public sealed class VocabularyService : IVocabularyService
         return OperationResult<WordDto>.Success(VocabularyDtoMapper.ToWord(word));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteWordAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteWordAsync(Guid userId, Guid wordId, CancellationToken cancellationToken = default)
     {
-        if (await _repository.GetWordAsync(userId, wordId, cancellationToken) is null)
+        var word = await _repository.GetWordAsync(userId, wordId, cancellationToken);
+        if (word is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(VocabularyError.NotFound());
+            return OperationResult<bool>.Failure(VocabularyError.NotFound());
         }
 
-        return await _trashService.TrashVocabularyAsync(userId, wordId, cancellationToken);
+        await _repository.SoftDeleteWordAsync(word, DateTime.UtcNow, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<BoardPreferencesDto>> UpdateBoardPreferencesAsync(Guid userId, Guid boardId, UpdateBoardPreferencesRequest request, CancellationToken cancellationToken = default)

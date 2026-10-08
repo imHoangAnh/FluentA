@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export type NotePageSummary = {
   id: string
@@ -58,7 +58,7 @@ export async function updateBoard(boardId: string, input: { name: string }) {
 }
 
 export async function deleteBoard(boardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/boards/${boardId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/notes/boards/${boardId}`)
   return response.data.data!
 }
 
@@ -78,6 +78,6 @@ export async function updatePage(pageId: string, input: UpdateNotePageInput) {
 }
 
 export async function deletePage(pageId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/pages/${pageId}`)
+  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/notes/pages/${pageId}`)
   return response.data.data!
 }

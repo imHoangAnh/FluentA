@@ -32,7 +32,6 @@ internal static class LearningServiceRegistrationExtensions
         services.AddHttpClient<IPronunciationAssessmentProvider, AzurePronunciationAssessmentProvider>();
         services.AddScoped<IReviewEnrollmentPort>(provider => provider.GetRequiredService<IReviewService>() as IReviewEnrollmentPort
             ?? throw new InvalidOperationException("Review service must implement review enrollment."));
-        services.AddScoped<IVocabularyReviewCleanupPort, EfVocabularyReviewCleanupPort>();
         services.AddScoped<IVocabularyRepository, VocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
         return services;

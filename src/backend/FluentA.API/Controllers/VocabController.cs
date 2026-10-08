@@ -2,7 +2,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Application.BoundedContexts.Vocabulary.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -57,7 +56,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -91,7 +90,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeletePageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -123,7 +122,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeleteWordAsync(CurrentUserId(), wordId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

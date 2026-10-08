@@ -26,7 +26,7 @@ public sealed class JournalServiceTests
         Assert.Equal("<p>Xin chao</p>", fetched.Value!.Content);
         Assert.Equal("Updated", updated.Value!.Title);
         Assert.Equal("2026-06-12", updated.Value.Date);
-        Assert.Equal(second.Value.Id, deleted.Value!.EntityId);
+        Assert.True(deleted.Value);
         Assert.Single(afterDelete.Value!);
     }
 
@@ -131,9 +131,6 @@ public sealed class JournalServiceTests
                 entry.Id == journalId && entry.UserId == userId && entry.DeletedAt is null));
         }
 
-        public Task<JournalEntry?> GetTrashedAsync(Guid userId, Guid journalId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_entries.FirstOrDefault(entry => entry.UserId == userId && entry.Id == journalId && entry.DeletedAt == trashedAt));
-
         public Task<IReadOnlyList<JournalEntrySearchItem>> SearchAsync(Guid userId, string query, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<JournalEntrySearchItem>>(_entries
@@ -182,11 +179,6 @@ public sealed class JournalServiceTests
             return Task.CompletedTask;
         }
 
-        public Task RemoveAsync(JournalEntry entry, CancellationToken cancellationToken = default)
-        {
-            _entries.Remove(entry);
-            return Task.CompletedTask;
-        }
     }
 
     private sealed class FakeJournalContentProcessor : IJournalContentProcessor

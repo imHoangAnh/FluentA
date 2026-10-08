@@ -23,8 +23,6 @@ public sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(asset => asset.ExpiresAt).HasColumnName("expires_at");
         builder.Property(asset => asset.Bucket).HasColumnName("bucket").HasMaxLength(255);
         builder.Property(asset => asset.OriginalName).HasColumnName("original_name").HasMaxLength(255);
-        builder.Property(asset => asset.ArchivedAt).HasColumnName("archived_at");
-        builder.Property(asset => asset.PurgeAfterAt).HasColumnName("purge_after_at");
         builder.Property(asset => asset.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(asset => asset.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(asset => asset.DeletedAt).HasColumnName("deleted_at");
@@ -32,7 +30,6 @@ public sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.HasIndex(asset => asset.ObjectKey).IsUnique();
         builder.HasIndex(asset => new { asset.UploadedByUserId, asset.Type, asset.DeletedAt });
         builder.HasIndex(asset => new { asset.UploadedByUserId, asset.Status, asset.DeletedAt });
-        builder.HasIndex(asset => new { asset.Status, asset.PurgeAfterAt });
 
         builder.HasOne<User>()
             .WithMany()

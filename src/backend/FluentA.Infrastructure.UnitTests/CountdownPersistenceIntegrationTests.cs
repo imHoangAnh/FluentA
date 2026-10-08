@@ -141,7 +141,7 @@ public sealed class CountdownPersistenceIntegrationTests
         }
         finally
         {
-            await storage.DeleteIfExistsAsync(objectKey);
+            await client.DeleteObjectAsync(new Amazon.S3.Model.DeleteObjectRequest { BucketName = bucket, Key = objectKey });
         }
     }
 

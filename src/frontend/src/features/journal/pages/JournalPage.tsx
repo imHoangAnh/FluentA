@@ -1,9 +1,9 @@
+import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
 import { BookOpen, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
 import { type FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
 import { journalKeys } from '../api/journal.queries'
-import { restoreTrashEntry } from '@/features/trash'
 import { toast } from '@/shared/lib/toast'
 import { Calendar } from '@/shared/components/ui/calendar'
 import { cn } from '@/shared/lib/utils'
@@ -51,6 +51,7 @@ function hasHighlights(entry: journalApi.JournalEntrySummary | journalApi.Journa
 export function JournalPage() {
   const queryClient = useQueryClient()
 
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isEditorActive, setIsEditorActive] = useState(false)
   const [title, setTitle] = useState('New Journal')
@@ -216,22 +217,13 @@ export function JournalPage() {
   const isUpdatePending = updateEntry.isPending
 
   const deleteEntry = useMutation({
-    mutationFn: journalApi.deleteJournalEntry,
-    onSuccess: async (entry, id) => {
+    mutationFn: (id: string) => journalApi.deleteJournalEntry(id),
+    onSuccess: async (_, id) => {
       queryClient.removeQueries({ queryKey: journalKeys.entry(id) })
       clearEditor()
       await refresh()
-      toast.success('Journal entry moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(refresh)
-              .then(() => toast.success('Journal entry restored.'))
-              .catch(() => toast.error('Could not restore the journal entry.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      toast.success('Journal entry deleted.')
     },
   })
 
@@ -472,7 +464,7 @@ export function JournalPage() {
                     type="button"
                     aria-label={`Delete journal ${title}`}
                     disabled={deleteEntry.isPending}
-                    onClick={() => selectedId && deleteEntry.mutate(selectedId)}
+                    onClick={() => { if (selectedId) { deleteEntry.reset(); setDeleteTarget({ id: selectedId, name: title }) } }}
                     title="Delete entry"
                   >
                     <Trash2 size={18} />
@@ -507,6 +499,8 @@ export function JournalPage() {
           </form>
         </div>
       </div>
+      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteEntry.isPending} error={deleteEntry.isError}
+        onCancel={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) deleteEntry.mutate(deleteTarget.id) }} />
     </div>
   )
 }
