@@ -7,7 +7,7 @@ using FluentA.Infrastructure.ObjectStorage.Assets;
 
 namespace FluentA.Infrastructure.UnitTests;
 
-public sealed class S3CompatibleAssetObjectStorageTests
+public sealed class AssetObjectStorageTests
 {
     [Fact]
     public void Regional_presigned_urls_are_https_and_support_temporary_credentials()
@@ -15,7 +15,7 @@ public sealed class S3CompatibleAssetObjectStorageTests
         using var client = new AmazonS3Client(
             new SessionAWSCredentials("TESTACCESSKEY", "test-secret-key", "test-session-token"),
             RegionEndpoint.APSoutheast1);
-        var storage = new S3CompatibleAssetObjectStorage(client, RegionalOptions());
+        var storage = new AssetObjectStorage(client, RegionalOptions());
 
         var upload = storage.CreatePresignedUpload(new AssetUploadRequest(
             "users/test/avatar.png",
@@ -38,27 +38,27 @@ public sealed class S3CompatibleAssetObjectStorageTests
     [Fact]
     public async Task Custom_presigning_endpoint_is_independent_from_operations_endpoint()
     {
-        using var operations = new RecordingS3Client();
+        using var operations = new RecordingObjectStorageClient();
         using var presigning = new AmazonS3Client(
             new BasicAWSCredentials("TESTACCESSKEY", "test-secret-key"),
             new AmazonS3Config
             {
-                ServiceURL = "https://localhost:7443",
+                ServiceURL = "https://storage-browser.example.test",
                 ForcePathStyle = true,
                 AuthenticationRegion = "us-east-1"
             });
         var options = new AssetStorageOptions
         {
             Enabled = true,
-            Endpoint = "http://minio:59000",
-            PublicEndpoint = "https://localhost:7443",
+            Endpoint = "https://storage.example.test",
+            PublicEndpoint = "https://storage-browser.example.test",
             Bucket = "fluenta-assets-test",
             AccessKey = "TESTACCESSKEY",
             SecretKey = "test-secret-key",
             Region = "us-east-1",
             UsePathStyle = true
         };
-        var storage = new S3CompatibleAssetObjectStorage(
+        var storage = new AssetObjectStorage(
             new AssetStorageClients(operations, presigning, ownsClients: false),
             options);
 
@@ -70,8 +70,8 @@ public sealed class S3CompatibleAssetObjectStorageTests
 
         var uploadUri = new Uri(upload.Url);
         Assert.Equal("https", uploadUri.Scheme);
-        Assert.Equal("localhost", uploadUri.Host);
-        Assert.Equal(7443, uploadUri.Port);
+        Assert.Equal("storage-browser.example.test", uploadUri.Host);
+        Assert.Equal(443, uploadUri.Port);
         Assert.StartsWith("/fluenta-assets-test/", uploadUri.AbsolutePath, StringComparison.Ordinal);
         Assert.Equal(1, operations.BucketLocationReads);
     }
@@ -79,8 +79,8 @@ public sealed class S3CompatibleAssetObjectStorageTests
     [Fact]
     public async Task Bucket_access_failure_is_translated_to_the_storage_contract()
     {
-        using var client = new RecordingS3Client { FailBucketLocation = true };
-        var storage = new S3CompatibleAssetObjectStorage(client, RegionalOptions());
+        using var client = new RecordingObjectStorageClient { FailBucketLocation = true };
+        var storage = new AssetObjectStorage(client, RegionalOptions());
 
         var exception = await Assert.ThrowsAsync<AssetStorageUnavailableException>(
             () => storage.VerifyBucketAccessAsync());
@@ -95,9 +95,9 @@ public sealed class S3CompatibleAssetObjectStorageTests
         Region = "ap-southeast-1"
     };
 
-    private sealed class RecordingS3Client : AmazonS3Client
+    private sealed class RecordingObjectStorageClient : AmazonS3Client
     {
-        public RecordingS3Client()
+        public RecordingObjectStorageClient()
             : base(
                 new BasicAWSCredentials("TESTACCESSKEY", "test-secret-key"),
                 new AmazonS3Config { RegionEndpoint = RegionEndpoint.APSoutheast1 })

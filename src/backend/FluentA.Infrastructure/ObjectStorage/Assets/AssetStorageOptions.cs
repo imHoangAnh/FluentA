@@ -49,6 +49,12 @@ public sealed class AssetStorageOptions
         ValidateEndpoint(Endpoint);
         ValidateEndpoint(PublicEndpoint);
 
+        if (string.Equals(Region, "auto", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(Endpoint))
+        {
+            throw new InvalidOperationException("AssetStorage region auto requires an explicit endpoint.");
+        }
+
         if (string.IsNullOrWhiteSpace(AccessKey) != string.IsNullOrWhiteSpace(SecretKey))
         {
             throw new InvalidOperationException("AssetStorage static credentials must be configured together.");

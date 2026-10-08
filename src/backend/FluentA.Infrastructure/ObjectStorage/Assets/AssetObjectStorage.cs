@@ -5,14 +5,14 @@ using Protocol = Amazon.S3.Protocol;
 
 namespace FluentA.Infrastructure.ObjectStorage.Assets;
 
-public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
+public sealed class AssetObjectStorage : IAssetObjectStorage
 {
     private readonly IAmazonS3 _operations;
     private readonly IAmazonS3 _presigning;
     private readonly AssetStorageOptions _options;
     private readonly Protocol _presignProtocol;
 
-    public S3CompatibleAssetObjectStorage(AssetStorageClients clients, AssetStorageOptions options)
+    public AssetObjectStorage(AssetStorageClients clients, AssetStorageOptions options)
     {
         _operations = clients.Operations;
         _presigning = clients.Presigning;
@@ -21,7 +21,7 @@ public sealed class S3CompatibleAssetObjectStorage : IAssetObjectStorage
         _presignProtocol = GetProtocol(options.PresigningEndpoint);
     }
 
-    public S3CompatibleAssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
+    public AssetObjectStorage(IAmazonS3 client, AssetStorageOptions options)
         : this(new AssetStorageClients(client, client, ownsClients: false), options)
     {
     }

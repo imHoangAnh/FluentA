@@ -19,7 +19,7 @@ internal static class AssetServiceRegistrationExtensions
         if (assetStorageOptions.Enabled)
         {
             services.AddSingleton(_ => DependencyInjection.CreateAssetStorageClients(assetStorageOptions));
-            services.AddSingleton<IAssetObjectStorage, S3CompatibleAssetObjectStorage>();
+            services.AddSingleton<IAssetObjectStorage, AssetObjectStorage>();
             services.AddSingleton<IAssetStorageReadinessProbe, AssetStorageReadinessProbe>();
         }
         else
