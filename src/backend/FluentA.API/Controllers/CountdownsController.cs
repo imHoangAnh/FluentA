@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +27,7 @@ public sealed class CountdownsController : ApiControllerBase
     {
         var result = await _countdowns.ListAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<CountdownEventDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<CountdownEventDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -38,17 +37,17 @@ public sealed class CountdownsController : ApiControllerBase
     {
         var result = await _countdowns.CreateAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<CountdownEventDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<CountdownEventDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
-    /// <summary>Soft-deletes an owned countdown.</summary>
+    /// <summary>Hides an owned countdown after client confirmation while retaining its record and cover.</summary>
     [HttpDelete("{countdownId:guid}")]
     public async Task<IActionResult> Delete(Guid countdownId, CancellationToken cancellationToken)
     {
         var result = await _countdowns.DeleteAsync(CurrentUserId(), countdownId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = true }))
             : ToErrorResult(result);
     }
 

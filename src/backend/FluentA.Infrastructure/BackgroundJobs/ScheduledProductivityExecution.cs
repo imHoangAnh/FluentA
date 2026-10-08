@@ -1,6 +1,4 @@
 using FluentA.Application.BoundedContexts.Notification;
-using FluentA.Domain.BoundedContexts.Countdown.Services;
-using FluentA.Domain.BoundedContexts.Countdown.Enums;
 using FluentA.Domain.BoundedContexts.Notification.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Services;
 using FluentA.Infrastructure.Persistence;
@@ -14,10 +12,10 @@ namespace FluentA.Infrastructure.BackgroundJobs;
 /// <summary>
 /// Executes one persisted productivity occurrence.
 ///
-/// Quartz owns when a trigger is delivered.  This adapter owns the business
-/// revalidation at delivery time: a changed reminder, completed item, changed
-/// countdown occurrence, or expired Vietnam calendar day makes the trigger a
-/// no-op.  Every successful claim and notification insert is committed in one
+/// The polling service finds due work. This adapter owns the business
+/// revalidation at delivery time: a changed reminder, a completed item, or an
+/// expired Vietnam calendar day makes the trigger a no-op. Every successful
+/// claim and notification insert is committed in one
 /// transaction while the business row is locked.
 /// </summary>
 public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecutor
@@ -48,14 +46,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
             case ScheduledOccurrenceKind.HabitReminder:
                 await ExecuteHabitReminderAsync(occurrence.SourceId, occurrence.OccurrenceDateUtc,
                     occurrence.ScheduledAtUtcNormalized, cancellationToken);
-                break;
-            case ScheduledOccurrenceKind.CountdownAlert:
-                var countdownId = await _dbContext.CountdownAlerts.AsNoTracking()
-                    .Where(alert => alert.Id == occurrence.SourceId)
-                    .Select(alert => (Guid?)alert.CountdownId).SingleOrDefaultAsync(cancellationToken);
-                if (countdownId.HasValue)
-                    await ExecuteCountdownAlertAsync(countdownId.Value, occurrence.SourceId,
-                        occurrence.OccurrenceDateUtc, occurrence.ScheduledAtUtcNormalized, cancellationToken);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(occurrence));
@@ -143,7 +133,7 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
             cancellationToken);
 
     /// <summary>
-    /// DateTime overload for Quartz job-data serializers that do not preserve
+    /// DateTime overload for callers that do not preserve
     /// <see cref="DateOnly"/> values.
     /// </summary>
     public Task ExecuteHabitReminderAsync(
@@ -245,123 +235,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
             created);
     }
 
-    /// <summary>
-    /// Executes a countdown alert occurrence.  The target date is part of the
-    /// trigger identity so a recurrence update can invalidate an old trigger
-    /// even when the alert row id is reused.
-    /// </summary>
-    public Task ExecuteCountdownAlertAsync(
-        Guid countdownId,
-        Guid alertId,
-        DateTime targetDate,
-        DateTime scheduledAtUtc,
-        CancellationToken cancellationToken = default) =>
-        ExecuteCountdownAlertAsync(
-            countdownId,
-            alertId,
-            targetDate,
-            scheduledAtUtc,
-            DateTime.UtcNow,
-            cancellationToken);
-
-    /// <summary>
-    /// Compatibility overload for schedulers that use the alert's persisted
-    /// target date and only carry the alert schedule instant in job data.
-    /// </summary>
-    public Task ExecuteCountdownAlertAsync(
-        Guid countdownId,
-        Guid alertId,
-        DateTime scheduledAtUtc,
-        CancellationToken cancellationToken = default) =>
-        ExecuteCountdownAlertAsync(
-            countdownId,
-            alertId,
-            targetDate: null,
-            scheduledAtUtc,
-            DateTime.UtcNow,
-            cancellationToken);
-
-    public async Task ExecuteCountdownAlertAsync(
-        Guid countdownId,
-        Guid alertId,
-        DateTime? targetDate,
-        DateTime scheduledAtUtc,
-        DateTime nowUtc,
-        CancellationToken cancellationToken = default)
-    {
-        if (countdownId == Guid.Empty || alertId == Guid.Empty || !IsUtc(scheduledAtUtc) || !IsUtc(nowUtc))
-        {
-            return;
-        }
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var countdown = await LockCountdownAsync(countdownId, cancellationToken);
-        if (countdown is null || countdown.DeletedAt is not null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return;
-        }
-
-        var alert = await LockCountdownAlertAsync(countdownId, alertId, cancellationToken);
-        var occurrenceTarget = DateTime.SpecifyKind((targetDate ?? countdown.TargetDate).Date, DateTimeKind.Utc);
-        var isCurrentTarget = occurrenceTarget == countdown.TargetDate;
-        var isNextTarget = countdown.RepeatPattern != CountdownRepeatPattern.None
-            && occurrenceTarget == CountdownSchedule.NextTargetDate(countdown.TargetDate,
-                countdown.RepeatPattern, countdown.TargetDate.AddDays(1));
-        if (alert is null
-            || alert.DeletedAt is not null
-            || (!isCurrentTarget && !isNextTarget)
-            || (isCurrentTarget && (alert.FiredAtUtc is not null || alert.ScheduledAtUtc != scheduledAtUtc))
-            || (isNextTarget && CountdownSchedule.BuildAlertScheduledAtUtc(
-                occurrenceTarget, alert.AlertDay, alert.AlertTime) != scheduledAtUtc)
-            || scheduledAtUtc > nowUtc)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return;
-        }
-
-        var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, VietnamTimeZone);
-        if (localNow.Date > occurrenceTarget.Date)
-        {
-            // A delayed alert is valid through the end of its target Vietnam
-            // day only.  A trigger from a previous recurrence must never fire
-            // after its target day has ended.
-            await transaction.CommitAsync(cancellationToken);
-            return;
-        }
-
-        var deduplicationKey = ScheduledProductivityJobKeys.CountdownAlert(
-            countdown.Id,
-            occurrenceTarget,
-            alert.Id);
-        var created = await AddNotificationIfMissingAsync(
-            countdown.UserId,
-            "CountdownAlert",
-            "Countdown reminder",
-            $"{countdown.Name} - {alert.AlertDay} at {alert.AlertTime}.",
-            deduplicationKey,
-            null,
-            cancellationToken);
-
-        // A future cycle must not consume the current cycle's fired marker.
-        // Its notification key is the durable claim until recurrence advances.
-        if (isCurrentTarget) alert.MarkFired(nowUtc);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        if (created)
-        {
-            await NotifyChangedAsync(countdown.UserId, cancellationToken);
-        }
-
-        _logger.LogInformation(
-            "Countdown alert occurrence {CountdownId}/{AlertId} for target {TargetDate} was claimed; notificationCreated={NotificationCreated}.",
-            countdown.Id,
-            alert.Id,
-            occurrenceTarget,
-            created);
-    }
-
     private async Task<bool> AddNotificationIfMissingAsync(
         Guid userId,
         string type,
@@ -404,7 +277,7 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
         catch (Exception exception)
         {
             // The notification row is already committed.  A transient SignalR
-            // failure must not cause Quartz to retry the business operation and
+            // failure must not cause the polling service to retry the business operation and
             // create a second occurrence notification.
             _logger.LogWarning(
                 exception,
@@ -439,38 +312,6 @@ public sealed class ScheduledProductivityExecution : IScheduledOccurrenceExecuto
         }
 
         return await _dbContext.Habits.SingleOrDefaultAsync(habit => habit.Id == habitId, cancellationToken);
-    }
-
-    private async Task<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent?> LockCountdownAsync(
-        Guid countdownId,
-        CancellationToken cancellationToken)
-    {
-        if (UsesPostgres())
-        {
-            return await _dbContext.CountdownEvents
-                .FromSqlInterpolated($"SELECT * FROM countdowns WHERE id = {countdownId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-
-        return await _dbContext.CountdownEvents
-            .SingleOrDefaultAsync(countdown => countdown.Id == countdownId, cancellationToken);
-    }
-
-    private async Task<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert?> LockCountdownAlertAsync(
-        Guid countdownId,
-        Guid alertId,
-        CancellationToken cancellationToken)
-    {
-        if (UsesPostgres())
-        {
-            return await _dbContext.CountdownAlerts
-                .FromSqlInterpolated($"SELECT * FROM countdown_alerts WHERE id = {alertId} AND countdown_id = {countdownId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-
-        return await _dbContext.CountdownAlerts.SingleOrDefaultAsync(
-            alert => alert.Id == alertId && alert.CountdownId == countdownId,
-            cancellationToken);
     }
 
     private bool UsesPostgres() =>

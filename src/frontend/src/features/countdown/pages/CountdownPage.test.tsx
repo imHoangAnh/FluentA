@@ -35,18 +35,14 @@ describe('CountdownPage', () => {
       coverAssetId: null,
       coverDownloadUrl: null,
       coverDownloadUrlExpiresAt: null,
-      repeatPattern: 'None',
       isCompleted: false,
-      alerts: [{ id: 'alert-1', alertDay: '1DayBefore', alertTime: '09:00', scheduledAtUtc: '2026-08-20T02:00:00Z', firedAtUtc: null }],
       createdAt: '2026-07-21T00:00:00Z',
       updatedAt: '2026-07-21T00:00:00Z',
     }])
-    countdownApi.deleteCountdown.mockResolvedValue({
-      id: 'trash-1', entityKind: 'Countdown', entityId: 'countdown-1', displayName: 'IELTS Exam', originalLocation: 'Countdown', trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
-    })
+    countdownApi.deleteCountdown.mockResolvedValue(undefined)
   })
 
-  it('renders the compact create action and moves the exact card to Trash via context menu without confirmation', async () => {
+  it('requires confirmation before hiding the exact card', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -57,6 +53,10 @@ describe('CountdownPage', () => {
 
     fireEvent.contextMenu(itemHeading)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    expect(countdownApi.deleteCountdown).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: 'Delete Countdown' })).toBeInTheDocument()
+    expect(screen.getByText(/It will no longer appear here/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete Countdown' }))
     await waitFor(() => expect(countdownApi.deleteCountdown.mock.calls[0]?.[0]).toBe('countdown-1'))
   })
 
@@ -81,9 +81,7 @@ describe('CountdownPage', () => {
       coverAssetId: null,
       coverDownloadUrl: null,
       coverDownloadUrlExpiresAt: null,
-      repeatPattern: 'None',
       isCompleted: true,
-      alerts: [],
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-10T00:00:00Z',
     }])

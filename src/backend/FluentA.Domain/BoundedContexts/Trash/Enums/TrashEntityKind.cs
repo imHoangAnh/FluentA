@@ -7,7 +7,6 @@ public enum TrashEntityKind
     Vocabulary,
     // Value 3 belonged to the retired Level Five Trash kind.
     Journal = 4,
-    Countdown,
     Habit,
     Project
 }

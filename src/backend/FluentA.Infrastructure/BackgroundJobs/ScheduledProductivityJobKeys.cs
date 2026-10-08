@@ -20,6 +20,4 @@ internal static class ScheduledProductivityJobKeys
     public static string HabitReminder(Guid habitId, DateTime vietnamDate) =>
         $"habit:{habitId}:{vietnamDate:yyyy-MM-dd}";
 
-    public static string CountdownAlert(Guid countdownId, DateTime targetDate, Guid alertId) =>
-        $"countdown:{countdownId}:target:{targetDate:yyyy-MM-dd}:alert:{alertId}";
 }

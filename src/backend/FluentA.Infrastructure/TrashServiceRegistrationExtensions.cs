@@ -1,4 +1,3 @@
-using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Note;
@@ -21,7 +20,6 @@ internal static class TrashServiceRegistrationExtensions
         services.AddScoped<ITrashParticipant, TodoTrashParticipant>();
         services.AddScoped<ITrashParticipant, NoteTrashParticipant>();
         services.AddScoped<ITrashParticipant, VocabularyTrashParticipant>();
-        services.AddScoped<ITrashParticipant, CountdownTrashParticipant>();
         services.AddScoped<ITrashParticipant, HabitTrashParticipant>();
         services.AddScoped<ITrashParticipant, JournalTrashParticipant>();
         services.AddScoped<ITrashParticipant, ProjectTrashParticipant>();

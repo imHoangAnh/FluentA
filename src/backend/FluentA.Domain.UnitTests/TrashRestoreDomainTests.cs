@@ -1,7 +1,6 @@
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
-using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
 using FluentA.Domain.BoundedContexts.Habit.Entities;
 using FluentA.Domain.BoundedContexts.Habit.Enums;
 
@@ -45,21 +44,6 @@ public sealed class TrashRestoreDomainTests
         Assert.Equal(AssetStatus.Ready, asset.Status);
         Assert.Null(asset.ArchivedAt);
         Assert.Null(asset.PurgeAfterAt);
-    }
-
-    [Fact]
-    public void ExpiredCountdown_RestoreRemainsVisibleAsADurableMemory()
-    {
-        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", new DateTime(2026, 7, 1));
-        var restoredAt = new DateTime(2026, 7, 28, 10, 0, 0, DateTimeKind.Utc);
-
-        countdown.SoftDelete(restoredAt);
-        countdown.RestoreFromTrash(restoredAt);
-
-        Assert.Null(countdown.DeletedAt);
-        Assert.True(countdown.IsCompletedAt(restoredAt));
-        Assert.True(countdown.IsVisibleAt(restoredAt.AddDays(7)));
-        Assert.True(countdown.IsVisibleAt(restoredAt.AddDays(8)));
     }
 
     [Fact]

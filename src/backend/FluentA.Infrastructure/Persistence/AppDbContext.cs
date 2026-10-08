@@ -48,7 +48,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<TrashEntry> TrashEntries => Set<TrashEntry>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
-    public DbSet<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert> CountdownAlerts => Set<FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<NoteBoard> NoteBoards => Set<NoteBoard>();
     public DbSet<NotePage> NotePages => Set<NotePage>();

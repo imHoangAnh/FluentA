@@ -5,7 +5,7 @@ export const countdownRoutes: RouteObject[] = [{
   path: 'countdowns',
   handle: appShellRoute({
     title: 'Countdowns',
-    description: 'Track important dates and reminder alerts.',
+    description: 'Track important target dates.',
     contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
   }),
   lazy: async () => ({ Component: (await import('./pages/CountdownPage')).CountdownPage }),

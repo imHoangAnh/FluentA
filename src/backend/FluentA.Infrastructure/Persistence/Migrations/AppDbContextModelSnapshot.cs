@@ -204,56 +204,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AlertDay")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("alert_day");
-
-                    b.Property<string>("AlertTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)")
-                        .HasColumnName("alert_time");
-
-                    b.Property<Guid>("CountdownId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("countdown_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<DateTime?>("FiredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fired_at_utc");
-
-                    b.Property<DateTime>("ScheduledAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("scheduled_at_utc");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CountdownId", "ScheduledAtUtc");
-
-                    b.ToTable("countdown_alerts", (string)null);
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -279,12 +229,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
 
-                    b.Property<string>("RepeatPattern")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("repeat_pattern");
-
                     b.Property<DateTime>("TargetDate")
                         .HasColumnType("date")
                         .HasColumnName("target_date");
@@ -301,7 +245,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CoverAssetId")
                         .IsUnique()
-                        .HasFilter("\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+                        .HasFilter("\"cover_asset_id\" IS NOT NULL");
 
                     b.HasIndex("UserId", "TargetDate");
 
@@ -2147,15 +2091,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", null)
-                        .WithMany("Alerts")
-                        .HasForeignKey("CountdownId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
@@ -2361,11 +2296,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
-                {
-                    b.Navigation("Alerts");
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
