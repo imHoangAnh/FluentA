@@ -418,17 +418,17 @@ public sealed partial class AuthService : IAuthService
     private static EmailMessage BuildVerificationEmail(User user, string otp, DateTime expiresAt) => new(
         user.Email,
         "Verify your FluentA email",
-        $"<p>Hello {WebUtility.HtmlEncode(user.FullName)},</p><p>Your verification code is <strong>{otp}</strong>.</p><p>It expires at {expiresAt:O}.</p>",
+        AuthEmailTemplates.BuildVerificationOtpEmailHtml(user.FullName, otp, Math.Max(1, (int)Math.Round((expiresAt - DateTime.UtcNow).TotalMinutes))),
         $"Your FluentA verification code is {otp}. It expires at {expiresAt:O}.");
 
     private EmailMessage BuildPasswordResetEmail(User user, string rawToken, DateTime expiresAt)
     {
         var resetUrl = $"{_frontendBaseUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}";
-        var encodedUrl = WebUtility.HtmlEncode(resetUrl);
+
         return new EmailMessage(
             user.Email,
             "Reset your FluentA password",
-            $"<p>Hello {WebUtility.HtmlEncode(user.FullName)},</p><p><a href=\"{encodedUrl}\">Reset your password</a>.</p><p>This single-use link expires at {expiresAt:O}.</p>",
+            AuthEmailTemplates.BuildPasswordResetEmailHtml(user.FullName, resetUrl, Math.Max(1, (int)Math.Round((expiresAt - DateTime.UtcNow).TotalMinutes))),
             $"Reset your FluentA password: {resetUrl}. This single-use link expires at {expiresAt:O}.");
     }
 
