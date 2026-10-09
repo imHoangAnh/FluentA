@@ -45,13 +45,12 @@ public sealed class HabitService : IHabitService
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
         var entryStart = habits.Min(habit => habit.StartDate);
         var entryEnd = monthEnd > localToday ? monthEnd : localToday;
-        var entries = await _repository.ListEntriesAsync(
+        var entries = await _repository.ListCheckInDatesAsync(
             habits.Select(habit => habit.Id).ToList(),
             entryStart,
             entryEnd,
             cancellationToken);
         var entriesByHabit = entries
-            .Where(entry => entry.DeletedAt is null)
             .GroupBy(entry => entry.HabitId)
             .ToDictionary(group => group.Key, group => group.Select(entry => entry.Date.Date).ToHashSet());
 
@@ -128,8 +127,8 @@ public sealed class HabitService : IHabitService
         var monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var entries = entryCount == 0
             ? []
-            : await _repository.ListEntriesAsync(habit.Id, habit.StartDate, localToday, cancellationToken);
-        var completedDates = entries.Where(entry => entry.DeletedAt is null).Select(entry => entry.Date.Date).ToHashSet();
+            : await _repository.ListCheckInDatesAsync([habit.Id], habit.StartDate, localToday, cancellationToken);
+        var completedDates = entries.Select(entry => entry.Date.Date).ToHashSet();
         return OperationResult<HabitDto>.Success(HabitStatisticsCalculator.ToDto(
             habit,
             localToday,

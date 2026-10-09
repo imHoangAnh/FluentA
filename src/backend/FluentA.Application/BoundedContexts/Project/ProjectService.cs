@@ -19,7 +19,7 @@ public sealed class ProjectService : IProjectService
     public async Task<OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var boards = await _repository.ListBoardsAsync(userId, cancellationToken);
-        return OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>.Success(boards.Select(ProjectDtoMapper.ToSummary).ToList());
+        return OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>.Success(boards);
     }
 
     public async Task<OperationResult<ProjectBoardDetailDto>> CreateBoardAsync(Guid userId, CreateProjectBoardRequest request, CancellationToken cancellationToken = default)

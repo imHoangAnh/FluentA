@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
 using FluentA.Domain.BoundedContexts.Habit.Entities;
+using FluentA.Domain.BoundedContexts.Habit.Enums;
 using HabitEntity = FluentA.Domain.BoundedContexts.Habit.Entities.Habit;
 
 namespace FluentA.Application.BoundedContexts.Habit;
@@ -106,24 +107,32 @@ internal static class HabitStatisticsCalculator
             return 0;
         }
 
+        var scheduledDays = habit.ScheduledCustomDays.ToHashSet();
+        bool IsScheduled(DateTime date) => habit.Frequency == HabitFrequency.Daily || scheduledDays.Contains(date.DayOfWeek);
+        var dates = completedDates.Where(date => date >= habit.StartDate && date <= asOfDate && IsScheduled(date))
+            .OrderBy(date => date);
         var longest = 0;
         var current = 0;
-        foreach (var date in EachDate(habit.StartDate, asOfDate))
+        DateTime? previous = null;
+        foreach (var date in dates)
         {
-            if (!habit.IsScheduledOn(date))
+            // A weekly schedule repeats within seven days. Inspect only the gap
+            // between check-ins, never every day since the habit started.
+            var consecutive = previous.HasValue && (date - previous.Value).Days <= 7;
+            if (consecutive)
             {
-                continue;
+                for (var cursor = previous.GetValueOrDefault().AddDays(1); cursor < date; cursor = cursor.AddDays(1))
+                {
+                    if (IsScheduled(cursor))
+                    {
+                        consecutive = false;
+                        break;
+                    }
+                }
             }
-
-            if (completedDates.Contains(date))
-            {
-                current++;
-                longest = Math.Max(longest, current);
-            }
-            else
-            {
-                current = 0;
-            }
+            current = consecutive ? current + 1 : 1;
+            longest = Math.Max(longest, current);
+            previous = date;
         }
 
         return longest;

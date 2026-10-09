@@ -8,6 +8,64 @@ namespace FluentA.Application.UnitTests;
 
 public sealed class HabitServiceTests
 {
+    [Theory]
+    [InlineData(0, false, false)]
+    [InlineData(1, true, false)]
+    [InlineData(2, true, true)]
+    [InlineData(3, false, true)]
+    public async Task List_OptimizedLongestStreakMatchesCalendarWalkWithGapsAndGoals(int seed, bool custom, bool finite)
+    {
+        var repository = new FakeHabitRepository();
+        var today = DateTime.UtcNow.Date;
+        var owner = Guid.NewGuid();
+        var habit = HabitEntity.Create(owner, "History", null, HabitIcon.Book,
+            custom ? HabitFrequency.Custom : HabitFrequency.Daily,
+            custom ? [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday] : null,
+            today.AddYears(-4), finite ? 23 : null);
+        repository.SeedHabit(habit);
+        var completed = new HashSet<DateTime>();
+        var random = new Random(seed);
+        for (var date = habit.StartDate; date <= today; date = date.AddDays(1))
+            if (random.Next(5) != 0)
+            {
+                // Include legacy check-ins on now-unscheduled weekdays too.
+                completed.Add(date);
+                repository.SeedEntry(habit.Id, date);
+            }
+        var goalDate = finite && completed.Count >= 23 ? completed.Order().ElementAt(22) : (DateTime?)null;
+        var asOf = goalDate.HasValue && goalDate < today ? goalDate.Value : today;
+        var longest = 0;
+        var run = 0;
+        for (var date = habit.StartDate; date <= asOf; date = date.AddDays(1))
+        {
+            if (!habit.IsScheduledOn(date)) continue;
+            run = completed.Contains(date) ? run + 1 : 0;
+            longest = Math.Max(longest, run);
+        }
+        var result = await new HabitService(repository).ListAsync(owner, "UTC");
+        var item = Assert.Single(result.Value!);
+        Assert.Equal(longest, item.LongestStreak);
+        Assert.Equal(completed.Count, item.TotalCheckIns);
+        Assert.Equal(goalDate?.ToString("yyyy-MM-dd"), item.GoalCompletedOn);
+    }
+
+    [Fact]
+    public async Task List_SparseHistorySinceYearOneKeepsStatisticsWithoutWalkingEveryHistoricalDay()
+    {
+        var repository = new FakeHabitRepository();
+        var today = DateTime.UtcNow.Date;
+        var owner = Guid.NewGuid();
+        var habit = HabitEntity.Create(owner, "Sparse history", null, HabitIcon.Book, HabitFrequency.Daily,
+            null, new DateTime(1, 1, 1), null);
+        repository.SeedHabit(habit);
+        repository.SeedEntry(habit.Id, today.AddDays(-1));
+        repository.SeedEntry(habit.Id, today);
+        var item = Assert.Single((await new HabitService(repository).ListAsync(owner, "UTC")).Value!);
+        Assert.Equal(2, item.LongestStreak);
+        Assert.Equal(2, item.CurrentStreak);
+        Assert.Equal(2, item.TotalCheckIns);
+    }
+
     [Fact]
     public async Task CreateListUpdateAndDelete_UseOwnedHabits()
     {
@@ -364,6 +422,12 @@ public sealed class HabitServiceTests
         {
             return Task.FromResult(_entries.Count(entry => entry.HabitId == habitId && entry.DeletedAt is null));
         }
+
+        public Task<IReadOnlyList<HabitCheckInDate>> ListCheckInDatesAsync(
+            IReadOnlyCollection<Guid> habitIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<HabitCheckInDate>>(_entries
+                .Where(entry => habitIds.Contains(entry.HabitId) && entry.DeletedAt is null && entry.Date >= startDate && entry.Date <= endDate)
+                .Select(entry => new HabitCheckInDate(entry.HabitId, entry.Date)).ToList());
 
         public Task AddAsync(HabitEntity habit, CancellationToken cancellationToken = default)
         {

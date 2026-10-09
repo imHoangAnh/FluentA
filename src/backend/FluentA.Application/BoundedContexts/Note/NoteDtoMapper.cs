@@ -7,6 +7,13 @@ namespace FluentA.Application.BoundedContexts.Note;
 internal static class NoteDtoMapper
 {
     private const string DateFormat = "yyyy-MM-dd";
+    public static NoteBoardSummaryDto ToBoardSummaryDto(NoteBoardListItem board) => new(
+        board.Id, board.Name,
+        board.Pages.Select(page => new NotePageSummaryDto(
+            page.Id, page.BoardId, page.Name, page.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
+            page.CreatedAt, page.UpdatedAt)).ToList(),
+        board.CreatedAt, board.UpdatedAt);
+
     public static NoteBoardSummaryDto ToBoardSummaryDto(NoteBoard board)
     {
         var pages = board.Pages

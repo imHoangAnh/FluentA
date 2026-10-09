@@ -12,6 +12,13 @@ using FluentA.Infrastructure.Persistence;
 using FluentA.Infrastructure.Persistence.Repositories.Journal;
 using FluentA.Infrastructure.Persistence.Repositories.Note;
 using FluentA.Infrastructure.Persistence.Repositories.Assets;
+using FluentA.Infrastructure.Persistence.Repositories.Project;
+using FluentA.Infrastructure.Persistence.Repositories.Habit;
+using FluentA.Domain.BoundedContexts.Note.Entities;
+using FluentA.Domain.BoundedContexts.Project.Entities;
+using FluentA.Domain.BoundedContexts.Project.Enums;
+using FluentA.Domain.BoundedContexts.Habit.Entities;
+using FluentA.Domain.BoundedContexts.Habit.Enums;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -19,6 +26,42 @@ namespace FluentA.Infrastructure.UnitTests;
 
 public sealed class JournalNotesPersistenceTests
 {
+    [JournalPostgresFact]
+    public async Task SummaryProjections_PreserveOwnershipActiveChildrenCountsAndOrdering()
+    {
+        await using var database = await JournalDatabase.CreateAsync();
+        var owner = User.CreateWithPassword($"projection-{Guid.NewGuid():N}@example.test", "Owner", "hash");
+        var foreign = User.CreateWithPassword($"foreign-{Guid.NewGuid():N}@example.test", "Foreign", "hash");
+        var board = NoteBoard.Create(owner.Id, "Notes");
+        var foreignBoard = NoteBoard.Create(foreign.Id, "Foreign");
+        var date = DateTime.SpecifyKind(new DateTime(2026, 10, 8), DateTimeKind.Utc);
+        var page = NotePage.Create(board.Id, "Active", new string('x', 100_000), date);
+        var deleted = NotePage.Create(board.Id, "Deleted", "Hidden content", date);
+        deleted.SoftDelete();
+        var project = ProjectBoard.Create(owner.Id, "Project");
+        var columns = project.Columns;
+        columns[0].AddCard("Visible", "Do not load this payload", CardPriority.Medium, null, 0);
+        var hidden = columns[0].AddCard("Hidden", null, CardPriority.Medium, null, 1);
+        hidden.SoftDelete();
+        columns[1].SoftDelete(DateTime.UtcNow, deleteCards: true);
+        var habit = Habit.Create(owner.Id, "Read", null, HabitIcon.Book, HabitFrequency.Daily, null, date, null);
+        await using (var seed = database.CreateContext())
+        {
+            seed.AddRange(owner, foreign, board, foreignBoard, page, deleted, project, habit, HabitEntry.Create(habit.Id, date));
+            await seed.SaveChangesAsync();
+        }
+        await using var read = database.CreateContext();
+        var summary = Assert.Single(await new EfNoteRepository(read).ListBoardsAsync(owner.Id));
+        Assert.Equal(page.Id, Assert.Single(summary.Pages).Id);
+        var projectSummary = Assert.Single(await new EfProjectRepository(read).ListBoardsAsync(owner.Id));
+        Assert.Equal(2, projectSummary.ColumnCount);
+        Assert.Equal(1, projectSummary.CardCount);
+        Assert.Empty(await new EfProjectRepository(read).ListBoardsAsync(foreign.Id));
+        var checkIn = Assert.Single(await new EfHabitRepository(read).ListCheckInDatesAsync([habit.Id], date, date));
+        Assert.Equal(date, checkIn.Date);
+        Assert.Empty(read.ChangeTracker.Entries());
+    }
+
     [JournalPostgresFact]
     public async Task ConcurrentCreates_CommitOneActiveJournal_AndDeleteAllowsReplacementWithoutLosingRows()
     {

@@ -128,9 +128,14 @@ public sealed class ProjectServiceTests
     {
         public List<ProjectBoard> Boards { get; } = [];
 
-        public Task<IReadOnlyList<ProjectBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<ProjectBoardSummaryDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            IReadOnlyList<ProjectBoard> boards = Boards.Where(board => board.UserId == userId && board.DeletedAt is null).ToList();
+            IReadOnlyList<ProjectBoardSummaryDto> boards = Boards.Where(board => board.UserId == userId && board.DeletedAt is null)
+                .OrderBy(board => board.CreatedAt)
+                .Select(board => new ProjectBoardSummaryDto(board.Id, board.Name,
+                    board.Columns.Count(column => column.DeletedAt is null),
+                    board.Columns.Where(column => column.DeletedAt is null).SelectMany(column => column.Cards).Count(card => card.DeletedAt is null),
+                    board.CreatedAt, board.UpdatedAt)).ToList();
             return Task.FromResult(boards);
         }
 

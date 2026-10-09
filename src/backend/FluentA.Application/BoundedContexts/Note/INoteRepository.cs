@@ -4,7 +4,7 @@ namespace FluentA.Application.BoundedContexts.Note;
 
 public interface INoteRepository
 {
-    Task<IReadOnlyList<NoteBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<NoteBoardListItem>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<NoteBoard?> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     Task<NotePage?> GetPageAsync(Guid userId, Guid pageId, CancellationToken cancellationToken = default);
     Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(Guid pageId, CancellationToken cancellationToken = default);
@@ -18,3 +18,6 @@ public interface INoteRepository
     Task SoftDeletePageAsync(NotePage page, DateTime trashedAt, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record NoteBoardListItem(Guid Id, string Name, IReadOnlyList<NotePageListItem> Pages, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record NotePageListItem(Guid Id, Guid BoardId, string Name, DateTime Date, DateTime CreatedAt, DateTime UpdatedAt);

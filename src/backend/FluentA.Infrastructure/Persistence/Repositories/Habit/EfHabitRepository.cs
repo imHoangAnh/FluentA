@@ -55,6 +55,18 @@ public sealed class EfHabitRepository : IHabitRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<HabitCheckInDate>> ListCheckInDatesAsync(
+        IReadOnlyCollection<Guid> habitIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+    {
+        if (habitIds.Count == 0) return [];
+        var start = NormalizeDate(startDate);
+        var end = NormalizeDate(endDate);
+        return await _dbContext.HabitEntries.AsNoTracking()
+            .Where(entry => habitIds.Contains(entry.HabitId) && entry.DeletedAt == null && entry.Date >= start && entry.Date <= end)
+            .Select(entry => new HabitCheckInDate(entry.HabitId, entry.Date))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
         IReadOnlyCollection<Guid> habitIds,
         DateTime startDate,

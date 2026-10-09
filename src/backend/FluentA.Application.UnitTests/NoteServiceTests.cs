@@ -266,12 +266,17 @@ public sealed class NoteServiceTests
         private readonly List<NotePage> _pages = [];
         private readonly Dictionary<Guid, HashSet<Guid>> _assetIdsByPage = [];
 
-        public Task<IReadOnlyList<NoteBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<NoteBoardListItem>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<NoteBoard>>(_boards
+            return Task.FromResult<IReadOnlyList<NoteBoardListItem>>(_boards
                 .Where(board => board.UserId == userId && board.DeletedAt is null)
                 .OrderByDescending(board => board.CreatedAt)
                 .ThenByDescending(board => board.Id)
+                .Select(board => new NoteBoardListItem(board.Id, board.Name,
+                    board.Pages.Where(page => page.DeletedAt is null)
+                        .OrderByDescending(page => page.CreatedAt).ThenByDescending(page => page.Id)
+                        .Select(page => new NotePageListItem(page.Id, page.BoardId, page.Name, page.Date, page.CreatedAt, page.UpdatedAt)).ToList(),
+                    board.CreatedAt, board.UpdatedAt))
                 .ToList());
         }
 

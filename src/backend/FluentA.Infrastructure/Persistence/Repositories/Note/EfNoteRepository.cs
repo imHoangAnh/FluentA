@@ -14,13 +14,20 @@ public sealed class EfNoteRepository : INoteRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<NoteBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NoteBoardListItem>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.NoteBoards
-            .Include(board => board.Pages)
+            .AsNoTracking()
             .Where(board => board.UserId == userId && board.DeletedAt == null)
             .OrderByDescending(board => board.CreatedAt)
             .ThenByDescending(board => board.Id)
+            .Select(board => new NoteBoardListItem(
+                board.Id, board.Name,
+                board.Pages.Where(page => page.DeletedAt == null)
+                    .OrderByDescending(page => page.CreatedAt).ThenByDescending(page => page.Id)
+                    .Select(page => new NotePageListItem(page.Id, page.BoardId, page.Name, page.Date, page.CreatedAt, page.UpdatedAt))
+                    .ToList(),
+                board.CreatedAt, board.UpdatedAt))
             .ToListAsync(cancellationToken);
     }
 

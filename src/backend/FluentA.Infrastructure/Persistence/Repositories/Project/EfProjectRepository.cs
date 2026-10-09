@@ -1,4 +1,5 @@
 using FluentA.Application.BoundedContexts.Project;
+using FluentA.Application.BoundedContexts.Project.DTOs;
 using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,13 +15,18 @@ public sealed class EfProjectRepository : IProjectRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<ProjectBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProjectBoardSummaryDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.ProjectBoards
-            .Include(board => board.Columns)
-            .ThenInclude(column => column.Cards)
+            .AsNoTracking()
             .Where(board => board.UserId == userId && board.DeletedAt == null)
             .OrderBy(board => board.CreatedAt)
+            .Select(board => new ProjectBoardSummaryDto(
+                board.Id, board.Name,
+                board.Columns.Count(column => column.DeletedAt == null),
+                board.Columns.Where(column => column.DeletedAt == null)
+                    .SelectMany(column => column.Cards).Count(card => card.DeletedAt == null),
+                board.CreatedAt, board.UpdatedAt))
             .ToListAsync(cancellationToken);
     }
 
