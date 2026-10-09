@@ -102,7 +102,7 @@ describe('JournalPage workspace redesign', () => {
     expect(within(actions).getByTestId('journal-save-status')).toHaveTextContent('Saved')
 
     const editorBody = screen.getByTestId('journal-editor-body')
-    const toolbar = await screen.findByRole('toolbar', { name: 'Journal formatting tools' })
+    const toolbar = await screen.findByRole('toolbar', { name: 'Journal formatting tools' }, { timeout: 5_000 })
     const writingSurface = within(editorBody).getByLabelText('Journal rich text editor')
     expect(editorHeader.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(toolbar.compareDocumentPosition(writingSurface) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -142,18 +142,34 @@ describe('JournalPage workspace redesign', () => {
     expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
   })
 
-  it('renders the recent journals empty state with a New Journal action', async () => {
+  it('renders the Figma first-entry state with a New Journal action', async () => {
     vi.mocked(journalApi.listJournalEntries).mockResolvedValueOnce([])
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'No journals yet' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Recent journals' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your story starts here' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('How do you feel today?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start wherever you are…' })).toBeInTheDocument()
 
     const newJournalButton = screen.getByRole('button', { name: 'New Journal' })
     await userEvent.click(newJournalButton)
 
     expect(screen.getByLabelText('Journal title')).toHaveValue('New Journal')
+  })
+
+  it('filters the current in-memory draft without discarding it and removes it after autosave', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
+    vi.useFakeTimers()
+    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'Current unsaved entry' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Drafts' }))
+    expect(screen.getByRole('button', { name: 'Open current draft Current unsaved entry' })).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: `Open journal ${journalEntry.title}` })).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    expect(screen.queryByRole('button', { name: 'Open current draft Current unsaved entry' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No unsaved drafts' })).toBeInTheDocument()
   })
 
   it('keeps editing disabled when opening another entry fails instead of saving the previous content into it', async () => {
@@ -225,6 +241,7 @@ describe('JournalPage workspace redesign', () => {
     vi.setSystemTime(new Date('2026-08-08T10:00:00Z'))
     renderPage()
 
+    fireEvent.click(screen.getByLabelText('Choose journal date'))
     const prevMonthButton = await screen.findByRole('button', { name: /previous month/i })
     fireEvent.click(prevMonthButton)
 
@@ -241,6 +258,7 @@ describe('JournalPage workspace redesign', () => {
     })
 
     const emptyDate = '2026-07-15'
+    fireEvent.click(screen.getByLabelText('Choose journal date'))
     const emptyButton = screen.getByTestId(`journal-calendar-day-${emptyDate}`)
     fireEvent.click(emptyButton)
     await waitFor(() => {

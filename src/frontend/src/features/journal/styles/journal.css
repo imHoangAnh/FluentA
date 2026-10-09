@@ -1,0 +1,242 @@
+/* Figma Page 2: Desktop writing (98:632) and First entry (98:686). */
+.journal-figma {
+  --journal-canvas: #f6f5f1;
+  --journal-sidebar: #eeefe9;
+  --journal-paper: #fff;
+  --journal-ink: #263d37;
+  --journal-muted: #5f6d65;
+  --journal-line: #cfd6cf;
+  --journal-teal: #236b5b;
+  --journal-tint: #ddebe4;
+  --journal-amber: #77591f;
+  background: var(--journal-canvas);
+  color: var(--journal-ink);
+  font-family: 'Inter Variable', sans-serif;
+  height: 100%;
+  padding: 0;
+}
+
+.journal-figma .journal-content {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.journal-figma .journal-sidebar {
+  background: var(--journal-sidebar);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  padding: 24px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.journal-figma .journal-new-entry {
+  background: var(--journal-teal);
+  color: var(--journal-paper);
+  border: 0;
+  border-radius: 6px;
+  flex-shrink: 0;
+  height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+  width: 100%;
+}
+
+.journal-figma .journal-new-entry:hover { background: color-mix(in srgb, var(--journal-teal) 90%, black); }
+.journal-figma .journal-sidebar-search { margin-top: 20px; padding: 0; }
+.journal-figma .journal-search {
+  background: var(--journal-paper);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--journal-muted);
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  gap: 12px;
+  width: 100%;
+}
+.journal-figma .journal-search:focus-within { border-color: var(--journal-teal); box-shadow: none; }
+.journal-figma .journal-search svg { color: var(--journal-muted); flex-shrink: 0; }
+.journal-figma .journal-search input { font-size: 14px; color: var(--journal-ink); }
+.journal-figma .journal-search input::placeholder { color: var(--journal-muted); }
+
+.journal-figma .journal-entry-filters {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--journal-line);
+}
+.journal-figma .journal-entry-filters button {
+  height: 44px;
+  color: var(--journal-ink);
+  font-size: 14px;
+  font-weight: 400;
+  border-radius: 8px;
+  flex: 1;
+  padding: 0 8px;
+}
+.journal-figma .journal-entry-filters button[aria-pressed='true'] { background: var(--journal-tint); }
+
+.journal-figma .journal-entries-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 0 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.journal-figma .journal-entry-list { display: flex; flex-direction: column; gap: 8px; padding: 0; overflow-y: auto; }
+.journal-figma .journal-entry-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-height: 112px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  padding: 14px;
+  gap: 5px;
+  color: var(--journal-ink);
+  text-align: left;
+}
+.journal-figma .journal-entry-card:hover { background: color-mix(in srgb, var(--journal-tint) 55%, transparent); }
+.journal-figma .journal-entry-card--active { background: var(--journal-tint); border-color: var(--journal-teal); }
+.journal-figma .journal-entry-date { color: var(--journal-muted); font-size: 11px; font-weight: 500; line-height: 1.55; }
+.journal-figma .journal-entry-card--active .journal-entry-date { color: var(--journal-teal); }
+.journal-figma .journal-entry-card strong { color: var(--journal-ink); font-size: 14px; font-weight: 600; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; }
+.journal-figma .journal-entry-card p {
+  color: var(--journal-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.journal-figma .journal-entry-card mark { background: #fef08a; color: var(--journal-ink); }
+.journal-figma .journal-empty-state { align-items: flex-start; justify-content: flex-start; padding: 12px 0; min-height: 0; text-align: left; }
+.journal-figma .journal-empty-state h4 { color: var(--journal-ink); font: 500 18px/1.55 'Lora Variable', serif; margin: 0 0 12px; }
+.journal-figma .journal-empty-state p { color: var(--journal-muted); font-size: 14px; line-height: 1.55; max-width: none; margin: 0; }
+
+.journal-figma .journal-writing-workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 44px 60px 28px;
+  position: relative;
+}
+.journal-figma .journal-editor-header { display: block; padding: 0; border: 0; flex-shrink: 0; }
+.journal-figma .journal-title-input {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  padding: 0;
+  color: var(--journal-ink);
+  font: 400 36px/1.55 'Lora Variable', serif;
+  height: 56px;
+  box-shadow: none;
+}
+.journal-figma .journal-title-input::placeholder { color: var(--journal-muted); opacity: 1; }
+.journal-figma .journal-title-input:disabled { opacity: 1; cursor: default; }
+.journal-figma .journal-date-and-state { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin-bottom: 24px; }
+.journal-figma .journal-date-picker { position: relative; min-width: 0; }
+.journal-figma .journal-date-display {
+  color: var(--journal-muted);
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.55;
+  text-transform: uppercase;
+  margin: 0;
+  display: block;
+}
+.journal-figma .journal-date-display::-webkit-details-marker { display: none; }
+.journal-figma .journal-date-display:hover { color: var(--journal-teal); }
+.journal-figma .journal-calendar-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: 264px;
+  max-width: calc(100vw - 48px);
+  background: var(--journal-paper);
+  border: 1px solid var(--journal-line);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 12px 32px rgb(38 61 55 / 12%);
+}
+.journal-figma .journal-calendar-card { padding: 0; border: 0; background: transparent; }
+.journal-figma .journal-editor-actions { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 12px; padding: 0; }
+.journal-figma .journal-editor-actions small { flex: 0 1 auto; color: var(--journal-muted); font-size: 12px; font-weight: 400; white-space: normal; text-align: right; margin: 0; }
+.journal-figma .journal-editor-actions small::before { content: '●'; margin-right: 8px; }
+.journal-figma .journal-editor-actions small[data-state='unsaved'] { color: var(--journal-amber); }
+.journal-figma .journal-editor-actions small[data-state='error'] { color: var(--ds-destructive); }
+.journal-figma .journal-delete-button { color: var(--journal-muted); border: 0; background: transparent; }
+
+.journal-figma .journal-editor-card {
+  background: var(--journal-paper);
+  border: 1px solid var(--journal-line);
+  border-radius: 12px;
+  flex: 1;
+  flex-basis: auto;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+}
+.journal-figma .journal-editor-toolbar-bar { flex-shrink: 0; padding: 0; border-bottom: 1px solid var(--journal-line); background: transparent; border-radius: 12px 12px 0 0; }
+.journal-figma .journal-editor-toolbar-bar .journal-toolbar { padding: 8px; gap: 4px; min-height: 52px; margin: 0; border: 0; flex-wrap: wrap; justify-content: flex-start; }
+.journal-figma .journal-toolbar-button { color: var(--journal-ink); width: 36px; min-width: 36px; height: 36px; min-height: 36px; border: 0; border-radius: 6px; padding: 8px; }
+.journal-figma .journal-toolbar-button:hover, .journal-figma .journal-toolbar-button--active { background: var(--journal-tint); color: var(--journal-teal); }
+.journal-figma .journal-text-style-select { width: 132px; height: 36px; padding: 0 8px; color: var(--journal-ink); border: 0; border-radius: 6px; background: transparent; font: inherit; font-size: 13px; cursor: pointer; }
+.journal-figma .journal-color-picker-dropdown { border-color: var(--journal-line); right: auto; left: 0; }
+.journal-figma .journal-editor-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 32px; border-radius: 0 0 12px 12px; }
+.journal-figma .journal-editor-inner { padding: 0; min-height: 100%; }
+.journal-figma .journal-editor-inner .journal-rich-text-content { color: var(--journal-ink); padding: 0; min-height: 100%; font: 400 19px/1.55 'Lora Variable', serif; overflow-wrap: anywhere; }
+.journal-figma .journal-rich-text-content p { margin: 0 0 20px; }
+.journal-figma .journal-rich-text-shell { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.journal-figma .journal-first-entry button { color: var(--journal-muted); font: 400 20px/1.55 'Lora Variable', serif; background: transparent; border: 0; padding: 0; text-align: left; cursor: text; }
+.journal-figma .journal-first-entry p { color: var(--journal-muted); font-size: 14px; line-height: 1.55; margin-top: 20px; }
+.journal-figma .journal-editor-body:has(.journal-first-entry) .journal-editor-inner { display: none; }
+.journal-figma .journal-editor-error { position: static; transform: none; white-space: normal; margin-top: 8px; flex-shrink: 0; font-size: 12px; }
+
+@media (max-width: 1200px) {
+  .journal-figma .journal-content { grid-template-columns: 248px minmax(0, 1fr); }
+  .journal-figma .journal-sidebar { padding: 20px; }
+  .journal-figma .journal-writing-workspace { padding: 32px 28px 24px; }
+  .journal-figma .journal-title-input { font-size: 30px; }
+}
+@media (max-width: 800px) {
+  .journal-figma .journal-content { grid-template-columns: 208px minmax(0, 1fr); }
+  .journal-figma .journal-sidebar { padding: 16px; }
+  .journal-figma .journal-writing-workspace { padding: 24px 20px; }
+  .journal-figma .journal-editor-body { padding: 24px; }
+  .journal-figma .journal-title-input { font-size: 26px; }
+  .journal-figma .journal-date-and-state { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 640px) {
+  .journal-figma .journal-content { display: flex; flex-direction: column; overflow-y: auto; }
+  .journal-figma .journal-sidebar { height: auto; max-height: 320px; flex: 0 0 auto; }
+  .journal-figma .journal-sidebar-search { margin-top: 12px; }
+  .journal-figma .journal-entry-filters { margin-top: 12px; }
+  .journal-figma .journal-entries-card { min-height: 80px; }
+  .journal-figma .journal-writing-workspace { flex: 1 0 640px; padding: 24px 16px; }
+  .journal-figma .journal-editor-header { display: block; }
+  .journal-figma .journal-editor-body { padding: 20px; }
+  .journal-figma .journal-toolbar-button { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+  .journal-figma .journal-text-style-select { width: 120px; height: 32px; }
+  .journal-figma .journal-date-and-state { margin-bottom: 16px; }
+  .journal-figma .journal-empty-state h4 { font-size: 17px; }
+}

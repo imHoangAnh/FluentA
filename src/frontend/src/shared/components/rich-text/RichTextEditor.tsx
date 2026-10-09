@@ -22,6 +22,7 @@ type RichTextEditorProps = {
   toolbarAriaLabel?: string
   toolbarClassName?: string
   toolbarHost?: HTMLElement | null
+  textStyleSelect?: boolean
 }
 
 const COLORS = [{ name: 'Default', value: '' }, { name: 'Teal', value: '#0f9f8f' }, { name: 'Red', value: '#ef4444' }, { name: 'Orange', value: '#f97316' }, { name: 'Amber', value: '#f59e0b' }, { name: 'Green', value: '#10b981' }, { name: 'Blue', value: '#3b82f6' }, { name: 'Indigo', value: '#6366f1' }, { name: 'Purple', value: '#a855f7' }, { name: 'Pink', value: '#ec4899' }, { name: 'Gray', value: '#6b7280' }]
@@ -102,8 +103,23 @@ export function RichTextEditor(props: RichTextEditorProps) {
     else if (!imageSelected) editor.chain().focus().setTextAlign(value).run()
   }
   const toolbar = <div className={cn('journal-toolbar', props.toolbarClassName)} role="toolbar" aria-label={toolbarAriaLabel} onMouseDown={event => event.preventDefault()}>
-    {([1, 2, 3, 4, 5, 6] as const).map(level => button(`Heading ${level}`, <span>H{level}</span>, () => { editor.chain().focus().toggleHeading({ level }).run() }, editor.isActive('heading', { level })))}
-    {button('Paragraph', <span>P</span>, () => { editor.chain().focus().setParagraph().run() }, editor.isActive('paragraph'))}
+    {props.textStyleSelect ? <select
+      className="journal-text-style-select"
+      aria-label="Text style"
+      disabled={disabled}
+      value={editor.isActive('heading') ? String(editor.getAttributes('heading').level) : 'paragraph'}
+      onMouseDown={event => event.stopPropagation()}
+      onChange={event => {
+        if (event.target.value === 'paragraph') editor.chain().focus().setParagraph().run()
+        else editor.chain().focus().setHeading({ level: Number(event.target.value) as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+      }}
+    >
+      <option value="paragraph">Paragraph</option>
+      {([1, 2, 3, 4, 5, 6] as const).map(level => <option key={level} value={level}>Heading {level}</option>)}
+    </select> : <>
+      {([1, 2, 3, 4, 5, 6] as const).map(level => button(`Heading ${level}`, <span>H{level}</span>, () => { editor.chain().focus().toggleHeading({ level }).run() }, editor.isActive('heading', { level })))}
+      {button('Paragraph', <span>P</span>, () => { editor.chain().focus().setParagraph().run() }, editor.isActive('paragraph'))}
+    </>}
     {button('Bold', <Bold size={16} />, () => { editor.chain().focus().toggleBold().run() }, editor.isActive('bold'))}
     {button('Italic', <Italic size={16} />, () => { editor.chain().focus().toggleItalic().run() }, editor.isActive('italic'))}
     {button('Underline', <Underline size={16} />, () => { editor.chain().focus().toggleUnderline().run() }, editor.isActive('underline'))}

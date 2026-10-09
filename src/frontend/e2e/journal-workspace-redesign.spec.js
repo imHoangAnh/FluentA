@@ -80,7 +80,9 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
   ]) {
     await page.setViewportSize(viewport);
     await expect(search).toBeVisible();
+    await page.getByLabel('Choose journal date', { exact: true }).click();
     await expect(page.getByLabel('Journal date calendar')).toBeVisible();
+    await page.getByLabel('Choose journal date', { exact: true }).click();
     await expect(entryButton).toBeVisible();
     await expect(editorHeader).toBeVisible();
     await expect(toolbar).toBeVisible();
@@ -115,8 +117,8 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
     expect(geometry.hasVerticalOverflow).toBeFalsy();
     expect(Math.abs(geometry.mainWidth - geometry.journalWidth)).toBeLessThanOrEqual(40);
     if (viewport.width >= 1024) {
-      expect(geometry.editorWidth / geometry.railWidth).toBeGreaterThan(4.8);
-      expect(geometry.editorWidth / geometry.railWidth).toBeLessThan(5.2);
+      expect(geometry.railWidth).toBe(viewport.width > 1200 ? 288 : 248);
+      expect(geometry.editorWidth).toBeGreaterThan(geometry.railWidth);
     }
     expect(geometry.entryListOverflowY).toBe('auto');
     expect(geometry.editorBodyOverflowY).toBe('auto');

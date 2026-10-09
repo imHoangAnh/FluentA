@@ -48,6 +48,7 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   expect(invalidResponse.status()).toBe(400);
 
   await page.getByRole('link', { name: 'Journal' }).click();
+  await page.getByLabel('Choose journal date', { exact: true }).click();
   const populatedButton = page.getByTestId(`journal-calendar-day-${populatedDate}`);
   await expect(populatedButton).toHaveAccessibleName(`${populatedDate}, 1 journal entry`);
   await expect(populatedButton.locator('small')).toHaveText('1');
@@ -56,6 +57,7 @@ test('Journal learning-date calendar opens populated dates and prepares empty da
   await populatedButton.click();
   await expect(page.getByTestId('journal-title-input')).toHaveValue(newest.title);
 
+  await page.getByLabel('Choose journal date', { exact: true }).click();
   await page.getByTestId(`journal-calendar-day-${emptyDate}`).click();
   await expect(page.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate);
   await page.getByTestId('create-journal-button').click();

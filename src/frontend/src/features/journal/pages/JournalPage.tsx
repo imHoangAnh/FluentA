@@ -1,11 +1,14 @@
 import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
-import { BookOpen, Plus, Search, Trash2, X } from 'lucide-react'
+import { Plus, Search, Trash2, X } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as journalApi from '../api/journal.api'
 import { journalKeys } from '../api/journal.queries'
 import { toast } from '@/shared/lib/toast'
 import { Calendar } from '@/shared/components/ui/calendar'
+import { Button } from '@/shared/components/ui/button'
+import '@fontsource-variable/lora/wght.css'
+import '../styles/journal.css'
 import { cn } from '@/shared/lib/utils'
 import { uploadAsset } from '@/features/assets'
 import { UnsavedChangesDialog } from '@/shared/components/UnsavedChangesDialog'
@@ -67,6 +70,7 @@ export function JournalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => toMonthInput(new Date()))
+  const [entryFilter, setEntryFilter] = useState<'all' | 'drafts'>('all')
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null)
   const openRequestRef = useRef(0)
   const draftVersionRef = useRef(0)
@@ -75,6 +79,8 @@ export function JournalPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
   const objectUrls = useRef<string[]>([])
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const datePickerRef = useRef<HTMLDetailsElement>(null)
   useEffect(() => () => objectUrls.current.forEach(url => URL.revokeObjectURL(url)), [])
   const navigation = useUnsavedNavigation(isDirty || uploadingImage)
   const isDataRouter = useIsDataRouter()
@@ -218,13 +224,15 @@ export function JournalPage() {
   }
 
   const openCalendarDate = (date: string) => {
+    if (datePickerRef.current) datePickerRef.current.open = false
     if (date === entryDate && (isEditorActive || selectedId)) return
     navigation.request(() => { discardDraft(); openCalendarDateNow(date) })
   }
-  function startWriting() {
+  function startWriting(date = entryDate) {
     if (entriesQuery.isLoading || entriesQuery.isError) return
-    const existing = (entriesQuery.data ?? []).find(entry => entry.date === entryDate)
+    const existing = (entriesQuery.data ?? []).find(entry => entry.date === date)
     if (existing) { void openEntry(existing); return }
+    prepareEntryForDate(date)
     setIsEditorActive(true)
     setTitle('New Journal')
     markChanged()
@@ -276,235 +284,178 @@ export function JournalPage() {
     return () => window.clearTimeout(timer)
   }, [content, entryDate, isDirty, isEditorActive, isOpening, autosave.isPending, saveEntry, selectedId, title, uploadingImage, saveStatus, navigation.open])
 
+  const hasDraft = isEditorActive && (isDirty || uploadingImage || saveStatus === 'saving' || saveStatus === 'error')
+  const draftMatchesSearch = !isSearching || title.toLocaleLowerCase().includes(searchQuery.trim().toLocaleLowerCase())
+  const visibleEntries = entryFilter === 'drafts' ? [] : entries
+  const showDraft = hasDraft && draftMatchesSearch && (entryFilter === 'drafts' || !selectedId)
+  const isEmpty = visibleEntries.length === 0 && !showDraft
+  const isFirstEntry = !isEditorActive && !selectedId
+  const dateLabel = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  }).format(selectedDate)
+  const draftPreview = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  const saveLabel = saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error'
+    ? 'Save failed — edit to try again' : isDirty ? 'Unsaved changes' : selectedId ? 'Saved' : 'Draft'
+
   return (
-    <div className="journal-page">
+    <div className="journal-page journal-figma">
       <div className="journal-content" data-testid="journal-workspace">
-        <div className="journal-sidebar">
-          <section className="journal-calendar-card" aria-label="Journal date calendar">
-            <Calendar
-              mode="single"
-              month={calendarMonthDate}
-              onMonthChange={(month) => setCalendarMonth(toMonthInput(month))}
-              selected={selectedDate}
-              onSelect={(date) => {
-                if (date) {
-                  openCalendarDate(toDateInput(date))
-                }
-              }}
-              className="p-0 w-full"
-              classNames={{
-                months: 'relative flex flex-col gap-2',
-                month: 'flex flex-col gap-1',
-                month_caption: 'flex justify-start items-center h-6 pr-14',
-                caption_label: 'text-xs font-semibold text-foreground',
-                nav: 'flex items-center gap-0.5 absolute right-0 top-0 z-20',
-                button_previous: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
-                button_next: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
-                month_grid: 'w-full border-collapse space-y-0.5',
-                weekdays: 'flex w-full justify-between',
-                weekday: 'text-muted-foreground font-semibold text-[10px] text-center w-7 flex items-center justify-center',
-                weeks: 'w-full flex flex-col gap-0.5',
-                week: 'flex w-full justify-between',
-                day: 'relative p-0 text-center text-xs flex items-center justify-center w-7 h-7 bg-transparent border-0 outline-none shadow-none ring-0',
-              }}
-              components={{
-                DayButton: ({ day, className, ...buttonProps }) => {
-                  const dateStr = day.isoDate
-                  const count = calendarCounts.get(dateStr) ?? 0
-                  const isSelected = entryDate === dateStr
-                  const hasEntry = count > 0
-
-                  return (
-                    <button
-                      {...buttonProps}
-                      type="button"
-                      aria-label={`${dateStr}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
-                      data-testid={`journal-calendar-day-${dateStr}`}
-                      className={cn(
-                        'journal-calendar-day rounded-full',
-                        day.outside ? 'journal-calendar-day--muted' : '',
-                        hasEntry ? 'journal-calendar-day--has-entry' : '',
-                        isSelected ? 'journal-calendar-day--selected' : '',
-                        className,
-                      )}
-                      onClick={(e) => {
-                        buttonProps.onClick?.(e)
-                        openCalendarDate(dateStr)
-                      }}
-                    >
-                      {day.date.getDate()}
-                      {count > 0 ? <small>{count}</small> : null}
-                    </button>
-                  )
-                },
-              }}
-            />
-            {calendarQuery.isError ? <p className="status-message status-message--error">Could not load calendar dates.</p> : null}
-          </section>
-
+        <aside className="journal-sidebar" aria-label="Journal navigation">
+          <Button type="button" className="journal-new-entry" data-testid="create-journal-button"
+            disabled={entriesQuery.isLoading || entriesQuery.isError || isOpening}
+            onClick={() => navigation.request(() => { setEntryFilter('all'); startWriting(isFirstEntry ? entryDate : toDateInput(new Date())) })}>
+            <Plus size={14} aria-hidden="true" /> New Journal
+          </Button>
           <div className="journal-sidebar-search">
             <label className="journal-search">
-              <Search size={14} />
-              <span className="sr-only">Search journals </span>
-              <input
-                aria-label="Search journals"
-                data-testid="journal-search-input"
-                maxLength={100}
-                placeholder="Search journals..."
-                type="text"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-              {searchQuery ? (
-                <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}>
-                  <X size={14} />
-                </button>
-              ) : null}
+              <Search size={14} aria-hidden="true" />
+              <span className="sr-only">Search journals</span>
+              <input aria-label="Search journals" data-testid="journal-search-input" maxLength={100}
+                placeholder="Search journals" type="search" value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)} />
+              {searchQuery && <button aria-label="Clear journal search" type="button" onClick={() => setSearchQuery('')}><X size={14} /></button>}
             </label>
           </div>
-
-          <section className="journal-entries-card">
-            <div className="journal-entries-card-header">
-              <h3>Recent journals</h3>
-            </div>
-
-            {isListLoading ? <p className="status-message">{isSearching ? 'Searching journal...' : 'Loading journal...'}</p> : null}
-            {isListError ? <p className="status-message status-message--error">Could not load journal entries.</p> : null}
-            {!isListLoading && !isListError && entries.length === 0 ? (
+          <div className="journal-entry-filters" aria-label="Filter journal entries">
+            <Button variant="ghost" type="button" aria-pressed={entryFilter === 'all'} onClick={() => setEntryFilter('all')}>All entries</Button>
+            <Button variant="ghost" type="button" aria-pressed={entryFilter === 'drafts'} onClick={() => setEntryFilter('drafts')}>Drafts</Button>
+          </div>
+          <section className="journal-entries-card" aria-label="Journal entries">
+            {entryFilter === 'all' && isListLoading && <p className="status-message">{isSearching ? 'Searching journal...' : 'Loading journal...'}</p>}
+            {entryFilter === 'all' && isListError && <p className="status-message status-message--error">Could not load journal entries.</p>}
+            {(entryFilter === 'drafts' || (!isListLoading && !isListError)) && isEmpty && (
               <div className="journal-empty-state" role="status">
-                <div className="journal-empty-state-icon" aria-hidden="true">
-                  <BookOpen size={32} strokeWidth={1.5} />
-                </div>
-                <h4>{isSearching ? 'No journals found' : 'No journals yet'}</h4>
-                <p>
-                  {isSearching ? `No journals match "${debouncedSearchQuery}".` : 'Start writing your first journal and keep your thoughts organized.'}
-                </p>
-                {!isSearching ? (
-                  <button
-                    className="journal-empty-create-button"
-                    disabled={entriesQuery.isLoading || entriesQuery.isError}
-                    type="button"
-                    onClick={() => {
-                      navigation.request(startWriting)
-                    }}
-                  >
-                    <Plus size={15} aria-hidden="true" />
-                    <span>New Journal</span>
-                  </button>
-                ) : null}
+                <h4>{isSearching ? 'No journals found' : entryFilter === 'drafts' ? 'No unsaved drafts' : 'Your story starts here'}</h4>
+                <p>{isSearching ? `No journals match "${debouncedSearchQuery}".` : entryFilter === 'drafts'
+                  ? 'Your current unsaved entry appears here while you write.'
+                  : 'Your saved entries will appear here. Start with a sentence about today.'}</p>
               </div>
-            ) : null}
-
+            )}
             <div className="journal-entry-list">
-              {entries.map((entry) => (
-                <button
-                  className={selectedId === entry.id ? 'journal-entry-card journal-entry-card--active' : 'journal-entry-card'}
-                  type="button"
-                  key={entry.id}
+              {showDraft && (
+                <button type="button" className="journal-entry-card journal-entry-card--active" aria-label={`Open current draft ${title}`}
+                  onClick={() => titleInputRef.current?.focus()}>
+                  <span className="journal-entry-date" data-testid="journal-entry-date">{formatDate(entryDate)} · Draft</span>
+                  <strong>{title || 'Untitled journal'}</strong>
+                  {draftPreview && <p>{draftPreview}</p>}
+                </button>
+              )}
+              {visibleEntries.map(entry => (
+                <button className={cn('journal-entry-card', selectedId === entry.id && 'journal-entry-card--active')}
+                  type="button" key={entry.id}
                   onClick={() => { if (entry.id !== selectedId) navigation.request(() => void openEntry(entry)) }}
-                  aria-label={`Open journal ${entry.title}`}
-                >
-                  <div className="journal-entry-card-top">
-                    <span className="journal-entry-date" data-testid="journal-entry-date">{formatDate(entry.date)}</span>
-                  </div>
-                  <strong>{entry.title}</strong>
-                  {hasHighlights(entry) && entry.highlights.length > 0 ? <p><HighlightedPreview entry={entry} /></p> : null}
+                  aria-label={`Open journal ${entry.title}`}>
+                  <span className="journal-entry-date" data-testid="journal-entry-date">{formatDate(entry.date)}{selectedId === entry.id && hasDraft ? ' · Draft' : ''}</span>
+                  <strong>{selectedId === entry.id && hasDraft ? title || 'Untitled journal' : hasHighlights(entry) ? <HighlightedPreview entry={entry} /> : entry.title}</strong>
                 </button>
               ))}
             </div>
           </section>
-        </div>
+        </aside>
+        <form className="journal-writing-workspace" onSubmit={event => event.preventDefault()}>
+          <div className="journal-editor-header" data-testid="journal-editor-header">
+            <input ref={titleInputRef} aria-label="Journal title" className="journal-title-input" data-testid="journal-title-input"
+              disabled={isOpening || isFirstEntry} value={isFirstEntry && !openFailed ? '' : title} maxLength={240}
+              onChange={event => { setTitle(event.target.value); markChanged() }} placeholder="How do you feel today?" />
+            <div className="journal-date-and-state">
+              <details ref={datePickerRef} className="journal-date-picker" onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.open = false }}>
+                <summary className="journal-date-display" data-date={entryDate} data-testid="journal-date-display" aria-label="Choose journal date" onClick={() => setCalendarMonth(entryDate.slice(0, 7))}>{dateLabel}</summary>
+                <div className="journal-calendar-popover">
+                  <section className="journal-calendar-card" aria-label="Journal date calendar">
+                    <Calendar
+                      mode="single"
+                      month={calendarMonthDate}
+                      onMonthChange={(month) => setCalendarMonth(toMonthInput(month))}
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          openCalendarDate(toDateInput(date))
+                        }
+                      }}
+                      className="p-0 w-full"
+                      classNames={{
+                        months: 'relative flex flex-col gap-2',
+                        month: 'flex flex-col gap-1',
+                        month_caption: 'flex justify-start items-center h-6 pr-14',
+                        caption_label: 'text-xs font-semibold text-foreground',
+                        nav: 'flex items-center gap-0.5 absolute right-0 top-0 z-20',
+                        button_previous: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
+                        button_next: 'h-6 w-6 bg-transparent p-0 opacity-70 hover:opacity-100 rounded-md cursor-pointer pointer-events-auto border border-border inline-flex items-center justify-center',
+                        month_grid: 'w-full border-collapse space-y-0.5',
+                        weekdays: 'flex w-full justify-between',
+                        weekday: 'text-muted-foreground font-semibold text-[10px] text-center w-7 flex items-center justify-center',
+                        weeks: 'w-full flex flex-col gap-0.5',
+                        week: 'flex w-full justify-between',
+                        day: 'relative p-0 text-center text-xs flex items-center justify-center w-7 h-7 bg-transparent border-0 outline-none shadow-none ring-0',
+                      }}
+                      components={{
+                        DayButton: ({ day, className, ...buttonProps }) => {
+                          const dateStr = day.isoDate
+                          const count = calendarCounts.get(dateStr) ?? 0
+                          const isSelected = entryDate === dateStr
+                          const hasEntry = count > 0
 
-        <div className="journal-editor-card relative">
-          {!isEditorActive && !selectedId && (
-            <div className="journal-editor-empty-overlay" data-testid="journal-editor-empty-state">
-              <button
-                type="button"
-                className="primary-button m-0 min-h-9 w-auto px-5 gap-2 shadow-sm"
-                onClick={() => {
-                  navigation.request(startWriting)
-                }}
-                disabled={entriesQuery.isLoading || entriesQuery.isError}
-                data-testid="create-journal-button"
-              >
-                <Plus size={16} aria-hidden="true" />
-                <span>Create</span>
-              </button>
-            </div>
-          )}
-
-          <form
-            className={cn('flex flex-col h-full min-h-0 min-w-0', !isEditorActive && !selectedId && 'journal-editor-blurred')}
-            onSubmit={event => event.preventDefault()}
-          >
-            <div className="journal-editor-header" data-testid="journal-editor-header">
-              <div className="journal-editor-heading">
-                <input
-                  aria-label="Journal title"
-                  className="journal-title-input"
-                  data-testid="journal-title-input"
-                  disabled={isOpening || (!isEditorActive && !selectedId)}
-                  value={title}
-                  maxLength={240}
-                  onChange={(event) => {
-                    setTitle(event.target.value)
-                    markChanged()
-                  }}
-                  placeholder="New Journal"
-                />
-                <p className="journal-date-display" data-date={entryDate} data-testid="journal-date-display">
-                  {formatDate(entryDate)}
-                </p>
-              </div>
-
+                          return (
+                            <button
+                              {...buttonProps}
+                              type="button"
+                              aria-label={`${dateStr}${count > 0 ? `, ${count} journal ${count === 1 ? 'entry' : 'entries'}` : ', no journal entries'}`}
+                              data-testid={`journal-calendar-day-${dateStr}`}
+                              className={cn(
+                                'journal-calendar-day rounded-full',
+                                day.outside ? 'journal-calendar-day--muted' : '',
+                                hasEntry ? 'journal-calendar-day--has-entry' : '',
+                                isSelected ? 'journal-calendar-day--selected' : '',
+                                className,
+                              )}
+                              onClick={(e) => {
+                                buttonProps.onClick?.(e)
+                                openCalendarDate(dateStr)
+                              }}
+                            >
+                              {day.date.getDate()}
+                              {count > 0 ? <small>{count}</small> : null}
+                            </button>
+                          )
+                        },
+                      }}
+                    />
+                    {calendarQuery.isError ? <p className="status-message status-message--error">Could not load calendar dates.</p> : null}
+                  </section>
+                </div>
+              </details>
               <div className="journal-editor-actions" data-testid="journal-editor-actions">
-                <small data-testid="journal-save-status">
-                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed — edit to try again' : isDirty ? 'Unsaved changes' : selectedId ? 'Saved' : 'Draft'}
-                </small>
-                {selectedId ? (
-                  <button
-                    className="journal-delete-button"
-                    type="button"
-                    aria-label={`Delete journal ${title}`}
-                    disabled={deleteEntry.isPending}
-                    onClick={() => { if (selectedId) { deleteEntry.reset(); setDeleteTarget({ id: selectedId, name: title }) } }}
-                    title="Delete entry"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                ) : null}
+                {!isFirstEntry && <small data-testid="journal-save-status" role="status" data-state={saveStatus === 'error' ? 'error' : isDirty ? 'unsaved' : saveStatus}>{saveLabel}</small>}
+                {selectedId && <Button className="journal-delete-button" variant="ghost" size="icon-sm" type="button"
+                  aria-label={`Delete journal ${title}`} disabled={deleteEntry.isPending}
+                  onClick={() => { deleteEntry.reset(); setDeleteTarget({ id: selectedId, name: title }) }} title="Delete entry">
+                  <Trash2 size={16} />
+                </Button>}
               </div>
             </div>
-
+          </div>
+          <div className="journal-editor-card">
             <div className="journal-editor-toolbar-bar" ref={setToolbarHost} data-testid="journal-toolbar-host" />
-
             <div className="journal-editor-body" data-testid="journal-editor-body">
+              {isFirstEntry && !openFailed && <div className="journal-first-entry" data-testid="journal-editor-empty-state">
+                <button type="button" disabled={entriesQuery.isLoading || entriesQuery.isError} onClick={() => navigation.request(() => startWriting())}>Start wherever you are…</button>
+                <p>A thought, a moment, a few words. There is no right way to begin.</p>
+              </div>}
               <div className="journal-editor-inner">
                 <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
-                  <JournalRichTextEditor
-                    key={`${entryDate}:${editorSession}`}
-                    disabled={isOpening || (!isEditorActive && !selectedId)}
-                    content={content}
-                    toolbarHost={toolbarHost}
-                    onImageFiles={uploadJournalImages}
-                    onImageUploadingChange={setUploadingImage}
-                    onImageUploadError={message => { setImageError(message) }}
-                    onChange={(html) => {
-                      setContent(html)
-                      markChanged()
-                    }}
-                  />
+                  <JournalRichTextEditor key={`${entryDate}:${editorSession}`} disabled={isOpening || isFirstEntry}
+                    content={content} toolbarHost={toolbarHost} textStyleSelect
+                    onImageFiles={uploadJournalImages} onImageUploadingChange={setUploadingImage}
+                    onImageUploadError={message => setImageError(message)}
+                    onChange={html => { setContent(html); markChanged() }} />
                 </Suspense>
               </div>
             </div>
-
-            {(openFailed || saveStatus === 'error' || imageError || deleteEntry.isError) && (
-              <div className="journal-editor-error" role="alert">
-                {imageError ?? (openFailed ? 'Could not open journal.' : 'The journal entry could not be saved. Edit to try again.')}
-              </div>
-            )}
-          </form>
-        </div>
+          </div>
+          {(openFailed || saveStatus === 'error' || imageError || deleteEntry.isError) && <div className="journal-editor-error" role="alert">
+            {imageError ?? (openFailed ? 'Could not open journal.' : 'The journal entry could not be saved. Edit to try again.')}
+          </div>}
+        </form>
       </div>
       <UnsavedChangesDialog open={navigation.open} onStay={navigation.stay} onDiscard={navigation.discard} />
       {isDataRouter && <RouteDraftGuard dirty={isDirty || uploadingImage} onDiscard={discardDraft} render={(open, stay, discard) => <UnsavedChangesDialog open={open} onStay={stay} onDiscard={discard} />} />}

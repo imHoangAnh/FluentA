@@ -5,6 +5,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { RichTextEditor } from './RichTextEditor'
 
 describe('RichTextEditor', () => {
+  it('uses the compact Journal Text style select for H1-H6 and Paragraph', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<RichTextEditor textStyleSelect content="<p>Journal entry</p>" onChange={onChange} />)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Text style' }), '6')
+    expect(screen.getByRole('textbox')).toContainHTML('<h6>Journal entry</h6>')
+    expect(onChange).toHaveBeenLastCalledWith(expect.stringContaining('<h6>Journal entry</h6>'))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Text style' }), 'paragraph')
+    expect(screen.getByRole('textbox')).toContainHTML('<p>Journal entry</p>')
+  })
+
   it('changes actual heading/list content using Tiptap and omits removed tools', async () => {
     const onChange = vi.fn()
     render(<RichTextEditor content="<p>Journal entry</p>" onChange={onChange} />)
