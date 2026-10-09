@@ -24,9 +24,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     custom_days = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
                     start_date = table.Column<DateTime>(type: "date", nullable: false),
                     goal_days = table.Column<int>(type: "integer", nullable: true),
-                    reminder_enabled = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    reminder_time = table.Column<TimeOnly>(type: "time(0) without time zone", precision: 0, nullable: false),
-                    last_reminder_sent_on = table.Column<DateTime>(type: "date", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -53,68 +50,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_journal", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "notifications",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    type = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
-                    title = table.Column<string>(type: "character varying(180)", maxLength: 180, nullable: false),
-                    message = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    deduplication_key = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
-                    action_path = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    read_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_notifications", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "pomodoro_configs",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    work_minutes = table.Column<int>(type: "integer", nullable: false),
-                    short_break_minutes = table.Column<int>(type: "integer", nullable: false),
-                    long_break_minutes = table.Column<int>(type: "integer", nullable: false),
-                    long_break_after = table.Column<int>(type: "integer", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_pomodoro_configs", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "pomodoro_sessions",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    phase = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    state = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    started_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    duration_seconds = table.Column<int>(type: "integer", nullable: false),
-                    linked_task_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    linked_task_source = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_pomodoro_sessions", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -146,10 +81,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     is_completed = table.Column<bool>(type: "boolean", nullable: false),
                     is_important = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     repeat_pattern = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
-                    reminder_time = table.Column<TimeOnly>(type: "time without time zone", nullable: true),
-                    reminder_time_zone_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    reminder_scheduled_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    reminder_sent_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     generated_from_todo_id = table.Column<Guid>(type: "uuid", nullable: true),
                     is_generated_occurrence_pristine = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -304,12 +235,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     page_id = table.Column<Guid>(type: "uuid", nullable: false),
                     word = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
-                    meaning_vn = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     ipa_pronunciation = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
-                    @class = table.Column<string>(name: "class", type: "character varying(20)", maxLength: 20, nullable: false),
-                    definition = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    context = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
                     example = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
-                    note = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
                     synonyms = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     antonyms = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -325,32 +255,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         principalTable: "vocab_pages",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "word_review_histories",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    word_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    session_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    time_spent_seconds = table.Column<int>(type: "integer", nullable: false),
-                    reviewed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    result = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_word_review_histories", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_word_review_histories_vocab_words_word_id",
-                        column: x => x.word_id,
-                        principalTable: "vocab_words",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -394,8 +298,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     bucket = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     original_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    archived_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    purge_after_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -414,7 +316,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     name = table.Column<string>(type: "character varying(180)", maxLength: 180, nullable: false),
                     target_date = table.Column<DateTime>(type: "date", nullable: false),
                     cover_asset_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    repeat_pattern = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -431,6 +332,34 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "journal_entry_assets",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    journal_entry_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    asset_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_journal_entry_assets", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_journal_entry_assets_assets_asset_id",
+                        column: x => x.asset_id,
+                        principalTable: "assets",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_journal_entry_assets_journal_journal_entry_id",
+                        column: x => x.journal_entry_id,
+                        principalTable: "journal",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "users",
                 columns: table => new
                 {
@@ -441,12 +370,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     current_avatar_asset_id = table.Column<Guid>(type: "uuid", nullable: true),
                     password_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     google_id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    google_link_confirmed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     email_verified_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    otp_code = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    otp_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     otp_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    otp_failed_attempts = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                    otp_resend_available_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    reset_password_token = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    reset_password_token_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     reset_password_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     last_login_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -462,31 +390,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         principalTable: "assets",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "countdown_alerts",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    countdown_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    alert_day = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    alert_time = table.Column<string>(type: "character varying(5)", maxLength: 5, nullable: false),
-                    scheduled_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    fired_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_countdown_alerts", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_countdown_alerts_countdowns_countdown_id",
-                        column: x => x.countdown_id,
-                        principalTable: "countdowns",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -518,6 +421,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     page_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    page_name = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
                     mode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     total_cards = table.Column<int>(type: "integer", nullable: false),
                     correct_cards = table.Column<int>(type: "integer", nullable: false),
@@ -536,30 +440,54 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         principalTable: "users",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_practice_session_summaries_vocab_pages_page_id",
-                        column: x => x.page_id,
-                        principalTable: "vocab_pages",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
-                name: "practice_settings",
+                name: "practice_sessions",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    mode_sequence = table.Column<string>(type: "text", nullable: false),
+                    page_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    page_name = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    board_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    board_name = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    board_language = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
+                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    current_item_index = table.Column<int>(type: "integer", nullable: false),
+                    started_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_practice_settings", x => x.id);
+                    table.PrimaryKey("PK_practice_sessions", x => x.id);
                     table.ForeignKey(
-                        name: "FK_practice_settings_users_user_id",
+                        name: "FK_practice_sessions_users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "refresh_tokens",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    token_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    revoked_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_refresh_tokens", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_refresh_tokens_users_user_id",
                         column: x => x.user_id,
                         principalTable: "users",
                         principalColumn: "id",
@@ -572,8 +500,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    board_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    order_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    time_zone_id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     session_date = table.Column<DateOnly>(type: "date", nullable: false),
                     started_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -587,40 +514,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("PK_review_sessions", x => x.id);
                     table.ForeignKey(
                         name: "FK_review_sessions_users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_review_sessions_vocab_boards_board_id",
-                        column: x => x.board_id,
-                        principalTable: "vocab_boards",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "trash_entries",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    entity_kind = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    entity_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    display_name = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
-                    original_location = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    trashed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    purge_after_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    state = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_trash_entries", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_trash_entries_users_user_id",
                         column: x => x.user_id,
                         principalTable: "users",
                         principalColumn: "id",
@@ -652,13 +545,76 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "practice_session_items",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    practice_session_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    word_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    position = table.Column<int>(type: "integer", nullable: false),
+                    word = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
+                    meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    ipa_pronunciation = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    type = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    context = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    example = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    synonyms = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    antonyms = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    current_step = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    already_in_review = table.Column<bool>(type: "boolean", nullable: false),
+                    selected_level = table.Column<int>(type: "integer", nullable: true),
+                    has_mistake = table.Column<bool>(type: "boolean", nullable: false),
+                    is_completed = table.Column<bool>(type: "boolean", nullable: false),
+                    completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    choice_1_slot_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    choice_2_slot_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    choice_3_slot_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    choice_4_slot_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    choice_1_meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    choice_2_meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    choice_3_meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    choice_4_meaning = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    correct_answer_slot_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_practice_session_items", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_practice_session_items_practice_sessions_practice_session_id",
+                        column: x => x.practice_session_id,
+                        principalTable: "practice_sessions",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "review_session_items",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     review_session_id = table.Column<Guid>(type: "uuid", nullable: false),
                     vocab_word_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    position = table.Column<int>(type: "integer", nullable: false),
+                    mode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    language_snapshot = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
+                    word_snapshot = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
+                    meaning_snapshot = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    ipa_pronunciation_snapshot = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    type_snapshot = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    context_snapshot = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    example_snapshot = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    synonyms_snapshot = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    antonyms_snapshot = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     is_reviewed = table.Column<bool>(type: "boolean", nullable: false),
+                    result = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    level_before = table.Column<int>(type: "integer", nullable: true),
+                    level_after = table.Column<int>(type: "integer", nullable: true),
+                    next_review_date_before = table.Column<DateOnly>(type: "date", nullable: true),
+                    next_review_date_after = table.Column<DateOnly>(type: "date", nullable: true),
+                    completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -670,12 +626,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         name: "FK_review_session_items_review_sessions_review_session_id",
                         column: x => x.review_session_id,
                         principalTable: "review_sessions",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_review_session_items_vocab_words_vocab_word_id",
-                        column: x => x.vocab_word_id,
-                        principalTable: "vocab_words",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -708,16 +658,106 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "practice_attempts",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    practice_session_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    practice_session_item_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    step = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    kind = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    submitted_answer = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    answer_slot_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    correctness = table.Column<bool>(type: "boolean", nullable: false),
+                    duration_ms = table.Column<long>(type: "bigint", nullable: false),
+                    attempt_number = table.Column<int>(type: "integer", nullable: true),
+                    accuracy_score = table.Column<double>(type: "double precision", nullable: true),
+                    completeness_score = table.Column<double>(type: "double precision", nullable: true),
+                    assessment_json = table.Column<string>(type: "jsonb", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_practice_attempts", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_practice_attempts_practice_session_items_practice_session_i~",
+                        column: x => x.practice_session_item_id,
+                        principalTable: "practice_session_items",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_practice_attempts_practice_sessions_practice_session_id",
+                        column: x => x.practice_session_id,
+                        principalTable: "practice_sessions",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "review_attempts",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    review_session_item_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    attempt_number = table.Column<int>(type: "integer", nullable: false),
+                    mode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    answer_text = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    is_correct = table.Column<bool>(type: "boolean", nullable: false),
+                    accuracy_score = table.Column<double>(type: "double precision", nullable: true),
+                    completeness_score = table.Column<double>(type: "double precision", nullable: true),
+                    feedback_mode = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                    feedback_json = table.Column<string>(type: "jsonb", nullable: true),
+                    time_spent_seconds = table.Column<int>(type: "integer", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_review_attempts", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_review_attempts_review_session_items_review_session_item_id",
+                        column: x => x.review_session_item_id,
+                        principalTable: "review_session_items",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "word_review_histories",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    word_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    session_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    review_session_item_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    time_spent_seconds = table.Column<int>(type: "integer", nullable: false),
+                    reviewed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    result = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_word_review_histories", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_word_review_histories_review_session_items_review_session_i~",
+                        column: x => x.review_session_item_id,
+                        principalTable: "review_session_items",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_assets_object_key",
                 table: "assets",
                 column: "object_key",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_assets_status_purge_after_at",
-                table: "assets",
-                columns: new[] { "status", "purge_after_at" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_assets_uploaded_by_user_id_asset_type_deleted_at",
@@ -730,16 +770,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 columns: new[] { "uploaded_by_user_id", "status", "deleted_at" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_countdown_alerts_countdown_id_scheduled_at_utc",
-                table: "countdown_alerts",
-                columns: new[] { "countdown_id", "scheduled_at_utc" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_countdowns_cover_asset_id",
                 table: "countdowns",
                 column: "cover_asset_id",
                 unique: true,
-                filter: "\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+                filter: "\"cover_asset_id\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_countdowns_user_id_target_date",
@@ -758,11 +793,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_habits_reminder_due",
-                table: "habits",
-                columns: new[] { "reminder_enabled", "reminder_time", "last_reminder_sent_on" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_habits_user_id",
                 table: "habits",
                 column: "user_id");
@@ -778,9 +808,22 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 columns: new[] { "user_id", "created_at" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_journal_user_id_date",
+                name: "ux_journal_user_date_active",
                 table: "journal",
-                columns: new[] { "user_id", "date" });
+                columns: new[] { "user_id", "date" },
+                unique: true,
+                filter: "deleted_at IS NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_journal_entry_assets_asset_id",
+                table: "journal_entry_assets",
+                column: "asset_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_journal_entry_assets_journal_entry_id_deleted_at",
+                table: "journal_entry_assets",
+                columns: new[] { "journal_entry_id", "deleted_at" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_note_boards_user_id_created_at",
@@ -809,27 +852,25 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 columns: new[] { "board_id", "created_at" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_notifications_user_id_deduplication_key",
-                table: "notifications",
-                columns: new[] { "user_id", "deduplication_key" },
+                name: "IX_practice_attempts_practice_session_id_created_at",
+                table: "practice_attempts",
+                columns: new[] { "practice_session_id", "created_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_practice_attempts_practice_session_item_id_step",
+                table: "practice_attempts",
+                columns: new[] { "practice_session_item_id", "step" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_practice_session_items_practice_session_id_position",
+                table: "practice_session_items",
+                columns: new[] { "practice_session_id", "position" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_notifications_user_id_read_at_created_at",
-                table: "notifications",
-                columns: new[] { "user_id", "read_at", "created_at" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_pomodoro_configs_user_id",
-                table: "pomodoro_configs",
-                column: "user_id",
-                unique: true,
-                filter: "deleted_at IS NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_pomodoro_sessions_user_id_completed_at",
-                table: "pomodoro_sessions",
-                columns: new[] { "user_id", "completed_at" });
+                name: "IX_practice_session_items_word_id",
+                table: "practice_session_items",
+                column: "word_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_practice_session_summaries_page_id_completed_at",
@@ -842,10 +883,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 columns: new[] { "user_id", "completed_at" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_practice_settings_user_id",
-                table: "practice_settings",
-                column: "user_id",
-                unique: true);
+                name: "IX_practice_sessions_page_id_started_at",
+                table: "practice_sessions",
+                columns: new[] { "page_id", "started_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_practice_sessions_user_id_started_at",
+                table: "practice_sessions",
+                columns: new[] { "user_id", "started_at" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_project_boards_user_id_deleted_at",
@@ -873,6 +918,31 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 columns: new[] { "board_id", "deleted_at", "sort_order" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_refresh_tokens_token_hash",
+                table: "refresh_tokens",
+                column: "token_hash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_refresh_tokens_user_id_revoked_at",
+                table: "refresh_tokens",
+                columns: new[] { "user_id", "revoked_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_review_attempts_review_session_item_id_attempt_number",
+                table: "review_attempts",
+                columns: new[] { "review_session_item_id", "attempt_number" },
+                unique: true,
+                filter: "deleted_at IS NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_review_session_items_review_session_id_position",
+                table: "review_session_items",
+                columns: new[] { "review_session_id", "position" },
+                unique: true,
+                filter: "deleted_at IS NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_review_session_items_review_session_id_vocab_word_id",
                 table: "review_session_items",
                 columns: new[] { "review_session_id", "vocab_word_id" },
@@ -885,14 +955,9 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 column: "vocab_word_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_review_sessions_board_id",
+                name: "IX_review_sessions_user_id_session_date_status",
                 table: "review_sessions",
-                column: "board_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_review_sessions_user_id_board_id_session_date_status",
-                table: "review_sessions",
-                columns: new[] { "user_id", "board_id", "session_date", "status" },
+                columns: new[] { "user_id", "session_date", "status" },
                 filter: "deleted_at IS NULL");
 
             migrationBuilder.CreateIndex(
@@ -903,12 +968,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 filter: "generated_from_todo_id IS NOT NULL AND deleted_at IS NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_todo_items_reminder_scheduled_at_utc",
-                table: "todo_items",
-                column: "reminder_scheduled_at_utc",
-                filter: "reminder_scheduled_at_utc IS NOT NULL AND reminder_sent_at_utc IS NULL AND is_completed = FALSE AND deleted_at IS NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_todo_items_user_id_date_sort_order",
                 table: "todo_items",
                 columns: new[] { "user_id", "date", "sort_order" });
@@ -917,22 +976,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 name: "IX_todo_items_user_id_is_completed_date",
                 table: "todo_items",
                 columns: new[] { "user_id", "is_completed", "date" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_trash_entries_entity_kind_entity_id",
-                table: "trash_entries",
-                columns: new[] { "entity_kind", "entity_id" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_trash_entries_state_purge_after_at",
-                table: "trash_entries",
-                columns: new[] { "state", "purge_after_at" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_trash_entries_user_id_state_trashed_at",
-                table: "trash_entries",
-                columns: new[] { "user_id", "state", "trashed_at" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_current_avatar_asset_id",
@@ -953,11 +996,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 filter: "google_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_users_reset_password_token",
+                name: "IX_users_reset_password_token_hash",
                 table: "users",
-                column: "reset_password_token",
+                column: "reset_password_token_hash",
                 unique: true,
-                filter: "reset_password_token IS NOT NULL");
+                filter: "reset_password_token_hash IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_vocab_board_preferences_user_id_board_id",
@@ -984,6 +1027,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 name: "IX_vocab_words_page_id_created_at",
                 table: "vocab_words",
                 columns: new[] { "page_id", "created_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_word_review_histories_review_session_item_id",
+                table: "word_review_histories",
+                column: "review_session_item_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_word_review_histories_user_id_reviewed_at_active",
@@ -1036,43 +1084,34 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 table: "assets");
 
             migrationBuilder.DropTable(
-                name: "countdown_alerts");
+                name: "countdowns");
 
             migrationBuilder.DropTable(
                 name: "habit_entries");
 
             migrationBuilder.DropTable(
-                name: "journal");
+                name: "journal_entry_assets");
 
             migrationBuilder.DropTable(
                 name: "note_page_assets");
 
             migrationBuilder.DropTable(
-                name: "notifications");
-
-            migrationBuilder.DropTable(
-                name: "pomodoro_configs");
-
-            migrationBuilder.DropTable(
-                name: "pomodoro_sessions");
+                name: "practice_attempts");
 
             migrationBuilder.DropTable(
                 name: "practice_session_summaries");
 
             migrationBuilder.DropTable(
-                name: "practice_settings");
-
-            migrationBuilder.DropTable(
                 name: "project_cards");
 
             migrationBuilder.DropTable(
-                name: "review_session_items");
+                name: "refresh_tokens");
+
+            migrationBuilder.DropTable(
+                name: "review_attempts");
 
             migrationBuilder.DropTable(
                 name: "todo_items");
-
-            migrationBuilder.DropTable(
-                name: "trash_entries");
 
             migrationBuilder.DropTable(
                 name: "vocab_board_preferences");
@@ -1084,19 +1123,22 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 name: "word_review_states");
 
             migrationBuilder.DropTable(
-                name: "countdowns");
+                name: "habits");
 
             migrationBuilder.DropTable(
-                name: "habits");
+                name: "journal");
 
             migrationBuilder.DropTable(
                 name: "note_pages");
 
             migrationBuilder.DropTable(
+                name: "practice_session_items");
+
+            migrationBuilder.DropTable(
                 name: "project_columns");
 
             migrationBuilder.DropTable(
-                name: "review_sessions");
+                name: "review_session_items");
 
             migrationBuilder.DropTable(
                 name: "vocab_words");
@@ -1105,7 +1147,13 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                 name: "note_boards");
 
             migrationBuilder.DropTable(
+                name: "practice_sessions");
+
+            migrationBuilder.DropTable(
                 name: "project_boards");
+
+            migrationBuilder.DropTable(
+                name: "review_sessions");
 
             migrationBuilder.DropTable(
                 name: "vocab_pages");

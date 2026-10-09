@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FluentA.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260809101816_InitialBaseline")]
+    [Migration("20261009024221_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -31,10 +31,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<DateTime?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("archived_at");
 
                     b.Property<string>("Bucket")
                         .HasMaxLength(255)
@@ -70,10 +66,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("original_name");
 
-                    b.Property<DateTime?>("PurgeAfterAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("purge_after_at");
-
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("size_bytes");
@@ -102,8 +94,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ObjectKey")
                         .IsUnique();
-
-                    b.HasIndex("Status", "PurgeAfterAt");
 
                     b.HasIndex("UploadedByUserId", "Status", "DeletedAt");
 
@@ -158,28 +148,22 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("google_id");
 
+                    b.Property<DateTime?>("GoogleLinkConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("google_link_confirmed_at");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
-
-                    b.Property<string>("OtpCode")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("otp_code");
 
                     b.Property<DateTime?>("OtpExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("otp_expires_at");
 
-                    b.Property<int>("OtpFailedAttempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("otp_failed_attempts");
-
-                    b.Property<DateTime?>("OtpResendAvailableAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("otp_resend_available_at");
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("otp_hash");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(256)
@@ -190,10 +174,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reset_password_expires_at");
 
-                    b.Property<string>("ResetPasswordToken")
+                    b.Property<string>("ResetPasswordTokenHash")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
-                        .HasColumnName("reset_password_token");
+                        .HasColumnName("reset_password_token_hash");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -210,61 +194,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("google_id IS NOT NULL");
 
-                    b.HasIndex("ResetPasswordToken")
+                    b.HasIndex("ResetPasswordTokenHash")
                         .IsUnique()
-                        .HasFilter("reset_password_token IS NOT NULL");
+                        .HasFilter("reset_password_token_hash IS NOT NULL");
 
                     b.ToTable("users", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AlertDay")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("alert_day");
-
-                    b.Property<string>("AlertTime")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)")
-                        .HasColumnName("alert_time");
-
-                    b.Property<Guid>("CountdownId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("countdown_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<DateTime?>("FiredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fired_at_utc");
-
-                    b.Property<DateTime>("ScheduledAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("scheduled_at_utc");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CountdownId", "ScheduledAtUtc");
-
-                    b.ToTable("countdown_alerts", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
@@ -292,12 +226,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
 
-                    b.Property<string>("RepeatPattern")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("repeat_pattern");
-
                     b.Property<DateTime>("TargetDate")
                         .HasColumnType("date")
                         .HasColumnName("target_date");
@@ -314,7 +242,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CoverAssetId")
                         .IsUnique()
-                        .HasFilter("\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+                        .HasFilter("\"cover_asset_id\" IS NOT NULL");
 
                     b.HasIndex("UserId", "TargetDate");
 
@@ -364,26 +292,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("Default")
                         .HasColumnName("icon");
 
-                    b.Property<DateTime?>("LastReminderSentOn")
-                        .HasColumnType("date")
-                        .HasColumnName("last_reminder_sent_on");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
-
-                    b.Property<bool>("ReminderEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("reminder_enabled");
-
-                    b.Property<TimeOnly>("ReminderTime")
-                        .HasPrecision(0)
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("reminder_time");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("date")
@@ -402,9 +315,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.HasIndex("UserId", "Name");
-
-                    b.HasIndex("ReminderEnabled", "ReminderTime", "LastReminderSentOn")
-                        .HasDatabaseName("ix_habits_reminder_due");
 
                     b.ToTable("habits", null, t =>
                         {
@@ -491,9 +401,49 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "CreatedAt");
 
-                    b.HasIndex("UserId", "Date");
+                    b.HasIndex("UserId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("ux_journal_user_date_active")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("journal", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntryAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("JournalEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("journal_entry_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId")
+                        .IsUnique();
+
+                    b.HasIndex("JournalEntryId", "DeletedAt");
+
+                    b.ToTable("journal_entry_assets", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>
@@ -616,78 +566,36 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("note_page_assets", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Notification.Entities.Notification", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeAttempt", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("ActionPath")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("action_path");
+                    b.Property<double?>("AccuracyScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("accuracy_score");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DeduplicationKey")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("deduplication_key");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("message");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("read_at");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("title");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("type");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("AnswerSlotId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("answer_slot_id");
 
-                    b.HasKey("Id");
+                    b.Property<string>("AssessmentJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("assessment_json");
 
-                    b.HasIndex("UserId", "DeduplicationKey")
-                        .IsUnique();
+                    b.Property<int?>("AttemptNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_number");
 
-                    b.HasIndex("UserId", "ReadAt", "CreatedAt");
+                    b.Property<double?>("CompletenessScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("completeness_score");
 
-                    b.ToTable("notifications", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Pomodoro.Entities.PomodoroConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                    b.Property<bool>("Correctness")
+                        .HasColumnType("boolean")
+                        .HasColumnName("correctness");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -697,47 +605,72 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<int>("LongBreakAfter")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_break_after");
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("duration_ms");
 
-                    b.Property<int>("LongBreakMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_break_minutes");
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
 
-                    b.Property<int>("ShortBreakMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("short_break_minutes");
+                    b.Property<Guid>("PracticeSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practice_session_id");
+
+                    b.Property<Guid>("PracticeSessionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practice_session_item_id");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("step");
+
+                    b.Property<string>("SubmittedAnswer")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("submitted_answer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<int>("WorkMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("work_minutes");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasFilter("deleted_at IS NULL");
+                    b.HasIndex("PracticeSessionId", "CreatedAt");
 
-                    b.ToTable("pomodoro_configs", (string)null);
+                    b.HasIndex("PracticeSessionItemId", "Step");
+
+                    b.ToTable("practice_attempts", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Pomodoro.Entities.PomodoroSession", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime>("CompletedAt")
+                    b.Property<Guid>("BoardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("board_id");
+
+                    b.Property<string>("BoardLanguage")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("board_language");
+
+                    b.Property<string>("BoardName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("board_name");
+
+                    b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 
@@ -745,38 +678,33 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("CurrentItemIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_item_index");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<Guid?>("LinkedTaskId")
+                    b.Property<Guid>("PageId")
                         .HasColumnType("uuid")
-                        .HasColumnName("linked_task_id");
+                        .HasColumnName("page_id");
 
-                    b.Property<string>("LinkedTaskSource")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("linked_task_source");
-
-                    b.Property<string>("Phase")
+                    b.Property<string>("PageName")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("phase");
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("page_name");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at");
 
-                    b.Property<string>("State")
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("state");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -788,9 +716,163 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "CompletedAt");
+                    b.HasIndex("PageId", "StartedAt");
 
-                    b.ToTable("pomodoro_sessions", (string)null);
+                    b.HasIndex("UserId", "StartedAt");
+
+                    b.ToTable("practice_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AlreadyInReview")
+                        .HasColumnType("boolean")
+                        .HasColumnName("already_in_review");
+
+                    b.Property<string>("Antonyms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("antonyms");
+
+                    b.Property<string>("Choice1Meaning")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("choice_1_meaning");
+
+                    b.Property<Guid>("Choice1SlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_1_slot_id");
+
+                    b.Property<string>("Choice2Meaning")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("choice_2_meaning");
+
+                    b.Property<Guid>("Choice2SlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_2_slot_id");
+
+                    b.Property<string>("Choice3Meaning")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("choice_3_meaning");
+
+                    b.Property<Guid>("Choice3SlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_3_slot_id");
+
+                    b.Property<string>("Choice4Meaning")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("choice_4_meaning");
+
+                    b.Property<Guid>("Choice4SlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_4_slot_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("Context")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("context");
+
+                    b.Property<Guid>("CorrectAnswerSlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correct_answer_slot_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrentStep")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("current_step");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Example")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("example");
+
+                    b.Property<bool>("HasMistake")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_mistake");
+
+                    b.Property<string>("IpaPronunciation")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("ipa_pronunciation");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_completed");
+
+                    b.Property<string>("Meaning")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("meaning");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("PracticeSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("practice_session_id");
+
+                    b.Property<int?>("SelectedLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("selected_level");
+
+                    b.Property<string>("Synonyms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("synonyms");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("word");
+
+                    b.Property<Guid>("WordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("word_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WordId");
+
+                    b.HasIndex("PracticeSessionId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("practice_session_items", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
@@ -826,6 +908,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("page_id");
 
+                    b.Property<string>("PageName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("page_name");
+
                     b.Property<int>("TotalCards")
                         .HasColumnType("integer")
                         .HasColumnName("total_cards");
@@ -849,43 +937,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "CompletedAt");
 
                     b.ToTable("practice_session_summaries", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("ModeSequence")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("mode_sequence");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_practice_settings_user_id");
-
-                    b.ToTable("practice_settings", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectBoard", b =>
@@ -1023,16 +1074,84 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("project_columns", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewAttempt", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("BoardId")
+                    b.Property<double?>("AccuracyScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("accuracy_score");
+
+                    b.Property<string>("AnswerText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("answer_text");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_number");
+
+                    b.Property<double?>("CompletenessScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("completeness_score");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("FeedbackJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("feedback_json");
+
+                    b.Property<string>("FeedbackMode")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("feedback_mode");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_correct");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("ReviewSessionItemId")
                         .HasColumnType("uuid")
-                        .HasColumnName("board_id");
+                        .HasColumnName("review_session_item_id");
+
+                    b.Property<int>("TimeSpentSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("time_spent_seconds");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewSessionItemId", "AttemptNumber")
+                        .IsUnique()
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("review_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1045,12 +1164,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
-
-                    b.Property<string>("OrderType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("order_type");
 
                     b.Property<DateOnly>("SessionDate")
                         .HasColumnType("date")
@@ -1066,6 +1179,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("time_zone_id");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1076,9 +1195,7 @@ namespace FluentA.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BoardId");
-
-                    b.HasIndex("UserId", "BoardId", "SessionDate", "Status")
+                    b.HasIndex("UserId", "SessionDate", "Status")
                         .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("review_sessions", (string)null);
@@ -1091,6 +1208,20 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AntonymsSnapshot")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("antonyms_snapshot");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("ContextSnapshot")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("context_snapshot");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1099,13 +1230,79 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
+                    b.Property<string>("ExampleSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("example_snapshot");
+
+                    b.Property<string>("IpaPronunciationSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("ipa_pronunciation_snapshot");
+
                     b.Property<bool>("IsReviewed")
                         .HasColumnType("boolean")
                         .HasColumnName("is_reviewed");
 
+                    b.Property<string>("LanguageSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language_snapshot");
+
+                    b.Property<int?>("LevelAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_after");
+
+                    b.Property<int?>("LevelBefore")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_before");
+
+                    b.Property<string>("MeaningSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("meaning_snapshot");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("mode");
+
+                    b.Property<DateOnly?>("NextReviewDateAfter")
+                        .HasColumnType("date")
+                        .HasColumnName("next_review_date_after");
+
+                    b.Property<DateOnly?>("NextReviewDateBefore")
+                        .HasColumnType("date")
+                        .HasColumnName("next_review_date_before");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("result");
+
                     b.Property<Guid>("ReviewSessionId")
                         .HasColumnType("uuid")
                         .HasColumnName("review_session_id");
+
+                    b.Property<string>("SynonymsSnapshot")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("synonyms_snapshot");
+
+                    b.Property<string>("TypeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("type_snapshot");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1115,9 +1312,19 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("vocab_word_id");
 
+                    b.Property<string>("WordSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)")
+                        .HasColumnName("word_snapshot");
+
                     b.HasKey("Id");
 
                     b.HasIndex("VocabWordId");
+
+                    b.HasIndex("ReviewSessionId", "Position")
+                        .IsUnique()
+                        .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("ReviewSessionId", "VocabWordId")
                         .IsUnique()
@@ -1147,6 +1354,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("result");
 
+                    b.Property<Guid?>("ReviewSessionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_session_item_id");
+
                     b.Property<DateTime>("ReviewedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reviewed_at");
@@ -1172,6 +1383,8 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnName("word_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ReviewSessionItemId");
 
                     b.HasIndex("UserId", "ReviewedAt")
                         .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
@@ -1295,23 +1508,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("note");
 
-                    b.Property<DateTime?>("ReminderScheduledAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reminder_scheduled_at_utc");
-
-                    b.Property<DateTime?>("ReminderSentAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reminder_sent_at_utc");
-
-                    b.Property<TimeOnly?>("ReminderTime")
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("reminder_time");
-
-                    b.Property<string>("ReminderTimeZoneId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("reminder_time_zone_id");
-
                     b.Property<string>("RepeatPattern")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
@@ -1341,85 +1537,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("generated_from_todo_id IS NOT NULL AND deleted_at IS NULL");
 
-                    b.HasIndex("ReminderScheduledAtUtc")
-                        .HasFilter("reminder_scheduled_at_utc IS NOT NULL AND reminder_sent_at_utc IS NULL AND is_completed = FALSE AND deleted_at IS NULL");
-
                     b.HasIndex("UserId", "Date", "SortOrder");
 
                     b.HasIndex("UserId", "IsCompleted", "Date");
 
                     b.ToTable("todo_items", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Trash.Entities.TrashEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("character varying(240)")
-                        .HasColumnName("display_name");
-
-                    b.Property<Guid>("EntityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityKind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("entity_kind");
-
-                    b.Property<string>("OriginalLocation")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("original_location");
-
-                    b.Property<DateTime>("PurgeAfterAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("purge_after_at");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("state");
-
-                    b.Property<DateTime>("TrashedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("trashed_at");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EntityKind", "EntityId")
-                        .IsUnique();
-
-                    b.HasIndex("State", "PurgeAfterAt");
-
-                    b.HasIndex("UserId", "State", "TrashedAt");
-
-                    b.ToTable("trash_entries", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", b =>
@@ -1564,20 +1686,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("antonyms");
 
-                    b.Property<string>("Class")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("class");
+                    b.Property<string>("Context")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("context");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<string>("Definition")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("definition");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1595,16 +1711,11 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("ipa_pronunciation");
 
-                    b.Property<string>("MeaningVn")
+                    b.Property<string>("Meaning")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("meaning_vn");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("note");
+                        .HasColumnName("meaning");
 
                     b.Property<Guid>("PageId")
                         .HasColumnType("uuid")
@@ -1614,6 +1725,12 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("synonyms");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("type");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1630,6 +1747,45 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("PageId", "CreatedAt");
 
                     b.ToTable("vocab_words", (string)null);
+                });
+
+            modelBuilder.Entity("FluentA.Infrastructure.Persistence.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAt");
+
+                    b.ToTable("refresh_tokens", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", b =>
@@ -1649,15 +1805,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownAlert", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", null)
-                        .WithMany("Alerts")
-                        .HasForeignKey("CountdownId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
@@ -1671,6 +1818,21 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasOne("FluentA.Domain.BoundedContexts.Habit.Entities.Habit", null)
                         .WithMany()
                         .HasForeignKey("HabitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntryAsset", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Assets.Entities.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FluentA.Domain.BoundedContexts.Journal.Entities.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -1708,14 +1870,23 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeAttempt", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", null)
+                    b.HasOne("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSession", null)
                         .WithMany()
-                        .HasForeignKey("PageId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasForeignKey("PracticeSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionItem", null)
+                        .WithMany()
+                        .HasForeignKey("PracticeSessionItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSession", b =>
+                {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1723,11 +1894,20 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionItem", b =>
+                {
+                    b.HasOne("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSession", null)
+                        .WithMany()
+                        .HasForeignKey("PracticeSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSessionSummary", b =>
                 {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithOne()
-                        .HasForeignKey("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", "UserId")
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -1750,14 +1930,17 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewAttempt", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabBoard", null)
+                    b.HasOne("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSessionItem", null)
                         .WithMany()
-                        .HasForeignKey("BoardId")
+                        .HasForeignKey("ReviewSessionItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
 
+            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSession", b =>
+                {
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1772,21 +1955,14 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ReviewSessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
-                        .WithMany()
-                        .HasForeignKey("VocabWordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewHistory", b =>
                 {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabWord", null)
+                    b.HasOne("FluentA.Domain.BoundedContexts.Review.Entities.ReviewSessionItem", null)
                         .WithMany()
-                        .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ReviewSessionItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Review.Entities.WordReviewState", b =>
@@ -1804,15 +1980,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("GeneratedFromTodoId")
                         .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Trash.Entities.TrashEntry", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Vocabulary.Entities.VocabPage", b =>
@@ -1833,9 +2000,13 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent", b =>
+            modelBuilder.Entity("FluentA.Infrastructure.Persistence.Entities.RefreshToken", b =>
                 {
-                    b.Navigation("Alerts");
+                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Note.Entities.NoteBoard", b =>

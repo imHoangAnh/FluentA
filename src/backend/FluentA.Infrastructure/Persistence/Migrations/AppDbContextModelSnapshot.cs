@@ -145,6 +145,10 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("google_id");
 
+                    b.Property<DateTime?>("GoogleLinkConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("google_link_confirmed_at");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
@@ -559,117 +563,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.ToTable("note_page_assets", (string)null);
                 });
 
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Pomodoro.Entities.PomodoroConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<int>("LongBreakAfter")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_break_after");
-
-                    b.Property<int>("LongBreakMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_break_minutes");
-
-                    b.Property<int>("ShortBreakMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("short_break_minutes");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<int>("WorkMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("work_minutes");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasFilter("deleted_at IS NULL");
-
-                    b.ToTable("pomodoro_configs", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Pomodoro.Entities.PomodoroSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<Guid?>("LinkedTaskId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("linked_task_id");
-
-                    b.Property<string>("LinkedTaskSource")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("linked_task_source");
-
-                    b.Property<string>("Phase")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("phase");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("state");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "CompletedAt");
-
-                    b.ToTable("pomodoro_sessions", (string)null);
-                });
-
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeAttempt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1041,43 +934,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "CompletedAt");
 
                     b.ToTable("practice_session_summaries", (string)null);
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("ModeSequence")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("mode_sequence");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_practice_settings_user_id");
-
-                    b.ToTable("practice_settings", (string)null);
                 });
 
             modelBuilder.Entity("FluentA.Domain.BoundedContexts.Project.Entities.ProjectBoard", b =>
@@ -2049,15 +1905,6 @@ namespace FluentA.Infrastructure.Persistence.Migrations
                     b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", b =>
-                {
-                    b.HasOne("FluentA.Domain.BoundedContexts.Auth.Entities.User", null)
-                        .WithOne()
-                        .HasForeignKey("FluentA.Domain.BoundedContexts.Practice.Entities.PracticeSettings", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
