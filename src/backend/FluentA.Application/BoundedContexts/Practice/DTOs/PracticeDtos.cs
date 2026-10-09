@@ -1,4 +1,5 @@
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
+using FluentA.Application.Common.Models;
 
 namespace FluentA.Application.BoundedContexts.Practice.DTOs;
 
@@ -54,12 +55,6 @@ public sealed record PracticeDeckDto(
     Guid BoardId,
     string BoardName,
     int WordCount);
-
-public sealed record PracticeDeckPageDto(
-    IReadOnlyList<PracticeDeckDto> Items,
-    int Page,
-    int PageSize,
-    int TotalCount);
 
 public sealed record PracticeAnswerSlotDto(Guid SlotId, string? Meaning);
 
@@ -151,7 +146,7 @@ public enum PracticeRepositoryOperationStatus
 
 public sealed record PracticeDeckQueryResult(
     PracticeRepositoryOperationStatus Status,
-    PracticeDeckPageDto? Page);
+    PagedResult<PracticeDeckDto>? Page);
 
 public sealed record PracticeRepositoryOperationResult<T>(
     PracticeRepositoryOperationStatus Status,

@@ -25,10 +25,10 @@ public static class RateLimitingExtensions
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString();
                 await context.HttpContext.Response.WriteAsJsonAsync(
-                    ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
+                    ApiResponseFactory.Fail(
                         "RATE_LIMITED",
                         "Too many requests. Please try again later.",
-                        new { retryAfterSeconds = retryAfter })),
+                        traceId: context.HttpContext.TraceIdentifier),
                     cancellationToken);
             };
         });

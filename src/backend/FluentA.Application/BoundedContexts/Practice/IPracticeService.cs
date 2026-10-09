@@ -1,11 +1,12 @@
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.Common;
+using FluentA.Application.Common.Models;
 
 namespace FluentA.Application.BoundedContexts.Practice;
 
 public interface IPracticeService
 {
-    Task<OperationResult<PracticeDeckPageDto>> GetDecksAsync(
+    Task<OperationResult<PagedResult<PracticeDeckDto>>> GetDecksAsync(
         Guid userId,
         Guid boardId,
         string? search,

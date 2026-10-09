@@ -35,15 +35,31 @@ const session = {
 }
 
 async function mockReviewApis(page) {
+  let currentSession = structuredClone(session)
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/review/dashboard')) return json({ localDate: '2026-07-14', dueCount: 1 })
-    if (path.endsWith('/review/sessions') && request.method() === 'POST') return json(session)
-    if (path.endsWith('/review/sessions/review-session') && request.method() === 'GET') return json(session)
+    if (path.endsWith('/review/sessions') && request.method() === 'POST') return json(currentSession)
+    if (path.endsWith('/review/sessions/review-session') && request.method() === 'GET') return json(currentSession)
     if (path.endsWith('/review/sessions/review-session/answers')) {
+      currentSession = {
+        ...currentSession,
+        status: 'completed',
+        completedWords: 1,
+        currentItemIndex: null,
+        items: [{
+          ...currentSession.items[0],
+          isReviewed: true,
+          result: 'correct',
+          levelBefore: 0,
+          levelAfter: 1,
+          nextReviewDateBefore: '2026-07-14',
+          nextReviewDateAfter: '2026-07-16',
+        }],
+      }
       return json({
         itemId: 'item-1',
         wordId: 'word-1',
@@ -74,13 +90,17 @@ test('Review opens its due-count modal and grades one persisted mode per due wor
   await page.getByRole('button', { name: 'Review', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByTestId('review-due-count')).toHaveText('1')
-  await expect(page.getByText('word due today')).toBeVisible()
+  await expect(page.getByText('word ready to review')).toBeVisible()
   await page.getByRole('button', { name: 'Start review' }).click()
 
   await expect(page).toHaveURL('/review/sessions/review-session')
-  await expect(page.getByTestId('active-review-card')).toHaveClass(/review-card--meaningToWord/)
+  await expect(page.getByTestId('active-review-card')).toBeVisible()
+  await expect(page.getByText('Read the meaning, type the word.')).toBeVisible()
   await expect(page.getByText('the first letter of the Greek alphabet')).toBeVisible()
+  await expect(page.getByText('Usage context')).toHaveCount(0)
   await page.getByLabel('Type the word').fill('alpha')
-  await page.getByRole('button', { name: 'Submit', exact: true }).click()
-  await expect(page.getByRole('status')).toHaveText('Correct')
+  await page.getByLabel('Type the word').press('Enter')
+  await expect(page.getByRole('status')).toContainText('Correct')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByText('Review complete')).toBeVisible()
 })

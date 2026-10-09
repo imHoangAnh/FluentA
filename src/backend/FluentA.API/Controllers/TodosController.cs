@@ -27,7 +27,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.GetAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -50,7 +50,7 @@ public sealed class TodosController : ApiControllerBase
         }
 
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<TodoItemDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<TodoItemDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -60,7 +60,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.CreateAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -70,7 +70,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.UpdateAsync(CurrentUserId(), todoId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -80,7 +80,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.DuplicateAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -90,7 +90,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.DeleteAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<bool>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = true }))
             : ToErrorResult(result);
     }
 

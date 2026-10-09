@@ -39,29 +39,8 @@ async function loginWithMockedApi(page) {
   await expect(page).toHaveURL('/')
 }
 
-test('Headless selection menus and action menus use the shared polished treatment', async ({ page }) => {
+test('Action menus use the shared polished treatment', async ({ page }) => {
   await loginWithMockedApi(page)
-
-  await page.getByRole('link', { name: 'Pomodoro', exact: true }).click()
-  const select = page.getByTestId('pomodoro-task-select')
-  await expect(select).toBeVisible()
-
-  await expect.poll(() => select.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return {
-      appearance: style.appearance,
-      borderRadius: style.borderRadius,
-      minHeight: style.minHeight,
-    }
-  })).toEqual({
-    appearance: 'button',
-    borderRadius: '8px',
-    minHeight: '40px',
-  })
-
-  await select.focus()
-  await expect.poll(() => select.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none')
-  await expect.poll(() => select.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
 
   await page.getByRole('link', { name: 'Todo', exact: true }).click()
   await page.getByRole('button', { name: 'Sort My Day tasks' }).click()

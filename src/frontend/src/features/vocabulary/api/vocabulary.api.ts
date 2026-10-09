@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export const DEFAULT_VOCAB_COLUMN_ORDER = [
@@ -127,67 +127,67 @@ export type Word = WordInput & {
 }
 
 export async function listBoards() {
-  const response = await apiClient.get<ApiEnvelope<BoardSummary[]>>('/vocabs/boards')
+  const response = await apiClient.get<ApiResponse<BoardSummary[]>>('/vocabs/boards')
   return response.data.data ?? []
 }
 
 export async function createBoard(input: CreateBoardInput) {
-  const response = await apiClient.post<ApiEnvelope<BoardDetail>>('/vocabs/boards', input)
+  const response = await apiClient.post<ApiResponse<BoardDetail>>('/vocabs/boards', input)
   return response.data.data!
 }
 
 export async function getBoard(boardId: string) {
-  const response = await apiClient.get<ApiEnvelope<BoardDetail>>(`/vocabs/boards/${boardId}`)
+  const response = await apiClient.get<ApiResponse<BoardDetail>>(`/vocabs/boards/${boardId}`)
   return response.data.data!
 }
 
 export async function updateBoard(boardId: string, input: UpdateBoardInput) {
-  const response = await apiClient.patch<ApiEnvelope<BoardDetail>>(`/vocabs/boards/${boardId}`, input)
+  const response = await apiClient.patch<ApiResponse<BoardDetail>>(`/vocabs/boards/${boardId}`, input)
   return response.data.data!
 }
 
 export async function deleteBoard(boardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/boards/${boardId}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/vocabs/boards/${boardId}`)
   return response.data.data!
 }
 
 export async function createPage(boardId: string, input: { name: string }) {
-  const response = await apiClient.post<ApiEnvelope<Page>>(`/vocabs/boards/${boardId}/pages`, input)
+  const response = await apiClient.post<ApiResponse<Page>>(`/vocabs/boards/${boardId}/pages`, input)
   return response.data.data!
 }
 
 export async function updatePage(pageId: string, input: { name: string }) {
-  const response = await apiClient.patch<ApiEnvelope<Page>>(`/vocabs/pages/${pageId}`, input)
+  const response = await apiClient.patch<ApiResponse<Page>>(`/vocabs/pages/${pageId}`, input)
   return response.data.data!
 }
 
 export async function deletePage(pageId: string) {
-  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/pages/${pageId}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/vocabs/pages/${pageId}`)
   return response.data.data!
 }
 
 export async function listWords(pageId: string) {
-  const response = await apiClient.get<ApiEnvelope<Word[]>>(`/vocabs/pages/${pageId}/words`)
+  const response = await apiClient.get<ApiResponse<Word[]>>(`/vocabs/pages/${pageId}/words`)
   return response.data.data ?? []
 }
 
 export async function createWord(pageId: string, input: WordInput) {
-  const response = await apiClient.post<ApiEnvelope<Word>>(`/vocabs/pages/${pageId}/words`, input)
+  const response = await apiClient.post<ApiResponse<Word>>(`/vocabs/pages/${pageId}/words`, input)
   return response.data.data!
 }
 
 export async function updateWord(wordId: string, input: WordInput) {
-  const response = await apiClient.patch<ApiEnvelope<Word>>(`/vocabs/words/${wordId}`, input)
+  const response = await apiClient.patch<ApiResponse<Word>>(`/vocabs/words/${wordId}`, input)
   return response.data.data!
 }
 
 export async function updateWordCell(wordId: string, columnKey: keyof WordInput, value: string) {
-  const response = await apiClient.patch<ApiEnvelope<Word>>(`/vocabs/words/${wordId}`, { [columnKey]: value })
+  const response = await apiClient.patch<ApiResponse<Word>>(`/vocabs/words/${wordId}`, { [columnKey]: value })
   return response.data.data!
 }
 
 export async function deleteWord(wordId: string) {
-  const response = await apiClient.delete<ApiEnvelope<DeleteResult>>(`/vocabs/words/${wordId}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/vocabs/words/${wordId}`)
   return response.data.data!
 }
 
@@ -196,6 +196,6 @@ export async function updateBoardPreferences(boardId: string, input: {
   columnOrder: string[]
   columnWidths: Record<string, number>
 }) {
-  const response = await apiClient.put<ApiEnvelope<BoardPreferences>>(`/vocabs/boards/${boardId}/preferences`, input)
+  const response = await apiClient.put<ApiResponse<BoardPreferences>>(`/vocabs/boards/${boardId}/preferences`, input)
   return response.data.data!
 }

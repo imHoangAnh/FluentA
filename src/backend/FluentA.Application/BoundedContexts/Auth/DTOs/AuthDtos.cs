@@ -12,8 +12,8 @@ public sealed record ForgotPasswordResponse(string Message);
 public sealed record ResetPasswordRequest(string Token, string NewPassword);
 public sealed record BasicMessageResponse(string Message, string? NextStep = null);
 public sealed record GoogleLoginRequest(string IdToken);
+public sealed record LinkGoogleRequest(string IdToken, string CurrentPassword);
 public sealed record UpdateProfileRequest(string? FullName = null, string? Bio = null, bool RemoveAvatar = false, Guid? AvatarAssetId = null);
-public sealed record SettingsDto(UserProfileDto Profile);
 
 // AuthResponse is an application-to-controller result. Access and refresh token values
 // are written only to HttpOnly cookies; AuthResultDto is the JSON projection.
@@ -41,7 +41,7 @@ public sealed record RefreshResultDto(DateTime AccessTokenExpiresAtUtc);
 public sealed record AccessTokenIssue(string Token, DateTime ExpiresAtUtc);
 public sealed record GoogleLoginSessionResult(GoogleLoginResult Result, AccessTokenIssue? AccessToken);
 public sealed record AuthUserDto(Guid Id, string FullName, string? AvatarUrl);
-public sealed record UserProfileDto(Guid Id, string Email, string FullName, bool IsEmailVerified, string? Bio = null, Guid? AvatarAssetId = null, string? AvatarDownloadUrl = null, DateTime? AvatarDownloadUrlExpiresAtUtc = null);
+public sealed record UserProfileDto(Guid Id, string Email, string FullName, bool IsEmailVerified, string? Bio = null, Guid? AvatarAssetId = null, string? AvatarDownloadUrl = null, DateTime? AvatarDownloadUrlExpiresAtUtc = null, bool IsGoogleLinked = false);
 public sealed record GoogleUserInfo(string Subject, string Email, string FullName, bool EmailVerified);
 public sealed record EmailMessage(string To, string Subject, string HtmlBody, string TextBody);
 
@@ -54,5 +54,6 @@ public enum VerificationOtpConsumeResult
 public enum GoogleLoginResult
 {
     Authenticated,
+    LinkRequired,
     AccountConflict
 }

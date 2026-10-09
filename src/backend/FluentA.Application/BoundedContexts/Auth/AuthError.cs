@@ -3,7 +3,7 @@ namespace FluentA.Application.BoundedContexts.Auth;
 public sealed record AuthError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static AuthError Validation(object details) =>
-        new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);
+        new("VALIDATION_ERROR", "One or more validation errors occurred.", 400, details);
 
     public static AuthError EmailExists() =>
         new("EMAIL_ALREADY_EXISTS", "An account already exists for this email.", 409);
@@ -43,6 +43,12 @@ public sealed record AuthError(string Code, string Message, int StatusCode, obje
 
     public static AuthError GoogleAccountConflict() =>
         new("GOOGLE_ACCOUNT_CONFLICT", "This email is already linked to a different Google account.", 409);
+
+    public static AuthError GoogleLinkRequired() =>
+        new("GOOGLE_LINK_REQUIRED", "Log in with your password, then link Google in Profile.", 409);
+
+    public static AuthError GoogleLinkFailed() =>
+        new("GOOGLE_LINK_FAILED", "Google could not be linked. Check the account email and try again.", 409);
 
     public static AuthError AssetNotFound() =>
         new("ASSET_NOT_FOUND", "The requested asset could not be found.", 404);

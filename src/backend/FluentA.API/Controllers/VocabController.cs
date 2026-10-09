@@ -24,7 +24,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.ListBoardsAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<BoardSummaryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -33,7 +33,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.CreateBoardAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<BoardDetailDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<BoardDetailDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -41,14 +41,14 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> GetBoard(Guid boardId, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.GetBoardAsync(CurrentUserId(), boardId, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     [HttpPatch("boards/{boardId:guid}")]
     public async Task<IActionResult> UpdateBoard(Guid boardId, UpdateBoardRequest request, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.UpdateBoardAsync(CurrentUserId(), boardId, request, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<BoardDetailDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     [HttpDelete("boards/{boardId:guid}")]
@@ -56,7 +56,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -65,7 +65,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.GetBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<PageDto>>.Ok(result.Value!.Pages))
+            ? Ok(ApiResponse<IReadOnlyList<PageDto>>.Ok(result.Value!.Pages))
             : ToErrorResult(result);
     }
 
@@ -74,7 +74,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.CreatePageAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<PageDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<PageDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -82,7 +82,7 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> UpdatePage(Guid pageId, UpdatePageRequest request, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.UpdatePageAsync(CurrentUserId(), pageId, request, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<PageDto>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<PageDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     [HttpDelete("pages/{pageId:guid}")]
@@ -90,7 +90,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeletePageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -98,7 +98,7 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> ListWords(Guid pageId, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.ListWordsAsync(CurrentUserId(), pageId, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<IReadOnlyList<WordDto>>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<IReadOnlyList<WordDto>>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     [HttpPost("pages/{pageId:guid}/words")]
@@ -106,7 +106,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.CreateWordAsync(CurrentUserId(), pageId, request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<WordDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<WordDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -114,7 +114,7 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> UpdateWord(Guid wordId, WordPatchRequest request, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.UpdateWordAsync(CurrentUserId(), wordId, request, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<WordDto>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<WordDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 
     [HttpDelete("words/{wordId:guid}")]
@@ -122,7 +122,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.DeleteWordAsync(CurrentUserId(), wordId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<object>.Ok(new { deleted = result.Value }))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -131,7 +131,7 @@ public sealed class VocabController : ApiControllerBase
     {
         var result = await _vocabulary.GetBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<BoardPreferencesDto>.Ok(result.Value!.Preferences))
+            ? Ok(ApiResponse<BoardPreferencesDto>.Ok(result.Value!.Preferences))
             : ToErrorResult(result);
     }
 
@@ -139,6 +139,6 @@ public sealed class VocabController : ApiControllerBase
     public async Task<IActionResult> UpdateBoardPreferences(Guid boardId, UpdateBoardPreferencesRequest request, CancellationToken cancellationToken)
     {
         var result = await _vocabulary.UpdateBoardPreferencesAsync(CurrentUserId(), boardId, request, cancellationToken);
-        return result.IsSuccess ? Ok(ApiEnvelope<BoardPreferencesDto>.Ok(result.Value!)) : ToErrorResult(result);
+        return result.IsSuccess ? Ok(ApiResponse<BoardPreferencesDto>.Ok(result.Value!)) : ToErrorResult(result);
     }
 }

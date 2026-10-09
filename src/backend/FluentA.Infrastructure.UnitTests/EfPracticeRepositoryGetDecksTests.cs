@@ -41,9 +41,10 @@ public sealed class EfPracticeRepositoryGetDecksTests
 
         Assert.Equal(PracticeRepositoryOperationStatus.Success, result.Status);
         Assert.NotNull(result.Page);
-        Assert.Equal(page, result.Page.Page);
+        Assert.Equal(page, result.Page.PageNumber);
         Assert.Equal(5, result.Page.PageSize);
-        Assert.Equal(0, result.Page.TotalCount);
+        Assert.Equal(0, result.Page.TotalItems);
+        Assert.Equal(0, result.Page.TotalPages);
         Assert.Empty(result.Page.Items);
         Assert.Equal(3, interceptor.Commands.Count);
 

@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { practiceKeys } from '@/features/practice/api/practice.queries'
-import { reviewKeys } from '@/features/review/api/review.queries'
+import { practiceKeys } from '@/features/practice'
+import { reviewKeys } from '@/features/review'
 
 export const vocabularyKeys = {
   all: ['vocab'] as const,

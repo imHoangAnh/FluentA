@@ -114,7 +114,7 @@ public sealed class ProjectServiceTests
         Assert.False(result.IsSuccess);
         var error = Assert.IsType<ProjectError>(result.Error);
         Assert.Equal("VALIDATION_ERROR", error.Code);
-        Assert.Equal(422, error.StatusCode);
+        Assert.Equal(400, error.StatusCode);
     }
 
     private static ProjectBoard SeedBoard(FakeProjectRepository repository, Guid userId)

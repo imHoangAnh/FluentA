@@ -1,8 +1,9 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse, PagedResult } from '@/shared/api/contracts'
 import type { PronunciationAssessment } from '@/features/pronunciation'
 
-export type PracticeStep = 'dictation' | 'wordToMeaning' | 'pronunciation' | 'recap'
+export type PracticeExerciseMode = 'dictation' | 'wordToMeaning' | 'pronunciation'
+export type PracticeStep = PracticeExerciseMode | 'recap'
 export type PracticeAnswerStep = PracticeStep
 export type PracticeSessionStatus = 'active' | 'completed' | 'abandoned'
 export type PracticeReviewLevel = 0 | 1 | 2 | 3 | 4 | 5
@@ -16,12 +17,7 @@ export type PracticeDeck = {
   wordCount: number
 }
 
-export type PracticeDeckPage = {
-  items: PracticeDeck[]
-  page: number
-  pageSize: number
-  totalCount: number
-}
+export type PracticeDeckPage = PagedResult<PracticeDeck>
 
 export type PracticeAnswerSlot = {
   slotId: string
@@ -107,22 +103,22 @@ export async function getPracticeDecks(input: {
   page: number
   pageSize: number
 }) {
-  const response = await apiClient.get<ApiEnvelope<PracticeDeckPage>>('/practice/decks', { params: input })
+  const response = await apiClient.get<ApiResponse<PracticeDeckPage>>('/practice/decks', { params: input })
   return response.data.data!
 }
 
 export async function createPracticeSession(input: { pageId: string }) {
-  const response = await apiClient.post<ApiEnvelope<CreatePracticeSessionResult>>('/practice/sessions', input)
+  const response = await apiClient.post<ApiResponse<CreatePracticeSessionResult>>('/practice/sessions', input)
   return response.data.data!
 }
 
 export async function getPracticeSession(sessionId: string, signal?: AbortSignal) {
-  const response = await apiClient.get<ApiEnvelope<PracticeSession>>(`/practice/sessions/${sessionId}`, { signal })
+  const response = await apiClient.get<ApiResponse<PracticeSession>>(`/practice/sessions/${sessionId}`, { signal })
   return response.data.data!
 }
 
 export async function submitPracticeAnswer(sessionId: string, input: SubmitPracticeAnswerInput) {
-  const response = await apiClient.post<ApiEnvelope<SubmitPracticeAnswerResult>>(`/practice/sessions/${sessionId}/answers`, input)
+  const response = await apiClient.post<ApiResponse<SubmitPracticeAnswerResult>>(`/practice/sessions/${sessionId}/answers`, input)
   return response.data.data!
 }
 
@@ -139,7 +135,7 @@ export async function submitPracticePronunciationAttempt(input: {
   formData.append('durationMs', String(input.durationMs))
   if (input.requestId) formData.append('requestId', input.requestId)
 
-  const response = await apiClient.post<ApiEnvelope<SubmitPracticePronunciationResult>>(
+  const response = await apiClient.post<ApiResponse<SubmitPracticePronunciationResult>>(
     `/practice/sessions/${input.sessionId}/pronunciation-attempts`,
     formData,
   )
@@ -152,7 +148,7 @@ export async function setPracticeReviewLevel(input: {
   level: PracticeReviewLevel
   timeZoneId: string
 }) {
-  const response = await apiClient.put<ApiEnvelope<SetPracticeReviewLevelResult>>(
+  const response = await apiClient.put<ApiResponse<SetPracticeReviewLevelResult>>(
     `/practice/sessions/${input.sessionId}/words/${input.wordId}/review-level`,
     { level: input.level, timeZoneId: input.timeZoneId },
   )
@@ -160,7 +156,7 @@ export async function setPracticeReviewLevel(input: {
 }
 
 export async function completePracticeSession(input: { sessionId: string; timeZoneId: string }) {
-  await apiClient.post<ApiEnvelope<unknown>>(
+  await apiClient.post<ApiResponse<unknown>>(
     `/practice/sessions/${input.sessionId}/complete`,
     { timeZoneId: input.timeZoneId },
   )

@@ -2,6 +2,7 @@ using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.Common;
+using FluentA.Application.Common.Models;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 
 namespace FluentA.Application.BoundedContexts.Practice;
@@ -40,7 +41,7 @@ public sealed class PracticeService : IPracticeService
         _transaction = transaction;
     }
 
-    public async Task<OperationResult<PracticeDeckPageDto>> GetDecksAsync(
+    public async Task<OperationResult<PagedResult<PracticeDeckDto>>> GetDecksAsync(
         Guid userId,
         Guid boardId,
         string? search,
@@ -66,7 +67,7 @@ public sealed class PracticeService : IPracticeService
 
         if (errors.Count > 0)
         {
-            return OperationResult<PracticeDeckPageDto>.Failure(PracticeError.Validation(errors));
+            return OperationResult<PagedResult<PracticeDeckDto>>.Failure(PracticeError.Validation(errors));
         }
 
         var result = await Sessions.GetDecksAsync(
@@ -78,9 +79,9 @@ public sealed class PracticeService : IPracticeService
             cancellationToken);
         return result.Status switch
         {
-            PracticeRepositoryOperationStatus.Success => OperationResult<PracticeDeckPageDto>.Success(result.Page!),
-            PracticeRepositoryOperationStatus.NotFound => OperationResult<PracticeDeckPageDto>.Failure(PracticeError.DeckOrCardNotFound()),
-            _ => OperationResult<PracticeDeckPageDto>.Failure(PracticeError.Validation(new Dictionary<string, string[]>
+            PracticeRepositoryOperationStatus.Success => OperationResult<PagedResult<PracticeDeckDto>>.Success(result.Page!),
+            PracticeRepositoryOperationStatus.NotFound => OperationResult<PagedResult<PracticeDeckDto>>.Failure(PracticeError.DeckOrCardNotFound()),
+            _ => OperationResult<PagedResult<PracticeDeckDto>>.Failure(PracticeError.Validation(new Dictionary<string, string[]>
             {
                 ["decks"] = ["The deck list could not be loaded."],
             })),

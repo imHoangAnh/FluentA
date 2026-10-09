@@ -36,7 +36,7 @@ for (const viewport of [
     const navigation = page.getByLabel('Primary navigation')
     await expect(navigation).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Todo', exact: true })).toHaveAttribute('aria-current', 'page')
-    await expect(navigation.getByRole('link', { name: 'Settings', exact: true })).toHaveAttribute('href', '/settings')
+    await expect(navigation.getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0)
     await expect(navigation.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
     await expect(navigation.getByRole('button', { name: 'Notifications', exact: true })).toHaveCount(0)
     await expect(navigation.getByRole('link', { name: 'Notifications', exact: true })).toHaveCount(0)

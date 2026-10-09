@@ -45,39 +45,18 @@ function createQueryClient() {
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
   queryClient.setQueryData(['vocab', 'boards'], [])
   queryClient.setQueryData(['review', 'dashboard'], { localDate: today, dueCount: 0 })
-  queryClient.setQueryData(['settings'], {
-    profile: {
+  queryClient.setQueryData(['profile'], {
       id: 'user-1',
       email: 'learner@example.com',
       fullName: 'FluentA Learner',
       isEmailVerified: true,
       bio: '',
-    },
   })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
   queryClient.setQueryData(['journal', 'entries'], [])
   queryClient.setQueryData(['note', 'boards'], [])
   queryClient.setQueryData(['project', 'boards'], [])
-  queryClient.setQueryData(['pomodoro', 'config'], {
-    id: 'pomodoro-config-1',
-    workMinutes: 25,
-    shortBreakMinutes: 5,
-    longBreakMinutes: 15,
-    longBreakAfter: 4,
-    createdAt: '2026-06-12T00:00:00Z',
-    updatedAt: '2026-06-12T00:00:00Z',
-  })
-  queryClient.setQueryData(['pomodoro', 'current'], {
-    state: 'Idle',
-    phase: 'Work',
-    remainingSeconds: 1500,
-    durationSeconds: 1500,
-    startedAt: null,
-    pausedAt: null,
-    linkedTaskId: null,
-    linkedTaskSource: null,
-  })
 
   return queryClient
 }
@@ -111,16 +90,15 @@ describe('FluentA app routes', async () => {
 
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Sign up now' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Register' })).toBeInTheDocument()
   })
 
   it('protects the home route when anonymous', async () => {
     await renderApp('/')
 
-    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Store deeper,\s*Grow faster/ })).toBeInTheDocument()
   })
 
   it('shows the dashboard and nav links when authenticated', async () => {
@@ -145,7 +123,8 @@ describe('FluentA app routes', async () => {
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
     expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
     expect(screen.getByRole('link', { name: 'Project' })).toHaveAttribute('href', '/project')
-    expect(screen.getByRole('link', { name: 'Pomodoro' })).toHaveAttribute('href', '/pomodoro')
+    expect(screen.queryByRole('link', { name: 'Pomodoro' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
   it('protects the notes route when anonymous', async () => {

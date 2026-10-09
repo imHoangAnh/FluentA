@@ -76,11 +76,11 @@ export function PracticeLibraryPage() {
   }
 
   const deckPage = decksQuery.data
-  const totalPages = deckPage ? Math.ceil(deckPage.totalCount / deckPage.pageSize) : 0
-  const currentPage = deckPage?.page ?? page
+  const totalPages = deckPage?.totalPages ?? 0
+  const currentPage = deckPage?.pageNumber ?? page
   const pageTokens = getPageTokens(totalPages, currentPage)
-  const rangeStart = deckPage && deckPage.totalCount > 0 ? (deckPage.page - 1) * deckPage.pageSize + 1 : 0
-  const rangeEnd = deckPage ? Math.min(deckPage.page * deckPage.pageSize, deckPage.totalCount) : 0
+  const rangeStart = deckPage && deckPage.totalItems > 0 ? (deckPage.pageNumber - 1) * deckPage.pageSize + 1 : 0
+  const rangeEnd = deckPage ? Math.min(deckPage.pageNumber * deckPage.pageSize, deckPage.totalItems) : 0
 
   const startPage = () => {
     if (!selectedDeck || startMutation.isPending) return
@@ -169,7 +169,7 @@ export function PracticeLibraryPage() {
         </p>
       ) : null}
 
-      {decksQuery.isSuccess && deckPage && deckPage.totalCount === 0 ? (
+      {decksQuery.isSuccess && deckPage && deckPage.totalItems === 0 ? (
         <div className="practice-library__message">
           <strong>{debouncedSearch ? 'No decks found' : 'No decks yet'}</strong>
           <span>
@@ -203,7 +203,7 @@ export function PracticeLibraryPage() {
 
           <nav className="practice-library__pagination" aria-label="Practice deck pages">
             <p aria-live="polite">
-              Showing {rangeStart}–{rangeEnd} of {deckPage.totalCount} ready {deckPage.totalCount === 1 ? 'deck' : 'decks'}
+              Showing {rangeStart}–{rangeEnd} of {deckPage.totalItems} ready {deckPage.totalItems === 1 ? 'deck' : 'decks'}
             </p>
             <div className="practice-library__page-controls">
               <button

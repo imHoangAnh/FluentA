@@ -20,6 +20,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.CurrentAvatarAssetId).HasColumnName("current_avatar_asset_id");
         builder.Property(user => user.PasswordHash).HasColumnName("password_hash").HasMaxLength(256);
         builder.Property(user => user.GoogleId).HasColumnName("google_id").HasMaxLength(128);
+        builder.Property(user => user.GoogleLinkConfirmedAt).HasColumnName("google_link_confirmed_at");
         builder.Ignore(user => user.IsEmailVerified);
         builder.Property(user => user.EmailVerifiedAt).HasColumnName("email_verified_at");
         builder.Property(user => user.OtpHash).HasColumnName("otp_hash").HasMaxLength(256);

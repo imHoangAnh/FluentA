@@ -26,7 +26,7 @@ public sealed class ReviewController : ApiControllerBase
     {
         var result = await _review.GetDashboardAsync(CurrentUserId(), timeZoneId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewDashboardDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ReviewDashboardDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -35,7 +35,7 @@ public sealed class ReviewController : ApiControllerBase
     {
         var result = await _review.CreateReviewSessionAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSessionDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ReviewSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -44,7 +44,7 @@ public sealed class ReviewController : ApiControllerBase
     {
         var result = await _review.GetSessionAsync(CurrentUserId(), sessionId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewSessionDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ReviewSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -56,7 +56,7 @@ public sealed class ReviewController : ApiControllerBase
     {
         var result = await _review.SubmitTypedAnswerAsync(CurrentUserId(), sessionId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewAnswerResultDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ReviewAnswerResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -78,7 +78,7 @@ public sealed class ReviewController : ApiControllerBase
             request.TimeSpentSeconds,
             cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ReviewAnswerResultDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ReviewAnswerResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

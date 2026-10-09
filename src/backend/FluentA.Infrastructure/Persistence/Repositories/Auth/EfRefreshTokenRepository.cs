@@ -99,6 +99,11 @@ public sealed class EfRefreshTokenRepository : IRefreshTokenRepository
         if (user.DeletedAt is not null)
             return new GoogleLoginSessionResult(GoogleLoginResult.AccountConflict, null);
 
+        // A verified Google email does not prove current ownership of a password
+        // account's third-party mailbox. Linking requires its current password.
+        if (user.GoogleId is null || (user.PasswordHash is not null && user.GoogleLinkConfirmedAt is null))
+            return new GoogleLoginSessionResult(GoogleLoginResult.LinkRequired, null);
+
         if (user.GoogleId is not null && !string.Equals(user.GoogleId, googleSubject, StringComparison.Ordinal))
         {
             return new GoogleLoginSessionResult(GoogleLoginResult.AccountConflict, null);

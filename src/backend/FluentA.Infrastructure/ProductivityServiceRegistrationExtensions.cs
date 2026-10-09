@@ -2,7 +2,6 @@ using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Note;
-using FluentA.Application.BoundedContexts.Pomodoro;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Infrastructure.ContentProcessing.Journal;
@@ -11,10 +10,8 @@ using FluentA.Infrastructure.Persistence.Repositories.Countdown;
 using FluentA.Infrastructure.Persistence.Repositories.Habit;
 using FluentA.Infrastructure.Persistence.Repositories.Journal;
 using FluentA.Infrastructure.Persistence.Repositories.Note;
-using FluentA.Infrastructure.Persistence.Repositories.Pomodoro;
 using FluentA.Infrastructure.Persistence.Repositories.Project;
 using FluentA.Infrastructure.Persistence.Repositories.Todo;
-using FluentA.Infrastructure.RuntimeState.Pomodoro;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentA.Infrastructure;
@@ -37,9 +34,6 @@ internal static class ProductivityServiceRegistrationExtensions
         services.AddScoped<INoteService, NoteService>();
         services.AddScoped<IProjectRepository, EfProjectRepository>();
         services.AddScoped<IProjectService, ProjectService>();
-        services.AddScoped<IPomodoroRepository, EfPomodoroRepository>();
-        services.AddSingleton<IPomodoroCurrentStateStore, MemoryPomodoroCurrentStateStore>();
-        services.AddScoped<IPomodoroService, PomodoroService>();
         return services;
     }
 }

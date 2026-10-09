@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/button'
 type Props = {
   onCredential: (idToken: string) => Promise<void>
   disabled?: boolean
+  label?: string
 }
 
 declare global {
@@ -65,7 +66,7 @@ function loadGoogleIdentityServices() {
   })
 }
 
-export function GoogleSignInButton({ onCredential, disabled = false }: Props) {
+export function GoogleSignInButton({ onCredential, disabled = false, label = 'Continue with Google' }: Props) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   const containerRef = useRef<HTMLDivElement>(null)
   const [message, setMessage] = useState<string | null>(clientId ? null : 'Google sign-in is not configured locally.')
@@ -117,7 +118,7 @@ export function GoogleSignInButton({ onCredential, disabled = false }: Props) {
         className="relative h-10 w-full rounded-lg border border-input bg-card text-sm font-semibold text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground sm:h-11 sm:text-base xl:h-12"
       >
         <GoogleIcon className="mr-2 size-5 shrink-0" />
-        <span>Continue with Google</span>
+        <span>{label}</span>
         {clientId ? (
           <div
             ref={containerRef}

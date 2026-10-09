@@ -30,7 +30,7 @@ export function PracticeRecap({ item, reviewStatus, isSaving, saveError, selecte
 
   return (
     <div className="practice-recap">
-      <h2 className="practice-exercise__prompt">Review the word and choose how well you remember it.</h2>
+      <h2 className="practice-exercise__prompt">{activeInReview ? 'Look back at this word before continuing.' : 'Look back at this word, then choose a level to add it to Review.'}</h2>
 
       <div className="practice-session-recap__content">
         <header className="practice-session-recap__word">

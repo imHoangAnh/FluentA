@@ -7,13 +7,11 @@ import {
   NotebookPen,
   Repeat2,
   RotateCcw,
-  Settings,
   StickyNote,
-  Timer,
 } from 'lucide-react'
 import { createElement } from 'react'
 import { ReviewSetup } from '@/features/review'
-import type { ShellNavigationItem, ShellNavigationSection } from '@/shared/components/layout/ShellEnvironment'
+import type { ShellNavigationSection } from '@/shared/components/layout/ShellEnvironment'
 
 const practiceRoute = (pathname: string) => pathname === '/practice'
   || /^\/practice\/[^/]+$/.test(pathname)
@@ -42,13 +40,6 @@ export const shellNavigationSections: ShellNavigationSection[] = [
       { to: '/journal', label: 'Journal', icon: NotebookPen },
       { to: '/notes', label: 'Notes', icon: StickyNote },
       { to: '/project', label: 'Project', icon: FolderKanban },
-      { to: '/pomodoro', label: 'Pomodoro', icon: Timer },
     ],
   },
 ]
-
-export const shellSettingsNavigation: ShellNavigationItem = {
-  to: '/settings',
-  label: 'Settings',
-  icon: Settings,
-}

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { Home, Settings } from 'lucide-react'
+import { Home } from 'lucide-react'
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { AppShellRouteLayout } from '@/app/layouts/AppShellRouteLayout'
@@ -12,7 +12,6 @@ const shellEnvironment = {
   account: { fullName: 'Test Learner', email: 'learner@example.com' },
   logout: vi.fn(async () => undefined),
   navigationSections: [{ label: 'Main', items: [{ to: '/', label: 'Home', icon: Home, end: true }] }],
-  settingsNavigation: { to: '/settings', label: 'Settings', icon: Settings },
 }
 
 function routesWithoutShellMetadata(routes: RouteObject[], inherited = false, parent = 'protected'): string[] {
@@ -38,7 +37,6 @@ describe('AppShell environment', () => {
           account: { fullName: 'Test Learner', email: 'learner@example.com' },
           logout,
           navigationSections: [{ label: 'Main', items: [{ to: '/', label: 'Home', icon: Home, end: true }] }],
-          settingsNavigation: { to: '/settings', label: 'Settings', icon: Settings },
         }}>
           <AppShell title="Test page"><p>Content</p></AppShell>
         </ShellEnvironmentProvider>
@@ -54,7 +52,7 @@ describe('AppShell environment', () => {
 
     expect(screen.queryByRole('link', { name: 'Notifications' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
 
     expect(screen.queryByRole('button', { name: /(?:Collapse|Expand) sidebar/ })).not.toBeInTheDocument()
     expect(screen.getByRole('tooltip')).toHaveTextContent('Log out')

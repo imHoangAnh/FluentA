@@ -1,7 +1,7 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, type RouteObject } from 'react-router-dom'
 import { authRoutes } from '@/features/auth'
 import { dashboardRoutes } from '@/features/dashboard'
-import { settingsRoutes } from '@/features/settings'
+import { profileRoutes } from '@/features/profile'
 import { vocabularyRoutes } from '@/features/vocabulary'
 import { practiceRoutes } from '@/features/practice'
 import { reviewRoutes, reviewSessionRoutes } from '@/features/review'
@@ -9,13 +9,11 @@ import { todoRoutes } from '@/features/todo'
 import { projectRoutes } from '@/features/project'
 import { journalRoutes } from '@/features/journal'
 import { notesRoutes } from '@/features/notes'
-import { pomodoroRoutes } from '@/features/pomodoro'
 import { countdownRoutes } from '@/features/countdown'
 import { habitsRoutes } from '@/features/habits'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { AppShellRouteLayout } from './layouts/AppShellRouteLayout'
 import { ProtectedRoute } from './route-guards/ProtectedRoute'
-import { ProtectedRuntime } from './runtime/ProtectedRuntime'
 
 const publicRoutes = authRoutes.map((route) => ({
   ...route,
@@ -25,7 +23,7 @@ const publicRoutes = authRoutes.map((route) => ({
 
 export const protectedAppRoutes: RouteObject[] = [
   ...dashboardRoutes,
-  ...settingsRoutes,
+  ...profileRoutes,
   ...vocabularyRoutes,
   ...practiceRoutes,
   ...reviewRoutes,
@@ -34,7 +32,6 @@ export const protectedAppRoutes: RouteObject[] = [
   ...projectRoutes,
   ...journalRoutes,
   ...notesRoutes,
-  ...pomodoroRoutes,
   ...countdownRoutes,
   ...habitsRoutes,
 ]
@@ -45,10 +42,7 @@ export const appRoutes: RouteObject[] = [
     element: <ProtectedRoute />,
     errorElement: <RouteError />,
     HydrateFallback: RouteLoading,
-    children: [{
-      element: <ProtectedRuntime />,
-      children: [{ element: <AppShellRouteLayout />, children: protectedAppRoutes }],
-    }],
+    children: [{ element: <AppShellRouteLayout />, children: protectedAppRoutes }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]

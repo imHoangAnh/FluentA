@@ -13,7 +13,6 @@ internal static class AssetServiceRegistrationExtensions
     {
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();
-        services.AddMemoryCache();
         services.AddSingleton(assetStorageOptions);
         services.AddHostedService<AssetStorageStartupService>();
         if (assetStorageOptions.Enabled)

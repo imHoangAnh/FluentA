@@ -27,6 +27,7 @@ public sealed class User : BaseEntity, IAggregateRoot
     public Guid? CurrentAvatarAssetId { get; private set; }
     public string? PasswordHash { get; private set; }
     public string? GoogleId { get; private set; }
+    public DateTime? GoogleLinkConfirmedAt { get; private set; }
     public DateTime? EmailVerifiedAt { get; private set; }
     public string? OtpHash { get; private set; }
     public DateTime? OtpExpiresAt { get; private set; }
@@ -122,12 +123,14 @@ public sealed class User : BaseEntity, IAggregateRoot
     public void LinkGoogleAccount(string googleId, DateTime verifiedAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(googleId);
-        if (GoogleId is not null && !string.Equals(GoogleId, googleId, StringComparison.Ordinal))
+        if (GoogleId is not null && !string.Equals(GoogleId, googleId, StringComparison.Ordinal)
+            && (PasswordHash is null || GoogleLinkConfirmedAt is not null))
         {
             throw new InvalidOperationException("This user is already linked to a different Google account.");
         }
 
         GoogleId = googleId;
+        GoogleLinkConfirmedAt = verifiedAt;
         EmailVerifiedAt = verifiedAt;
         ClearVerificationOtp();
         UpdatedAt = verifiedAt;

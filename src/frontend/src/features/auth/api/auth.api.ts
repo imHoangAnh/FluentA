@@ -1,5 +1,5 @@
 import { apiClient, logoutCurrentSession } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 import axios from 'axios'
 
 export type AuthUser = {
@@ -8,12 +8,13 @@ export type AuthUser = {
   avatarUrl: string | null
 }
 
-/** Full profile returned by the existing settings/profile API, never by /auth/me. */
+/** Full profile returned by /profile, never by /auth/me. */
 export type UserProfile = {
   id: string
   email: string
   fullName: string
   isEmailVerified: boolean
+  isGoogleLinked?: boolean
   bio?: string | null
   avatarAssetId?: string | null
   avatarDownloadUrl?: string | null
@@ -47,10 +48,10 @@ export function getAuthApiError(error: unknown, fallback = 'Something went wrong
   if (!axios.isAxiosError(error)) return { message: fallback, retryAfterSeconds: null as number | null }
 
   const envelope = error.response?.data as {
-    error?: { message?: string; details?: { retryAfterSeconds?: number | string } }
+    message?: string
+    errors?: { code?: string; message?: string }[]
   } | undefined
-  const rawRetryAfter = envelope?.error?.details?.retryAfterSeconds
-    ?? error.response?.headers?.['retry-after']
+  const rawRetryAfter = error.response?.headers?.['retry-after']
   let retryAfterSeconds: number | null = null
   if (typeof rawRetryAfter === 'number' || (typeof rawRetryAfter === 'string' && /^\d+(\.\d+)?$/.test(rawRetryAfter))) {
     const seconds = Number(rawRetryAfter)
@@ -60,7 +61,7 @@ export function getAuthApiError(error: unknown, fallback = 'Something went wrong
     if (Number.isFinite(retryDate)) retryAfterSeconds = Math.max(1, Math.ceil((retryDate - Date.now()) / 1000))
   }
 
-  const message = envelope?.error?.message ?? fallback
+  const message = envelope?.message ?? fallback
   return {
     message: retryAfterSeconds && error.response?.status === 429
       ? `${message} Please try again in ${retryAfterSeconds} seconds.`
@@ -70,27 +71,27 @@ export function getAuthApiError(error: unknown, fallback = 'Something went wrong
 }
 
 export async function registerAccount(input: { email: string; password: string; fullName: string }) {
-  const response = await apiClient.post<ApiEnvelope<RegisterPayload>>('/auth/register', input)
+  const response = await apiClient.post<ApiResponse<RegisterPayload>>('/auth/register', input)
   return response.data.data!
 }
 
 export async function verifyOtp(input: { email: string; otp: string }) {
-  const response = await apiClient.post<ApiEnvelope<RegisteredPayload>>('/auth/verify-otp', input)
+  const response = await apiClient.post<ApiResponse<RegisteredPayload>>('/auth/verify-otp', input)
   return response.data.data!
 }
 
 export async function resendVerificationOtp(input: { email: string }) {
-  const response = await apiClient.post<ApiEnvelope<ResendVerificationPayload>>('/auth/resend-verification-otp', input)
+  const response = await apiClient.post<ApiResponse<ResendVerificationPayload>>('/auth/resend-verification-otp', input)
   return response.data.data!
 }
 
 export async function login(input: { email: string; password: string }) {
-  const response = await apiClient.post<ApiEnvelope<AuthenticationResult>>('/auth/login', input)
+  const response = await apiClient.post<ApiResponse<AuthenticationResult>>('/auth/login', input)
   return response.data.data!
 }
 
 export async function googleLogin(input: { idToken: string }) {
-  const response = await apiClient.post<ApiEnvelope<AuthenticationResult>>('/auth/google', input)
+  const response = await apiClient.post<ApiResponse<AuthenticationResult>>('/auth/google', input)
   return response.data.data!
 }
 
@@ -99,16 +100,16 @@ export async function logout() {
 }
 
 export async function me() {
-  const response = await apiClient.get<ApiEnvelope<AuthUser>>('/auth/me')
+  const response = await apiClient.get<ApiResponse<AuthUser>>('/auth/me')
   return response.data.data!
 }
 
 export async function forgotPassword(input: { email: string }) {
-  const response = await apiClient.post<ApiEnvelope<ForgotPasswordPayload>>('/auth/forgot-password', input)
+  const response = await apiClient.post<ApiResponse<ForgotPasswordPayload>>('/auth/forgot-password', input)
   return response.data.data!
 }
 
 export async function resetPassword(input: { token: string; newPassword: string }) {
-  const response = await apiClient.post<ApiEnvelope<ResetPasswordPayload>>('/auth/reset-password', input)
+  const response = await apiClient.post<ApiResponse<ResetPasswordPayload>>('/auth/reset-password', input)
   return response.data.data!
 }

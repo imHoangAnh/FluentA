@@ -153,6 +153,7 @@ test('Review pronunciation uses two attempts and completes the due word after th
   await installFakeMicrophone(page)
   const outcomes = [422, false, false]
   let assessmentCount = 0
+  let currentReviewSession = reviewSession()
   const audioBodies = []
 
   await page.route('**/api/v1/**', async (route) => {
@@ -160,13 +161,29 @@ test('Review pronunciation uses two attempts and completes the due word after th
     const path = new URL(request.url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
     if (path.endsWith('/auth/me')) return json(user)
-    if (path.endsWith('/review/sessions/review-session-1')) return json(reviewSession())
+    if (path.endsWith('/review/sessions/review-session-1')) return json(currentReviewSession)
     if (path.endsWith('/review/sessions/review-session-1/pronunciation-attempts')) {
       audioBodies.push(request.postDataBuffer())
       const outcome = outcomes.shift()
-      if (outcome === 422) return json({ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }, 422)
+      if (outcome === 422) return route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'No speech', errors: [{ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }] }),
+      })
       assessmentCount += 1
       const isFinal = assessmentCount === 2
+      currentReviewSession = {
+        ...currentReviewSession,
+        status: isFinal ? 'completed' : 'active',
+        completedWords: isFinal ? 1 : 0,
+        currentItemIndex: isFinal ? null : 0,
+        items: [{
+          ...currentReviewSession.items[0],
+          pronunciationAttemptCount: assessmentCount,
+          isReviewed: isFinal,
+          result: isFinal ? 'wrong' : null,
+        }],
+      }
       return json({
         itemId: 'item-1',
         wordId: 'word-1',
@@ -194,13 +211,15 @@ test('Review pronunciation uses two attempts and completes the due word after th
   await expect(page.getByText('Attempt 1 of 2')).toBeVisible()
 
   await recordOnce(page)
-  await expect(page.getByText('Not quite. One more attempt.')).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Pronunciation needs another try')
   await expect(page.getByText('Attempt 2 of 2')).toBeVisible()
   expect(assessmentCount).toBe(1)
+  await page.getByRole('button', { name: 'Continue' }).click()
 
   await recordOnce(page)
-  await expect(page.getByRole('status')).toHaveText('Wrong')
-  await expect(page.getByRole('heading', { name: 'Review complete' })).toBeVisible({ timeout: 2_000 })
+  await expect(page.getByRole('status')).toContainText('Not quite')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('heading', { name: 'Review complete' })).toBeVisible()
   await expect(page.getByText('You reviewed 1 word.')).toBeVisible()
   expect(assessmentCount).toBe(2)
   expect(audioBodies).toHaveLength(3)

@@ -5,7 +5,7 @@ namespace FluentA.Application.BoundedContexts.Review;
 public sealed record ReviewError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static ReviewError Validation(object details) =>
-        new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);
+        new("VALIDATION_ERROR", "One or more validation errors occurred.", 400, details);
 
     public static ReviewError SessionNotFound() =>
         new("REVIEW_SESSION_NOT_FOUND", "The review session could not be found.", 404);

@@ -3,7 +3,7 @@ namespace FluentA.Application.BoundedContexts.Project;
 public sealed record ProjectError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static ProjectError Validation(object details) =>
-        new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);
+        new("VALIDATION_ERROR", "One or more validation errors occurred.", 400, details);
 
     public static ProjectError NotFound() =>
         new("PROJECT_NOT_FOUND", "The requested Project resource could not be found.", 404);

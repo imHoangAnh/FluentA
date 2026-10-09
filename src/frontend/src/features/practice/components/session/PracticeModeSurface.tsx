@@ -1,15 +1,13 @@
 import type { PronunciationAssessment } from '@/features/pronunciation'
-import type { PracticeSessionItem, PracticeStep } from '../../api/practice.api'
+import type { PracticeExerciseMode, PracticeSessionItem } from '../../api/practice.api'
 import { PracticeAnswerForm } from './PracticeAnswerForm'
 import { PracticeDictationMode } from './PracticeDictationMode'
 import { PracticeWordToMeaningMode } from './PracticeWordToMeaningMode'
 import { PracticePronunciationMode } from './PracticePronunciationMode'
 import { hasText } from './practiceFormatters'
 
-type InteractivePracticeStep = Exclude<PracticeStep, 'recap'>
-
 type PracticeModeSurfaceProps = {
-  mode: InteractivePracticeStep
+  mode: PracticeExerciseMode
   item: PracticeSessionItem
   typedAnswer: string
   selectedSlotId: string | null
@@ -30,7 +28,7 @@ type PracticeModeSurfaceProps = {
   onStopRecording: () => void
 }
 
-const prompts: Record<InteractivePracticeStep, string> = {
+const prompts: Record<PracticeExerciseMode, string> = {
   dictation: 'Listen to the audio, type the word, then press Enter.',
   wordToMeaning: 'Read the word and context, then click the correct meaning.',
   pronunciation: 'Listen to the word, then record your pronunciation.',

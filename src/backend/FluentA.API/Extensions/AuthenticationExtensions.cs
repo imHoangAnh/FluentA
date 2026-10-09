@@ -57,8 +57,8 @@ public static class AuthenticationExtensions
                         : !hasAccessCookie
                             ? ("AUTHENTICATION_REQUIRED", "Authentication is required.")
                             : ("ACCESS_TOKEN_INVALID", "The access token is invalid.");
-                    await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(new ApiErrorEnvelope(
-                        code, message)));
+                    await context.Response.WriteAsJsonAsync(ApiResponseFactory.Fail(
+                        code, message, traceId: context.HttpContext.TraceIdentifier));
                 }
             };
         });

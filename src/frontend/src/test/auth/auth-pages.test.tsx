@@ -19,6 +19,6 @@ describe('password reset page', () => {
     expect(screen.getByRole('main')).toHaveClass('ds-root')
     expect(screen.queryByLabelText('Authentication context')).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Authentication' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create a new password' })).toBeInTheDocument()
   })
 })

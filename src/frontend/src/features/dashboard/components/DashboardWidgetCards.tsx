@@ -4,10 +4,10 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { CardContent } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
+import { formatVietnamDateOnly } from '@/shared/lib/timezone'
 import * as habitApi from '@/features/habits'
 import * as todoApi from '@/features/todo'
 import type { ProjectBoardSummary } from '@/features/project'
-import type { PomodoroCurrentState, PomodoroToday } from '@/features/pomodoro'
 import { HabitIconGlyph } from '@/features/habits'
 
 type ReviewQueueWidgetProps = {
@@ -51,16 +51,17 @@ export function ReviewQueueWidget({ dueReview }: ReviewQueueWidgetProps) {
 type TodoWidgetProps = {
   todos: todoApi.TodoItem[]
   onToggle: (todo: todoApi.TodoItem) => void
+  isPending?: boolean
 }
 
-export function TodoWidget({ todos, onToggle }: TodoWidgetProps) {
+export function TodoWidget({ todos, onToggle, isPending = false }: TodoWidgetProps) {
   const visibleTodos = todos.slice(0, 3)
   return (
     <CardContent className="flex min-h-0 flex-col gap-3 p-4 sm:p-5">
       <ul className="m-0 grid list-none gap-1.5 p-0" role="list">
         {visibleTodos.map((todo) => (
           <li key={todo.id}>
-            <button type="button" className={cn('flex min-h-9 w-full cursor-pointer items-center gap-3 rounded-md border border-transparent px-2 text-left text-sm transition-colors hover:bg-accent', todo.isCompleted && 'text-muted-foreground line-through')} aria-label={`${todo.isCompleted ? 'Uncheck' : 'Check'} todo ${todo.title}`} onClick={() => onToggle(todo)}>
+            <button type="button" disabled={isPending} className={cn('flex min-h-9 w-full cursor-pointer items-center gap-3 rounded-md border border-transparent px-2 text-left text-sm transition-colors hover:bg-accent disabled:cursor-wait disabled:opacity-60', todo.isCompleted && 'text-muted-foreground line-through')} aria-label={`${todo.isCompleted ? 'Uncheck' : 'Check'} todo ${todo.title}`} onClick={() => onToggle(todo)}>
               {todo.isCompleted ? <CheckCircle2 className="size-[18px] shrink-0 text-primary" /> : <Circle className="size-[18px] shrink-0 text-muted-foreground" />}
               <span className="min-w-0 truncate">{todo.title}</span>
             </button>
@@ -83,6 +84,7 @@ export function CountdownWidget({ countdown, remainingText }: CountdownWidgetPro
       <div className="rounded-lg bg-secondary p-4 text-center sm:p-5">
         <p className="m-0 text-2xl font-semibold tracking-[-0.03em] text-secondary-foreground sm:text-3xl">{countdown ? remainingText(countdown.targetDate) : '--:--'}</p>
         <p className="m-0 mt-2 truncate text-sm text-muted-foreground">{countdown?.name ?? 'No upcoming events'}</p>
+        {countdown ? <time className="mt-1 block text-xs text-muted-foreground" dateTime={countdown.targetDate}>Until {formatVietnamDateOnly(countdown.targetDate)}</time> : null}
       </div>
     </CardContent>
   )
@@ -91,13 +93,14 @@ export function CountdownWidget({ countdown, remainingText }: CountdownWidgetPro
 type HabitWidgetProps = {
   habits: habitApi.Habit[]
   onToggle: (habit: habitApi.Habit) => void
+  isPending?: boolean
 }
 
-export function HabitWidget({ habits, onToggle }: HabitWidgetProps) {
+export function HabitWidget({ habits, onToggle, isPending = false }: HabitWidgetProps) {
   return (
     <CardContent className="grid gap-2.5 p-4 sm:p-5">
       {habits.map((habit) => (
-        <button type="button" key={habit.id} className="grid min-h-11 cursor-pointer grid-cols-[1fr_auto] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-primary/35 hover:bg-accent/50" aria-label={`${habit.isCheckedToday ? 'Uncheck' : 'Check'} habit ${habit.name}`} onClick={() => onToggle(habit)}>
+        <button type="button" key={habit.id} disabled={isPending} className="grid min-h-11 cursor-pointer grid-cols-[1fr_auto] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-primary/35 hover:bg-accent/50 disabled:cursor-wait disabled:opacity-60" aria-label={`${habit.isCheckedToday ? 'Uncheck' : 'Check'} habit ${habit.name}`} onClick={() => onToggle(habit)}>
           <span className="flex min-w-0 items-center gap-2 truncate text-sm font-medium"><HabitIconGlyph icon={habit.icon} size={16} /> {habit.name}</span>
           <span className="text-xs font-semibold text-muted-foreground">{habit.currentStreak} day streak</span>
           <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted"><span className={cn('block h-full rounded-full bg-primary transition-[width] duration-200', habit.isCheckedToday ? 'w-full' : 'w-0')} /></span>
@@ -125,28 +128,6 @@ export function ProjectWidget({ boards }: ProjectWidgetProps) {
   )
 }
 
-type PomodoroWidgetProps = {
-  current?: PomodoroCurrentState
-  today?: PomodoroToday
-}
-
-function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${`${seconds % 60}`.padStart(2, '0')}`
-}
-
-export function PomodoroWidget({ current, today }: PomodoroWidgetProps) {
-  const phaseLabel = current?.phase === 'ShortBreak' ? 'Short break' : current?.phase === 'LongBreak' ? 'Long break' : 'Focus'
-  return (
-    <CardContent className="flex min-h-0 flex-col gap-3 p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary p-4">
-        <div><p className="m-0 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{phaseLabel}</p><strong className="mt-1 block text-3xl tracking-[-0.04em] text-secondary-foreground">{formatDuration(current?.remainingSeconds ?? 0)}</strong></div>
-        <div className="text-right"><p className="m-0 text-xs text-muted-foreground">State</p><strong className="mt-1 block text-sm text-secondary-foreground">{current?.state ?? 'Idle'}</strong><p className="m-0 mt-2 text-xs text-muted-foreground">{today?.completedWorkSessions ?? 0} sessions today</p></div>
-      </div>
-    </CardContent>
-  )
-}
-
 export function ReviewQueueAction() {
   const [searchParams, setSearchParams] = useSearchParams()
   function openReview() {
@@ -169,8 +150,4 @@ export function CountdownAction() {
 
 export function ProjectAction() {
   return <Button asChild variant="outline" className="w-full"><Link to="/project"><FolderKanban /> Open Project</Link></Button>
-}
-
-export function PomodoroAction() {
-  return <Button asChild variant="outline" className="w-full"><Link to="/pomodoro"><Timer /> Open Pomodoro</Link></Button>
 }

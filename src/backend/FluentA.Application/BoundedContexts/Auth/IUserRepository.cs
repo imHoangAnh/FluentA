@@ -12,5 +12,6 @@ public interface IUserRepository
     Task<bool> TryReplaceVerificationOtpAsync(Guid userId, string otpHash, DateTime expiresAt, DateTime now, CancellationToken cancellationToken = default);
     Task<bool> TrySetPasswordResetAsync(string normalizedEmail, string tokenHash, DateTime expiresAt, DateTime now, CancellationToken cancellationToken = default);
     Task<bool> ConsumePasswordResetAsync(string tokenHash, string passwordHash, DateTime now, CancellationToken cancellationToken = default);
+    Task<bool> TryLinkGoogleAsync(Guid userId, string normalizedEmail, string expectedPasswordHash, string googleSubject, DateTime now, CancellationToken cancellationToken = default);
     Task<bool> UpdateProfileAsync(User user, CancellationToken cancellationToken = default);
 }

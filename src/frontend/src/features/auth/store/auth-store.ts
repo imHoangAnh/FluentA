@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import axios from 'axios'
-import { queryClient } from '@/app/query-client'
+import { queryClient } from '@/shared/api/query-client'
 import {
   getAuthSessionGeneration,
   hasAuthLogoutMarker,
@@ -32,8 +32,8 @@ type AuthState = {
 
 function authErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
-    return response?.data?.error?.message ?? 'Authentication failed.'
+    const response = (error as { response?: { data?: { message?: string } } }).response
+    return response?.data?.message ?? 'Authentication failed.'
   }
   return 'Authentication failed.'
 }
@@ -48,7 +48,7 @@ function storeAuthenticatedUser(user: AuthUser) {
 function isDefinitiveAuthenticationFailure(error: unknown) {
   if (!axios.isAxiosError(error)) return false
   if (error.response?.status === 401) return true
-  return (error.response?.data as { error?: { code?: string } } | undefined)?.error?.code === 'REFRESH_TOKEN_INVALID'
+  return (error.response?.data as { errors?: { code?: string }[] } | undefined)?.errors?.[0]?.code === 'REFRESH_TOKEN_INVALID'
 }
 
 function showLogoutRetry() {
@@ -116,12 +116,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     const generation = getAuthSessionGeneration()
-    const previousUser = useAuthStore.getState().user
     set({ status: 'checking' })
     try {
       const user = await authApi.me()
       if (!isAuthSessionGenerationCurrent(generation)) return
-      if (previousUser?.id !== user.id) queryClient.clear()
+      if (useAuthStore.getState().user?.id !== user.id) queryClient.clear()
       set({ user, status: 'authenticated', error: null })
     } catch (error) {
       if (!isAuthSessionGenerationCurrent(generation)) return

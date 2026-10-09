@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 
 export type HabitFrequency = 'Daily' | 'Custom'
 export type HabitIcon = 'Default' | 'Book' | 'Exercise' | 'Water' | 'Meditation' | 'Study' | 'Work' | 'Health'
@@ -52,31 +52,31 @@ export type CreateHabitInput = {
 export type UpdateHabitInput = Partial<CreateHabitInput>
 
 export async function listHabits(timeZoneId: string, month?: string) {
-  const response = await apiClient.get<ApiEnvelope<Habit[]>>('/habits', { params: { timeZoneId, month } })
+  const response = await apiClient.get<ApiResponse<Habit[]>>('/habits', { params: { timeZoneId, month } })
   return response.data.data ?? []
 }
 
 export async function createHabit(input: CreateHabitInput) {
-  const response = await apiClient.post<ApiEnvelope<Habit>>('/habits', input)
+  const response = await apiClient.post<ApiResponse<Habit>>('/habits', input)
   return response.data.data!
 }
 
 export async function updateHabit(id: string, input: UpdateHabitInput) {
-  const response = await apiClient.patch<ApiEnvelope<Habit>>(`/habits/${id}`, input)
+  const response = await apiClient.patch<ApiResponse<Habit>>(`/habits/${id}`, input)
   return response.data.data!
 }
 
 export async function deleteHabit(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<{ deleted: boolean }>>(`/habits/${id}`)
+  const response = await apiClient.delete<ApiResponse<{ deleted: boolean }>>(`/habits/${id}`)
   return response.data.data!
 }
 
 export async function listHabitEntries(id: string, month: string, timeZoneId: string) {
-  const response = await apiClient.get<ApiEnvelope<HabitEntry[]>>(`/habits/${id}/entries`, { params: { month, timeZoneId } })
+  const response = await apiClient.get<ApiResponse<HabitEntry[]>>(`/habits/${id}/entries`, { params: { month, timeZoneId } })
   return response.data.data ?? []
 }
 
 export async function toggleHabitEntry(id: string, date: string, timeZoneId: string) {
-  const response = await apiClient.post<ApiEnvelope<HabitEntryToggle>>(`/habits/${id}/entries`, { date, timeZoneId })
+  const response = await apiClient.post<ApiResponse<HabitEntryToggle>>(`/habits/${id}/entries`, { date, timeZoneId })
   return response.data.data!
 }

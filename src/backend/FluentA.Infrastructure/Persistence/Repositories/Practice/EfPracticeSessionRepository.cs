@@ -3,6 +3,7 @@ using System.Data;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
+using FluentA.Application.Common.Models;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Infrastructure.Persistence;
@@ -55,7 +56,13 @@ public sealed partial class EfPracticeRepository
 
         return new PracticeDeckQueryResult(
             PracticeRepositoryOperationStatus.Success,
-            new PracticeDeckPageDto(items, page, pageSize, totalCount));
+            new PagedResult<PracticeDeckDto>
+            {
+                Items = items,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalItems = totalCount
+            });
     }
 
     public async Task<PracticeRepositoryOperationResult<PracticeSessionDto>> CreateSessionAsync(

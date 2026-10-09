@@ -1,6 +1,6 @@
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { CalendarClock, FolderKanban, ListChecks, Repeat2, RotateCcw, Timer } from 'lucide-react'
+import { CalendarClock, FolderKanban, ListChecks, Repeat2, RotateCcw } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth'
@@ -8,8 +8,6 @@ import * as countdownApi from '@/features/countdown'
 import { countdownKeys } from '@/features/countdown'
 import * as habitApi from '@/features/habits'
 import { habitKeys } from '@/features/habits'
-import * as pomodoroApi from '@/features/pomodoro'
-import { pomodoroKeys } from '@/features/pomodoro'
 import * as projectApi from '@/features/project'
 import { projectKeys } from '@/features/project'
 import { getReviewDashboard } from '@/features/review'
@@ -17,12 +15,12 @@ import { reviewKeys } from '@/features/review'
 import * as todoApi from '@/features/todo'
 import { todoKeys } from '@/features/todo'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { APP_TIME_ZONE, appHour, formatVietnamDateOnly, todayInAppTimeZone, vietnamDateOnlyToUtc } from '@/shared/lib/timezone'
+import { APP_TIME_ZONE, appHour, differenceInCalendarDays, formatVietnamDateOnly, todayInAppTimeZone } from '@/shared/lib/timezone'
 import { cn } from '@/shared/lib/utils'
 import { DashboardWidgetMenu } from '../components/DashboardWidgetMenu'
-import { CountdownAction, CountdownWidget, HabitWidget, PomodoroAction, PomodoroWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
+import { CountdownAction, CountdownWidget, HabitWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
 import { SortableDashboardWidget } from '../components/SortableDashboardWidget'
-import { dashboardWidgetLabel, dashboardWidgetRows, dashboardWidgetSlotClass, type DashboardWidgetId } from '../model/dashboard-widgets'
+import { dashboardWidgetLabel, dashboardWidgetRows, type DashboardWidgetId } from '../model/dashboard-widgets'
 import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../model/dashboard-widget-preferences'
 
 function greeting(hour: number, name: string) {
@@ -33,23 +31,29 @@ function greeting(hour: number, name: string) {
 }
 
 function remainingText(targetDate: string, now: Date) {
-  const today = todayInAppTimeZone(now)
-  if (targetDate === today) return 'Today'
-
-  const target = vietnamDateOnlyToUtc(targetDate)
-  if (!target) return 'Unknown'
-
-  const diff = target.getTime() - now.getTime()
-  if (diff <= 0) return 'Completed'
-  const totalHours = Math.floor(diff / 3_600_000)
-  const days = Math.floor(totalHours / 24)
-  const hours = totalHours % 24
-  if (days > 0) return `${days} days ${hours}h`
-  return `${hours} hours`
+  const days = differenceInCalendarDays(targetDate, todayInAppTimeZone(now))
+  if (!Number.isFinite(days)) return 'Unknown'
+  if (days < 0) return 'Completed'
+  if (days === 0) return 'Today'
+  return `${days} ${days === 1 ? 'day' : 'days'} left`
 }
 
-function WidgetError({ label }: { label: string }) {
-  return <p className="m-0 p-4 text-sm text-destructive" role="alert">Could not load {label}.</p>
+function WidgetError({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="grid gap-2 p-4" role="alert">
+      <p className="m-0 text-sm text-destructive">Could not load {label}.</p>
+      <button type="button" className="w-fit text-sm text-primary underline" onClick={onRetry}>Retry loading {label}</button>
+    </div>
+  )
+}
+
+function ToggleError({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="grid gap-2 px-4 pb-4" role="alert">
+      <p className="m-0 text-sm text-destructive">Could not update {label}. Your previous state is unchanged.</p>
+      <button type="button" className="w-fit text-sm text-primary underline" onClick={onRetry}>Retry {label} update</button>
+    </div>
+  )
 }
 
 const widgetMeta: Record<DashboardWidgetId, { description: string; icon: ReactNode }> = {
@@ -58,7 +62,6 @@ const widgetMeta: Record<DashboardWidgetId, { description: string; icon: ReactNo
   countdown: { description: 'Keep the nearest milestone in view.', icon: <CalendarClock className="size-4" /> },
   habits: { description: 'Small actions that keep your learning rhythm alive.', icon: <Repeat2 className="size-4" /> },
   project: { description: 'Your boards and active project cards at a glance.', icon: <FolderKanban className="size-4" /> },
-  pomodoro: { description: 'Current focus state and today\'s completed sessions.', icon: <Timer className="size-4" /> },
 }
 
 export function DashboardPage() {
@@ -92,7 +95,6 @@ export function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: habitKeys.all, refetchType: 'all' }),
       queryClient.invalidateQueries({ queryKey: countdownKeys.events, refetchType: 'all' }),
       queryClient.invalidateQueries({ queryKey: reviewKeys.dashboard, refetchType: 'all' }),
-      queryClient.invalidateQueries({ queryKey: pomodoroKeys.today, refetchType: 'all' }),
     ])
   }, [queryClient, today])
 
@@ -101,8 +103,6 @@ export function DashboardPage() {
   const countdownsQuery = useQuery({ queryKey: countdownKeys.events, queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
   const reviewDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
   const projectBoardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards, enabled: visible('project') })
-  const pomodoroCurrentQuery = useQuery({ queryKey: pomodoroKeys.current, queryFn: pomodoroApi.getPomodoroCurrent, enabled: visible('pomodoro') })
-  const pomodoroTodayQuery = useQuery({ queryKey: pomodoroKeys.today, queryFn: pomodoroApi.getPomodoroToday, enabled: visible('pomodoro') })
 
   const todoToggle = useMutation({
     mutationFn: (todo: todoApi.TodoItem) => todoApi.updateTodo(todo.id, { isCompleted: !todo.isCompleted }),
@@ -110,7 +110,7 @@ export function DashboardPage() {
   })
 
   const habitToggle = useMutation({
-    mutationFn: (habit: habitApi.Habit) => habitApi.toggleHabitEntry(habit.id, today, timeZoneId),
+    mutationFn: ({ habit, date }: { habit: habitApi.Habit; date: string }) => habitApi.toggleHabitEntry(habit.id, date, timeZoneId),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: habitKeys.all }) },
   })
 
@@ -120,16 +120,11 @@ export function DashboardPage() {
   )
   const habits = useMemo(() => (habitsQuery.data ?? []).filter((habit) => habit.isScheduledToday).slice(0, 3), [habitsQuery.data])
   const countdowns = useMemo(() => (countdownsQuery.data ?? [])
-    .filter((countdown) => !countdown.isCompleted)
-    .toSorted((left, right) => new Date(left.targetDate).getTime() - new Date(right.targetDate).getTime())
-    .slice(0, 1), [countdownsQuery.data])
+    .filter((countdown) => !countdown.isCompleted && countdown.targetDate >= today)
+    .toSorted((left, right) => left.targetDate.localeCompare(right.targetDate))
+    .slice(0, 1), [countdownsQuery.data, today])
   const dueReview = reviewDashboardQuery.data?.dueCount ?? 0
-  const isLoading = (visible('todo') && todosQuery.isLoading)
-    || (visible('habits') && habitsQuery.isLoading)
-    || (visible('countdown') && countdownsQuery.isLoading)
-    || (visible('review') && reviewDashboardQuery.isLoading)
-    || (visible('project') && projectBoardsQuery.isLoading)
-    || (visible('pomodoro') && (pomodoroCurrentQuery.isLoading || pomodoroTodayQuery.isLoading))
+  const widgetQueries = { review: reviewDashboardQuery, todo: todosQuery, countdown: countdownsQuery, habits: habitsQuery, project: projectBoardsQuery }
 
   function saveWidgetOrder(nextOrder: readonly DashboardWidgetId[]) {
     const normalized = normalizeDashboardWidgetOrder(nextOrder)
@@ -152,14 +147,34 @@ export function DashboardPage() {
   }
 
   function renderWidget(id: DashboardWidgetId) {
-    if (id === 'review') return reviewDashboardQuery.isError ? <WidgetError label="Review queue" /> : <ReviewQueueWidget dueReview={dueReview} />
-    if (id === 'todo') return todosQuery.isError ? <WidgetError label="Todo" /> : <TodoWidget todos={todos} onToggle={(todo) => todoToggle.mutate(todo)} />
-    if (id === 'countdown') return countdownsQuery.isError ? <WidgetError label="Countdowns" /> : <CountdownWidget countdown={countdowns[0]} remainingText={(targetDate) => remainingText(targetDate, now)} />
-    if (id === 'habits') return habitsQuery.isError ? <WidgetError label="Habit tracker" /> : <HabitWidget habits={habits} onToggle={(habit) => habitToggle.mutate(habit)} />
-    if (id === 'project') return projectBoardsQuery.isError ? <WidgetError label="Project" /> : <ProjectWidget boards={projectBoardsQuery.data ?? []} />
-    return pomodoroCurrentQuery.isError || pomodoroTodayQuery.isError
-      ? <WidgetError label="Pomodoro" />
-      : <PomodoroWidget current={pomodoroCurrentQuery.data} today={pomodoroTodayQuery.data} />
+    const query = widgetQueries[id]
+    const label = dashboardWidgetLabel(id)
+    if (query.isPending) return (
+      <div className="grid gap-3 p-4" role="status" aria-label={`Loading ${label}`} aria-busy="true">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-8 w-3/4" />
+      </div>
+    )
+    if (query.isError) return <WidgetError label={label} onRetry={() => { void query.refetch() }} />
+    if (id === 'review') return <ReviewQueueWidget dueReview={dueReview} />
+    if (id === 'todo') return (
+      <>
+        <TodoWidget todos={todos} isPending={todoToggle.isPending} onToggle={(todo) => todoToggle.mutate(todo)} />
+        {todoToggle.isError && todoToggle.variables?.date === today ? (
+          <ToggleError label="Todo" onRetry={() => { if (todoToggle.variables) todoToggle.mutate(todoToggle.variables) }} />
+        ) : null}
+      </>
+    )
+    if (id === 'countdown') return <CountdownWidget countdown={countdowns[0]} remainingText={(targetDate) => remainingText(targetDate, now)} />
+    if (id === 'habits') return (
+      <>
+        <HabitWidget habits={habits} isPending={habitToggle.isPending} onToggle={(habit) => habitToggle.mutate({ habit, date: today })} />
+        {habitToggle.isError && habitToggle.variables?.date === today ? (
+          <ToggleError label="Habit" onRetry={() => { if (habitToggle.variables) habitToggle.mutate(habitToggle.variables) }} />
+        ) : null}
+      </>
+    )
+    if (id === 'project') return <ProjectWidget boards={projectBoardsQuery.data ?? []} />
   }
 
   function renderWidgetFooter(id: DashboardWidgetId) {
@@ -167,7 +182,6 @@ export function DashboardPage() {
     if (id === 'todo') return <TodoAction />
     if (id === 'countdown') return <CountdownAction />
     if (id === 'project') return <ProjectAction />
-    if (id === 'pomodoro') return <PomodoroAction />
     return undefined
   }
 
@@ -186,12 +200,7 @@ export function DashboardPage() {
         <DashboardWidgetMenu visibleWidgets={visibleWidgets} onToggle={handleWidgetToggle} />
       </section>
 
-      {isLoading ? (
-        <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} aria-label="Loading dashboard" aria-busy="true">
-          {visibleWidgets.map((id, index) => <Skeleton key={id} className={cn('h-full min-h-0', dashboardWidgetSlotClass(index))} />)}
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveWidget(null)} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveWidget(null)} onDragEnd={handleDragEnd}>
           <SortableContext items={visibleWidgets} strategy={rectSortingStrategy}>
             <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} data-testid="dashboard-widget-grid">
               {visibleWidgets.map((id, index) => (
@@ -212,8 +221,7 @@ export function DashboardPage() {
             </div>
           </SortableContext>
           <div className="sr-only" aria-live="polite">{activeWidget ? `Moving ${dashboardWidgetLabel(activeWidget)} widget` : ''}</div>
-        </DndContext>
-      )}
+      </DndContext>
     </div>
   )
 }

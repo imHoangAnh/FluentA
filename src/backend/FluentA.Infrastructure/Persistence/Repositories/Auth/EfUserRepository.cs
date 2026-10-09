@@ -3,6 +3,7 @@ using FluentA.Application.BoundedContexts.Auth.DTOs;
 using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FluentA.Infrastructure.Persistence.Repositories.Auth;
 
@@ -124,6 +125,39 @@ public sealed class EfUserRepository : IUserRepository
             """, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<bool> TryLinkGoogleAsync(
+        Guid userId,
+        string normalizedEmail,
+        string expectedPasswordHash,
+        string googleSubject,
+        DateTime now,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // The password hash is a compare-and-swap guard against a concurrent
+            // password reset. The unique google_id index prevents cross-account links.
+            var updated = await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE users
+                SET google_id = {googleSubject},
+                    google_link_confirmed_at = {now},
+                    updated_at = {now}
+                WHERE id = {userId}
+                  AND email = {normalizedEmail}
+                  AND password_hash = {expectedPasswordHash}
+                  AND email_verified_at IS NOT NULL
+                  AND (google_id IS NULL OR google_id = {googleSubject} OR google_link_confirmed_at IS NULL)
+                  AND deleted_at IS NULL
+                """, cancellationToken);
+            return updated == 1;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(exception.ConstraintName, "IX_users_google_id", StringComparison.Ordinal))
+        {
+            return false;
+        }
     }
 
     public async Task<bool> UpdateProfileAsync(User user, CancellationToken cancellationToken = default)

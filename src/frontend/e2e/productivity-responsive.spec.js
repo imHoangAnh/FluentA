@@ -11,7 +11,6 @@ const productivityRoutes = [
   { path: '/habits', title: 'Habits' },
   { path: '/countdowns', title: 'Countdowns' },
   { path: '/project', title: 'Project' },
-  { path: '/pomodoro', title: 'Pomodoro' },
 ];
 
 test('productivity routes avoid page overflow at desktop and tablet widths', async ({ page }, testInfo) => {

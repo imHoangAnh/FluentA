@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AuthDialog, type AuthDialogEntryMode } from '@/features/auth/components/AuthDialog'
+import { AuthDialog, type AuthDialogEntryMode } from '@/features/auth'
 import { LandingPage } from '../components/LandingPage'
 
 export function GuestLandingPage() {
@@ -30,12 +30,14 @@ export function GuestLandingPage() {
         onRegister={() => { setAuthNotice(null); setAuthMode('register') }}
         onGetStarted={() => { setAuthNotice(null); setAuthMode('login') }}
       />
-      <AuthDialog
-        open={authMode !== null}
-        initialMode={authMode ?? 'login'}
-        initialNotice={authNotice}
-        onOpenChange={closeAuthDialog}
-      />
+      {authMode !== null && (
+        <AuthDialog
+          open
+          initialMode={authMode}
+          initialNotice={authNotice}
+          onOpenChange={closeAuthDialog}
+        />
+      )}
     </>
   )
 }

@@ -4,7 +4,6 @@ using FluentA.Infrastructure.Persistence.Entities;
 using FluentA.Domain.BoundedContexts.Journal.Entities;
 using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Domain.BoundedContexts.Note.Entities;
-using FluentA.Domain.BoundedContexts.Pomodoro.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
@@ -39,7 +38,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<PracticeSession> PracticeSessions => Set<PracticeSession>();
     public DbSet<PracticeSessionItem> PracticeSessionItems => Set<PracticeSessionItem>();
     public DbSet<PracticeAttempt> PracticeAttempts => Set<PracticeAttempt>();
-    public DbSet<PracticeSettings> PracticeSettings => Set<PracticeSettings>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
@@ -52,8 +50,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<ProjectBoard> ProjectBoards => Set<ProjectBoard>();
     public DbSet<ProjectColumn> ProjectColumns => Set<ProjectColumn>();
     public DbSet<ProjectCard> ProjectCards => Set<ProjectCard>();
-    public DbSet<PomodoroConfig> PomodoroConfigs => Set<PomodoroConfig>();
-    public DbSet<PomodoroSession> PomodoroSessions => Set<PomodoroSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

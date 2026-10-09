@@ -19,7 +19,7 @@ export function DashboardWidgetMenu({ visibleWidgets, onToggle }: DashboardWidge
       <MenuItems anchor={{ to: 'bottom end', gap: '8px' }} transition className={`${dropdownContentClassName} min-w-56`}>
         {DASHBOARD_WIDGET_CATALOG.map((widget) => {
           const checked = visibleWidgets.includes(widget.id)
-          const disabled = checked ? visibleWidgets.length <= 3 : visibleWidgets.length >= 6
+          const disabled = checked ? visibleWidgets.length <= 3 : visibleWidgets.length >= DASHBOARD_WIDGET_CATALOG.length
           return (
             <MenuItem
               as="button"

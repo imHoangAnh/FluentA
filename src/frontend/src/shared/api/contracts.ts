@@ -1,12 +1,3 @@
-export type ApiEnvelope<T> = {
-  success: boolean
-  data?: T
-  error?: {
-    code: string
-    message: string
-    details?: Record<string, string[]>
-  }
-}
 export type ApiResponse<T> = {
   success: boolean
   message?: string | null
@@ -16,3 +7,11 @@ export type ApiResponse<T> = {
 }
 
 export type ApiError = { code: string; message: string; field?: string | null }
+
+export type PagedResult<T> = {
+  items: T[]
+  pageNumber: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}

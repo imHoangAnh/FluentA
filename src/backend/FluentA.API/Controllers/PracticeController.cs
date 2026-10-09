@@ -3,6 +3,7 @@ using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
+using FluentA.Application.Common.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,7 +31,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.GetDecksAsync(CurrentUserId(), boardId, search, page, pageSize, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeDeckPageDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PagedResult<PracticeDeckDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -41,7 +42,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.CreateSessionAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeSessionDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticeSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -50,7 +51,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.GetSessionAsync(CurrentUserId(), sessionId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeSessionDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticeSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -62,7 +63,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.SubmitAnswerAsync(CurrentUserId(), sessionId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeAnswerResultDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticeAnswerResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -93,7 +94,7 @@ public sealed class PracticeController : ApiControllerBase
             cancellationToken,
             requestId);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticePronunciationAttemptResultDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticePronunciationAttemptResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -106,7 +107,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.SetReviewLevelAsync(CurrentUserId(), sessionId, wordId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeReviewLevelResultDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticeReviewLevelResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -118,7 +119,7 @@ public sealed class PracticeController : ApiControllerBase
     {
         var result = await _practice.CompleteSessionAsync(CurrentUserId(), sessionId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PracticeSessionDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PracticeSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

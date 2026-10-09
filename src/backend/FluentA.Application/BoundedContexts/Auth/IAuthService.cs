@@ -10,6 +10,7 @@ public interface IAuthService
     Task<OperationResult<ResendVerificationOtpResponse>> ResendVerificationOtpAsync(ResendVerificationOtpRequest request, CancellationToken cancellationToken = default);
     Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
     Task<OperationResult<AuthResponse>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<UserProfileDto>> LinkGoogleAsync(Guid userId, LinkGoogleRequest request, CancellationToken cancellationToken = default);
     Task<OperationResult<RefreshResponse>> RefreshAsync(string? rawRefreshToken, CancellationToken cancellationToken = default);
     Task LogoutAsync(string? rawRefreshToken, CancellationToken cancellationToken = default);
     Task<OperationResult<ForgotPasswordResponse>> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);

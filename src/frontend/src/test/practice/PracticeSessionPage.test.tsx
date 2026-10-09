@@ -113,6 +113,16 @@ describe('Practice authoritative recovery', () => {
     expect(vi.mocked(api.setPracticeReviewLevel).mock.calls[1][0].level).toBe(3)
     expect(await screen.findByRole('textbox')).toHaveValue('')
   })
+  it('shows Recap as a word summary with a self-assessed Review level, not an exercise', async () => {
+    renderSession(at('recap'))
+    vi.mocked(api.setPracticeReviewLevel).mockResolvedValue({ status: 'added', itemCompleted: true, currentItemIndex: 1 })
+    expect(await screen.findByText('Look back at this word, then choose a level to add it to Review.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'alpha' })).toBeInTheDocument()
+    expect(screen.getByText('Alpha example.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Type the word you hear' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('practice-review-level-3'))
+    await waitFor(() => expect(vi.mocked(api.setPracticeReviewLevel).mock.calls[0]?.[0]).toEqual(expect.objectContaining({ wordId: 'word-1', level: 3 })))
+  })
   it('advances Recap after a lost successful response without a failure toast or duplicate enrollment', async () => {
     renderSession(at('recap')); await screen.findByTestId('practice-review-level-3')
     vi.mocked(api.setPracticeReviewLevel).mockRejectedValue(new Error('lost'))

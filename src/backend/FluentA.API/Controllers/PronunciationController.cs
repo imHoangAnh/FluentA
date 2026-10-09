@@ -34,7 +34,7 @@ public sealed class PronunciationController : ApiControllerBase
         var audio = await ReadAudioAsync(Request.Body, cancellationToken);
         var result = await _pronunciation.AssessAsync(CurrentUserId(), wordId, audio, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PronunciationAssessmentDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PronunciationAssessmentDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

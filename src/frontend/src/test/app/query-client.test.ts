@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createQueryClient } from '@/app/query-client'
+import { createQueryClient } from '@/shared/api/query-client'
 
-describe('application QueryClient', () => {
+describe('shared QueryClient', () => {
   it('creates an isolated cache for each provider tree', () => {
     const first = createQueryClient()
     const second = createQueryClient()

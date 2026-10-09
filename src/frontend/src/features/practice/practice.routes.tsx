@@ -12,7 +12,7 @@ export const practiceRoutes: RouteObject[] = [
     handle: appShellRoute({
       title: 'Practice',
       contentClassName: 'learning-figma-main',
-      description: 'Practice a deck in the fixed dictation, meaning, pronunciation, and recap sequence.',
+      description: 'Practice each word through three exercises, then recap it and choose a Review level.',
     }),
     lazy: async () => ({ Component: (await import('./pages/PracticeSessionPage')).PracticeSessionPage }),
   },

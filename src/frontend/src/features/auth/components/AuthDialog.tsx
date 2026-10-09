@@ -34,7 +34,7 @@ export function AuthDialog({ open, initialMode = 'login', initialNotice = null, 
   const [view, setView] = useState<AuthView>(initialMode)
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
-  const [loginNotice, setLoginNotice] = useState<string | null>(null)
+  const [loginNotice, setLoginNotice] = useState<string | null>(initialNotice)
   const [registerDraft, setRegisterDraft] = useState<RegisterDraft>(emptyDraft)
   const [verificationEmail, setVerificationEmail] = useState('')
   const [verificationSource, setVerificationSource] = useState<VerificationSource>('register')
@@ -44,40 +44,11 @@ export function AuthDialog({ open, initialMode = 'login', initialNotice = null, 
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [resendRetryAt, setResendRetryAt] = useState<number | null>(null)
-  const [clock, setClock] = useState(Date.now())
+  const [clock, setClock] = useState(0)
   const operationRef = useRef(0)
   const lastAutoSubmittedCode = useRef<string | null>(null)
   const verificationInFlight = useRef(false)
   const resendSecondsRemaining = resendRetryAt ? Math.max(0, Math.ceil((resendRetryAt - clock) / 1000)) : 0
-
-  useEffect(() => {
-    if (open) {
-      setView(initialMode)
-      setError(null)
-      setFeedback(null)
-      setLoginNotice(initialNotice)
-      setOtp('')
-      setResendRetryAt(null)
-      lastAutoSubmittedCode.current = null
-    } else {
-      operationRef.current += 1
-      verificationInFlight.current = false
-      setView(initialMode)
-      setLoginEmail('')
-      setLoginPassword('')
-      setLoginNotice(null)
-      setRegisterDraft(emptyDraft)
-      setVerificationEmail('')
-      setVerificationSource('register')
-      setOtp('')
-      setForgotEmail('')
-      setError(null)
-      setFeedback(null)
-      setIsSubmitting(false)
-      setResendRetryAt(null)
-      lastAutoSubmittedCode.current = null
-    }
-  }, [initialMode, initialNotice, open])
 
   useEffect(() => {
     if (!resendRetryAt || resendSecondsRemaining === 0) return
@@ -224,7 +195,11 @@ export function AuthDialog({ open, initialMode = 'login', initialNotice = null, 
       if (operation === operationRef.current) {
         const result = getAuthApiError(resendError, 'Unable to send a new code.')
         setError(result.message)
-        if (result.retryAfterSeconds) setResendRetryAt(Date.now() + result.retryAfterSeconds * 1000)
+        if (result.retryAfterSeconds) {
+          const now = Date.now()
+          setClock(now)
+          setResendRetryAt(now + result.retryAfterSeconds * 1000)
+        }
       }
     } finally {
       if (operation === operationRef.current) setIsSubmitting(false)

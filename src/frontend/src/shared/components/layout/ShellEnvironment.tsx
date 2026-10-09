@@ -28,7 +28,6 @@ export type ShellEnvironmentValue = {
   account: ShellAccount | null
   logout: () => Promise<void>
   navigationSections: ShellNavigationSection[]
-  settingsNavigation: ShellNavigationItem
 }
 
 const ShellEnvironmentContext = createContext<ShellEnvironmentValue | null>(null)

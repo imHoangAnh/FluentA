@@ -10,7 +10,7 @@ type AuthRequestConfig = InternalAxiosRequestConfig & {
   _authRetried?: boolean
   _authGeneration?: number
 }
-type AuthErrorEnvelope = { error?: { code?: string } }
+type AuthErrorEnvelope = { errors?: { code?: string }[] }
 type AuthSessionMessage = { type: 'session-invalidated'; epoch: string } | { type: 'session-established' }
 
 const logoutMarkerKey = 'fluenta.auth.logout-epoch'
@@ -41,7 +41,7 @@ export function registerAuthSessionInvalidationHandler(handler: () => void) {
 
 function readErrorCode(error: unknown) {
   if (!axios.isAxiosError(error)) return undefined
-  return (error.response?.data as AuthErrorEnvelope | undefined)?.error?.code
+  return (error.response?.data as AuthErrorEnvelope | undefined)?.errors?.[0]?.code
 }
 
 function isLogoutMarked() {
@@ -233,9 +233,4 @@ export async function waitForPendingAuthMutation() {
   // remains visible through its retry toast, but does not prevent a new login.
   if (logoutPromise) await logoutPromise.catch(() => undefined)
   if (refreshPromise) await refreshPromise.promise.catch(() => undefined)
-}
-
-export async function ensureRealtimeAuthIsFresh() {
-  if (hasAuthLogoutMarker()) throw new Error('Authentication was explicitly signed out.')
-  await apiClient.get('/auth/me')
 }

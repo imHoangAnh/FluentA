@@ -203,6 +203,10 @@ public sealed partial class AuthService : IAuthService
         {
             return OperationResult<AuthResponse>.Failure(AuthError.GoogleAccountConflict());
         }
+        if (result.Result == GoogleLoginResult.LinkRequired)
+        {
+            return OperationResult<AuthResponse>.Failure(AuthError.GoogleLinkRequired());
+        }
 
         var user = await _users.GetByEmailAsync(email, cancellationToken);
         return user is null || result.AccessToken is null
@@ -213,6 +217,40 @@ public sealed partial class AuthService : IAuthService
                 now.Add(RefreshTokenLifetime),
                 result.AccessToken,
                 cancellationToken));
+    }
+
+    public async Task<OperationResult<UserProfileDto>> LinkGoogleAsync(Guid userId, LinkGoogleRequest request, CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.IdToken)) errors["idToken"] = ["Google ID token is required."];
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword)) errors["currentPassword"] = ["Current password is required."];
+        if (errors.Count > 0)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.Validation(errors));
+        }
+
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
+        if (user is null || user.PasswordHash is null || !_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.InvalidCredentials());
+        }
+        var verification = await _googleVerifier.VerifyAsync(request.IdToken, cancellationToken);
+        if (!verification.IsSuccess) return OperationResult<UserProfileDto>.Failure(verification.Error!);
+        var google = verification.Value!;
+        if (!google.EmailVerified || User.NormalizeEmail(google.Email) != user.Email)
+        {
+            return OperationResult<UserProfileDto>.Failure(AuthError.GoogleLinkFailed());
+        }
+        if (user.GoogleId is not null && user.GoogleId != google.Subject && user.GoogleLinkConfirmedAt is not null)
+            return OperationResult<UserProfileDto>.Failure(AuthError.GoogleAccountConflict());
+
+        var linked = await _users.TryLinkGoogleAsync(userId, user.Email, user.PasswordHash, google.Subject, DateTime.UtcNow, cancellationToken);
+        if (!linked) return OperationResult<UserProfileDto>.Failure(AuthError.GoogleLinkFailed());
+
+        var updated = await _users.GetByIdAsync(userId, cancellationToken);
+        return updated is null
+            ? OperationResult<UserProfileDto>.Failure(AuthError.Unauthorized())
+            : OperationResult<UserProfileDto>.Success(await BuildProfileAsync(updated, cancellationToken));
     }
 
     public async Task<OperationResult<RefreshResponse>> RefreshAsync(string? rawRefreshToken, CancellationToken cancellationToken = default)
@@ -357,7 +395,8 @@ public sealed partial class AuthService : IAuthService
     {
         var avatar = await BuildAvatarDownloadAsync(user, cancellationToken);
         return new UserProfileDto(user.Id, user.Email, user.FullName, user.IsEmailVerified,
-            user.Bio, user.CurrentAvatarAssetId, avatar.Url, avatar.ExpiresAtUtc);
+            user.Bio, user.CurrentAvatarAssetId, avatar.Url, avatar.ExpiresAtUtc,
+            user.GoogleId is not null && (user.PasswordHash is null || user.GoogleLinkConfirmedAt is not null));
     }
 
     private async Task<(string? Url, DateTime? ExpiresAtUtc)> BuildAvatarDownloadAsync(User user, CancellationToken cancellationToken)

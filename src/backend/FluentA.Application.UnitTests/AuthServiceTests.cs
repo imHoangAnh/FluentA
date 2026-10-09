@@ -134,7 +134,7 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task GoogleLogin_AutoLinksVerifiedEmailWithoutOverwritingProfile()
+    public async Task GoogleLogin_RejectsExistingPasswordAccountWithoutLinkingOrIssuingTokens()
     {
         var fixture = CreateFixture();
         var user = User.CreateWithPassword("learner@example.com", "Original Name", "hash:password");
@@ -142,11 +142,78 @@ public sealed class AuthServiceTests
         await fixture.Users.AddAsync(user);
         fixture.Google.User = new GoogleUserInfo("google-subject", "learner@example.com", "Google Name", true);
         var result = await fixture.Service.GoogleLoginAsync(new GoogleLoginRequest("valid-id-token"));
-        Assert.True(result.IsSuccess);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("GOOGLE_LINK_REQUIRED", ((AuthError)result.Error!).Code);
         Assert.Equal("Original Name", fixture.Users.Single.FullName);
         Assert.Equal("Existing bio", fixture.Users.Single.Bio);
-        Assert.Equal("google-subject", fixture.Users.Single.GoogleId);
-        Assert.True(fixture.Users.Single.IsEmailVerified);
+        Assert.Null(fixture.Users.Single.GoogleId);
+        Assert.Equal(0, fixture.RefreshTokens.Count);
+    }
+
+    [Fact]
+    public async Task LinkGoogle_RequiresPasswordAndMatchingVerifiedGoogleEmail()
+    {
+        var fixture = CreateFixture();
+        var user = User.CreateWithPassword("learner@example.com", "Learner", "hash:current-password");
+        user.MarkEmailVerified(DateTime.UtcNow);
+        await fixture.Users.AddAsync(user);
+
+        fixture.Google.User = new GoogleUserInfo("google-subject", "learner@example.com", "Learner", true);
+        var wrongPassword = await fixture.Service.LinkGoogleAsync(user.Id, new LinkGoogleRequest("valid-id-token", "wrong-password"));
+        Assert.Equal("INVALID_CREDENTIALS", ((AuthError)wrongPassword.Error!).Code);
+        Assert.Null(user.GoogleId);
+
+        fixture.Google.User = new GoogleUserInfo("google-subject", "other@example.com", "Other", true);
+        var wrongEmail = await fixture.Service.LinkGoogleAsync(user.Id, new LinkGoogleRequest("valid-id-token", "current-password"));
+        Assert.Equal("GOOGLE_LINK_FAILED", ((AuthError)wrongEmail.Error!).Code);
+        Assert.Null(user.GoogleId);
+
+        fixture.Google.User = new GoogleUserInfo("google-subject", "learner@example.com", "Learner", true);
+        var linked = await fixture.Service.LinkGoogleAsync(user.Id, new LinkGoogleRequest("valid-id-token", "current-password"));
+        Assert.True(linked.IsSuccess);
+        Assert.True(linked.Value!.IsGoogleLinked);
+        Assert.Equal("google-subject", user.GoogleId);
+
+        var login = await fixture.Service.GoogleLoginAsync(new GoogleLoginRequest("valid-id-token"));
+        Assert.True(login.IsSuccess);
+        Assert.Equal("AUTHENTICATED", login.Value!.NextStep);
+        Assert.Equal(1, fixture.RefreshTokens.Count);
+    }
+
+    [Fact]
+    public async Task LegacyGoogleLink_CannotSignInUntilPasswordOwnerConfirmsReplacement()
+    {
+        var fixture = CreateFixture();
+        var user = User.CreateWithPassword("learner@example.com", "Learner", "hash:current-password");
+        user.MarkEmailVerified(DateTime.UtcNow);
+        user.LinkGoogleAccount("old-subject", DateTime.UtcNow);
+        typeof(User).GetProperty(nameof(User.GoogleLinkConfirmedAt))!.SetValue(user, null);
+        await fixture.Users.AddAsync(user);
+
+        fixture.Google.User = new GoogleUserInfo("old-subject", user.Email, "Old", true);
+        var oldLogin = await fixture.Service.GoogleLoginAsync(new GoogleLoginRequest("valid-id-token"));
+        Assert.Equal("GOOGLE_LINK_REQUIRED", ((AuthError)oldLogin.Error!).Code);
+        Assert.Equal(0, fixture.RefreshTokens.Count);
+
+        fixture.Google.User = new GoogleUserInfo("new-subject", user.Email, "New", true);
+        var linked = await fixture.Service.LinkGoogleAsync(user.Id, new LinkGoogleRequest("valid-id-token", "current-password"));
+        Assert.True(linked.IsSuccess);
+        Assert.Equal("new-subject", user.GoogleId);
+        Assert.NotNull(user.GoogleLinkConfirmedAt);
+
+        fixture.Google.User = new GoogleUserInfo("old-subject", user.Email, "Old", true);
+        var rejectedOldSubject = await fixture.Service.GoogleLoginAsync(new GoogleLoginRequest("valid-id-token"));
+        Assert.Equal("GOOGLE_ACCOUNT_CONFLICT", ((AuthError)rejectedOldSubject.Error!).Code);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_CreatesNewGoogleAccount()
+    {
+        var fixture = CreateFixture();
+        var result = await fixture.Service.GoogleLoginAsync(new GoogleLoginRequest("valid-id-token"));
+        Assert.True(result.IsSuccess);
+        Assert.Equal("subject", fixture.Users.Single.GoogleId);
+        Assert.Equal(1, fixture.RefreshTokens.Count);
     }
 
     [Fact]
@@ -177,10 +244,10 @@ public sealed class AuthServiceTests
             new EmptyAssetRepository(),
             new DisabledAssetStorage(),
             new AuthApplicationOptions("https://localhost:5173"));
-        return new Fixture(service, users, email, google);
+        return new Fixture(service, users, refreshTokens, email, google);
     }
 
-    private sealed record Fixture(AuthService Service, InMemoryUserRepository Users, RecordingEmailService Email, FakeGoogleVerifier Google);
+    private sealed record Fixture(AuthService Service, InMemoryUserRepository Users, InMemoryRefreshTokenRepository RefreshTokens, RecordingEmailService Email, FakeGoogleVerifier Google);
 
     private sealed class FakePasswordHasher : IPasswordHasher
     {
@@ -274,6 +341,16 @@ public sealed class AuthServiceTests
             RevokeRefreshTokensForUser?.Invoke(user.Id);
             return Task.FromResult(true);
         }
+        public Task<bool> TryLinkGoogleAsync(Guid userId, string normalizedEmail, string expectedPasswordHash, string googleSubject, DateTime now, CancellationToken cancellationToken = default)
+        {
+            var user = _users.FirstOrDefault(candidate => candidate.Id == userId && candidate.Email == normalizedEmail
+                && candidate.PasswordHash == expectedPasswordHash
+                && (candidate.GoogleId is null || candidate.GoogleId == googleSubject || candidate.GoogleLinkConfirmedAt is null)
+                && candidate.IsEmailVerified);
+            if (user is null) return Task.FromResult(false);
+            user.LinkGoogleAccount(googleSubject, now);
+            return Task.FromResult(true);
+        }
         public Task<bool> UpdateProfileAsync(User user, CancellationToken cancellationToken = default) => Task.FromResult(_users.Contains(user));
     }
 
@@ -281,6 +358,7 @@ public sealed class AuthServiceTests
     {
         private readonly InMemoryUserRepository _users;
         private readonly List<StoredRefreshToken> _tokens = [];
+        public int Count => _tokens.Count;
 
         public InMemoryRefreshTokenRepository(InMemoryUserRepository users)
         {
@@ -315,6 +393,9 @@ public sealed class AuthServiceTests
             CancellationToken cancellationToken = default)
         {
             var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+            if (user is not null && (user.GoogleId is null
+                || (user.PasswordHash is not null && user.GoogleLinkConfirmedAt is null)))
+                return new GoogleLoginSessionResult(GoogleLoginResult.LinkRequired, null);
             if (user?.GoogleId is not null && user.GoogleId != googleSubject)
                 return new GoogleLoginSessionResult(GoogleLoginResult.AccountConflict, null);
             if (user is null)

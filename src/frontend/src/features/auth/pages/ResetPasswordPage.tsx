@@ -105,8 +105,8 @@ export function ResetPasswordPage() {
 
 function authApiError(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
-    return response?.data?.error?.message ?? 'Something went wrong.'
+    const response = (error as { response?: { data?: { message?: string } } }).response
+    return response?.data?.message ?? 'Something went wrong.'
   }
 
   return 'Something went wrong.'
