@@ -48,6 +48,24 @@ test('Figma first-entry screen starts a journal and auto-saves the new entry', a
   await expect(page.getByRole('button', { name: 'Open journal A small moment today' })).toBeVisible()
 })
 
+test('large Journal lists retain offscreen entries and allow opening them after scrolling', async ({ page }) => {
+  const entries = Array.from({ length: 400 }, (_, index) => ({
+    ...first, id: `large-entry-${index}`, title: `History entry ${index}`,
+    date: new Date(Date.UTC(2026, 8, 29 - index)).toISOString().slice(0, 10),
+  }))
+  await mockJournal(page, entries)
+  await page.goto('/journal')
+  await expect(page.locator('.journal-entry-list > button')).toHaveCount(400)
+  const last = page.getByRole('button', { name: 'Open journal History entry 399', exact: true })
+  expect(await last.evaluate(element => getComputedStyle(element).contentVisibility)).toBe('auto')
+  await last.scrollIntoViewIfNeeded()
+  await expect(last).toBeVisible()
+  await last.click()
+  await expect(page.getByLabel('Journal title', { exact: true })).toHaveValue('History entry 399')
+  await page.getByTestId('journal-search-input').fill('History entry 0')
+  await expect(page.getByRole('button', { name: 'Open journal History entry 0', exact: true })).toBeVisible()
+})
+
 test('Figma writing screen keeps toolbar, calendar, search, drafts and responsive geometry working', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const writes = await mockJournal(page, [first,

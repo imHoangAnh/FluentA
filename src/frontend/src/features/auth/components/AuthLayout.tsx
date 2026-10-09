@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import wordmarkUrl from '@/shared/assets/fluenta-wordmark.svg'
+import wordmarkUrl from '@/shared/assets/fluenta-wordmark.webp'
 
 export function AuthLayout() {
   return (

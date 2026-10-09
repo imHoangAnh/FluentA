@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import logoUrl from '@/shared/assets/fluenta-wordmark.svg'
+import logoUrl from '@/shared/assets/fluenta-wordmark.webp'
 
 export function SidebarLogo() {
   return (

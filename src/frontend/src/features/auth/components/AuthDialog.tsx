@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CircleX, LockKeyhole, Mail } from 'lucide-react'
-import logoUrl from '@/shared/assets/fluenta-wordmark.svg'
+import logoUrl from '@/shared/assets/fluenta-wordmark.webp'
 import { Button } from '@/shared/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/shared/components/ui/dialog'
 import { getAuthApiError } from '../api/auth.api'
