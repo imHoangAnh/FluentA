@@ -28,6 +28,8 @@ export function PracticePronunciationMode({ item, assessment, recordingSupported
         {details ? <span>{details}</span> : null}
       </div>
 
+      <PronunciationFeedback assessment={assessment} />
+
       <div className="practice-pronunciation__controls">
         <button className="practice-pronunciation__listen" type="button" aria-label="Listen to pronunciation" aria-keyshortcuts="Tab" onClick={onPlayAudio}>
           <span>Listen</span>
@@ -45,7 +47,6 @@ export function PracticePronunciationMode({ item, assessment, recordingSupported
       </div>
 
       <p className="practice-pronunciation__hint">Listen to the model, then record your pronunciation.</p>
-      <PronunciationFeedback assessment={assessment} />
       {!recordingSupported ? <p className="practice-pronunciation__warning"><TriangleAlert size={16} /> Microphone recording is unavailable in this browser.</p> : null}
       {error ? <p className="practice-pronunciation__error" role="alert">{error}</p> : null}
     </div>

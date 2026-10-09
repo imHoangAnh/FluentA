@@ -1,4 +1,5 @@
 import { Mic, Square, Volume2 } from 'lucide-react'
+import { PronunciationFeedback, type PronunciationAssessment } from '@/features/pronunciation'
 import type { ReviewSessionItem } from '../../api/review.api'
 import { formatIpa, hasText } from './reviewFormatters'
 
@@ -7,6 +8,7 @@ export type ReviewFeedback = {
   title: string
   message: string
   item: ReviewSessionItem
+  assessment?: PronunciationAssessment | null
 }
 
 type ReviewModeSurfaceProps = {
@@ -73,6 +75,7 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
                 {hasText(item.type) ? item.type : ''}
               </span>
             ) : null}
+            <PronunciationFeedback assessment={feedback?.assessment ?? null} />
             <div className="review-figma-session__pronunciation-controls">
               <button className="review-figma-session__listen-button" type="button" aria-label="Listen to pronunciation" aria-keyshortcuts="Tab" title="Listen (Tab)" onClick={onPlayAudio} disabled={isBusy}>
                 <span>Listen</span>
@@ -117,7 +120,7 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
 
       </div>
 
-      {feedback ? (
+      {feedback && !isPronunciation ? (
         <div className={`review-figma-session__feedback review-figma-session__feedback--${feedback.kind === 'correct' ? 'correct' : 'wrong'}`} role="status" aria-live="polite">
           <strong>{feedback.title}</strong>
           <span>{feedback.message}</span>

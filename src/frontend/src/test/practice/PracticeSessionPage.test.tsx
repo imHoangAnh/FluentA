@@ -6,14 +6,15 @@ import { PracticeSessionPage } from '@/features/practice/pages/PracticeSessionPa
 import * as api from '@/features/practice/api/practice.api'
 import { practiceKeys } from '@/features/practice/api/practice.queries'
 import { toast } from '@/shared/lib/toast'
+import type { PronunciationAssessment } from '@/features/pronunciation'
 
 const audio = vi.hoisted(() => ({ callback: null as ((blob: Blob) => Promise<void>) | null, cancel: vi.fn(), stop: vi.fn() }))
 vi.mock('@/features/practice/api/practice.api', () => ({ getPracticeSession: vi.fn(), submitPracticeAnswer: vi.fn(), submitPracticePronunciationAttempt: vi.fn(), setPracticeReviewLevel: vi.fn(), completePracticeSession: vi.fn() }))
 vi.mock('@/shared/lib/toast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
-vi.mock('@/features/pronunciation', () => ({
+vi.mock('@/features/pronunciation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/features/pronunciation')>(),
   supportsPcmRecording: () => true,
   startPcmRecording: vi.fn(async (callback: typeof audio.callback) => { audio.callback = callback; return { cancel: audio.cancel, stop: audio.stop } }),
-  PronunciationFeedback: () => null,
 }))
 const item: api.PracticeSessionItem = {
   itemId: 'item-1', wordId: 'word-1', position: 0, word: 'alpha', meaning: 'first',
@@ -134,15 +135,21 @@ describe('Practice authoritative recovery', () => {
   })
   it('uses server pronunciation attempt counts and feedback after a lost wrong result', async () => {
     renderSession(at('pronunciation'))
+    const assessment: PronunciationAssessment = {
+      correct: false, accuracyScore: 76, feedbackMode: 'syllable',
+      words: [{ text: 'alpha', accuracyScore: 76, units: [], syllables: [{ text: 'a', accuracyScore: 55, phonemes: [{ text: 'a', correct: false, accuracyScore: 55 }] }] }],
+    }
     vi.mocked(api.submitPracticePronunciationAttempt).mockImplementation(async input => {
-      vi.mocked(api.getPracticeSession).mockResolvedValue({ ...at('pronunciation'), items: [{ ...item, currentStep: 'pronunciation', attemptCount: 2, pronunciationAttemptCount: 2, lastAttempt: { requestId: input.requestId!, step: 'pronunciation', correctness: false, isSkip: false, attemptNumber: 2, assessment: null } }, session.items[1]] })
+      vi.mocked(api.getPracticeSession).mockResolvedValue({ ...at('pronunciation'), items: [{ ...item, currentStep: 'pronunciation', attemptCount: 2, pronunciationAttemptCount: 2, lastAttempt: { requestId: input.requestId!, step: 'pronunciation', correctness: false, isSkip: false, attemptNumber: 2, assessment } }, session.items[1]] })
       throw new Error('lost')
     })
     fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
     await waitFor(() => expect(audio.callback).not.toBeNull())
     await act(async () => { await audio.callback!(new Blob(['audio'])) })
     expect(await screen.findByText('Saved pronunciation attempts: 2')).toBeInTheDocument()
-    expect(screen.getByText(/Pronunciation needs another try/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Red syllable /a/' })).toBeInTheDocument()
+    expect(screen.queryByText(/Pronunciation needs another try/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
     expect(api.submitPracticePronunciationAttempt).toHaveBeenCalledTimes(1)
   })
   it('redirects an already abandoned session without showing answer controls', async () => {

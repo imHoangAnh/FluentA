@@ -56,22 +56,17 @@ function withAnswerResult(session: reviewApi.ReviewSession, result: reviewApi.Re
 }
 
 function feedbackFor(item: reviewApi.ReviewSessionItem, result: reviewApi.ReviewAnswerResult): ReviewFeedback {
-  if (item.mode === 'listenAndRepeat' && !result.isReviewed && !result.correct) {
-    const pronunciation = item.ipaPronunciation?.trim()
+  if (item.mode === 'listenAndRepeat') {
     return {
-      kind: 'retry',
-      title: '×  Pronunciation needs another try',
-      message: `${pronunciation ? `Listen to /${pronunciation.replace(/^\/+|\/+$/g, '')}/ again.` : 'Listen to the word again.'} Press Enter to continue.`,
+      kind: result.correct ? 'correct' : result.isReviewed ? 'wrong' : 'retry',
+      title: '',
+      message: '',
       item,
     }
   }
 
   if (result.correct) {
     return { kind: 'correct', title: '✓  Correct', message: 'Nice work. Press Enter to continue.', item }
-  }
-
-  if (item.mode === 'listenAndRepeat') {
-    return { kind: 'wrong', title: '×  Not quite', message: 'Both attempts are used. Press Enter to continue.', item }
   }
 
   return { kind: 'wrong', title: '×  Not quite', message: `Correct answer: ${item.word}  ·  Press Enter to continue.`, item }
@@ -162,7 +157,7 @@ export function ReviewSessionPage() {
       queryClient.setQueryData<reviewApi.ReviewSession>(queryKey, (cached) => cached ? withAnswerResult(cached, result) : cached)
       cardStartedAt.current = Date.now()
       setPronunciationError(null)
-      if (answeredItem) setOutcomeFeedback(feedbackFor(itemWithAnswerResult(answeredItem, result), result))
+      if (answeredItem) setOutcomeFeedback({ ...feedbackFor(itemWithAnswerResult(answeredItem, result), result), assessment: result.assessment })
       await queryClient.invalidateQueries({ queryKey, exact: true })
     },
     onError: async (error, variables) => {
@@ -253,6 +248,8 @@ export function ReviewSessionPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+
+      if (event.defaultPrevented || target?.closest('[data-pronunciation-feedback]')) return
 
       if (outcomeFeedback) {
         if (event.key === 'Enter') {

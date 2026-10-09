@@ -18,11 +18,19 @@ public sealed record PronunciationWordAssessment(
     string Text,
     double AccuracyScore,
     string? ErrorType,
-    IReadOnlyList<PronunciationUnitAssessment> Units);
+    IReadOnlyList<PronunciationUnitAssessment> Units,
+    IReadOnlyList<PronunciationSyllableAssessment>? Syllables = null);
+
+public sealed record PronunciationSyllableAssessment(
+    string Text,
+    double AccuracyScore,
+    IReadOnlyList<PronunciationUnitAssessment> Phonemes);
 
 public sealed record PronunciationUnitAssessment(
     string Text,
-    double AccuracyScore);
+    double AccuracyScore,
+    long? Offset = null,
+    long? Duration = null);
 
 public enum PronunciationNotRecognizedReason
 {

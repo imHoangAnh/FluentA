@@ -395,6 +395,9 @@ function SessionPracticePage() {
       const target = event.target as HTMLElement | null
       const isTextEntry = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
 
+      if (event.defaultPrevented || target?.closest('[data-pronunciation-feedback]')) return
+      if (event.key === 'Tab' && activeStep === 'pronunciation' && pronunciationFeedback) return
+
       if (event.key === 'Tab' && activeStep !== 'wordToMeaning' && activeStep !== 'recap' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
         speakWord(word, language)
@@ -448,7 +451,7 @@ function SessionPracticePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeStep, completeTransition, currentItem, isRecording, isSaving, language, pendingTransition, selectMeaning, selectReviewLevel, skipCurrentStep, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
+  }, [activeStep, completeTransition, currentItem, isRecording, isSaving, language, pendingTransition, pronunciationFeedback, selectMeaning, selectReviewLevel, skipCurrentStep, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
 
   const currentReviewStatus: PracticeReviewStatus | null = currentItem
     ? reviewStatuses[currentItem.wordId] ?? (currentItem.alreadyInReview ? 'alreadyInReview' : null)

@@ -83,7 +83,7 @@ export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, f
         ) : null}
       </div>
 
-      {feedback ? (
+      {feedback && mode !== 'pronunciation' ? (
         <div className={`practice-exercise__feedback practice-exercise__feedback--${feedback}`} role="status" aria-live="polite">
           <strong>{feedback === 'correct' ? '✓  Correct' : `×  ${feedbackTitle}`}</strong>
           <span>{feedback === 'correct' ? 'Nice work. Press Enter or continue below.' : isResolved ? 'Press Enter or continue below.' : feedbackDescription}</span>

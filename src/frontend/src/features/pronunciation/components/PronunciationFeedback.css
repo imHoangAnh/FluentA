@@ -1,0 +1,58 @@
+.pronunciation-feedback-row {
+  gap: 0.4rem 1rem;
+}
+
+.pronunciation-feedback-word {
+  gap: 0.25rem;
+}
+
+.pronunciation-syllable {
+  min-height: 2.75rem;
+  padding: 0.35rem 0.2rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pronunciation-syllable:hover,
+.pronunciation-syllable[aria-expanded='true'] {
+  background: var(--ds-muted);
+}
+
+.pronunciation-syllable:focus-visible {
+  outline: 2px solid var(--ds-primary);
+  outline-offset: 2px;
+}
+
+.pronunciation-tone--good {
+  color: #16836b;
+}
+
+.pronunciation-tone--practice {
+  color: #996400;
+}
+
+.pronunciation-tone--priority {
+  color: #c0392b;
+}
+
+.pronunciation-phoneme-tooltip {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  max-width: calc(100vw - 1rem);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ds-border);
+  border-radius: 0.65rem;
+  background: var(--ds-card);
+  box-shadow: 0 0.4rem 1.3rem rgb(0 0 0 / 12%);
+  font-size: 1.15rem;
+  font-weight: 600;
+  pointer-events: none;
+}
