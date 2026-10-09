@@ -49,10 +49,10 @@ File `.env.local` sử dụng các biến sau:
 
 | Biến | Mục đích |
 | --- | --- |
-| `VITE_API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
+| `API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
 | `ASSET_STORAGE_BUCKET` | Bucket path mà Vite proxy tới S3-compatible local storage |
 | `ASSET_STORAGE_PROXY_TARGET` | Internal target của Vite proxy, mặc định `http://127.0.0.1:9000` |
-| `VITE_GOOGLE_CLIENT_ID` | Google Identity Services web client ID; có thể để trống nếu không dùng Google login |
+| `GOOGLE_CLIENT_ID` | Google Identity Services web client ID; có thể để trống nếu không dùng Google login |
 
 Không commit thông tin cấu hình bí mật của môi trường vào Git.
 
@@ -90,7 +90,7 @@ Output production được tạo trong thư mục `dist/`.
    đặt thành phần dùng chung thực sự trong `src/shared`.
 
 Các route được bảo vệ sẽ chuyển người dùng chưa xác thực về `/login`. REST API
-được gọi qua base URL trong `VITE_API_URL`; REST và SignalR đều dùng HttpOnly
+được gọi qua base URL trong `API_URL`; REST và SignalR đều dùng HttpOnly
 cookie, không dùng access token trong JavaScript.
 
 ## 6. Các lệnh thường dùng

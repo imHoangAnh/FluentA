@@ -67,7 +67,7 @@ function loadGoogleIdentityServices() {
 }
 
 export function GoogleSignInButton({ onCredential, disabled = false, label = 'Continue with Google' }: Props) {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
+  const clientId = import.meta.env.GOOGLE_CLIENT_ID as string | undefined
   const containerRef = useRef<HTMLDivElement>(null)
   const [message, setMessage] = useState<string | null>(clientId ? null : 'Google sign-in is not configured locally.')
   const [isReady, setIsReady] = useState(false)

@@ -128,8 +128,8 @@ jobs:
           tags: fluenta-frontend:pr-ci
           build-args: |
             VCS_REF=${{ github.sha }}
-            VITE_API_URL=https://api.sophion.io.vn/api/v1
-            VITE_GOOGLE_CLIENT_ID=ci-validation.apps.googleusercontent.com
+            API_URL=https://api.sophion.io.vn/api/v1
+            GOOGLE_CLIENT_ID=ci-validation.apps.googleusercontent.com
 
       - name: Verify image revisions and runtime identities
         env:

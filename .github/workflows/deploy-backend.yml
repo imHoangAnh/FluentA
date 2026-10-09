@@ -69,10 +69,10 @@ jobs:
 
       - name: Validate public frontend configuration
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           set -Eeuo pipefail
-          [[ "$VITE_GOOGLE_CLIENT_ID" =~ ^[0-9A-Za-z._-]+\.apps\.googleusercontent\.com$ ]]
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9A-Za-z._-]+\.apps\.googleusercontent\.com$ ]]
 
       - name: Build and push API image
         id: api-image
@@ -110,8 +110,8 @@ jobs:
           tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
           build-args: |
             VCS_REF=${{ github.sha }}
-            VITE_API_URL=https://api.sophion.io.vn/api/v1
-            VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
+            API_URL=https://api.sophion.io.vn/api/v1
+            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
 
       - name: Verify published digests
         env:
