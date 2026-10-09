@@ -3,10 +3,13 @@
 Authority: user choices accepted in the Vocabulary / Practice / Review
 migration discussion, recorded on 2026-10-04.
 
-For example, one word goes through Dictation, Word to Meaning, Pronunciation,
-then Recap before the next word begins. Practice keeps this fixed sequence and
-has no shuffle, ordering or settings UI. Ordinary successful answers show
-feedback until Continue. Practice pronunciation retries remain unlimited;
+For example, one word goes through the three Practice modes: Dictation,
+Word to Meaning, and Pronunciation. Recap follows those modes as a review screen,
+not a fourth mode. It shows the practiced word and its details, then lets the
+user choose a self-assessed level from 0 to 5 to add that word to Review before
+the next word begins. Practice keeps this fixed sequence and has no shuffle,
+ordering, settings UI, or `practice_settings` table. Ordinary successful answers
+show feedback until Continue. Practice pronunciation retries remain unlimited;
 Review's two-attempt pronunciation rule is unchanged.
 
 ## Authoritative Progress
