@@ -84,6 +84,40 @@ flows.
 
 ## Getting Started
 
+### Run the whole application locally with Docker
+
+After configuring the existing backend user-secrets and `src/frontend/.env`
+as described in [local setup](docs/local-development.md), start Docker Desktop
+and run this command from the repository root in PowerShell 7:
+
+```powershell
+./start-local.ps1
+```
+
+This builds and starts PostgreSQL, a one-time migration container, the API,
+and the frontend. Open `https://localhost:5173`; the API stays at
+`https://localhost:7000`. The script exports your trusted .NET development
+certificate, mounts existing backend secrets read-only, and uses the existing
+frontend `.env` during build. The host needs .NET 10 for certificate setup;
+Node.js runs inside Docker. R2, Google, Resend, and Azure Speech continue using
+your existing credentials. This is a built frontend; rerun the command after
+changing source or frontend configuration.
+
+The database uses the same `fluenta-postgres-dev-data` volume as
+`docker-compose.dev.yml`. Migrations apply to `fluenta_dev`; they do not erase
+or reset the database. Stop any host API/Vite processes using ports 7000/5173
+before starting the containers.
+
+```powershell
+./start-local.ps1 -Logs
+./start-local.ps1 -Stop
+```
+
+The first command displays recent application logs. The second stops the local
+containers while keeping PostgreSQL data. Do not use `down -v` if you want to
+keep that data. Generated certificate files under `.local-docker/` are ignored
+by Git and must remain local.
+
 ### Prerequisites
 
 - Docker with Docker Compose

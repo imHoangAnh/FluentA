@@ -1,0 +1,11 @@
+{
+    auto_https disable_redirects
+    admin off
+}
+
+https://localhost:5173 {
+    tls /certs/localhost.pem /certs/localhost.key
+    root * /srv
+    try_files {path} /index.html
+    file_server
+}
