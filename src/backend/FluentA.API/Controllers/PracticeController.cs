@@ -67,6 +67,16 @@ public sealed class PracticeController : ApiControllerBase
             : ToErrorResult(result);
     }
 
+    [HttpPost("sessions/{sessionId:guid}/retry")]
+    public async Task<IActionResult> RetryStep(
+        Guid sessionId, RetryPracticeStepRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _practice.RetryStepAsync(CurrentUserId(), sessionId, request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<PracticeRetryStepResultDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     [HttpPost("sessions/{sessionId:guid}/pronunciation-attempts")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> SubmitPronunciationAttempt(

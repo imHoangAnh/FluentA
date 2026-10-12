@@ -186,6 +186,17 @@ public sealed class PracticeSessionItem : BaseEntity
         }
     }
 
+    public bool TryReopenExercise(PracticeStep step, DateTime utcNow)
+    {
+        if (IsCompleted || step is < PracticeStep.Dictation or > PracticeStep.Pronunciation
+            || (CurrentStep != step && (int)CurrentStep != (int)step + 1))
+            return false;
+
+        CurrentStep = step;
+        UpdatedAt = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
+        return true;
+    }
+
     public void SetReviewEnrollment(int level, bool alreadyActive, DateTime utcNow)
     {
         EnsureCurrentStep(PracticeStep.Recap);

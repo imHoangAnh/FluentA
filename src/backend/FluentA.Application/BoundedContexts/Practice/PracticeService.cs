@@ -205,6 +205,27 @@ public sealed class PracticeService : IPracticeService
         }, cancellationToken);
     }
 
+    public async Task<OperationResult<PracticeRetryStepResultDto>> RetryStepAsync(
+        Guid userId, Guid sessionId, RetryPracticeStepRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.ItemId == Guid.Empty || request.AttemptId == Guid.Empty
+            || !TryParseStep(request.Step, out var step) || step == PracticeStep.Recap)
+        {
+            return OperationResult<PracticeRetryStepResultDto>.Failure(PracticeError.Validation(
+                new Dictionary<string, string[]> { ["retry"] = ["An item, successful attempt id, and exercise step are required."] }));
+        }
+
+        return await Transaction.ExecuteAsync(userId, sessionId, async token =>
+        {
+            var result = await Sessions.RetryStepAsync(userId, sessionId, request.ItemId,
+                step, request.AttemptId, DateTime.UtcNow, token);
+            if (result.Status == PracticeRepositoryOperationStatus.Success)
+                await Transaction.SaveChangesAsync(token);
+            return MapRepositoryResult(result);
+        }, cancellationToken);
+    }
+
     public async Task<OperationResult<PracticePronunciationAttemptResultDto>> SubmitPronunciationAttemptAsync(
         Guid userId,
         Guid sessionId,

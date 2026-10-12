@@ -38,6 +38,10 @@ public interface IPracticeSessionRepository
         CancellationToken cancellationToken = default,
         Guid? requestId = null);
 
+    Task<PracticeRepositoryOperationResult<PracticeRetryStepResultDto>> RetryStepAsync(
+        Guid userId, Guid sessionId, Guid itemId, PracticeStep step, Guid attemptId,
+        DateTime utcNow, CancellationToken cancellationToken = default);
+
     Task<PracticeRepositoryOperationResult<PracticePronunciationAttemptResultDto>?> GetPronunciationReplayAsync(
         Guid userId, Guid sessionId, Guid itemId, Guid? requestId, CancellationToken cancellationToken = default);
 

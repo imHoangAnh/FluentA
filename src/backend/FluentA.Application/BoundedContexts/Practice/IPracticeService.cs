@@ -30,6 +30,10 @@ public interface IPracticeService
         SubmitPracticeAnswerRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<OperationResult<PracticeRetryStepResultDto>> RetryStepAsync(
+        Guid userId, Guid sessionId, RetryPracticeStepRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<OperationResult<PracticePronunciationAttemptResultDto>> SubmitPronunciationAttemptAsync(
         Guid userId,
         Guid sessionId,

@@ -142,6 +142,126 @@ public sealed class PracticePersistenceIntegrationTests
         }
     }
 
+    [LearningPostgresFact]
+    public async Task CorrectExercisesCanRetryRepeatedly_PreserveHistory_AndRejectStaleRetries()
+    {
+        await using var database = await Database.CreateAsync();
+        var (userId, sessionId, itemId, _) = await database.SeedRecap(dictation: true);
+        Guid firstAttempt = default;
+        for (var index = 0; index < 4; index++)
+        {
+            var requestId = Guid.NewGuid();
+            if (index == 0) firstAttempt = requestId;
+            await using (var context = database.Context())
+                Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                    new(itemId, "dictation", "alpha", RequestId: requestId))).IsSuccess);
+            async Task Retry()
+            {
+                await using var context = database.Context();
+                Assert.True((await Service(context).RetryStepAsync(userId, sessionId,
+                    new(itemId, "dictation", requestId))).IsSuccess);
+            }
+            await Task.WhenAll(Retry(), Retry());
+            await using var verify = database.Context();
+            Assert.Equal(PracticeStep.Dictation, (await verify.PracticeSessionItems.SingleAsync()).CurrentStep);
+            Assert.Equal(index + 1, await verify.PracticeAttempts.CountAsync());
+            if (index > 0)
+                Assert.False((await Service(verify).RetryStepAsync(userId, sessionId,
+                    new(itemId, "dictation", firstAttempt))).IsSuccess);
+        }
+
+        await using (var context = database.Context())
+        {
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "dictation", "alpha", RequestId: Guid.NewGuid()))).IsSuccess);
+        }
+        Guid meaningAttempt = Guid.NewGuid();
+        await using (var context = database.Context())
+        {
+            var choice = (await context.PracticeSessionItems.SingleAsync()).CorrectAnswerSlotId;
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "wordToMeaning", AnswerSlotId: choice, RequestId: meaningAttempt))).IsSuccess);
+        }
+        await using (var context = database.Context())
+        {
+            Assert.True((await Service(context).RetryStepAsync(userId, sessionId, new(itemId, "wordToMeaning", meaningAttempt))).IsSuccess);
+            Assert.Equal(PracticeStep.WordToMeaning, (await context.PracticeSessionItems.SingleAsync()).CurrentStep);
+        }
+        await using (var context = database.Context())
+        {
+            var choice = (await context.PracticeSessionItems.SingleAsync()).CorrectAnswerSlotId;
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "wordToMeaning", AnswerSlotId: choice, RequestId: Guid.NewGuid()))).IsSuccess);
+        }
+        Guid pronunciationAttempt = Guid.NewGuid();
+        await using (var context = database.Context())
+        {
+            // Isolate retry persistence from Azure; the provider result is supplied directly.
+            Assert.Equal(PracticeRepositoryOperationStatus.Success,
+                (await new EfPracticeRepository(context).RecordPronunciationAttemptAsync(userId, sessionId, itemId,
+                    new(true, 95, 100, "word", []), 0, DateTime.UtcNow, requestId: pronunciationAttempt)).Status);
+        }
+        await using (var context = database.Context())
+            Assert.True((await Service(context).RetryStepAsync(userId, sessionId,
+                new(itemId, "pronunciation", pronunciationAttempt))).IsSuccess);
+        await using (var verify = database.Context())
+        {
+            Assert.Equal(PracticeStep.Pronunciation, (await verify.PracticeSessionItems.SingleAsync()).CurrentStep);
+            Assert.Equal(8, await verify.PracticeAttempts.CountAsync());
+        }
+        await using (var context = database.Context())
+            Assert.False((await Service(context).RetryStepAsync(Guid.NewGuid(), sessionId,
+                new(itemId, "pronunciation", pronunciationAttempt))).IsSuccess);
+        await using (var context = database.Context())
+        {
+            (await context.PracticeSessions.SingleAsync()).Abandon(DateTime.UtcNow);
+            await context.SaveChangesAsync();
+            Assert.False((await Service(context).RetryStepAsync(userId, sessionId,
+                new(itemId, "pronunciation", pronunciationAttempt))).IsSuccess);
+        }
+    }
+
+    [LearningPostgresFact]
+    public async Task RetryRejectsWrongAnswers_SkippedSteps_AndCompletedItems()
+    {
+        await using var database = await Database.CreateAsync();
+        var (userId, sessionId, itemId, _) = await database.SeedRecap(dictation: true);
+        var wrongId = Guid.NewGuid();
+        await using (var context = database.Context())
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "dictation", "wrong", RequestId: wrongId))).IsSuccess);
+        await using (var context = database.Context())
+            Assert.False((await Service(context).RetryStepAsync(userId, sessionId, new(itemId, "dictation", wrongId))).IsSuccess);
+        var correctId = Guid.NewGuid();
+        await using (var context = database.Context())
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "dictation", "alpha", RequestId: correctId))).IsSuccess);
+        var skipId = Guid.NewGuid();
+        await using (var context = database.Context())
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "wordToMeaning", Skip: true, RequestId: skipId))).IsSuccess);
+        await using (var context = database.Context())
+        {
+            Assert.False((await Service(context).RetryStepAsync(userId, sessionId, new(itemId, "dictation", correctId))).IsSuccess);
+            Assert.False((await Service(context).RetryStepAsync(userId, sessionId, new(itemId, "wordToMeaning", skipId))).IsSuccess);
+            var item = await context.PracticeSessionItems.SingleAsync();
+            Assert.Equal(PracticeStep.Pronunciation, item.CurrentStep);
+            Assert.True(item.HasMistake);
+        }
+        await using (var context = database.Context())
+        {
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "pronunciation", Skip: true))).IsSuccess);
+            Assert.True((await Service(context).SubmitAnswerAsync(userId, sessionId,
+                new(itemId, "recap", Skip: true))).IsSuccess);
+        }
+        await using (var context = database.Context())
+        {
+            Assert.False((await Service(context).RetryStepAsync(userId, sessionId, new(itemId, "dictation", correctId))).IsSuccess);
+            Assert.True((await context.PracticeSessionItems.SingleAsync()).IsCompleted);
+        }
+    }
+
     private static PracticeService Service(AppDbContext context, IPracticeTransaction? transaction = null) =>
         new(new EfPracticeRepository(context), new ReviewService(new EfReviewRepository(context), null!), null!, transaction ?? new EfPracticeTransaction(context));
 

@@ -113,6 +113,10 @@ public sealed record PracticeAnswerResultDto(
     int CurrentItemIndex,
     string Status);
 
+public sealed record RetryPracticeStepRequest(Guid ItemId, string Step, Guid AttemptId);
+
+public sealed record PracticeRetryStepResultDto(Guid ItemId, string Step);
+
 public sealed record PracticePronunciationAttemptResultDto(
     Guid ItemId,
     PronunciationAssessmentDto Assessment,

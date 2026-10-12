@@ -320,6 +320,29 @@ public sealed partial class EfPracticeRepository
             SessionStatusName(session.Status)));
     }
 
+    public async Task<PracticeRepositoryOperationResult<PracticeRetryStepResultDto>> RetryStepAsync(
+        Guid userId, Guid sessionId, Guid itemId, PracticeStep step, Guid attemptId,
+        DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var session = await FindOwnedSessionAsync(userId, sessionId, cancellationToken);
+        if (session is null) return Failed<PracticeRetryStepResultDto>(PracticeRepositoryOperationStatus.NotFound);
+        var current = await FindCurrentItemAsync(session, itemId, cancellationToken);
+        if (current.Status != PracticeRepositoryOperationStatus.Success || current.Item is null)
+            return Failed<PracticeRetryStepResultDto>(current.Status);
+
+        // The successful attempt identifies this retry. A delayed retry must not
+        // rewind an exercise after another answer or skip has already been saved.
+        var last = await _dbContext.PracticeAttempts.AsNoTracking()
+            .Where(attempt => attempt.PracticeSessionItemId == itemId && attempt.DeletedAt == null)
+            .OrderByDescending(attempt => attempt.CreatedAt).ThenByDescending(attempt => attempt.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (last is null || last.Id != attemptId || last.Step != step || !last.Correctness
+            || last.Kind == PracticeAttemptKind.Skip || !current.Item.TryReopenExercise(step, utcNow))
+            return Failed<PracticeRetryStepResultDto>(PracticeRepositoryOperationStatus.Conflict);
+
+        return Succeeded(new PracticeRetryStepResultDto(itemId, StepName(step)));
+    }
+
     public async Task<PracticeRepositoryOperationResult<PracticePronunciationAttemptResultDto>?> GetPronunciationReplayAsync(
         Guid userId, Guid sessionId, Guid itemId, Guid? requestId, CancellationToken cancellationToken = default)
     {
