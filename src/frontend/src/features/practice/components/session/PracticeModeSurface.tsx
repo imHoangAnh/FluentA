@@ -24,6 +24,7 @@ type PracticeModeSurfaceProps = {
   onSelectSlot: (slotId: string) => void
   onSkip: () => void
   onContinue: () => void
+  onRetry: () => void
   onStartRecording: () => void
   onStopRecording: () => void
 }
@@ -34,7 +35,7 @@ const prompts: Record<PracticeExerciseMode, string> = {
   pronunciation: 'Listen to the word, then record your pronunciation.',
 }
 
-export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, feedback, isResolved, isBusy, pronunciationFeedback, recordingSupported, isRecording, pronunciationError, onPlayAudio, onAnswerChange, onSubmit, onSelectSlot, onSkip, onContinue, onStartRecording, onStopRecording }: PracticeModeSurfaceProps) {
+export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, feedback, isResolved, isBusy, pronunciationFeedback, recordingSupported, isRecording, pronunciationError, onPlayAudio, onAnswerChange, onSubmit, onSelectSlot, onSkip, onContinue, onRetry, onStartRecording, onStopRecording }: PracticeModeSurfaceProps) {
   const feedbackTitle = mode === 'pronunciation' ? 'Pronunciation needs another try' : 'Not quite'
   const feedbackDescription = mode === 'dictation'
     ? 'Try again or skip this word.'
@@ -91,6 +92,7 @@ export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, f
       ) : null}
 
       <div className={`practice-exercise__actions${isResolved ? ' practice-exercise__actions--resolved' : ''}`}>
+        {(isResolved && feedback === 'correct') || (mode === 'pronunciation' && feedback === 'wrong' && !isResolved) ? <button type="button" onClick={onRetry} disabled={isBusy || isRecording}>Try again</button> : null}
         {mode === 'dictation' && !isResolved ? <button className="learning-touch-submit" type="button" onClick={onSubmit} disabled={isBusy || !typedAnswer.trim()}>Check answer</button> : null}
         {!isResolved ? (
           <button type="button" onClick={onSkip} disabled={isBusy || isRecording}>Skip</button>

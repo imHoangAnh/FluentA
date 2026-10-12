@@ -24,6 +24,7 @@ type ReviewModeSurfaceProps = {
   onCheckAnswer: () => void
   onSkip: () => void
   onContinue: () => void
+  onRetry: () => void
   onToggleRecording: () => void
 }
 
@@ -33,7 +34,7 @@ const prompts = {
   listenAndRepeat: 'Listen to the word, then record your pronunciation.',
 } satisfies Record<ReviewSessionItem['mode'], string>
 
-export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecording, recordingSupported, pronunciationError, onPlayAudio, onAnswerChange, onCheckAnswer, onSkip, onContinue, onToggleRecording }: ReviewModeSurfaceProps) {
+export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecording, recordingSupported, pronunciationError, onPlayAudio, onAnswerChange, onCheckAnswer, onSkip, onContinue, onRetry, onToggleRecording }: ReviewModeSurfaceProps) {
   const isPronunciation = item.mode === 'listenAndRepeat'
   const hasContext = hasText(item.context)
 
@@ -44,7 +45,7 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
       <div className={`review-figma-session__exercise-content${feedback ? ' review-figma-session__exercise-content--feedback' : ''}`}>
         {item.mode === 'dictation' ? (
           <div className="review-figma-session__dictation-prompt">
-            <button className="review-figma-session__audio-disc" type="button" aria-label="Play word" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio} disabled={isBusy}>
+            <button className="review-figma-session__audio-disc" type="button" aria-label="Play word" aria-keyshortcuts="Tab" title="Play audio (Tab)" onClick={onPlayAudio} disabled={isBusy || Boolean(feedback)}>
               <Volume2 size={32} strokeWidth={2.26667} color="var(--review-green)" aria-hidden="true" />
             </button>
             <strong>Play</strong>
@@ -77,7 +78,7 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
             ) : null}
             <PronunciationFeedback assessment={feedback?.assessment ?? null} />
             <div className="review-figma-session__pronunciation-controls">
-              <button className="review-figma-session__listen-button" type="button" aria-label="Listen to pronunciation" aria-keyshortcuts="Tab" title="Listen (Tab)" onClick={onPlayAudio} disabled={isBusy}>
+              <button className="review-figma-session__listen-button" type="button" aria-label="Listen to pronunciation" aria-keyshortcuts="Tab" title="Listen (Tab)" onClick={onPlayAudio} disabled={isBusy || Boolean(feedback)}>
                 <span>Listen</span>
                 <Volume2 size={20} strokeWidth={1.41667} color="var(--review-green)" aria-hidden="true" />
               </button>
@@ -88,12 +89,12 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
                 aria-keyshortcuts={isRecording ? 'Space' : 'R'}
                 title={isRecording ? 'Stop recording (Space)' : 'Record (R)'}
                 onClick={onToggleRecording}
-                disabled={isBusy || (!isRecording && (!recordingSupported || item.pronunciationAttemptCount >= 2))}
+                disabled={isBusy || Boolean(feedback) || (!isRecording && (!recordingSupported || item.pronunciationAttemptCount >= 2))}
               >
                 {isRecording ? <><Square size={16} fill="currentColor" aria-hidden="true" /> Stop</> : <><Mic size={18} aria-hidden="true" /> Record</>}
               </button>
             </div>
-            <span className="review-figma-session__attempt">Attempt {Math.min(item.pronunciationAttemptCount + 1, 2)} of 2</span>
+            <span className="review-figma-session__attempt">Attempt {Math.max(1, Math.min(item.pronunciationAttemptCount + (feedback ? 0 : 1), 2))} of 2</span>
             {pronunciationError ? <p className="review-figma-session__error" role="alert">{pronunciationError}</p> : null}
           </div>
         ) : null}
@@ -130,7 +131,9 @@ export function ReviewModeSurface({ item, typedAnswer, feedback, isBusy, isRecor
       <div className="review-figma-session__exercise-actions">
         {!isPronunciation && !feedback ? <button className="review-figma-session__action-button learning-touch-submit" type="button" onClick={onCheckAnswer} disabled={isBusy || !typedAnswer.trim()}>Check answer</button> : null}
         {feedback ? (
-          <button className="review-figma-session__action-button" type="button" onClick={onContinue}>Continue</button>
+          isPronunciation && feedback.kind === 'retry'
+            ? <button className="review-figma-session__action-button" type="button" onClick={onRetry} disabled={isBusy || !recordingSupported}>Try again</button>
+            : <button className="review-figma-session__action-button" type="button" onClick={onContinue} disabled={isBusy}>Continue</button>
         ) : !isPronunciation ? (
           <>
             <button className="review-figma-session__submit-button" type="button" onClick={onCheckAnswer} disabled={isBusy || typedAnswer.trim().length === 0}>Check answer</button>

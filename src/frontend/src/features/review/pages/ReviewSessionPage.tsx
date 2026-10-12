@@ -86,7 +86,7 @@ function ReviewSessionFrame({ onExit, children }: { onExit: () => void; children
 
 function ReviewShortcutGuide({ mode, feedback }: { mode: reviewApi.ReviewMode; feedback: ReviewFeedback | null }) {
   if (feedback) {
-    return <p className="review-figma-session__shortcut"><kbd>Enter</kbd> Continue</p>
+    return <p className="review-figma-session__shortcut"><kbd>Enter</kbd> {feedback.kind === 'retry' ? 'Try again' : 'Continue'}</p>
   }
   if (mode === 'listenAndRepeat') {
     return <p className="review-figma-session__shortcut"><kbd>Tab</kbd> Listen <span>·</span> <kbd>R</kbd> Record <span>·</span> <kbd>Space</kbd> Stop</p>
@@ -118,6 +118,9 @@ export function ReviewSessionPage() {
   const [outcomeFeedback, setOutcomeFeedback] = useState<ReviewFeedback | null>(null)
   const [pronunciationError, setPronunciationError] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [isStartingRecording, setIsStartingRecording] = useState(false)
+  const startingRecordingRef = useRef(false)
+  const mountedRef = useRef(true)
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const cardStartedAt = useRef(0)
   const recordingSupported = supportsPcmRecording()
@@ -201,18 +204,32 @@ export function ReviewSessionPage() {
     }).catch(() => undefined)
   }, [currentItem, pronunciationMutation, session])
 
-  const startRecording = useCallback(async () => {
-    if (!currentItem || outcomeFeedback || pronunciationMutation.isPending || !recordingSupported || currentItem.pronunciationAttemptCount >= 2) return
+  const startRecording = useCallback(async (retry = false) => {
+    if (!currentItem || (outcomeFeedback && !(retry && outcomeFeedback.kind === 'retry'
+      && outcomeFeedback.item.itemId === currentItem.itemId)) || pronunciationMutation.isPending
+      || !recordingSupported || currentItem.pronunciationAttemptCount >= 2
+      || isRecording || startingRecordingRef.current) return
+    startingRecordingRef.current = true
+    setIsStartingRecording(true)
+    setOutcomeFeedback(null)
     setPronunciationError(null)
     pronunciationMutation.reset()
     try {
-      recordingRef.current = await startPcmRecording(handleRecordingResult)
+      const recording = await startPcmRecording(handleRecordingResult)
+      if (!mountedRef.current) {
+        await recording.cancel()
+        return
+      }
+      recordingRef.current = recording
       setIsRecording(true)
     } catch {
       cardStartedAt.current = Date.now()
-      setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
+      if (mountedRef.current) setPronunciationError('Microphone access is unavailable. Check browser permission and try again.')
+    } finally {
+      startingRecordingRef.current = false
+      if (mountedRef.current) setIsStartingRecording(false)
     }
-  }, [currentItem, handleRecordingResult, outcomeFeedback, pronunciationMutation, recordingSupported])
+  }, [currentItem, handleRecordingResult, isRecording, outcomeFeedback, pronunciationMutation, recordingSupported])
 
   const stopRecording = useCallback(() => {
     void recordingRef.current?.stop()
@@ -234,7 +251,7 @@ export function ReviewSessionPage() {
   }, [location.state, navigate])
 
   const continueAfterFeedback = useCallback(() => {
-    if (!outcomeFeedback) return
+    if (!outcomeFeedback || outcomeFeedback.kind === 'retry') return
     setOutcomeFeedback(null)
     setTypedAnswer('')
     setPronunciationError(null)
@@ -254,7 +271,8 @@ export function ReviewSessionPage() {
       if (outcomeFeedback) {
         if (event.key === 'Enter') {
           event.preventDefault()
-          continueAfterFeedback()
+          if (outcomeFeedback.kind === 'retry') void startRecording(true)
+          else continueAfterFeedback()
         }
         return
       }
@@ -295,9 +313,13 @@ export function ReviewSessionPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [answerMutation.isPending, continueAfterFeedback, currentItem, isRecording, outcomeFeedback, playCurrentWord, pronunciationMutation.isPending, recordingSupported, session, sessionComplete, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
 
-  useEffect(() => () => {
-    void recordingRef.current?.cancel()
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      void recordingRef.current?.cancel()
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    }
   }, [])
 
   useEffect(() => {
@@ -346,7 +368,7 @@ export function ReviewSessionPage() {
 
   const progressItemIndex = session.items.findIndex((item) => item.itemId === itemForExercise.itemId)
   const progressCurrentWord = progressItemIndex >= 0 ? progressItemIndex + 1 : Math.min(session.completedWords + 1, session.totalWords)
-  const isBusy = answerMutation.isPending || pronunciationMutation.isPending || Boolean(outcomeFeedback)
+  const isBusy = answerMutation.isPending || pronunciationMutation.isPending || isStartingRecording
 
   return (
     <ReviewSessionFrame onExit={finishSession}>
@@ -366,6 +388,7 @@ export function ReviewSessionPage() {
             onCheckAnswer={() => submitTypedAnswer(typedAnswer)}
             onSkip={() => submitTypedAnswer('')}
             onContinue={continueAfterFeedback}
+            onRetry={() => void startRecording(true)}
             onToggleRecording={() => isRecording ? stopRecording() : void startRecording()}
           />
         </article>

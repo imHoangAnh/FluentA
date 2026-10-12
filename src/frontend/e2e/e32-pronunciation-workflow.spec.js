@@ -63,7 +63,7 @@ function reviewSession() {
 
 test('Practice shows syllables, keeps unlimited retries, and honors Already in review', async ({ page }, testInfo) => {
   await installFakeMicrophone(page)
-  const outcomes = [422, 503, false, false, true]
+  const outcomes = [422, 503, false, false, true, true]
   const audioBodies = []
   let current = practiceSession()
   await page.route('**/api/v1/**', async route => {
@@ -72,11 +72,17 @@ test('Practice shows syllables, keeps unlimited retries, and honors Already in r
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
     if (path.endsWith('/auth/me')) return json(user)
     if (path.endsWith('/practice/sessions/practice-session-1')) return json(current)
+    if (path.endsWith('/practice/sessions/practice-session-1/retry')) {
+      current = { ...current, items: [{ ...current.items[0], currentStep: 'pronunciation' }] }
+      return json({ itemId: 'item-1', step: 'pronunciation' })
+    }
     if (path.endsWith('/practice/sessions/practice-session-1/pronunciation-attempts')) {
       audioBodies.push(request.postDataBuffer())
       const outcome = outcomes.shift()
       if (typeof outcome === 'number') return json({ message: 'Provider error' }, outcome)
-      current = { ...current, items: [{ ...current.items[0], currentStep: outcome ? 'recap' : 'pronunciation', pronunciationAttemptCount: audioBodies.length - 2 }] }
+      const requestId = request.postData()?.match(/name="requestId"\r\n\r\n([^\r]+)/)?.[1]
+      current = { ...current, items: [{ ...current.items[0], currentStep: outcome ? 'recap' : 'pronunciation', pronunciationAttemptCount: audioBodies.length - 2,
+        lastAttempt: { requestId, step: 'pronunciation', correctness: outcome } }] }
       return json({
         itemId: 'item-1', isCorrect: outcome, attemptNumber: audioBodies.length - 2, attemptsRemaining: null,
         nextStep: outcome ? 'recap' : 'pronunciation', currentItemIndex: 0, status: 'active',
@@ -92,12 +98,15 @@ test('Practice shows syllables, keeps unlimited retries, and honors Already in r
     await recordOnce(page)
     await expect(page.getByRole('alert')).toContainText('Your recording was not saved')
   }
+  await recordOnce(page)
   for (let i = 0; i < 2; i++) {
-    await recordOnce(page)
     await expect(page.getByTestId('pronunciation-feedback')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Continue', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Try again' }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible()
+    await expect(page.getByTestId('pronunciation-feedback')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Stop recording' }).click()
   }
-  await recordOnce(page)
   const feedback = page.getByTestId('pronunciation-feedback')
   await expect(feedback).toHaveText('/kʌn//tɹi//saɪd/')
   const first = page.getByRole('button', { name: 'Green syllable /kʌn/' })
@@ -121,6 +130,11 @@ test('Practice shows syllables, keeps unlimited retries, and honors Already in r
   expect(bounds.x).toBeGreaterThanOrEqual(0)
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(320)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible()
+  await expect(feedback).toHaveCount(0)
+  await page.getByRole('button', { name: 'Stop recording' }).click()
+  await expect(feedback).toBeVisible()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(feedback).toHaveCount(0)
   await expect(page.getByText('Already in review', { exact: true })).toBeVisible()
@@ -131,13 +145,13 @@ test('Practice shows syllables, keeps unlimited retries, and honors Already in r
   await expect(recap.getByTestId('practice-review-level-0')).toBeDisabled()
   expect(await recap.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  expect(audioBodies).toHaveLength(5)
+  expect(audioBodies).toHaveLength(6)
   expect(audioBodies.every(body => body && body.length > 0)).toBe(true)
 })
 
-for (const finalCorrect of [false, true]) test(`Review phrase keeps two attempts and original correctness (${finalCorrect})`, async ({ page }, testInfo) => {
+for (const assessedOutcomes of [[false, false], [false, true], [true]]) test(`Review phrase follows retry limit (${assessedOutcomes.join(',')})`, async ({ page }, testInfo) => {
   await installFakeMicrophone(page)
-  const outcomes = [422, false, finalCorrect]
+  const outcomes = [422, ...assessedOutcomes]
   let assessmentCount = 0
   let current = reviewSession()
   await page.route('**/api/v1/**', async route => {
@@ -149,7 +163,7 @@ for (const finalCorrect of [false, true]) test(`Review phrase keeps two attempts
       const correct = outcomes.shift()
       if (correct === 422) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ errors: [{ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }] }) })
       assessmentCount += 1
-      const isFinal = assessmentCount === 2
+      const isFinal = correct || assessmentCount === 2
       const result = isFinal ? (correct ? 'correct' : 'wrong') : null
       current = { ...current, status: isFinal ? 'completed' : 'active', completedWords: isFinal ? 1 : 0,
         currentItemIndex: isFinal ? null : 0, items: [{ ...current.items[0], pronunciationAttemptCount: assessmentCount, isReviewed: isFinal, result }] }
@@ -169,10 +183,17 @@ for (const finalCorrect of [false, true]) test(`Review phrase keeps two attempts
   await expect(page.getByText('Attempt 1 of 2')).toBeVisible()
   await recordOnce(page)
   await expect(page.getByTestId('pronunciation-feedback')).toHaveText('/tə//deɪ//wɑz//ə//bju//tɪ//fəl//deɪ/')
-  await expect(page.getByText('Attempt 2 of 2')).toBeVisible()
+  await expect(page.getByText('Attempt 1 of 2')).toBeVisible()
   expect(assessmentCount).toBe(1)
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await recordOnce(page)
+  if (!assessedOutcomes[0]) {
+    await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Try again' }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible()
+    await expect(page.getByTestId('pronunciation-feedback')).toHaveCount(0)
+    await expect(page.getByText('Attempt 2 of 2')).toBeVisible()
+    await page.getByRole('button', { name: 'Stop recording' }).click()
+  }
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Red syllable /deɪ/' }).hover()
   await expect(page.locator('.pronunciation-phoneme-tooltip')).toHaveText('/d//eɪ/')
   await expect(page.getByLabel('Red phoneme eɪ')).toHaveCSS('color', 'rgb(192, 57, 43)')
@@ -182,5 +203,5 @@ for (const finalCorrect of [false, true]) test(`Review phrase keeps two attempts
   await page.screenshot({ path: testInfo.outputPath('phrase-feedback.png'), fullPage: true })
   await page.getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByRole('heading', { name: 'Review complete' })).toBeVisible()
-  expect(assessmentCount).toBe(2)
+  expect(assessmentCount).toBe(assessedOutcomes.length)
 })

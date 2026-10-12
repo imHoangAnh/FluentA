@@ -535,6 +535,7 @@
 .practice-exercise__actions--resolved {
   height: 48px;
   align-items: flex-start;
+  gap: 12px;
 }
 
 .practice-exercise__actions button,

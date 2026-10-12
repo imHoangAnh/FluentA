@@ -6,10 +6,10 @@ import { PracticeSessionPage } from '@/features/practice/pages/PracticeSessionPa
 import * as api from '@/features/practice/api/practice.api'
 import { practiceKeys } from '@/features/practice/api/practice.queries'
 import { toast } from '@/shared/lib/toast'
-import type { PronunciationAssessment } from '@/features/pronunciation'
+import { startPcmRecording, type PronunciationAssessment } from '@/features/pronunciation'
 
 const audio = vi.hoisted(() => ({ callback: null as ((blob: Blob) => Promise<void>) | null, cancel: vi.fn(), stop: vi.fn() }))
-vi.mock('@/features/practice/api/practice.api', () => ({ getPracticeSession: vi.fn(), submitPracticeAnswer: vi.fn(), submitPracticePronunciationAttempt: vi.fn(), setPracticeReviewLevel: vi.fn(), completePracticeSession: vi.fn() }))
+vi.mock('@/features/practice/api/practice.api', () => ({ getPracticeSession: vi.fn(), submitPracticeAnswer: vi.fn(), retryPracticeStep: vi.fn(), submitPracticePronunciationAttempt: vi.fn(), setPracticeReviewLevel: vi.fn(), completePracticeSession: vi.fn() }))
 vi.mock('@/shared/lib/toast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 vi.mock('@/features/pronunciation', async importOriginal => ({
   ...await importOriginal<typeof import('@/features/pronunciation')>(),
@@ -45,8 +45,18 @@ async function answer() {
 describe('Practice authoritative recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks(); audio.callback = null
-    for (const mock of [api.getPracticeSession, api.submitPracticeAnswer, api.setPracticeReviewLevel, api.submitPracticePronunciationAttempt, api.completePracticeSession]) vi.mocked(mock).mockReset()
+    for (const mock of [api.getPracticeSession, api.submitPracticeAnswer, api.retryPracticeStep, api.setPracticeReviewLevel, api.submitPracticePronunciationAttempt, api.completePracticeSession]) vi.mocked(mock).mockReset()
     vi.mocked(api.completePracticeSession).mockResolvedValue(undefined)
+  })
+  it('opens only one recorder while microphone permission is pending', async () => {
+    let resolveRecording!: (value: Awaited<ReturnType<typeof startPcmRecording>>) => void
+    vi.mocked(startPcmRecording).mockImplementationOnce(() => new Promise(resolve => { resolveRecording = resolve }))
+    renderSession(at('pronunciation'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+    fireEvent.keyDown(document.body, { key: 'r' })
+    expect(startPcmRecording).toHaveBeenCalledTimes(1)
+    await act(async () => { resolveRecording({ cancel: audio.cancel, stop: audio.stop }) })
+    expect(await screen.findByRole('button', { name: 'Stop recording and check' })).toBeInTheDocument()
   })
   it('keeps normal correctness feedback until Continue while caching server progress', async () => {
     const client = renderSession()
@@ -56,6 +66,125 @@ describe('Practice authoritative recovery', () => {
     expect(client.getQueryData<api.PracticeSession>(practiceKeys.session('session-1'))?.items[0].currentStep).toBe('wordToMeaning')
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByText('first')).toBeInTheDocument()
+  })
+  it('retries correct dictation repeatedly before Continue with fresh answer ids', async () => {
+    renderSession()
+    vi.mocked(api.submitPracticeAnswer).mockResolvedValue({ itemId: item.itemId, step: 'dictation', correctness: true, canRetry: false, nextStep: 'wordToMeaning', currentItemIndex: 0, status: 'active' })
+    vi.mocked(api.retryPracticeStep).mockResolvedValue({ itemId: item.itemId, step: 'dictation' })
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await answer()
+      fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+      await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled())
+      expect(screen.getByRole('textbox')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+    }
+    const ids = vi.mocked(api.submitPracticeAnswer).mock.calls.map(call => call[1].requestId)
+    expect(new Set(ids).size).toBe(4)
+    expect(vi.mocked(api.retryPracticeStep).mock.calls.map(call => call[0].attemptId)).toEqual(ids)
+    await answer()
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText('first')).toBeInTheDocument()
+  })
+  it('reopens correct word-to-meaning and clears the selected answer', async () => {
+    renderSession(at('wordToMeaning'))
+    vi.mocked(api.submitPracticeAnswer).mockResolvedValue({ itemId: item.itemId, step: 'wordToMeaning', correctness: true, canRetry: false, nextStep: 'pronunciation', currentItemIndex: 0, status: 'active' })
+    vi.mocked(api.retryPracticeStep).mockResolvedValue({ itemId: item.itemId, step: 'wordToMeaning' })
+    fireEvent.click(await screen.findByText('first'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByText('first').closest('button')).toBeEnabled())
+    fireEvent.click(screen.getByText('first'))
+    await waitFor(() => expect(api.submitPracticeAnswer).toHaveBeenCalledTimes(2))
+  })
+  it('checks a lost retry response and reopens without resubmitting it', async () => {
+    renderSession()
+    vi.mocked(api.submitPracticeAnswer).mockResolvedValue({ itemId: item.itemId, step: 'dictation', correctness: true, canRetry: false, nextStep: 'wordToMeaning', currentItemIndex: 0, status: 'active' })
+    vi.mocked(api.retryPracticeStep).mockImplementation(async input => {
+      vi.mocked(api.getPracticeSession).mockResolvedValue({ ...session, items: [{ ...item,
+        lastAttempt: { requestId: input.attemptId, step: 'dictation', correctness: true, isSkip: false, attemptNumber: null, assessment: null } }, session.items[1]] })
+      throw new Error('response lost')
+    })
+    await answer()
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled())
+    expect(screen.getByRole('textbox')).toHaveValue('')
+    expect(api.retryPracticeStep).toHaveBeenCalledTimes(1)
+    expect(api.submitPracticeAnswer).toHaveBeenCalledTimes(1)
+  })
+  it('retains correct feedback after an unsaved retry and permits a manual retry', async () => {
+    const client = renderSession()
+    vi.mocked(api.submitPracticeAnswer).mockResolvedValue({ itemId: item.itemId, step: 'dictation', correctness: true, canRetry: false, nextStep: 'wordToMeaning', currentItemIndex: 0, status: 'active' })
+    vi.mocked(api.retryPracticeStep).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ itemId: item.itemId, step: 'dictation' })
+    await answer()
+    await screen.findByRole('button', { name: 'Try again' })
+    vi.mocked(api.getPracticeSession).mockResolvedValue(client.getQueryData<api.PracticeSession>(practiceKeys.session('session-1'))!)
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Unable to restart this exercise. Please try again.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled())
+    expect(api.retryPracticeStep).toHaveBeenCalledTimes(2)
+  })
+  it('blocks Continue and retry while a lost retry cannot be checked', async () => {
+    renderSession()
+    vi.mocked(api.submitPracticeAnswer).mockResolvedValue({ itemId: item.itemId, step: 'dictation', correctness: true, canRetry: false, nextStep: 'wordToMeaning', currentItemIndex: 0, status: 'active' })
+    vi.mocked(api.retryPracticeStep).mockRejectedValue(new Error('lost'))
+    await answer()
+    vi.mocked(api.getPracticeSession).mockRejectedValueOnce(new Error('offline'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    const connection = await screen.findByRole('button', { name: 'Retry connection' })
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled()
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(screen.getByRole('textbox')).toHaveValue('alpha')
+    const attemptId = vi.mocked(api.retryPracticeStep).mock.calls[0][0].attemptId
+    vi.mocked(api.getPracticeSession).mockResolvedValue({ ...session, items: [{ ...item,
+      lastAttempt: { requestId: attemptId, step: 'dictation', correctness: true, isSkip: false, attemptNumber: null, assessment: null } }, session.items[1]] })
+    fireEvent.click(connection)
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled())
+    expect(screen.getByRole('textbox')).toHaveValue('')
+    expect(api.retryPracticeStep).toHaveBeenCalledTimes(1)
+  })
+  it('retries correct pronunciation more than twice and continues to Recap', async () => {
+    renderSession(at('pronunciation'))
+    const assessment: PronunciationAssessment = { correct: true, accuracyScore: 95, feedbackMode: 'word', words: [{ text: 'alpha', accuracyScore: 95, units: [] }] }
+    vi.mocked(api.submitPracticePronunciationAttempt).mockImplementation(async () => ({ itemId: item.itemId,
+      assessment, isCorrect: true, attemptNumber: vi.mocked(api.submitPracticePronunciationAttempt).mock.calls.length,
+      attemptsRemaining: null, nextStep: 'recap', currentItemIndex: 0, status: 'active' }))
+    vi.mocked(api.retryPracticeStep).mockResolvedValue({ itemId: item.itemId, step: 'pronunciation' })
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      if (attempt === 1) fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Stop recording and check' })).toBeInTheDocument())
+      await act(async () => { await audio.callback!(new Blob(['audio'])) })
+      expect(await screen.findByText(`Saved pronunciation attempts: ${attempt}`)).toBeInTheDocument()
+      if (attempt < 4) {
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+        await screen.findByRole('button', { name: 'Stop recording and check' })
+        expect(screen.queryByTestId('pronunciation-feedback')).not.toBeInTheDocument()
+      }
+    }
+    expect(api.submitPracticePronunciationAttempt).toHaveBeenCalledTimes(4)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByTestId('practice-review-level-3')).toBeInTheDocument()
+  })
+  it('keeps wrong pronunciation feedback until Try again starts recording and replaces it', async () => {
+    renderSession(at('pronunciation'))
+    const assessment: PronunciationAssessment = { correct: false, accuracyScore: 55, feedbackMode: 'word',
+      words: [{ text: 'alpha', accuracyScore: 55, units: [] }] }
+    vi.mocked(api.submitPracticePronunciationAttempt)
+      .mockResolvedValueOnce({ itemId: item.itemId, assessment, isCorrect: false, attemptNumber: 1, attemptsRemaining: null, nextStep: 'pronunciation', currentItemIndex: 0, status: 'active' })
+      .mockResolvedValueOnce({ itemId: item.itemId, assessment: { ...assessment, words: [{ text: 'alpha', accuracyScore: 75, units: [] }] }, isCorrect: false, attemptNumber: 2, attemptsRemaining: null, nextStep: 'pronunciation', currentItemIndex: 0, status: 'active' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+    await screen.findByRole('button', { name: 'Stop recording and check' })
+    await act(async () => { await audio.callback!(new Blob(['audio'])) })
+    expect(screen.getByRole('button', { name: 'Red syllable alpha' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('button', { name: 'Stop recording and check' })
+    expect(screen.queryByTestId('pronunciation-feedback')).not.toBeInTheDocument()
+    expect(api.retryPracticeStep).not.toHaveBeenCalled()
+    await act(async () => { await audio.callback!(new Blob(['audio'])) })
+    expect(screen.getByRole('button', { name: 'Yellow syllable alpha' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Red syllable alpha' })).not.toBeInTheDocument()
+    expect(startPcmRecording).toHaveBeenCalledTimes(2)
   })
   it('automatically advances when the answer was saved but its response was lost', async () => {
     renderSession(); await screen.findByRole('textbox')

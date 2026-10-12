@@ -122,6 +122,19 @@ export async function submitPracticeAnswer(sessionId: string, input: SubmitPract
   return response.data.data!
 }
 
+export async function retryPracticeStep(input: {
+  sessionId: string
+  itemId: string
+  step: PracticeExerciseMode
+  attemptId: string
+}) {
+  const response = await apiClient.post<ApiResponse<{ itemId: string; step: PracticeExerciseMode }>>(
+    `/practice/sessions/${input.sessionId}/retry`,
+    { itemId: input.itemId, step: input.step, attemptId: input.attemptId },
+  )
+  return response.data.data!
+}
+
 export async function submitPracticePronunciationAttempt(input: {
   sessionId: string
   itemId: string
