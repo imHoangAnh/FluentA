@@ -71,7 +71,7 @@ export function TextField({
           onChange={(event) => onChange(event.target.value)}
           className={cn(
             'h-10 rounded-lg px-3.5 text-sm sm:h-11 sm:text-base xl:h-12',
-            isPassword && 'pr-12',
+            isPassword && 'pr-12 [&::-ms-reveal]:hidden',
             leadingIcon && 'pl-12',
             inputClassName,
           )}
