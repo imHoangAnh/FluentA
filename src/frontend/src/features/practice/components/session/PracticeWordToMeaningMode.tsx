@@ -1,6 +1,6 @@
-import { Circle } from 'lucide-react'
+import { CheckCircle2, Circle, XCircle } from 'lucide-react'
 import type { PracticeSessionItem } from '../../api/practice.api'
-import { hasText } from './practiceFormatters'
+import { formatIpa, formatWordType, hasText } from './practiceFormatters'
 
 type PracticeWordToMeaningModeProps = {
   item: PracticeSessionItem
@@ -14,16 +14,24 @@ type PracticeWordToMeaningModeProps = {
 export function PracticeWordToMeaningMode({ item, selectedSlotId, isResolved, isBusy, feedback, onSelect }: PracticeWordToMeaningModeProps) {
   const slots = Array.from({ length: 4 }, (_, index) => item.answerSlots[index] ?? { slotId: `empty-${index}`, meaning: null })
   const hasContext = hasText(item.context)
+  const wordType = hasText(item.type) ? formatWordType(item.type) : ''
+  const ipa = hasText(item.ipaPronunciation) ? formatIpa(item.ipaPronunciation) : ''
 
   return (
     <div className="practice-word-meaning">
-      <div className="practice-word-meaning__context">
-        <strong>{item.word}</strong>
+      <div className="practice-word-hero">
+        <div className="practice-word-hero__row">
+          <div className="practice-word-hero__title">
+            <strong>{item.word}</strong>
+            {wordType ? <span className="practice-pos-badge">{wordType}</span> : null}
+          </div>
+          {ipa ? <span className="practice-ipa">{ipa}</span> : null}
+        </div>
         {hasContext ? (
-          <>
-            <span>CONTEXT </span>
+          <div className="practice-word-hero__context">
+            <span className="practice-detail-label">CONTEXT</span>
             <p>{item.context}</p>
-          </>
+          </div>
         ) : null}
       </div>
 
@@ -51,7 +59,11 @@ export function PracticeWordToMeaningMode({ item, selectedSlotId, isResolved, is
               className={`practice-word-meaning__choice${isEmpty ? ' practice-word-meaning__choice--empty' : ''}${stateClass}`}
             >
               <span className="practice-word-meaning__radio" aria-hidden="true">
-                <Circle aria-hidden="true" size={18} strokeWidth={1} />
+                {isSelected && feedback === 'correct'
+                  ? <CheckCircle2 size={18} />
+                  : isSelected && feedback === 'wrong'
+                    ? <XCircle size={18} />
+                    : <Circle size={18} strokeWidth={1.5} />}
               </span>
               <span className="practice-word-meaning__choice-text">{isEmpty ? '' : slot.meaning}</span>
             </button>

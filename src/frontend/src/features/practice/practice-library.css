@@ -1,17 +1,17 @@
 .practice-library {
-  --practice-paper: #ffffff;
-  --practice-tint: #ddebe4;
-  --practice-line: #cfd6cf;
-  --practice-ink: #263d37;
-  --practice-muted: #5f6d65;
-  --practice-teal: #236b5b;
+  --practice-paper: var(--ds-card, #ffffff);
+  --practice-tint: var(--ds-secondary, #e7f5f2);
+  --practice-line: var(--ds-border, #dce5e2);
+  --practice-ink: var(--ds-foreground, #14201e);
+  --practice-muted: var(--ds-muted-foreground, #5b6d69);
+  --practice-teal: var(--ds-primary, #0f766e);
   display: grid;
   width: 100%;
   max-width: 1288px;
   margin-inline: auto;
-  gap: 28px;
+  gap: 24px;
   color: var(--practice-ink);
-  font-family: "Inter Variable", Inter, sans-serif;
+  font-family: var(--font-sans, "Open Sans", "Segoe UI", sans-serif);
 }
 
 .practice-library__flow {
@@ -95,7 +95,7 @@
   display: block;
   width: 22px;
   height: 22px;
-  color: #236b5b;
+  color: var(--practice-teal);
 }
 
 .practice-library__flow-copy {
@@ -163,7 +163,7 @@
 .practice-library__board-select-button > svg {
   width: 20px;
   height: 20px;
-  color: #236b5b;
+  color: var(--practice-teal);
 }
 
 .practice-library__board-options {
@@ -266,13 +266,13 @@
 }
 
 .practice-library__deck-action:hover:not(:disabled) {
-  background: #1c5e50;
-  box-shadow: 0 4px 12px rgb(35 107 91 / 20%);
+  background: var(--ds-primary-hover, #0d5e58);
+  box-shadow: 0 4px 12px rgb(15 118 110 / 22%);
 }
 
 .practice-library__deck-action:focus-visible,
 .practice-library__page-button:focus-visible {
-  outline: 2px solid #236b5b;
+  outline: 2px solid var(--practice-teal);
   outline-offset: 2px;
 }
 
@@ -403,12 +403,12 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: 24px 32px 32px;
-  border: 1px solid #dcebe6;
-  border-radius: 24px;
-  background: #fafcfc;
-  color: #173c32;
-  font-family: "Inter Variable", Inter, sans-serif;
-  box-shadow: 0 20px 48px rgb(5 31 26 / 14%);
+  border: 1px solid var(--ds-border, #dce5e2);
+  border-radius: 20px;
+  background: var(--ds-card, #ffffff);
+  color: var(--ds-foreground, #14201e);
+  font-family: var(--font-sans, "Open Sans", "Segoe UI", sans-serif);
+  box-shadow: var(--ds-shadow-lg, 0 24px 64px rgb(20 32 30 / 16%));
 }
 
 .practice-launch__header {
@@ -421,7 +421,7 @@
 
 .practice-launch__eyebrow {
   margin: 0;
-  color: #467368;
+  color: var(--ds-primary, #0f766e);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -439,8 +439,8 @@
   border-radius: 50%;
   cursor: pointer;
 
-  background: #eef5f2;
-  color: #527168;
+  background: var(--ds-muted, #eef2f1);
+  color: var(--ds-muted-foreground, #5b6d69);
 }
 
 .practice-launch__welcome {
@@ -450,7 +450,7 @@
 
 .practice-launch__title {
   margin: 0;
-  color: #173c32;
+  color: var(--ds-foreground, #14201e);
   font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
@@ -474,9 +474,9 @@
   flex: 0 0 110.575px;
   overflow: hidden;
 
-  border: 1px solid #d7eae1;
-  border-radius: 20px;
-  background: #eaf5f0;
+  border: 1px solid color-mix(in srgb, var(--ds-primary, #0f766e) 18%, var(--ds-border, #dce5e2));
+  border-radius: 16px;
+  background: var(--ds-secondary, #e7f5f2);
 }
 
 .practice-launch__deck-icon {
@@ -487,9 +487,9 @@
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 13px;
+  border-radius: 12px;
   background: white;
-  color: #087f6d;
+  color: var(--ds-primary, #0f766e);
 }
 
 .practice-launch__deck-copy {
@@ -512,23 +512,23 @@
 }
 
 .practice-launch__board-name {
-  color: #6c8b7b;
+  color: var(--ds-muted-foreground, #5b6d69);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .practice-launch__deck-name {
-  color: #173c32;
+  color: var(--ds-foreground, #14201e);
   font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .practice-launch__word-count {
-  color: #4e7063;
+  color: var(--ds-secondary-foreground, #115e59);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.25;
 }
 
@@ -540,7 +540,7 @@
 
 .practice-launch__overview h3 {
   margin: 0;
-  color: #6d8179;
+  color: var(--ds-muted-foreground, #5b6d69);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.2;
@@ -566,8 +566,8 @@
   flex: 0 0 140.27px;
   overflow: hidden;
 
-  border: 1px solid #dfe9e3;
-  border-radius: 13px;
+  border: 1px solid var(--ds-border, #dce5e2);
+  border-radius: 12px;
   background: white;
 }
 
@@ -577,7 +577,7 @@
   left: 12px;
   width: 24px;
   height: 24px;
-  color: #087f6d;
+  color: var(--ds-primary, #0f766e);
 }
 
 .practice-launch__step-number,
@@ -592,9 +592,9 @@
 .practice-launch__step-number {
   top: 17.77px;
   right: 16px;
-  color: #9bb2a6;
+  color: var(--ds-muted-foreground, #5b6d69);
   font-size: 10px;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 .practice-launch__step-title {
@@ -602,7 +602,7 @@
   right: 6px;
   left: 12.02px;
   overflow: hidden;
-  color: #173c32;
+  color: var(--ds-foreground, #14201e);
   font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -613,7 +613,7 @@
   right: 6px;
   left: 12.02px;
   overflow: hidden;
-  color: #6d8179;
+  color: var(--ds-muted-foreground, #5b6d69);
   font-size: 12px;
   font-weight: 400;
   text-overflow: ellipsis;
@@ -621,7 +621,7 @@
 
 .practice-launch__error {
   margin: -8px 0 0;
-  color: #a5211a;
+  color: var(--ds-destructive, #b42318);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -638,18 +638,18 @@
   margin-top: auto;
   padding: 0 16px;
   border: 0;
-  border-radius: 14px;
-  background: #087f6d;
+  border-radius: 12px;
+  background: var(--ds-primary, #0f766e);
   color: #ffffff;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: none;
+  box-shadow: var(--ds-shadow-xs);
 }
 
 .practice-launch__start:hover:not(:disabled) {
-  background: #067461;
-  filter: brightness(0.97);
+  background: var(--ds-primary-hover, #0d5e58);
+  filter: none;
 }
 
 .practice-launch__start:disabled {
@@ -758,18 +758,18 @@
 
 
   .practice-launch__deck {
-    border: 1px solid #d7eae1;
-    border-radius: 18px;
-    background: #eef5f2;
+    border: 1px solid var(--ds-border, #dce5e2);
+    border-radius: 16px;
+    background: var(--ds-secondary, #e7f5f2);
   }
 
   .practice-launch__start {
     width: 100%;
-    border-radius: 14px;
-    background: #087f6d;
+    border-radius: 12px;
+    background: var(--ds-primary, #0f766e);
   }
 
   .practice-launch__start:hover:not(:disabled) {
-    background: #067461;
+    background: var(--ds-primary-hover, #0d5e58);
   }
 }

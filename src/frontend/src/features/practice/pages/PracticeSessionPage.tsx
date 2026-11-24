@@ -64,6 +64,9 @@ function SessionPracticePage() {
   const [reviewStatuses, setReviewStatuses] = useState<Record<string, PracticeReviewStatus>>({})
   const recordingRef = useRef<ActivePcmRecording | null>(null)
   const stepStartedAtRef = useRef<number | null>(null)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const recordedAudioUrlRef = useRef<string | null>(null)
+  const myVoiceAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const cancelSessionRead = () => queryClient.cancelQueries({ queryKey: practiceKeys.session(sessionId) })
   const answerMutation = useMutation({ mutationFn: (input: practiceApi.SubmitPracticeAnswerInput) => practiceApi.submitPracticeAnswer(sessionId, input), onMutate: cancelSessionRead })
@@ -93,7 +96,7 @@ function SessionPracticePage() {
     queryFn: ({ signal }) => practiceApi.getPracticeSession(sessionId, signal),
     enabled: Boolean(sessionId) && !mutationPending && !isRecovering,
     // Notice abandonment even while the learner is recording in a visible tab.
-    refetchInterval: query => query.state.data?.status === 'active' ? 10_000 : false,
+    refetchInterval: (query) => (query.state.data?.status === 'active' ? 10_000 : false),
   })
 
   const session = sessionQuery.data ?? null
@@ -105,6 +108,10 @@ function SessionPracticePage() {
   const currentWord = currentItem?.word
   const recordingSupported = supportsPcmRecording()
   const isSaving = isRecovering || Boolean(connectionError) || session?.status !== 'active' || mutationPending || isStartingRecording
+  const isLastItem = Boolean(session && activeIndex >= session.items.length - 1)
+  const currentReviewStatus: PracticeReviewStatus | null = currentItem
+    ? reviewStatuses[currentItem.wordId] ?? (currentItem.alreadyInReview ? 'alreadyInReview' : null)
+    : null
 
   function requestFor(key: string) {
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() }
@@ -114,6 +121,18 @@ function SessionPracticePage() {
   useEffect(() => {
     if (session && stepStartedAtRef.current === null) stepStartedAtRef.current = Date.now()
   }, [session])
+
+  const clearRecordedAudio = useCallback(() => {
+    if (myVoiceAudioRef.current) {
+      myVoiceAudioRef.current.pause()
+      myVoiceAudioRef.current = null
+    }
+    if (recordedAudioUrlRef.current && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(recordedAudioUrlRef.current)
+    }
+    recordedAudioUrlRef.current = null
+    setRecordedAudioUrl(null)
+  }, [])
 
   const clearInteraction = useCallback(() => {
     setTypedAnswer('')
@@ -130,8 +149,9 @@ function SessionPracticePage() {
     void recordingRef.current?.cancel()
     recordingRef.current = null
     setIsRecording(false)
+    clearRecordedAudio()
     stepStartedAtRef.current = Date.now()
-  }, [])
+  }, [clearRecordedAudio])
 
   const finishSession = useCallback(() => {
     if (!sessionId || completeMutation.isPending) return
@@ -143,10 +163,11 @@ function SessionPracticePage() {
     clearInteraction()
     const nextItem = session?.items[nextIndex]
     const resolvedStep = nextStep ?? nextItem?.currentStep ?? (nextIndex < (session?.items.length ?? 0) ? 'dictation' : null)
-    queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), current => current ? {
-      ...current, currentItemIndex: nextIndex,
-      items: current.items.map((item, index) => index === nextIndex && resolvedStep ? { ...item, currentStep: resolvedStep } : item),
-    } : current)
+    queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), (current) => (current ? {
+      ...current,
+      currentItemIndex: nextIndex,
+      items: current.items.map((item, index) => (index === nextIndex && resolvedStep ? { ...item, currentStep: resolvedStep } : item)),
+    } : current))
     if (session && nextIndex >= session.items.length) finishSession()
   }, [clearInteraction, finishSession, queryClient, session, sessionId])
 
@@ -159,7 +180,7 @@ function SessionPracticePage() {
       queryClient.setQueryData(practiceKeys.session(sessionId), fresh)
       if (!mountedRef.current) return false
       setConnectionError(null)
-      const item = fresh.items.find(candidate => candidate.itemId === recovery.item.itemId)
+      const item = fresh.items.find((candidate) => candidate.itemId === recovery.item.itemId)
       if (recovery.retry) {
         const sameAttempt = item?.lastAttempt?.requestId === recovery.item.lastAttempt?.requestId
         const reopened = fresh.status === 'active' && fresh.currentItemIndex === recovery.item.position
@@ -226,14 +247,19 @@ function SessionPracticePage() {
   const handleAnswerResult = useCallback((result: practiceApi.SubmitPracticeAnswerResult, wasSkip: boolean) => {
     const requestId = requestRef.current?.id ?? ''
     requestRef.current = null
-    queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), current => current ? {
-      ...current, currentItemIndex: result.currentItemIndex, status: result.status,
-      items: current.items.map((item, index) => ({ ...item,
-        ...(item.itemId === result.itemId ? { attemptCount: (item.attemptCount ?? 0) + 1,
-          lastAttempt: { requestId, step: result.step, correctness: result.correctness, isSkip: wasSkip, attemptNumber: null, assessment: null } } : {}),
+    queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), (current) => (current ? {
+      ...current,
+      currentItemIndex: result.currentItemIndex,
+      status: result.status,
+      items: current.items.map((item, index) => ({
+        ...item,
+        ...(item.itemId === result.itemId ? {
+          attemptCount: (item.attemptCount ?? 0) + 1,
+          lastAttempt: { requestId, step: result.step, correctness: result.correctness, isSkip: wasSkip, attemptNumber: null, assessment: null },
+        } : {}),
         ...(index === result.currentItemIndex && result.nextStep ? { currentStep: result.nextStep } : {}),
       })),
-    } : current)
+    } : current))
     if (result.correctness) {
       setFeedback('correct')
       stepStartedAtRef.current = Date.now()
@@ -322,6 +348,12 @@ function SessionPracticePage() {
     if (!mountedRef.current || !session || !currentItem || activeStep !== 'pronunciation' || latest?.status !== 'active'
       || latest.items[latest.currentItemIndex]?.itemId !== currentItem.itemId || latest.items[latest.currentItemIndex]?.currentStep !== 'pronunciation' || busyRef.current) return
     busyRef.current = true
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      clearRecordedAudio()
+      const nextUrl = URL.createObjectURL(audio)
+      recordedAudioUrlRef.current = nextUrl
+      setRecordedAudioUrl(nextUrl)
+    }
     const requestId = requestFor(`${currentItem.itemId}:pronunciation:${crypto.randomUUID()}`)
 
     try {
@@ -334,15 +366,16 @@ function SessionPracticePage() {
       })
       setPronunciationFeedback(result.assessment)
       handleAnswerResult({ ...result, step: 'pronunciation', correctness: result.isCorrect, canRetry: !result.isCorrect }, false)
-      queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), current => current ? {
-        ...current, items: current.items.map(item => item.itemId === currentItem.itemId ? { ...item, pronunciationAttemptCount: result.attemptNumber } : item),
-      } : current)
+      queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), (current) => (current ? {
+        ...current,
+        items: current.items.map((item) => (item.itemId === currentItem.itemId ? { ...item, pronunciationAttemptCount: result.attemptNumber } : item)),
+      } : current))
     } catch {
       await recoverProgress({ item: currentItem, step: activeStep, requestId })
     } finally {
       busyRef.current = false
     }
-  }, [activeStep, currentItem, handleAnswerResult, pronunciationMutation, queryClient, recoverProgress, session, sessionId])
+  }, [activeStep, clearRecordedAudio, currentItem, handleAnswerResult, pronunciationMutation, queryClient, recoverProgress, session, sessionId])
 
   const beginRecording = useCallback(async () => {
     if (startingRecordingRef.current || recordingRef.current || !recordingSupported || !mountedRef.current) return
@@ -351,6 +384,7 @@ function SessionPracticePage() {
     setPronunciationError(null)
     setPronunciationFeedback(null)
     setFeedback(null)
+    clearRecordedAudio()
     try {
       const recording = await startPcmRecording(handlePronunciationAudio)
       const latest = currentSessionRef.current
@@ -368,7 +402,7 @@ function SessionPracticePage() {
       startingRecordingRef.current = false
       if (mountedRef.current) setIsStartingRecording(false)
     }
-  }, [currentItem, handlePronunciationAudio, recordingSupported])
+  }, [clearRecordedAudio, currentItem, handlePronunciationAudio, recordingSupported])
 
   const startRecording = useCallback(async () => {
     if (isSaving || pendingTransition || isRecording || busyRef.current) return
@@ -386,12 +420,17 @@ function SessionPracticePage() {
     setRetryError(null)
     let reopened: boolean
     try {
-      const result = await retryMutation.mutateAsync({ sessionId, itemId: currentItem.itemId,
-        step: activeStep, attemptId: currentItem.lastAttempt.requestId })
+      const result = await retryMutation.mutateAsync({
+        sessionId,
+        itemId: currentItem.itemId,
+        step: activeStep,
+        attemptId: currentItem.lastAttempt.requestId,
+      })
       if (!mountedRef.current) return
-      queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), current => current ? {
-        ...current, items: current.items.map(item => item.itemId === result.itemId ? { ...item, currentStep: result.step } : item),
-      } : current)
+      queryClient.setQueryData<practiceApi.PracticeSession>(practiceKeys.session(sessionId), (current) => (current ? {
+        ...current,
+        items: current.items.map((item) => (item.itemId === result.itemId ? { ...item, currentStep: result.step } : item)),
+      } : current))
       suppressAutoSpeechRef.current = activeStep === 'pronunciation'
       clearInteraction()
       reopened = true
@@ -412,7 +451,24 @@ function SessionPracticePage() {
     void recordingRef.current?.stop()
   }, [])
 
-  const selectReviewLevel = useCallback(async (level: PracticeReviewLevel) => {
+  const playMyVoice = useCallback(() => {
+    const url = recordedAudioUrlRef.current
+    if (!url || isRecording || typeof Audio === 'undefined') return
+    if (myVoiceAudioRef.current) {
+      myVoiceAudioRef.current.pause()
+    }
+    const player = new Audio(url)
+    myVoiceAudioRef.current = player
+    void player.play().catch(() => undefined)
+  }, [isRecording])
+
+  const handleSelectRecapLevel = useCallback((level: PracticeReviewLevel) => {
+    if (!currentItem || currentItem.alreadyInReview || currentReviewStatus === 'added' || isSaving || busyRef.current) return
+    reviewLevelMutation.reset()
+    setSelectedLevel(level)
+  }, [currentItem, currentReviewStatus, isSaving, reviewLevelMutation])
+
+  const submitReviewLevel = useCallback(async (level: PracticeReviewLevel) => {
     if (!session || !currentItem || activeStep !== 'recap' || isSaving || currentItem.alreadyInReview || busyRef.current) return
     busyRef.current = true
     setSelectedLevel(level)
@@ -424,13 +480,30 @@ function SessionPracticePage() {
         timeZoneId: APP_TIME_ZONE,
       })
       setReviewStatuses((current) => ({ ...current, [currentItem.wordId]: result.status }))
-      if (result.itemCompleted) moveToServerPosition(result.currentItemIndex, session.items[result.currentItemIndex]?.currentStep ?? (result.currentItemIndex < session.items.length ? 'dictation' : null))
+      if (result.itemCompleted) {
+        moveToServerPosition(
+          result.currentItemIndex,
+          session.items[result.currentItemIndex]?.currentStep ?? (result.currentItemIndex < session.items.length ? 'dictation' : null),
+        )
+      }
     } catch {
       await recoverProgress({ item: currentItem, step: activeStep, recap: true })
     } finally {
       busyRef.current = false
     }
   }, [activeStep, currentItem, isSaving, moveToServerPosition, recoverProgress, reviewLevelMutation, session])
+
+  const confirmRecapNext = useCallback(async () => {
+    if (!session || !currentItem || activeStep !== 'recap' || isSaving || busyRef.current) return
+    if (currentReviewStatus === 'alreadyInReview' || currentItem.alreadyInReview) {
+      await skipCurrentStep()
+      return
+    }
+    const levelToSave = selectedLevel ?? currentItem.selectedLevel
+    if (levelToSave != null) {
+      await submitReviewLevel(levelToSave)
+    }
+  }, [activeStep, currentItem, currentReviewStatus, isSaving, selectedLevel, session, skipCurrentStep, submitReviewLevel])
 
   useEffect(() => {
     if (!currentWord || !activeStep || pendingTransition || activeStep === 'wordToMeaning' || activeStep === 'recap') return
@@ -444,11 +517,12 @@ function SessionPracticePage() {
   useEffect(() => {
     mountedRef.current = true
     return () => {
-    mountedRef.current = false
-    void recordingRef.current?.cancel()
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+      mountedRef.current = false
+      void recordingRef.current?.cancel()
+      clearRecordedAudio()
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel()
     }
-  }, [])
+  }, [clearRecordedAudio])
 
   const interactionPosition = currentItem && activeStep ? `${currentItem.itemId}:${activeStep}` : null
   useEffect(() => {
@@ -467,7 +541,7 @@ function SessionPracticePage() {
       if (event.defaultPrevented || target?.closest('[data-pronunciation-feedback]')) return
       if (event.key === 'Tab' && activeStep === 'pronunciation' && pronunciationFeedback) return
 
-      if (event.key === 'Tab' && activeStep !== 'wordToMeaning' && activeStep !== 'recap' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      if (event.key === 'Tab' && activeStep !== 'wordToMeaning' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
         speakWord(word, language)
         return
@@ -476,7 +550,7 @@ function SessionPracticePage() {
       if (event.key === 'Enter') {
         if (activeStep === 'recap' && !target?.closest('button')) {
           event.preventDefault()
-          void skipCurrentStep()
+          void confirmRecapNext()
           return
         }
         if (pendingTransition && !target?.closest('button')) {
@@ -506,25 +580,38 @@ function SessionPracticePage() {
         return
       }
 
-      if ((event.key === 'r' || event.key === 'R') && activeStep === 'pronunciation' && !isTextEntry && !isRecording && !isSaving && !pendingTransition) {
+      if ((event.key === 'p' || event.key === 'P') && activeStep === 'pronunciation' && !isTextEntry && !isRecording && recordedAudioUrl && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
-        void startRecording()
+        playMyVoice()
+        return
+      }
+
+      if ((event.key === 'r' || event.key === 'R') && activeStep === 'pronunciation' && !isTextEntry && !isRecording && !isSaving && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault()
+        if (pendingTransition && feedback === 'correct') {
+          void retryCurrentStep()
+        } else if (!pendingTransition) {
+          void startRecording()
+        }
         return
       }
 
       if ((event.key === ' ' || event.key === 'Space') && activeStep === 'pronunciation' && isRecording) {
         event.preventDefault()
         stopRecording()
+        return
+      }
+
+      if (activeStep === 'recap' && /^[0-5]$/.test(event.key) && !isTextEntry && !isSaving && !currentItem.alreadyInReview && currentReviewStatus !== 'added' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault()
+        handleSelectRecapLevel(Number(event.key) as PracticeReviewLevel)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeStep, completeTransition, currentItem, isRecording, isSaving, language, pendingTransition, pronunciationFeedback, selectMeaning, selectReviewLevel, skipCurrentStep, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
+  }, [activeStep, completeTransition, confirmRecapNext, currentItem, currentReviewStatus, feedback, handleSelectRecapLevel, isRecording, isSaving, language, pendingTransition, playMyVoice, pronunciationFeedback, recordedAudioUrl, retryCurrentStep, selectMeaning, skipCurrentStep, startRecording, stopRecording, submitTypedAnswer, typedAnswer])
 
-  const currentReviewStatus: PracticeReviewStatus | null = currentItem
-    ? reviewStatuses[currentItem.wordId] ?? (currentItem.alreadyInReview ? 'alreadyInReview' : null)
-    : null
   const pendingTransitionLabel = pendingTransition
     ? pendingTransition.nextStep === null
       ? 'Finish practice'
@@ -543,21 +630,25 @@ function SessionPracticePage() {
   return (
     <>
       <section className={`figma-learning-session practice-figma-session practice-figma-session--${activeStep}`}>
-        <header className="practice-figma-session__header">
-          <span className="practice-figma-session__brand">FluentA</span>
-          <button className="practice-figma-session__exit" type="button" onClick={() => navigate('/practice')}>Exit session</button>
-        </header>
-        <PracticeProgress currentIndex={activeIndex} totalCards={session.items.length} step={activeStep} />
+        <PracticeProgress
+          currentIndex={activeIndex}
+          totalCards={session.items.length}
+          step={activeStep}
+          onExit={() => navigate('/practice')}
+        />
+
         <article className={`practice-figma-session__card practice-figma-session__card--${activeStep}`} data-testid="active-practice-card">
           {activeStep === 'recap' ? (
             <PracticeRecap
               item={currentItem}
+              isLastItem={isLastItem}
               reviewStatus={currentReviewStatus}
               isSaving={isSaving}
               saveError={answerMutation.isError || reviewLevelMutation.isError || completeMutation.isError}
               selectedLevel={selectedLevel}
-              onRetry={() => { if (selectedLevel != null) void selectReviewLevel(selectedLevel) }}
-              onSelectLevel={(level) => void selectReviewLevel(level)}
+              onPlayAudio={() => speakWord(currentItem.word, language)}
+              onSelectLevel={handleSelectRecapLevel}
+              onConfirmNext={() => void confirmRecapNext()}
               onSkip={() => void skipCurrentStep()}
             />
           ) : (
@@ -572,8 +663,10 @@ function SessionPracticePage() {
               pronunciationFeedback={pronunciationFeedback}
               recordingSupported={recordingSupported}
               isRecording={isRecording}
+              hasRecordedAudio={Boolean(recordedAudioUrl)}
               pronunciationError={pronunciationError}
               onPlayAudio={() => speakWord(currentItem.word, language)}
+              onPlayMyVoice={playMyVoice}
               onAnswerChange={setTypedAnswer}
               onSubmit={() => void submitTypedAnswer()}
               onSelectSlot={(slotId) => void selectMeaning(slotId)}
@@ -585,17 +678,32 @@ function SessionPracticePage() {
             />
           )}
         </article>
-        {activeStep === 'pronunciation' ? <p role="status" className="text-center text-sm text-muted-foreground">Saved pronunciation attempts: {currentItem.pronunciationAttemptCount ?? 0}</p> : null}
+
         <p className="practice-figma-session__shortcuts" aria-label="Keyboard shortcuts">
-          {pendingTransition ? <><kbd>Enter</kbd> {pendingTransitionLabel}</> : activeStep === 'dictation' ? <><kbd>Enter</kbd> Check answer <span aria-hidden="true">·</span> <kbd>Esc</kbd> Skip <span aria-hidden="true">·</span> <kbd>Tab</kbd> Play audio</> : activeStep === 'wordToMeaning' ? <>Click an answer to check <span aria-hidden="true">·</span> <kbd>1–4</kbd> Select and check <span aria-hidden="true">·</span> <kbd>Esc</kbd> Skip</> : activeStep === 'pronunciation' ? <><kbd>Tab</kbd> Listen <span aria-hidden="true">·</span> <kbd>R</kbd> Record <span aria-hidden="true">·</span> <kbd>Space</kbd> Stop and check <span aria-hidden="true">·</span> <kbd>Esc</kbd> Skip</> : <><kbd>Esc</kbd> Skip recap</>}
+          {pendingTransition ? (
+            <>Shortcuts: <kbd>[Enter]</kbd> {pendingTransitionLabel}</>
+          ) : activeStep === 'dictation' ? (
+            <>Shortcuts: <kbd>[Tab]</kbd> Play Audio <span aria-hidden="true">•</span> <kbd>[Enter]</kbd> Check Answer <span aria-hidden="true">•</span> <kbd>[Esc]</kbd> Skip</>
+          ) : activeStep === 'wordToMeaning' ? (
+            <>Shortcuts: <kbd>[1]–[4]</kbd> Select Answer <span aria-hidden="true">•</span> <kbd>[Enter]</kbd> Continue <span aria-hidden="true">•</span> <kbd>[Esc]</kbd> Skip</>
+          ) : activeStep === 'pronunciation' ? (
+            isRecording ? (
+              <>Shortcuts: <kbd>[Space]</kbd> Stop and Check <span aria-hidden="true">•</span> <kbd>[Esc]</kbd> Skip</>
+            ) : (
+              <>Shortcuts: <kbd>[Tab]</kbd> Listen <span aria-hidden="true">•</span> <kbd>[R]</kbd> Record <span aria-hidden="true">•</span> <kbd>[P]</kbd> My Voice <span aria-hidden="true">•</span> <kbd>[Enter]</kbd> Continue <span aria-hidden="true">•</span> <kbd>[Esc]</kbd> Skip</>
+            )
+          ) : (
+            <>Shortcuts: <kbd>[0]–[5]</kbd> Choose Level <span aria-hidden="true">•</span> <kbd>[Tab]</kbd> Listen <span aria-hidden="true">•</span> <kbd>[Enter]</kbd> {isLastItem ? 'Finish Practice' : 'Next Word'} <span aria-hidden="true">•</span> <kbd>[Esc]</kbd> Skip</>
+          )}
         </p>
       </section>
-      {answerMutation.isError && activeStep !== 'recap' ? <p className="mt-3 text-sm text-destructive" role="alert">Unable to save your answer. Try again.</p> : null}
-      {isRecovering ? <p role="status">Checking saved practice progress…</p> : null}
-      {retryError ? <p role="alert" className="mt-3 text-sm text-destructive">{retryError}</p> : null}
-      {connectionError ? <div role="alert"><p>{connectionError}</p><button type="button" disabled={isRecovering} onClick={() => { if (recoveryRef.current) void recoverProgress(recoveryRef.current) }}>Retry connection</button></div> : null}
-      {completeMutation.isError ? <p className="mt-3 text-sm text-destructive" role="alert">Unable to finish the practice session. Try again.</p> : null}
-      {completeMutation.isPending ? <p className="mt-3 text-sm text-muted-foreground" role="status">Saving practice results…</p> : null}
+
+      {answerMutation.isError && activeStep !== 'recap' ? <p className="mx-auto mt-3 w-full max-w-[880px] text-sm text-destructive" role="alert">Unable to save your answer. Try again.</p> : null}
+      {isRecovering ? <p className="mx-auto mt-3 w-full max-w-[880px] text-sm text-muted-foreground" role="status">Checking saved practice progress…</p> : null}
+      {retryError ? <p role="alert" className="mx-auto mt-3 w-full max-w-[880px] text-sm text-destructive">{retryError}</p> : null}
+      {connectionError ? <div className="mx-auto mt-3 flex w-full max-w-[880px] items-center gap-3 text-sm text-destructive" role="alert"><p className="m-0">{connectionError}</p><button className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground" type="button" disabled={isRecovering} onClick={() => { if (recoveryRef.current) void recoverProgress(recoveryRef.current) }}>Retry connection</button></div> : null}
+      {completeMutation.isError ? <p className="mx-auto mt-3 w-full max-w-[880px] text-sm text-destructive" role="alert">Unable to finish the practice session. Try again.</p> : null}
+      {completeMutation.isPending ? <p className="mx-auto mt-3 w-full max-w-[880px] text-sm text-muted-foreground" role="status">Saving practice results…</p> : null}
     </>
   )
 }

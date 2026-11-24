@@ -1,3 +1,4 @@
+import { ArrowRight, CheckCircle2, SkipForward, XCircle } from 'lucide-react'
 import type { PronunciationAssessment } from '@/features/pronunciation'
 import type { PracticeExerciseMode, PracticeSessionItem } from '../../api/practice.api'
 import { PracticeAnswerForm } from './PracticeAnswerForm'
@@ -17,8 +18,10 @@ type PracticeModeSurfaceProps = {
   pronunciationFeedback: PronunciationAssessment | null
   recordingSupported: boolean
   isRecording: boolean
+  hasRecordedAudio: boolean
   pronunciationError: string | null
   onPlayAudio: () => void
+  onPlayMyVoice: () => void
   onAnswerChange: (value: string) => void
   onSubmit: () => void
   onSelectSlot: (slotId: string) => void
@@ -29,35 +32,71 @@ type PracticeModeSurfaceProps = {
   onStopRecording: () => void
 }
 
+const stepEyebrows: Record<PracticeExerciseMode, string> = {
+  dictation: 'STEP 1 OF 3  •  DICTATION',
+  wordToMeaning: 'STEP 2 OF 3  •  WORD TO MEANING',
+  pronunciation: 'STEP 3 OF 3  •  PRONUNCIATION',
+}
+
 const prompts: Record<PracticeExerciseMode, string> = {
-  dictation: 'Listen to the audio, type the word, then press Enter.',
+  dictation: 'Listen to the audio, type the word',
   wordToMeaning: 'Read the word and context, then click the correct meaning.',
   pronunciation: 'Listen to the word, then record your pronunciation.',
 }
 
-export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, feedback, isResolved, isBusy, pronunciationFeedback, recordingSupported, isRecording, pronunciationError, onPlayAudio, onAnswerChange, onSubmit, onSelectSlot, onSkip, onContinue, onRetry, onStartRecording, onStopRecording }: PracticeModeSurfaceProps) {
-  const feedbackTitle = mode === 'pronunciation' ? 'Pronunciation needs another try' : 'Not quite'
+export function PracticeModeSurface({
+  mode,
+  item,
+  typedAnswer,
+  selectedSlotId,
+  feedback,
+  isResolved,
+  isBusy,
+  pronunciationFeedback,
+  recordingSupported,
+  isRecording,
+  hasRecordedAudio,
+  pronunciationError,
+  onPlayAudio,
+  onPlayMyVoice,
+  onAnswerChange,
+  onSubmit,
+  onSelectSlot,
+  onSkip,
+  onContinue,
+  onRetry,
+  onStartRecording,
+  onStopRecording,
+}: PracticeModeSurfaceProps) {
   const feedbackDescription = mode === 'dictation'
     ? 'Try again or skip this word.'
-    : mode === 'wordToMeaning'
-      ? 'Choose another answer or skip this word.'
-      : 'Record again or skip this word.'
+    : 'Choose another answer or skip this word.'
 
   return (
     <div className={`practice-exercise practice-exercise--${mode}${feedback ? ` practice-exercise--${feedback}` : ''}`}>
-      <h2 className="practice-exercise__prompt">{mode === 'wordToMeaning' && !hasText(item.context) ? 'Read the word, then click the correct meaning.' : prompts[mode]}</h2>
+      <div className="practice-prompt-stack">
+        <span className="practice-eyebrow">{stepEyebrows[mode]}</span>
+        <h2 className="practice-exercise__prompt">
+          {mode === 'wordToMeaning' && !hasText(item.context)
+            ? 'Read the word, then click the correct meaning.'
+            : prompts[mode]}
+        </h2>
+      </div>
 
-      <div className={`practice-exercise__body practice-exercise__body--${mode}${feedback ? ' practice-exercise__body--feedback' : ''}`}>
-        {mode === 'dictation' ? <PracticeDictationMode onPlayAudio={onPlayAudio} /> : null}
+      <div className="practice-exercise__body">
         {mode === 'dictation' ? (
-          <PracticeAnswerForm
-            typedAnswer={typedAnswer}
-            isResolved={isResolved}
-            isBusy={isBusy}
-            onAnswerChange={onAnswerChange}
-            onSubmit={onSubmit}
-          />
+          <>
+            <PracticeDictationMode onPlayAudio={onPlayAudio} />
+            <PracticeAnswerForm
+              typedAnswer={typedAnswer}
+              isResolved={isResolved}
+              isBusy={isBusy}
+              onAnswerChange={onAnswerChange}
+              onSubmit={onSubmit}
+            />
+          </>
         ) : null}
+
         {mode === 'wordToMeaning' ? (
           <PracticeWordToMeaningMode
             item={item}
@@ -68,6 +107,7 @@ export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, f
             onSelect={onSelectSlot}
           />
         ) : null}
+
         {mode === 'pronunciation' ? (
           <PracticePronunciationMode
             item={item}
@@ -76,29 +116,64 @@ export function PracticeModeSurface({ mode, item, typedAnswer, selectedSlotId, f
             isRecording={isRecording}
             isAssessmentPending={isBusy}
             isResolved={isResolved}
+            hasRecordedAudio={hasRecordedAudio}
             error={pronunciationError}
             onPlayAudio={onPlayAudio}
+            onPlayMyVoice={onPlayMyVoice}
             onStartRecording={onStartRecording}
             onStopRecording={onStopRecording}
+            onRetry={onRetry}
           />
         ) : null}
       </div>
 
       {feedback && mode !== 'pronunciation' ? (
-        <div className={`practice-exercise__feedback practice-exercise__feedback--${feedback}`} role="status" aria-live="polite">
-          <strong>{feedback === 'correct' ? '✓  Correct' : `×  ${feedbackTitle}`}</strong>
-          <span>{feedback === 'correct' ? 'Nice work. Press Enter or continue below.' : isResolved ? 'Press Enter or continue below.' : feedbackDescription}</span>
+        <div className={`practice-feedback-banner practice-feedback-banner--${feedback}`} role="status" aria-live="polite">
+          {feedback === 'correct' ? (
+            <>
+              <CheckCircle2 size={16} aria-hidden="true" />
+              <strong>Correct</strong>
+            </>
+          ) : (
+            <>
+              <XCircle size={16} aria-hidden="true" />
+              <strong>Not quite</strong>
+              <span>{isResolved ? 'Press Enter or continue below.' : feedbackDescription}</span>
+            </>
+          )}
         </div>
       ) : null}
 
-      <div className={`practice-exercise__actions${isResolved ? ' practice-exercise__actions--resolved' : ''}`}>
-        {(isResolved && feedback === 'correct') || (mode === 'pronunciation' && feedback === 'wrong' && !isResolved) ? <button type="button" onClick={onRetry} disabled={isBusy || isRecording}>Try again</button> : null}
-        {mode === 'dictation' && !isResolved ? <button className="learning-touch-submit" type="button" onClick={onSubmit} disabled={isBusy || !typedAnswer.trim()}>Check answer</button> : null}
-        {!isResolved ? (
-          <button type="button" onClick={onSkip} disabled={isBusy || isRecording}>Skip</button>
+      <div className="practice-action-row">
+        {mode !== 'pronunciation' && isResolved && feedback === 'correct' ? (
+          <button className="practice-btn-secondary" type="button" onClick={onRetry} disabled={isBusy}>
+            Try Again
+          </button>
+        ) : !isResolved ? (
+          <button className="practice-btn-secondary" type="button" onClick={onSkip} disabled={isBusy || isRecording}>
+            {mode === 'pronunciation' ? <SkipForward size={14} aria-hidden="true" /> : null}
+            <span>Skip</span>
+          </button>
         ) : (
-          <button type="button" onClick={onContinue} disabled={isBusy}>Continue</button>
+          <span />
         )}
+
+        {mode === 'dictation' && !isResolved ? (
+          <button
+            className="practice-btn-primary"
+            type="button"
+            onClick={onSubmit}
+            disabled={isBusy || !typedAnswer.trim()}
+          >
+            <span>Check Answer</span>
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        ) : isResolved ? (
+          <button className="practice-btn-primary" type="button" onClick={onContinue} disabled={isBusy}>
+            <span>{mode === 'pronunciation' ? 'Continue to Recap' : 'Continue'}</span>
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </div>
   )
