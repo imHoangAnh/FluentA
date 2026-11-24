@@ -43,14 +43,14 @@ export function ResetPasswordPage() {
   return (
     <>
       <div className="mb-6">
-        <h1 className="m-0 text-[32px] font-bold leading-[1.2] tracking-[-0.035em] text-[#111827]">
+        <h1 className="m-0 text-[30px] font-bold leading-[1.2] tracking-[-0.03em] text-foreground">
           Create a new password
         </h1>
-        <p className="m-0 mt-2 text-sm leading-5 text-[#66747c]">
+        <p className="m-0 mt-2 text-sm leading-5 text-muted-foreground">
           Enter your new password and confirm it below.
         </p>
       </div>
-      <form className="grid gap-6" onSubmit={(event) => void submit(event)}>
+      <form className="grid gap-5" onSubmit={(event) => void submit(event)}>
         <TextField
           label="New password"
           name="password"
@@ -61,8 +61,8 @@ export function ResetPasswordPage() {
           onChange={setPassword}
           minLength={8}
           disabled={isSubmitting}
-          className="[&>label]:text-[14px] [&>label]:leading-5 [&>label]:text-[#111827]"
-          inputClassName="!h-[54px] !rounded-2xl !border-[#e2e7eb] !bg-white !pl-4 !pr-12 !text-sm !shadow-none placeholder:!text-[#9ca3af] focus-visible:!border-[#00b8ae] focus-visible:!ring-[#00b8ae]/15"
+          className="[&>label]:text-sm [&>label]:font-semibold [&>label]:text-foreground"
+          inputClassName="!h-11 !rounded-[10px] !border-input !bg-card !pl-3.5 !pr-12 !text-sm !shadow-[var(--ds-shadow-xs)] placeholder:!text-muted-foreground focus-visible:!border-primary focus-visible:!ring-primary/20"
         />
         <TextField
           label="Confirm password"
@@ -74,13 +74,13 @@ export function ResetPasswordPage() {
           onChange={setConfirmPassword}
           minLength={8}
           disabled={isSubmitting}
-          className="[&>label]:text-[14px] [&>label]:leading-5 [&>label]:text-[#111827]"
-          inputClassName="!h-[54px] !rounded-2xl !border-[#e2e7eb] !bg-white !pl-4 !pr-12 !text-sm !shadow-none placeholder:!text-[#9ca3af] focus-visible:!border-[#00b8ae] focus-visible:!ring-[#00b8ae]/15"
+          className="[&>label]:text-sm [&>label]:font-semibold [&>label]:text-foreground"
+          inputClassName="!h-11 !rounded-[10px] !border-input !bg-card !pl-3.5 !pr-12 !text-sm !shadow-[var(--ds-shadow-xs)] placeholder:!text-muted-foreground focus-visible:!border-primary focus-visible:!ring-primary/20"
         />
         {missingToken ? <p role="alert" className="m-0 text-sm font-medium text-destructive">This password reset link is missing its token.</p> : null}
         {error ? <p role="alert" className="m-0 text-sm font-medium text-destructive">{error}</p> : null}
         <Button
-          className="h-14 w-full rounded-full border border-[#e2e7eb] bg-white text-base font-semibold text-[#18202e] shadow-none transition-colors hover:bg-[#00ada4] hover:text-white active:bg-[#00958e] active:text-white"
+          className="h-11 w-full rounded-[10px] bg-primary text-sm font-semibold text-primary-foreground shadow-[var(--ds-shadow-xs)] transition-colors hover:bg-[#0d5e58] active:bg-[#0b504b]"
           type="submit"
           disabled={missingToken || isSubmitting}
         >
@@ -88,13 +88,13 @@ export function ResetPasswordPage() {
         </Button>
       </form>
       <div className="mt-6 text-center">
-        <Link to="/login" className="text-sm font-normal text-[#6b7280] hover:text-[#374151]">
+        <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-primary hover:underline">
           Back to login
         </Link>
       </div>
       {missingToken || showRequestLink ? (
         <div className="mt-3 text-center">
-          <Link to="/forgot-password" className="text-sm font-medium text-[#2e6a64] hover:text-[#245650]">
+          <Link to="/forgot-password" className="text-sm font-semibold text-primary hover:text-[#0d5e58] hover:underline">
             Request a new link
           </Link>
         </div>

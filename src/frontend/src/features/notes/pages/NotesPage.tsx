@@ -345,7 +345,7 @@ export function NotesPage() {
 
   return (
     <>
-      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,5fr)] min-[900px]:grid-rows-1">
+      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[280px_minmax(0,1fr)] min-[900px]:grid-rows-1">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-3.5 py-2">
             <h2 className="m-0 text-sm font-semibold">Boards</h2>
@@ -373,7 +373,7 @@ export function NotesPage() {
                     <ContextMenuTrigger asChild>
                       <button
                         type="button"
-                        className={cn('flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActiveBoard && 'bg-secondary text-secondary-foreground')}
+                        className={cn('flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground', isActiveBoard && 'bg-secondary font-semibold text-secondary-foreground')}
                         onClick={() => { void handleSelectBoard(board.id) }}
                         onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectBoard(board.id) }}
                       >
@@ -395,7 +395,7 @@ export function NotesPage() {
                           <ContextMenuTrigger asChild>
                             <button
                               type="button"
-                              className={cn('flex min-h-9 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePageSummary?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
+                              className={cn('flex min-h-9 w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground', activePageSummary?.id === page.id && 'bg-secondary font-semibold text-secondary-foreground [&_svg]:text-primary')}
                               onClick={() => { void handleSelectPage(page.id) }}
                               onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectPage(page.id) }}
                             >

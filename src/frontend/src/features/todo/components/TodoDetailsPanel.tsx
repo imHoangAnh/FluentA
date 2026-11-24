@@ -1,6 +1,6 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronRight, Circle, ClipboardCheck, Repeat2, Star, Trash2, X } from 'lucide-react'
+import { Check, ChevronRight, Circle, Repeat2, Star, Trash2, X } from 'lucide-react'
 import { dropdownContentClassName, dropdownItemClassName } from '@/shared/components/ui/dropdown-styles'
 import type { TodoItem, TodoRepeatPattern, UpdateTodoInput } from '../api/todo.api'
 
@@ -16,27 +16,13 @@ const repeatOptions: Array<{ value: TodoRepeatPattern | null; label: string }> =
 type TodoDetailsPanelProps = {
   item: TodoItem
   pending: boolean
+  suspendEscape?: boolean
   onClose: () => void
   onUpdate: (id: string, patch: UpdateTodoInput) => Promise<void>
   onDelete: (item: TodoItem) => void
 }
 
-export function TodoDetailsEmptyState() {
-  return (
-    <aside className="todo-details todo-details--empty" aria-label="Task details">
-      <div className="todo-details__topbar">
-        <span>Task details</span>
-      </div>
-      <div className="todo-details__empty">
-        <ClipboardCheck aria-hidden="true" />
-        <strong>Select a task</strong>
-        <p>Choose a task to view and edit its details.</p>
-      </div>
-    </aside>
-  )
-}
-
-export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }: TodoDetailsPanelProps) {
+export function TodoDetailsPanel({ item, pending, suspendEscape = false, onClose, onUpdate, onDelete }: TodoDetailsPanelProps) {
   const [title, setTitle] = useState(item.title)
   const [note, setNote] = useState(item.note ?? '')
   const savedTitle = useRef(item.title)
@@ -51,11 +37,11 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) onClose()
+      if (event.key === 'Escape' && !suspendEscape && !event.defaultPrevented) onClose()
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [onClose])
+  }, [onClose, suspendEscape])
 
   async function saveTitle() {
     const normalized = title.trim()
@@ -92,7 +78,6 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
 
   return (
     <aside className="todo-details" aria-label={`Details for ${item.title}`} aria-busy={pending}>
-
       <div className="todo-details__topbar">
         <span>Task details</span>
         <button type="button" aria-label="Close details" onClick={onClose}><X aria-hidden="true" /></button>
@@ -112,6 +97,7 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
           <input
             ref={titleInputRef}
             id={`todo-title-${item.id}`}
+            data-testid="todo-title-input"
             className={item.isCompleted ? 'todo-details__title todo-details__title--completed' : 'todo-details__title'}
             value={title}
             maxLength={240}
@@ -135,7 +121,7 @@ export function TodoDetailsPanel({ item, pending, onClose, onUpdate, onDelete }:
           </button>
         </div>
         <div className="todo-details__fields">
-          <Menu as="div" className="relative inline-block">
+          <Menu as="div" className="relative inline-block w-full">
               <MenuButton
                 className="todo-details__field"
                 type="button"

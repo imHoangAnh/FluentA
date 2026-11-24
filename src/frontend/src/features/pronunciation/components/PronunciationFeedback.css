@@ -1,42 +1,85 @@
 .pronunciation-feedback-row {
-  gap: 0.4rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .pronunciation-feedback-word {
-  gap: 0.25rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .pronunciation-syllable {
-  min-height: 2.75rem;
-  padding: 0.35rem 0.2rem;
-  border: 0;
-  border-radius: 0.35rem;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 7px 15px;
+  border: 1px solid var(--ds-border, #dce5e2);
+  border-radius: 9999px;
+  background: var(--ds-card, #ffffff);
   font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
   cursor: pointer;
   white-space: nowrap;
+  transition: filter 150ms ease, background-color 150ms ease;
 }
 
 .pronunciation-syllable:hover,
 .pronunciation-syllable[aria-expanded='true'] {
-  background: var(--ds-muted);
+  filter: brightness(0.97);
 }
 
 .pronunciation-syllable:focus-visible {
-  outline: 2px solid var(--ds-primary);
+  outline: 2px solid var(--ds-primary, #0f766e);
   outline-offset: 2px;
 }
 
+.pronunciation-syllable__icon {
+  flex: 0 0 auto;
+}
+
+.pronunciation-syllable__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
 .pronunciation-tone--good {
-  color: #16836b;
+  color: #15803d;
 }
 
 .pronunciation-tone--practice {
-  color: #996400;
+  color: #b45309;
 }
 
 .pronunciation-tone--priority {
-  color: #c0392b;
+  color: #b42318;
+}
+
+.pronunciation-syllable.pronunciation-tone--good {
+  border-color: #15803d;
+  background: #dcfce7;
+}
+
+.pronunciation-syllable.pronunciation-tone--practice {
+  border-color: #b45309;
+  background: #fef3c7;
+}
+
+.pronunciation-syllable.pronunciation-tone--priority {
+  border-width: 1.5px;
+  border-color: #b42318;
+  background: var(--ds-card, #ffffff);
+  box-shadow: 0 1px 3px 0 rgb(20 32 30 / 5%);
 }
 
 .pronunciation-phoneme-tooltip {
@@ -48,9 +91,9 @@
   gap: 0.65rem;
   max-width: calc(100vw - 1rem);
   padding: 0.75rem 1rem;
-  border: 1px solid var(--ds-border);
+  border: 1px solid var(--ds-border, #dce5e2);
   border-radius: 0.65rem;
-  background: var(--ds-card);
+  background: var(--ds-card, #ffffff);
   box-shadow: 0 0.4rem 1.3rem rgb(0 0 0 / 12%);
   font-size: 1.15rem;
   font-weight: 600;

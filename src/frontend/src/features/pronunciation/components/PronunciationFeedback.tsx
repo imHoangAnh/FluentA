@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PronunciationAssessment, PronunciationUnitFeedback } from '../api/pronunciation.api'
@@ -98,7 +99,12 @@ export function PronunciationFeedback({ assessment }: { assessment: Pronunciatio
                 onKeyDown={event => {
                   if (event.key === 'Escape') { event.preventDefault(); close() }
                 }}
-              >{text}</button>
+              >
+                {color === 'good'
+                  ? <Check className="pronunciation-syllable__icon" size={13} aria-hidden="true" />
+                  : <span className="pronunciation-syllable__dot" aria-hidden="true" />}
+                {text}
+              </button>
             )
           })}
         </span>

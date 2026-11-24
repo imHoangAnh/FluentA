@@ -146,13 +146,13 @@
   align-items: center;
   background: var(--ds-card);
   border: 1px solid var(--ds-border);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(23, 33, 31, 0.05);
+  border-radius: 0.75rem;
+  box-shadow: var(--ds-shadow-xs);
   display: grid;
   gap: 0.5rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 3.25rem;
-  padding: 0 0.75rem;
+  padding: 0 0.875rem;
 }
 
 .todo-quick-add > svg {
@@ -222,14 +222,14 @@
   align-items: center;
   background: var(--ds-card);
   border: 1px solid var(--ds-border);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(23, 33, 31, 0.04);
+  border-radius: 0.75rem;
+  box-shadow: var(--ds-shadow-xs);
   display: grid;
   gap: 0.5rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 3.25rem;
   min-width: 0;
-  padding: 0.375rem 0.625rem;
+  padding: 0.375rem 0.75rem;
   transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -378,66 +378,57 @@
   padding: 0 0.375rem;
 }
 
+.todo-sheet-backdrop {
+  animation: ds-sheet-backdrop-in 180ms ease both;
+  backdrop-filter: blur(2px);
+  background: rgba(20, 32, 30, 0.34);
+  inset: 0;
+  position: fixed;
+  z-index: 40;
+}
+
 .todo-details {
-  align-self: start;
+  animation: ds-sheet-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
   background: var(--ds-card);
-  border: 1px solid var(--ds-border);
-  border-radius: 0.5rem;
+  border: 0;
+  border-left: 1px solid var(--ds-border);
+  border-radius: 0;
+  bottom: 0;
+  box-shadow: var(--ds-shadow-lg);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 7rem);
-  min-height: 26rem;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
-  position: sticky;
-  top: 1rem;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: min(440px, 100vw);
+  z-index: 50;
 }
 
-.todo-details--empty {
-  align-self: stretch;
-  min-height: 20rem;
-}
-
-.todo-details__empty {
-  align-items: center;
-  color: var(--ds-muted-foreground);
+.todo-details__body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  justify-content: center;
-  padding: 1.5rem 1rem;
-  text-align: center;
-}
-
-.todo-details__empty svg {
-  color: var(--ds-primary);
-  height: 2.25rem;
-  margin-bottom: 0.75rem;
-  width: 2.25rem;
-}
-
-.todo-details__empty strong {
-  color: var(--ds-foreground);
-  font-size: 0.875rem;
-}
-
-.todo-details__empty p {
-  font-size: 0.75rem;
-  line-height: 1.45;
-  margin: 0.375rem 0 0;
-  max-width: 12rem;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .todo-details__topbar {
   align-items: center;
   border-bottom: 1px solid var(--ds-border);
-  color: var(--ds-muted-foreground);
+  color: var(--ds-primary);
   display: flex;
   font-size: 0.75rem;
   font-weight: 700;
   justify-content: space-between;
-  min-height: 2.75rem;
-  padding: 0 0.5rem 0 0.875rem;
+  letter-spacing: 0.06em;
+  min-height: 3.25rem;
+  padding: 0 0.75rem 0 1.25rem;
+  text-transform: uppercase;
 }
 
 .todo-details__topbar button,
@@ -667,16 +658,12 @@
   overflow: hidden;
 }
 
-.todo-main-layout--week-details {
-  grid-template-columns: minmax(0, 10fr) minmax(0, 2fr);
-}
-
 .todo-main-layout--week .todo-week-surface {
-  background: color-mix(in srgb, var(--ds-muted) 24%, var(--ds-card));
+  background: color-mix(in srgb, var(--ds-muted) 28%, var(--ds-card));
   border: 1px solid var(--ds-border);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   height: 100%;
-  padding: 0.5rem;
+  padding: 0.625rem;
 }
 
 .todo-main-layout--week .todo-week-grid {
@@ -685,13 +672,6 @@
 
 .todo-main-layout--week .todo-week-day {
   min-height: 30rem;
-}
-
-.todo-main-layout--week .todo-details {
-  align-self: stretch;
-  height: 100%;
-  max-height: none;
-  position: static;
 }
 
 .todo-week-grid {
@@ -859,14 +839,8 @@
 }
 
 @media (max-width: 64rem) {
-  .todo-main-layout--week-details .todo-details__identity {
-    grid-template-columns: auto auto;
-    justify-content: space-between;
-  }
-
-  .todo-main-layout--week-details .todo-details__title {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .todo-details__identity {
+    padding-inline: 0.75rem;
   }
 }
 
@@ -895,12 +869,8 @@
     min-height: 0;
   }
 
-  .todo-workspace-page:has(.todo-page-header--week) .todo-week-surface,
-  .todo-workspace-page:has(.todo-page-header--week) .todo-details {
-    min-height: 0;
-  }
-
   .todo-workspace-page:has(.todo-page-header--week) .todo-week-surface {
+    min-height: 0;
     overflow: auto;
   }
 
@@ -933,16 +903,11 @@
     padding-top: 1rem;
   }
 
-  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout--details,
-  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary,
-  .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day {
-    min-height: 0;
-  }
-
-  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout--details,
+  .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout,
   .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary,
   .todo-workspace-page:has(.todo-page-header--my-day) .todo-my-day {
     height: 100%;
+    min-height: 0;
   }
 
   .todo-workspace-page:has(.todo-page-header--my-day) .todo-main-layout__primary {
@@ -960,15 +925,6 @@
     min-height: 0;
     overflow-y: auto;
   }
-
-  .todo-workspace-page:has(.todo-page-header--my-day) .todo-details {
-    align-self: stretch;
-    height: auto;
-    max-height: none;
-    min-height: 0;
-    margin-top: 2.75rem;
-    position: static;
-  }
 }
 
 @media (max-width: 48rem) {
@@ -976,17 +932,8 @@
     padding: 1rem;
   }
 
-  .todo-main-layout--details {
-    gap: 0.625rem;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .todo-main-layout--week-details {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .todo-details__identity {
-    padding-inline: 0.375rem;
+    padding-inline: 0.75rem;
   }
 }
 
@@ -1010,37 +957,6 @@
 
   .todo-page-header__action span {
     display: none;
-  }
-
-  .todo-main-layout--details {
-    gap: 0.5rem;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .todo-details__topbar > span,
-  .todo-details__footer button > span {
-    display: none;
-  }
-
-  .todo-details__identity {
-    grid-template-columns: auto auto;
-    justify-content: space-between;
-  }
-
-  .todo-details__title {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .todo-details__note,
-  .todo-details__footer {
-    padding: 0.375rem;
-  }
-
-  .todo-details__footer button {
-    justify-content: center;
-    padding: 0;
-    width: 100%;
   }
 
   .todo-quick-add {

@@ -165,27 +165,27 @@ export function ProfilePage() {
   }
 
   return (
-    <form className="mx-auto max-w-4xl space-y-12 rounded-lg bg-white px-4 py-6 sm:px-6 lg:px-8" onSubmit={submitProfile}>
-      <div className="border-b border-gray-900/10 pb-12">
+    <form className="mx-auto max-w-3xl space-y-10 rounded-2xl border border-border bg-card px-6 py-7 shadow-[var(--ds-shadow-xs)] sm:px-8" onSubmit={submitProfile}>
+      <div className="border-b border-border pb-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl/8 font-semibold text-gray-900">Profile</h1>
-            <p className="mt-1 text-sm/6 text-gray-600">This information will be displayed publicly so be careful what you share.</p>
+            <h1 className="text-2xl/8 font-bold tracking-[-0.025em] text-foreground">Profile</h1>
+            <p className="mt-1 text-sm/6 text-muted-foreground">This information will be displayed publicly so be careful what you share.</p>
           </div>
           <div className="pt-1">{status}</div>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+        <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-6">
           <div className="col-span-full sm:col-span-4">
-            <span className="block text-base/7 font-semibold text-gray-900">Photo</span>
+            <span className="block text-sm font-semibold text-foreground">Photo</span>
             <div className="mt-3 flex flex-wrap items-center gap-4">
               <img
-                className="size-16 shrink-0 rounded-full border border-gray-200 bg-gray-50 object-cover"
+                className="size-16 shrink-0 rounded-full border border-border bg-muted object-cover"
                 src={profileAvatarPreview}
                 alt={`${profile.fullName} avatar preview`}
               />
-              <label htmlFor="profile-avatar-file" className="inline-flex cursor-pointer items-center rounded-md bg-white px-4 py-2.5 text-base font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-600">
-                <Upload aria-hidden="true" className="mr-2 size-5" />
+              <label htmlFor="profile-avatar-file" className="inline-flex cursor-pointer items-center rounded-lg border border-input bg-card px-3.5 py-2 text-sm font-semibold text-foreground shadow-[var(--ds-shadow-xs)] transition-colors hover:border-primary/40 hover:bg-secondary/50 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
+                <Upload aria-hidden="true" className="mr-2 size-4 text-primary" />
                 Change
                 <input
                   id="profile-avatar-file"
@@ -203,22 +203,22 @@ export function ProfilePage() {
               <Button
                 variant="ghost"
                 type="button"
-                className="h-auto px-2 py-2 text-base font-medium text-gray-600 hover:text-gray-900"
+                className="h-auto px-2.5 py-2 text-sm font-medium text-muted-foreground hover:text-destructive"
                 onClick={() => updateDraft({ avatarFile: null, avatarAssetId: null, removeAvatar: true })}
               >
-                <ImageMinus aria-hidden="true" className="size-5" />
+                <ImageMinus aria-hidden="true" className="size-4" />
                 Remove
               </Button>
             </div>
-            <p className="mt-4 text-base/7 text-gray-600">JPG, PNG, or WebP. Maximum 2 MB.</p>
+            <p className="mt-3 text-xs text-muted-foreground">JPG, PNG, or WebP. Maximum 2 MB.</p>
           </div>
 
           <div className="sm:col-span-3">
-            <label htmlFor="profile-full-name" className="block text-sm/6 font-medium text-gray-900">Full name</label>
+            <label htmlFor="profile-full-name" className="block text-sm/6 font-semibold text-foreground">Full name</label>
             <div className="mt-2">
               <Input
                 id="profile-full-name"
-                className="block h-10 rounded-md border-gray-300 bg-white py-1.5 text-base text-gray-900 shadow-none outline-1 -outline-offset-1 outline-gray-300 focus-visible:border-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:ring-0 sm:text-sm/6"
+                className="h-10 rounded-lg border-input bg-card text-sm text-foreground focus-visible:border-primary focus-visible:ring-ring/20"
                 value={profile.fullName}
                 onChange={(event) => updateDraft({ fullName: event.target.value })}
               />
@@ -226,11 +226,11 @@ export function ProfilePage() {
           </div>
 
           <div className="sm:col-span-3">
-            <label htmlFor="profile-email" className="block text-sm/6 font-medium text-gray-900">Email</label>
+            <label htmlFor="profile-email" className="block text-sm/6 font-semibold text-foreground">Email</label>
             <div className="mt-2">
               <Input
                 id="profile-email"
-                className="block h-10 rounded-md border-gray-300 bg-gray-50 py-1.5 text-base text-gray-500 shadow-none outline-1 -outline-offset-1 outline-gray-300 sm:text-sm/6"
+                className="h-10 rounded-lg border-border bg-muted/50 text-sm text-muted-foreground shadow-none"
                 value={profile.email}
                 readOnly
               />
@@ -238,11 +238,11 @@ export function ProfilePage() {
           </div>
 
           <div className="col-span-full">
-            <label htmlFor="profile-bio" className="block text-sm/6 font-medium text-gray-900">About</label>
+            <label htmlFor="profile-bio" className="block text-sm/6 font-semibold text-foreground">About</label>
             <div className="mt-2">
               <textarea
                 id="profile-bio"
-                className="block min-h-28 w-full resize-y rounded-md border-0 bg-white px-3 py-1.5 text-base text-gray-900 shadow-none outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                className="block min-h-28 w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground shadow-[var(--ds-shadow-xs)] transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
                 maxLength={500}
                 placeholder="Write a few sentences about yourself."
                 rows={4}
@@ -250,30 +250,30 @@ export function ProfilePage() {
                 onChange={(event) => updateDraft({ bio: event.target.value })}
               />
             </div>
-            <p className="mt-3 text-right text-sm/6 text-gray-600">{profile.bio.length}/500</p>
+            <p className="mt-2 text-right text-xs text-muted-foreground">{profile.bio.length}/500</p>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-x-6">
-        <span className="text-sm/6 text-gray-500">Changes stay local until you save.</span>
+      <div className="flex flex-wrap items-center justify-end gap-4">
+        <span className="text-sm text-muted-foreground">Changes stay local until you save.</span>
         <Button
           type="submit"
-          className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 focus-visible:ring-0"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--ds-shadow-xs)] hover:bg-[#0d5e58] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           disabled={!hasUnsavedChanges || updateProfile.isPending}
         >
           <Save aria-hidden="true" />
           {updateProfile.isPending ? 'Saving profile...' : 'Save profile'}
         </Button>
       </div>
-      <section className="border-t border-gray-900/10 pt-8" aria-label="Google account linking">
-        <h2 className="text-lg font-semibold text-gray-900">Google account</h2>
+      <section className="border-t border-border pt-8" aria-label="Google account linking">
+        <h2 className="text-lg font-semibold text-foreground">Google account</h2>
         {profileQuery.data.isGoogleLinked ? (
-          <p className="mt-2 text-sm text-gray-600">Your Google account is linked.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Your Google account is linked.</p>
         ) : (
           <div className="mt-4 max-w-md space-y-3">
-            <p className="text-sm text-gray-600">Enter your current password, then choose the Google account to link.</p>
-            <label htmlFor="google-link-password" className="block text-sm font-medium text-gray-900">Current password</label>
+            <p className="text-sm text-muted-foreground">Enter your current password, then choose the Google account to link.</p>
+            <label htmlFor="google-link-password" className="block text-sm font-semibold text-foreground">Current password</label>
             <Input
               id="google-link-password"
               type="password"
@@ -288,8 +288,8 @@ export function ProfilePage() {
             />
           </div>
         )}
-        {googleLinkError ? <p role="alert" className="mt-3 text-sm text-red-600">{googleLinkError}</p> : null}
-        {googleLinkMessage ? <p role="status" className="mt-3 text-sm text-green-700">{googleLinkMessage}</p> : null}
+        {googleLinkError ? <p role="alert" className="mt-3 text-sm text-destructive">{googleLinkError}</p> : null}
+        {googleLinkMessage ? <p role="status" className="mt-3 text-sm text-primary">{googleLinkMessage}</p> : null}
       </section>
     </form>
   )

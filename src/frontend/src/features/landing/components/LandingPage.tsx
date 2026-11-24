@@ -1,5 +1,5 @@
 import { CalendarDays, FileText, ListTodo, TrendingUp, type LucideIcon } from 'lucide-react'
-import logoUrl from '@/shared/assets/fluenta-wordmark.webp'
+import logoUrl from '@/shared/assets/fluenta-wordmark.svg'
 import './landing.css'
 
 interface LandingPageProps {

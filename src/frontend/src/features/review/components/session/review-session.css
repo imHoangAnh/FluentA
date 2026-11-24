@@ -4,12 +4,12 @@
 }
 
 .review-figma-session {
-  --review-canvas: #f6f5f1;
-  --review-green: #236b5b;
-  --review-ink: #263d37;
-  --review-muted: #5f6d65;
-  --review-tint: #ddebe4;
-  --review-border: #cfd6cf;
+  --review-canvas: var(--ds-background, #f7f9f8);
+  --review-green: var(--ds-primary, #0f766e);
+  --review-ink: var(--ds-foreground, #14201e);
+  --review-muted: var(--ds-muted-foreground, #5b6d69);
+  --review-tint: var(--ds-secondary, #e7f5f2);
+  --review-border: var(--ds-border, #dce5e2);
   width: 100%;
   max-width: 1120px;
   margin-inline: auto;
@@ -17,6 +17,7 @@
   flex-direction: column;
   gap: 22px;
   color: var(--review-ink);
+  font-family: var(--font-sans, "Open Sans", "Segoe UI", sans-serif);
 }
 
 .review-figma-session__header {
@@ -325,8 +326,8 @@
 }
 
 .review-figma-session__record-button:hover {
-  border-color: #1d5b4e;
-  background: #1d5b4e;
+  border-color: var(--ds-primary-hover, #0d5e58);
+  background: var(--ds-primary-hover, #0d5e58);
 }
 
 .review-figma-session__record-button--recording {
@@ -433,8 +434,8 @@
 }
 
 .review-figma-session__submit-button:hover {
-  border-color: #1d5b4e;
-  background: #1d5b4e;
+  border-color: var(--ds-primary-hover, #0d5e58);
+  background: var(--ds-primary-hover, #0d5e58);
 }
 
 .review-figma-session__shortcut {
@@ -562,8 +563,8 @@
 }
 
 .review-figma-session__done-button:hover {
-  border-color: #1d5b4e;
-  background: #1d5b4e;
+  border-color: var(--ds-primary-hover, #0d5e58);
+  background: var(--ds-primary-hover, #0d5e58);
 }
 
 .review-figma-session__loading,

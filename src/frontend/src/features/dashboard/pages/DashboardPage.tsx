@@ -1,6 +1,6 @@
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { CalendarClock, FolderKanban, ListChecks, Repeat2, RotateCcw } from 'lucide-react'
+import { CalendarClock, FolderKanban, ListChecks, Moon, Repeat2, RotateCcw, Sun, Sunrise, Sunset } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth'
@@ -23,11 +23,18 @@ import { SortableDashboardWidget } from '../components/SortableDashboardWidget'
 import { dashboardWidgetLabel, dashboardWidgetRows, type DashboardWidgetId } from '../model/dashboard-widgets'
 import { normalizeDashboardWidgetOrder, persistDashboardWidgetOrder, readDashboardWidgetOrder, reorderDashboardWidgets, toggleDashboardWidget } from '../model/dashboard-widget-preferences'
 
-function greeting(hour: number, name: string) {
-  if (hour >= 5 && hour < 12) return `Good morning 🌅, ${name}`
-  if (hour >= 12 && hour < 17) return `Good afternoon ☀️, ${name}`
-  if (hour >= 17 && hour < 21) return `Good evening 🌇, ${name}`
-  return `Good night 🌙, ${name}`
+function greetingText(hour: number, name: string) {
+  if (hour >= 5 && hour < 12) return `Good morning, ${name}`
+  if (hour >= 12 && hour < 17) return `Good afternoon, ${name}`
+  if (hour >= 17 && hour < 21) return `Good evening, ${name}`
+  return `Good night, ${name}`
+}
+
+function GreetingIcon({ hour }: { hour: number }) {
+  if (hour >= 5 && hour < 12) return <Sunrise className="size-4 text-primary" aria-hidden="true" />
+  if (hour >= 12 && hour < 17) return <Sun className="size-4 text-primary" aria-hidden="true" />
+  if (hour >= 17 && hour < 21) return <Sunset className="size-4 text-primary" aria-hidden="true" />
+  return <Moon className="size-4 text-primary" aria-hidden="true" />
 }
 
 function remainingText(targetDate: string, now: Date) {
@@ -192,9 +199,14 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3" data-testid="dashboard-overview">
-      <section className="flex shrink-0 flex-wrap items-end justify-between gap-3" aria-labelledby="welcome-heading">
+      <section className="flex shrink-0 flex-wrap items-end justify-between gap-3 pb-1" aria-labelledby="welcome-heading">
         <div className="min-w-0">
-          <h2 id="welcome-heading" className="m-0 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-3xl">{greeting(appHour(now), displayName)}</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/20 bg-secondary">
+              <GreetingIcon hour={appHour(now)} />
+            </span>
+            <h2 id="welcome-heading" className="m-0 truncate text-2xl font-bold tracking-[-0.03em] text-foreground sm:text-[28px]">{greetingText(appHour(now), displayName)}</h2>
+          </div>
           <p className="m-0 mt-1.5 text-sm text-muted-foreground">{formatVietnamDateOnly(today, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <DashboardWidgetMenu visibleWidgets={visibleWidgets} onToggle={handleWidgetToggle} />

@@ -477,7 +477,7 @@ export function ProjectPage() {
               <div className="project-filter-bar" aria-label="Project card filters">
                 <SelectMenu
                   className="project-filter-control"
-                  buttonClassName="min-h-[32px] h-8 rounded-md border-[var(--ds-border)] px-2.5 py-1 text-xs font-medium"
+                  buttonClassName="!min-h-[34px] h-[34px] flex items-center rounded-lg border-[var(--ds-input)] px-3 !py-0 text-xs font-medium"
                   aria-label="Filter by priority"
                   value={filters.priority}
                   onChange={(priority) => setFilters((current) => ({ ...current, priority }))}
@@ -485,7 +485,7 @@ export function ProjectPage() {
                 />
                 <SelectMenu
                   className="project-filter-control"
-                  buttonClassName="min-h-[32px] h-8 rounded-md border-[var(--ds-border)] px-2.5 py-1 text-xs font-medium"
+                  buttonClassName="!min-h-[34px] h-[34px] flex items-center rounded-lg border-[var(--ds-input)] px-3 !py-0 text-xs font-medium"
                   aria-label="Filter by deadline"
                   value={filters.deadline}
                   onChange={(deadline) => setFilters((current) => ({ ...current, deadline }))}
@@ -715,14 +715,20 @@ export function ProjectPage() {
         </AlertDialog>
 
 
-        {/* Card Editor Dialog */}
-        <Dialog open={!!cardEditor} onOpenChange={(open) => { if (!open) closeEditor() }}>
-          <DialogContent className="max-w-xl border-0 bg-transparent p-0 shadow-none">
+        {/* Card Editor Right Slide-Over Sheet */}
+        <Dialog open={!!cardEditor} onOpenChange={(open) => { if (!open && !deletingCard) closeEditor() }}>
+          <DialogContent
+            aria-label="Card details"
+            className="left-auto right-0 top-0 bottom-0 h-dvh w-full max-w-[500px] translate-x-0 translate-y-0 rounded-none border-0 bg-transparent p-0 shadow-none"
+            aria-describedby={undefined}
+            onEscapeKeyDown={(event) => { if (deletingCard) event.preventDefault() }}
+          >
             <ProjectCardDetailPanel
               mode={cardEditor?.mode ?? 'create'}
               editorKey={cardEditor ? (cardEditor.mode === 'create' ? `create-${cardEditor.columnId}` : `edit-${cardEditor.card.id}`) : 'none'}
               form={cardForm}
               pending={cardMutationPending}
+              suspendEscape={Boolean(deletingCard)}
               onChange={setCardForm}
               onSubmit={submitCard}
               onClose={closeEditor}

@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDia
 import * as todoApi from '../api/todo.api'
 import { todoKeys } from '../api/todo.queries'
 import { MyDayView } from '../components/MyDayView'
-import { TodoDetailsEmptyState, TodoDetailsPanel } from '../components/TodoDetailsPanel'
+import { TodoDetailsPanel } from '../components/TodoDetailsPanel'
 import { TodoPageHeader } from '../components/TodoPageHeader'
 import { TodoSortMenu } from '../components/TodoSortMenu'
 import { formatMyDayDate, formatWeekRange, shiftDate, weekDates } from '../model/todo-date'
@@ -215,7 +215,7 @@ export function TodoPage() {
       />
 
       {activeView === 'my-day' ? (
-        <main className="todo-main-layout todo-main-layout--details">
+        <main className="todo-main-layout">
             <div className="todo-main-layout__primary">
               <div className="todo-my-day__sort-row">
                 <TodoSortMenu sortMode={sortMode} onSortChange={changeSortMode} />
@@ -243,19 +243,9 @@ export function TodoPage() {
                 </p>
               ) : null}
             </div>
-            {selectedTask ? (
-              <TodoDetailsPanel
-                key={selectedTask.id}
-                item={selectedTask}
-                pending={updateTodo.isPending}
-                onClose={closeDetails}
-                onUpdate={updateTask}
-                onDelete={(item) => setDeletingTask(item)}
-              />
-            ) : <TodoDetailsEmptyState />}
         </main>
       ) : (
-        <main className="todo-main-layout todo-main-layout--week todo-main-layout--week-details">
+        <main className="todo-main-layout todo-main-layout--week">
           <div className="todo-week-surface">
             {weekQuery.isLoading ? <p className="todo-my-day__status" role="status">Loading week...</p> : null}
             {weekQuery.isError ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load Todo week.</p> : null}
@@ -275,18 +265,23 @@ export function TodoPage() {
               />
             ) : null}
           </div>
-          {selectedTask ? (
-            <TodoDetailsPanel
-              key={selectedTask.id}
-              item={selectedTask}
-              pending={updateTodo.isPending}
-              onClose={closeDetails}
-              onUpdate={updateTask}
-              onDelete={(item) => setDeletingTask(item)}
-            />
-          ) : <TodoDetailsEmptyState />}
         </main>
       )}
+
+      {selectedTask ? (
+        <>
+          <div className="todo-sheet-backdrop" aria-hidden="true" onClick={closeDetails} />
+          <TodoDetailsPanel
+            key={selectedTask.id}
+            item={selectedTask}
+            pending={updateTodo.isPending}
+            suspendEscape={Boolean(deletingTask)}
+            onClose={closeDetails}
+            onUpdate={updateTask}
+            onDelete={(item) => setDeletingTask(item)}
+          />
+        </>
+      ) : null}
 
       <AlertDialog open={!!deletingTask} onOpenChange={(open) => { if (!open && !deleteTodo.isPending) setDeletingTask(null) }}>
         <AlertDialogContent>
