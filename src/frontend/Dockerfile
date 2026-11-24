@@ -14,7 +14,7 @@ ARG GOOGLE_CLIENT_ID
 RUN google_client_prefix="${GOOGLE_CLIENT_ID%.apps.googleusercontent.com}" \
     && test "${#VCS_REF}" -eq 40 \
     && case "$VCS_REF" in *[!0-9a-f]*) exit 1 ;; esac \
-    && test "$API_URL" = "https://api.sophion.io.vn/api/v1" \
+    && test "$API_URL" = "/api/v1" \
     && test -n "$google_client_prefix" \
     && test "$google_client_prefix" != "$GOOGLE_CLIENT_ID" \
     && case "$GOOGLE_CLIENT_ID" in *[!0-9A-Za-z._-]*) exit 1 ;; esac \
