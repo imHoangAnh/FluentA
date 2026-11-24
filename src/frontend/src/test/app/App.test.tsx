@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/app/App'
@@ -46,11 +46,11 @@ function createQueryClient() {
   queryClient.setQueryData(['vocab', 'boards'], [])
   queryClient.setQueryData(['review', 'dashboard'], { localDate: today, dueCount: 0 })
   queryClient.setQueryData(['profile'], {
-      id: 'user-1',
-      email: 'learner@example.com',
-      fullName: 'FluentA Learner',
-      isEmailVerified: true,
-      bio: '',
+    id: 'user-1',
+    email: 'learner@example.com',
+    fullName: 'FluentA Learner',
+    isEmailVerified: true,
+    bio: '',
   })
   queryClient.setQueryData(['countdown', 'events'], [])
   queryClient.setQueryData(['habit', 'list', timeZone], [])
@@ -114,15 +114,23 @@ describe('FluentA app routes', async () => {
     await renderApp('/')
 
     expect(screen.getByRole('heading', { name: /Good|Burning midnight oil/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Learning' }))
     expect(screen.getByRole('link', { name: 'Vocabulary' })).toHaveAttribute('href', '/vocabulary')
     expect(screen.getByRole('link', { name: 'Practice' })).toHaveAttribute('href', '/practice')
     expect(screen.getByRole('button', { name: 'Review' })).toHaveAttribute('aria-haspopup', 'dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Productivity' }))
     expect(screen.getByRole('link', { name: 'Todo' })).toHaveAttribute('href', '/todo')
     expect(screen.getByRole('link', { name: 'Habits' })).toHaveAttribute('href', '/habits')
     expect(screen.getByRole('link', { name: 'Countdowns' })).toHaveAttribute('href', '/countdowns')
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/project')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Personal' }))
     expect(screen.getByRole('link', { name: 'Journal' })).toHaveAttribute('href', '/journal')
     expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
-    expect(screen.getByRole('link', { name: 'Project' })).toHaveAttribute('href', '/project')
+
     expect(screen.queryByRole('link', { name: 'Pomodoro' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
   })
@@ -150,8 +158,8 @@ describe('FluentA app routes', async () => {
     await renderApp('/profile')
 
     expect(screen.getByRole('main').querySelector('form h1')).toHaveTextContent('Profile')
+    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }))
     expect(screen.getByRole('link', { name: 'Open profile' })).toHaveAttribute('href', '/profile')
     expect(screen.queryByRole('navigation', { name: 'Settings navigation' })).not.toBeInTheDocument()
   })
-
 })

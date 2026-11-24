@@ -18,10 +18,19 @@ const practiceRoute = (pathname: string) => pathname === '/practice'
 
 export const shellNavigationSections: ShellNavigationSection[] = [
   {
-    label: 'Studying',
+    label: 'Learning',
     items: [
-      { to: '/vocabulary', label: 'Vocabulary', icon: LibraryBig },
-      { to: '/practice', label: 'Practice', icon: Dumbbell, isActive: practiceRoute },
+      {
+        to: '/vocabulary',
+        label: 'Vocabulary',
+        icon: LibraryBig,
+      },
+      {
+        to: '/practice',
+        label: 'Practice',
+        icon: Dumbbell,
+        isActive: practiceRoute,
+      },
       {
         to: '/review',
         label: 'Review',
@@ -34,12 +43,41 @@ export const shellNavigationSections: ShellNavigationSection[] = [
   {
     label: 'Productivity',
     items: [
-      { to: '/todo', label: 'Todo', icon: ListChecks },
-      { to: '/habits', label: 'Habits', icon: Repeat2 },
-      { to: '/countdowns', label: 'Countdowns', icon: CalendarClock },
-      { to: '/journal', label: 'Journal', icon: NotebookPen },
-      { to: '/notes', label: 'Notes', icon: StickyNote },
-      { to: '/project', label: 'Project', icon: FolderKanban },
+      {
+        to: '/todo',
+        label: 'Todo',
+        icon: ListChecks,
+      },
+      {
+        to: '/habits',
+        label: 'Habits',
+        icon: Repeat2,
+      },
+      {
+        to: '/countdowns',
+        label: 'Countdowns',
+        icon: CalendarClock,
+      },
+      {
+        to: '/project',
+        label: 'Projects',
+        icon: FolderKanban,
+      },
+    ],
+  },
+  {
+    label: 'Personal',
+    items: [
+      {
+        to: '/journal',
+        label: 'Journal',
+        icon: NotebookPen,
+      },
+      {
+        to: '/notes',
+        label: 'Notes',
+        icon: StickyNote,
+      },
     ],
   },
 ]

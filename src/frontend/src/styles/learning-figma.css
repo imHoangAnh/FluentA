@@ -5,23 +5,23 @@
 }
 
 .practice-library-main {
-  background: #f6f5f1;
-  padding: 36px clamp(16px, 3vw, 44px);
+  background: var(--ds-background, #f7f9f8);
+  padding: 28px clamp(16px, 3vw, 40px);
 }
 
 .learning-figma-main {
-  background: #f6f5f1;
-  font-family: 'Inter Variable', Inter, sans-serif;
-  padding: 40px clamp(16px, 3vw, 48px);
+  background: var(--ds-background, #f7f9f8);
+  font-family: var(--font-sans, "Open Sans", "Segoe UI", sans-serif);
+  padding: 32px clamp(16px, 3vw, 44px);
   min-height: 100vh;
 }
 
 @media (max-width: 800px) {
-  .practice-library-main { padding: 24px 16px; }
-  .learning-figma-main { padding: 24px 16px; }
+  .practice-library-main { padding: 20px 16px; }
+  .learning-figma-main { padding: 20px 16px; }
 }
 
 @media (max-width: 480px) {
-  .practice-library-main { padding: 20px 12px; }
-  .learning-figma-main { padding: 20px 12px; }
+  .practice-library-main { padding: 16px 12px; }
+  .learning-figma-main { padding: 16px 12px; }
 }
