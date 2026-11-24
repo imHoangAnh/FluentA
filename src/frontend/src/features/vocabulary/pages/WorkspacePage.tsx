@@ -1,15 +1,14 @@
 import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
-import { BookOpenText, FileText, FolderPlus, Plus, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { BookOpenText, FileText, Folder, FolderPlus, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { useAuthStore } from '@/features/auth'
-import { CreateBoardDialog, CreatePageDialog, UpdateBoardDialog } from '../components/CreateVocabularyDialog'
+import { BoardSettingsDialog, CreateBoardDialog, CreatePageDialog } from '../components/CreateVocabularyDialog'
 import { VocabTable } from '../components/VocabTable'
 import { Button } from '@/shared/components/ui/button'
 import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
-import { Input } from '@/shared/components/ui/input'
 import { toast } from '@/shared/lib/toast'
 import * as vocabularyApi from '../api/vocabulary.api'
 import { vocabularyKeys, refreshLearningAfterVocabularyDeletion } from '../api/vocabulary.queries'
@@ -19,17 +18,28 @@ type DeleteTarget =
   | { kind: 'board'; boardId: string; name: string }
   | { kind: 'page'; boardId: string; pageId: string; name: string }
 
-type BoardUpdateTarget = {
+type BoardSettingsTarget = {
   boardId: string
   name: string
   language: string
   includedOptionalColumns: string[]
 }
 
-type RenameTarget = { boardId: string; pageId: string; name: string }
+type RenameBoardTarget = {
+  boardId: string
+  name: string
+  language: string
+}
+
+type RenamePageTarget = {
+  boardId: string
+  pageId: string
+  name: string
+}
 
 const boardSelectionStorageKey = 'fluenta:vocabulary:selected-board'
 const pageSelectionStorageKey = 'fluenta:vocabulary:selected-page'
+const sidebarCollapsedStorageKey = 'fluenta:vocabulary:sidebar-collapsed'
 
 function readSessionSelection(key: string): string | null {
   if (typeof window === 'undefined') return null
@@ -50,7 +60,7 @@ function writeSessionSelection(key: string, value: string | null) {
   }
 }
 
-function vocabularySnapshotKey(userId: string, section: 'boards' | 'board' | 'words', id?: string) {
+function vocabularySnapshotKey(userId: string, section: 'boards' | 'board', id?: string) {
   return `fluenta:vocabulary:snapshot:${userId}:${section}${id ? `:${id}` : ''}`
 }
 
@@ -141,54 +151,11 @@ function normalizeBoardDetail(value: unknown): vocabularyApi.BoardDetail | undef
   return preferences ? { ...detail, preferences } : undefined
 }
 
-function isWordType(value: unknown): value is vocabularyApi.WordType {
-  return typeof value === 'string'
-    && vocabularyApi.WORD_TYPE_OPTIONS.some((option) => option.value === value)
-}
-
-function stringOrEmpty(value: unknown) {
-  return typeof value === 'string' ? value : ''
-}
-
-function nullableString(value: unknown) {
-  return value === null || typeof value === 'string' ? value : null
-}
-
-function normalizeWordSnapshot(value: unknown): vocabularyApi.Word | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const word = value as Record<string, unknown>
-  if (typeof word.id !== 'string' || typeof word.pageId !== 'string' || typeof word.word !== 'string') return undefined
-
-  const rawType = typeof word.type === 'string' ? word.type : word.class
-  const contextValue = Object.prototype.hasOwnProperty.call(word, 'context') ? word.context : word.definition
-
-  return {
-    id: word.id,
-    pageId: word.pageId,
-    word: word.word,
-    meaning: stringOrEmpty(typeof word.meaning === 'string' ? word.meaning : word.meaningVn),
-    ipaPronunciation: stringOrEmpty(word.ipaPronunciation),
-    type: isWordType(rawType) ? rawType : 'other',
-    context: nullableString(contextValue),
-    example: stringOrEmpty(word.example),
-    synonyms: nullableString(word.synonyms),
-    antonyms: nullableString(word.antonyms),
-    createdAt: stringOrEmpty(word.createdAt),
-    updatedAt: stringOrEmpty(word.updatedAt),
-  }
-}
-
-function normalizeWords(value: unknown): vocabularyApi.Word[] | undefined {
-  if (!Array.isArray(value)) return undefined
-  const normalized = value.map(normalizeWordSnapshot)
-  return normalized.every((word): word is vocabularyApi.Word => word !== undefined) ? normalized : undefined
-}
-
 function newestFirst<T extends { createdAt: string; id: string }>(items: T[]) {
   return items.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
 }
 
-function focusHorizontalTab<T extends { id: string }>(
+function focusVerticalTab<T extends { id: string }>(
   event: KeyboardEvent<HTMLButtonElement>,
   items: T[],
   currentId: string,
@@ -202,9 +169,9 @@ function focusHorizontalTab<T extends { id: string }>(
     ? 0
     : event.key === 'End'
       ? items.length - 1
-      : event.key === 'ArrowRight'
+      : event.key === 'ArrowDown'
         ? (currentIndex + 1) % items.length
-        : event.key === 'ArrowLeft'
+        : event.key === 'ArrowUp'
           ? (currentIndex - 1 + items.length) % items.length
           : -1
 
@@ -222,17 +189,13 @@ export function WorkspacePage() {
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(() => readSessionSelection(boardSelectionStorageKey))
   const [selectedPageId, setSelectedPageId] = useState<string | null>(() => readSessionSelection(pageSelectionStorageKey))
   const [isCreatingBoard, setIsCreatingBoard] = useState(false)
-  const [isCreatingPage, setIsCreatingPage] = useState(false)
-  const [boardUpdateTarget, setBoardUpdateTarget] = useState<BoardUpdateTarget | null>(null)
+  const [createPageBoardTarget, setCreatePageBoardTarget] = useState<{ id: string; name: string } | null>(null)
+  const [boardSettingsTarget, setBoardSettingsTarget] = useState<BoardSettingsTarget | null>(null)
+  const [renameBoardTarget, setRenameBoardTarget] = useState<RenameBoardTarget | null>(null)
+  const [renamePageTarget, setRenamePageTarget] = useState<RenamePageTarget | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
-  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
-  const [boardSearch, setBoardSearch] = useState('')
-  const [pageSearch, setPageSearch] = useState('')
   const [wordSearch, setWordSearch] = useState('')
-  const boardRowRef = useRef<HTMLDivElement>(null)
-  const boardScrollRef = useRef<HTMLDivElement>(null)
-  const pageRowRef = useRef<HTMLDivElement>(null)
-  const pageScrollRef = useRef<HTMLDivElement>(null)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => readSessionSelection(sidebarCollapsedStorageKey) === 'true')
 
   const boardsQuery = useQuery({
     queryKey: vocabularyKeys.boards,
@@ -274,15 +237,6 @@ export function WorkspacePage() {
     writeSessionSelection(pageSelectionStorageKey, activePage?.id ?? null)
   }, [activePage?.id, boardQuery.isSuccess])
 
-  const activeWordsQuery = useQuery({
-    queryKey: vocabularyKeys.words(activePage?.id ?? 'none'),
-    queryFn: () => vocabularyApi.listWords(activePage!.id),
-    enabled: Boolean(activeBoardId && activePage),
-    initialData: () => userId && activePage
-      ? readSessionSnapshot(vocabularySnapshotKey(userId, 'words', activePage.id), normalizeWords)
-      : undefined,
-  })
-
   useEffect(() => {
     if (userId && boardsQuery.data) {
       writeSessionSnapshot(vocabularySnapshotKey(userId, 'boards'), boardsQuery.data)
@@ -296,44 +250,8 @@ export function WorkspacePage() {
   }, [activeBoard, userId])
 
   useEffect(() => {
-    if (userId && activePage && activeWordsQuery.data) {
-      writeSessionSnapshot(vocabularySnapshotKey(userId, 'words', activePage.id), activeWordsQuery.data)
-    }
-  }, [activePage, activeWordsQuery.data, userId])
-
-  const visibleBoards = useMemo(() => {
-    const term = boardSearch.trim().toLocaleLowerCase()
-    return term ? sortedBoards.filter((board) => board.name.toLocaleLowerCase().includes(term)) : sortedBoards
-  }, [boardSearch, sortedBoards])
-
-  const visiblePages = useMemo(() => {
-    const term = pageSearch.trim().toLocaleLowerCase()
-    return term ? sortedPages.filter((page) => page.name.toLocaleLowerCase().includes(term)) : sortedPages
-  }, [pageSearch, sortedPages])
-
-  useEffect(() => {
-    const wheelTargets = [
-      [boardRowRef.current, boardScrollRef.current],
-      [pageRowRef.current, pageScrollRef.current],
-    ] as const
-    const cleanups = wheelTargets.flatMap(([row, scroller]) => {
-      if (!row || !scroller) return []
-
-      const handleWheel = (event: WheelEvent) => {
-        if (event.deltaY === 0) return
-
-        const previousScrollLeft = scroller.scrollLeft
-        const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth
-        scroller.scrollLeft = Math.max(0, Math.min(maxScrollLeft, previousScrollLeft + event.deltaY))
-        if (scroller.scrollLeft !== previousScrollLeft) event.preventDefault()
-      }
-
-      row.addEventListener('wheel', handleWheel, { passive: false })
-      return [() => row.removeEventListener('wheel', handleWheel)]
-    })
-
-    return () => cleanups.forEach((cleanup) => cleanup())
-  }, [activeBoard?.id])
+    writeSessionSelection(sidebarCollapsedStorageKey, isSidebarCollapsed ? 'true' : 'false')
+  }, [isSidebarCollapsed])
 
   const createBoard = useMutation({
     mutationFn: vocabularyApi.createBoard,
@@ -350,12 +268,14 @@ export function WorkspacePage() {
 
   const createPage = useMutation({
     mutationFn: (input: { boardId: string; name: string }) => vocabularyApi.createPage(input.boardId, { name: input.name }),
-    onSuccess: async (page) => {
+    onSuccess: async (page, input) => {
+      setSelectedBoardId(input.boardId)
       setSelectedPageId(page.id)
-      setIsCreatingPage(false)
+      setWordSearch('')
+      setCreatePageBoardTarget(null)
       toast.success('Page created successfully')
       await queryClient.invalidateQueries({ queryKey: vocabularyKeys.boards })
-      await queryClient.invalidateQueries({ queryKey: vocabularyKeys.board(activeBoardId) })
+      await queryClient.invalidateQueries({ queryKey: vocabularyKeys.board(input.boardId) })
     },
   })
 
@@ -366,37 +286,61 @@ export function WorkspacePage() {
       columnWidths: input.preferences.columnWidths,
     }),
     onSuccess: (preferences, input) => {
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(input.boardId), (current) => current ? { ...current, preferences } : current)
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(
+        vocabularyKeys.board(input.boardId),
+        (current) => (current ? { ...current, preferences } : current),
+      )
     },
   })
 
-  const updateBoard = useMutation({
-    mutationFn: (input: { target: BoardUpdateTarget; name: string; language: string; includedOptionalColumns: string[] }) =>
+  const renameBoard = useMutation({
+    mutationFn: (input: { target: RenameBoardTarget; name: string }) =>
       vocabularyApi.updateBoard(input.target.boardId, {
         name: input.name,
+        language: input.target.language,
+      }),
+    onSuccess: (board) => {
+      queryClient.setQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards, (current = []) =>
+        current.map((item) => (item.id === board.id
+          ? { ...item, name: board.name, language: board.language, updatedAt: board.updatedAt }
+          : item)),
+      )
+      queryClient.setQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(board.id), board)
+      setRenameBoardTarget(null)
+      toast.success('Board renamed successfully')
+    },
+  })
+
+  const updateBoardSettings = useMutation({
+    mutationFn: (input: { target: BoardSettingsTarget; language: string; includedOptionalColumns: string[] }) =>
+      vocabularyApi.updateBoard(input.target.boardId, {
+        name: input.target.name,
         language: input.language,
         includedOptionalColumns: input.includedOptionalColumns,
       }),
     onSuccess: (board) => {
       queryClient.setQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards, (current = []) =>
-        current.map((item) => item.id === board.id
+        current.map((item) => (item.id === board.id
           ? { ...item, name: board.name, language: board.language, updatedAt: board.updatedAt }
-          : item),
+          : item)),
       )
       queryClient.setQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(board.id), board)
-      setBoardUpdateTarget(null)
-      toast.success('Board updated successfully')
+      setBoardSettingsTarget(null)
+      toast.success('Board settings updated')
     },
   })
 
   const renamePage = useMutation({
-    mutationFn: (input: { target: RenameTarget; name: string }) =>
+    mutationFn: (input: { target: RenamePageTarget; name: string }) =>
       vocabularyApi.updatePage(input.target.pageId, { name: input.name }),
     onSuccess: (page, input) => {
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(vocabularyKeys.board(input.target.boardId), (board) => board
-        ? { ...board, pages: board.pages.map((item) => item.id === page.id ? page : item) }
-        : board)
-      setRenameTarget(null)
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(
+        vocabularyKeys.board(input.target.boardId),
+        (board) => (board
+          ? { ...board, pages: board.pages.map((item) => (item.id === page.id ? page : item)) }
+          : board),
+      )
+      setRenamePageTarget(null)
       toast.success('Page renamed successfully')
     },
   })
@@ -404,11 +348,16 @@ export function WorkspacePage() {
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<DeleteTarget, { kind: 'board' }>) => vocabularyApi.deleteBoard(target.boardId),
     onSuccess: (_, target) => {
-      const remainingBoards = newestFirst((queryClient.getQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards) ?? []).filter((board) => board.id !== target.boardId))
+      const remainingBoards = newestFirst(
+        (queryClient.getQueryData<vocabularyApi.BoardSummary[]>(vocabularyKeys.boards) ?? [])
+          .filter((board) => board.id !== target.boardId),
+      )
       const deletedBoard = queryClient.getQueryData<vocabularyApi.BoardDetail>(vocabularyKeys.board(target.boardId))
       queryClient.setQueryData(vocabularyKeys.boards, remainingBoards)
       queryClient.removeQueries({ queryKey: vocabularyKeys.board(target.boardId), exact: true })
-      for (const page of deletedBoard?.pages ?? []) queryClient.removeQueries({ queryKey: vocabularyKeys.words(page.id), exact: true })
+      for (const page of deletedBoard?.pages ?? []) {
+        queryClient.removeQueries({ queryKey: vocabularyKeys.words(page.id), exact: true })
+      }
       setSelectedBoardId(remainingBoards[0]?.id ?? null)
       setSelectedPageId(null)
       requestAnimationFrame(() => document.getElementById(remainingBoards[0] ? `vocabulary-board-tab-${remainingBoards[0].id}` : 'vocabulary-add-board')?.focus())
@@ -425,7 +374,7 @@ export function WorkspacePage() {
       const boardKey = vocabularyKeys.board(target.boardId)
       const current = queryClient.getQueryData<vocabularyApi.BoardDetail>(boardKey)
       const remainingPages = newestFirst((current?.pages ?? []).filter((page) => page.id !== target.pageId))
-      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(boardKey, (board) => board ? { ...board, pages: remainingPages } : board)
+      queryClient.setQueryData<vocabularyApi.BoardDetail | undefined>(boardKey, (board) => (board ? { ...board, pages: remainingPages } : board))
       queryClient.removeQueries({ queryKey: vocabularyKeys.words(target.pageId), exact: true })
       setSelectedPageId(remainingPages[0]?.id ?? null)
       requestAnimationFrame(() => document.getElementById(remainingPages[0] ? `vocabulary-page-tab-${remainingPages[0].id}` : 'vocabulary-add-page')?.focus())
@@ -440,8 +389,7 @@ export function WorkspacePage() {
   function selectBoard(boardId: string) {
     setSelectedBoardId(boardId)
     setSelectedPageId(null)
-    setIsCreatingPage(false)
-    setPageSearch('')
+    setCreatePageBoardTarget(null)
     setWordSearch('')
   }
 
@@ -455,14 +403,20 @@ export function WorkspacePage() {
     setIsCreatingBoard(true)
   }
 
-  async function openUpdateBoardDialog(board: vocabularyApi.BoardSummary) {
+  function openCreatePageDialog(board: { id: string; name: string }) {
+    createPage.reset()
+    setCreatePageBoardTarget({ id: board.id, name: board.name })
+  }
+
+  async function openBoardSettingsDialog(board: vocabularyApi.BoardSummary) {
+    updateBoardSettings.reset()
     try {
       const detail = await queryClient.fetchQuery({
         queryKey: vocabularyKeys.board(board.id),
         queryFn: () => vocabularyApi.getBoard(board.id),
         staleTime: 0,
       })
-      setBoardUpdateTarget({
+      setBoardSettingsTarget({
         boardId: detail.id,
         name: detail.name,
         language: detail.language,
@@ -475,253 +429,412 @@ export function WorkspacePage() {
     }
   }
 
-  function openCreatePageDialog() {
-    createPage.reset()
-    setIsCreatingPage(true)
-  }
-
-  function confirmRename(name: string) {
-    if (!renameTarget) return
-    renamePage.mutate({ target: renameTarget, name })
-  }
-
   return (
     <>
-      <div className="flex h-full min-h-0 min-w-0">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          <Card className="shrink-0 border-border bg-card px-3.5 py-1.5 sm:px-4 sm:py-2" data-testid="vocabulary-board-section">
-            <div ref={boardRowRef} className="flex min-w-0 items-center gap-2">
-              <Button id="vocabulary-add-board" type="button" variant="outline" size="sm" className="h-8 w-20 shrink-0 justify-center rounded-full px-3" aria-label="New board" onClick={openCreateBoardDialog}>
-                <Plus className="size-3.5" /> New
-              </Button>
-              <div className="relative w-36 shrink-0 sm:w-44">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  id="vocabulary-board-search"
-                  aria-label="Filter boards"
-                  className="h-8 rounded-full pl-8 text-xs"
-                  placeholder="Find a board..."
-                  value={boardSearch}
-                  onChange={(event) => setBoardSearch(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setBoardSearch('')
-                  }}
-                />
-              </div>
-              <div ref={boardScrollRef} role="tablist" aria-label="Vocabulary boards" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="vocabulary-board-scroll">
-                {visibleBoards.map((board) => (
-                  <ContextMenu key={board.id}>
-                    <ContextMenuTrigger asChild>
-                      <button
-                        id={`vocabulary-board-tab-${board.id}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeBoardId === board.id}
-                        tabIndex={activeBoardId === board.id ? 0 : -1}
-                        title={board.name}
-                        className={cn(
-                          'h-8 max-w-44 shrink-0 rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-                          activeBoardId === board.id && 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
-                        )}
-                        onClick={() => selectBoard(board.id)}
-                        onKeyDown={(event) => focusHorizontalTab(event, visibleBoards, board.id, 'vocabulary-board-tab', selectBoard)}
-                      >
-                        <span className="block max-w-36 truncate">{board.name}</span>
-                      </button>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => { void openUpdateBoardDialog(board) }}>Update Board</ContextMenuItem>
-                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deleteBoard.reset(); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }) }}>Delete Board</ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))}
-                {boardsQuery.isSuccess && visibleBoards.length === 0 ? <span className="px-2 text-xs text-muted-foreground">No boards found</span> : null}
+      <div className="flex h-full min-h-0 min-w-0 flex-col bg-background md:flex-row">
+        <aside
+          aria-label="Vocabulary boards"
+          data-testid="vocabulary-boards-rail"
+          data-collapsed={isSidebarCollapsed ? 'true' : 'false'}
+          className={cn(
+            'flex shrink-0 border-b border-border bg-card transition-[width] duration-200 md:h-full md:max-h-none md:border-b-0 md:border-r',
+            isSidebarCollapsed
+              ? 'w-full flex-row items-center gap-2 overflow-x-auto px-3 py-2 md:w-[56px] md:flex-col md:items-center md:gap-3 md:overflow-x-hidden md:overflow-y-auto md:px-2 md:py-[22px]'
+              : 'max-h-60 w-full flex-col gap-[14px] overflow-y-auto px-[18px] py-[22px] md:w-[260px]',
+          )}
+        >
+          {isSidebarCollapsed ? (
+            <div className="flex shrink-0 items-center gap-1.5 md:flex-col">
+              <button
+                type="button"
+                data-testid="vocabulary-sidebar-toggle"
+                aria-label="Expand sidebar"
+                aria-expanded={false}
+                title="Expand sidebar"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[8px] bg-muted text-foreground/80 transition-colors hover:bg-secondary hover:text-secondary-foreground"
+              >
+                <PanelLeftOpen className="size-[15px]" aria-hidden="true" />
+              </button>
+              <button
+                id="vocabulary-add-board"
+                type="button"
+                aria-label="New board"
+                title="New board"
+                onClick={openCreateBoardDialog}
+                className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[8px] bg-muted text-foreground/80 transition-colors hover:bg-secondary hover:text-secondary-foreground"
+              >
+                <Plus className="size-[15px]" aria-hidden="true" />
+              </button>
+              <div className="h-5 w-px shrink-0 bg-border md:h-px md:w-6" aria-hidden="true" />
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase leading-[18px] tracking-[0.7px] text-muted-foreground">
+                BOARDS
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  id="vocabulary-add-board"
+                  type="button"
+                  aria-label="New board"
+                  title="New board"
+                  onClick={openCreateBoardDialog}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-[6px] bg-muted px-[6px] py-[4px] text-foreground/80 transition-colors hover:bg-secondary hover:text-secondary-foreground"
+                >
+                  <Plus className="size-[14px]" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  data-testid="vocabulary-sidebar-toggle"
+                  aria-label="Collapse sidebar"
+                  aria-expanded={true}
+                  title="Collapse sidebar"
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-[6px] bg-muted px-[6px] py-[4px] text-foreground/80 transition-colors hover:bg-secondary hover:text-secondary-foreground"
+                >
+                  <PanelLeftClose className="size-[14px]" aria-hidden="true" />
+                </button>
               </div>
             </div>
+          )}
 
-          </Card>
-
-          {activeBoard ? (
-            <Card className="shrink-0 border-border bg-card px-3.5 py-1.5 sm:px-4 sm:py-2" data-testid="vocabulary-page-section">
-                <div ref={pageRowRef} className="flex min-w-0 items-center gap-2">
-                  <Button id="vocabulary-add-page" type="button" variant="outline" size="sm" className="h-8 w-20 shrink-0 justify-center rounded-full px-3" aria-label="New page" onClick={openCreatePageDialog}>
-                    <Plus className="size-3.5" /> New
-                  </Button>
-                  <div className="relative w-36 shrink-0 sm:w-44">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                    <Input
-                      id="vocabulary-page-search"
-                      aria-label="Filter pages"
-                      className="h-8 rounded-full pl-8 text-xs"
-                      placeholder="Find a page..."
-                      value={pageSearch}
-                      onChange={(event) => setPageSearch(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') setPageSearch('')
-                      }}
-                    />
-                  </div>
-                  <div ref={pageScrollRef} role="tablist" aria-label={`${activeBoard.name} pages`} className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="vocabulary-page-scroll">
-                    {visiblePages.map((page) => (
-                      <ContextMenu key={page.id}>
-                        <ContextMenuTrigger asChild>
+          <div
+            role="tablist"
+            aria-label="Vocabulary boards"
+            aria-orientation="vertical"
+            className={cn(
+              'flex',
+              isSidebarCollapsed ? 'flex-row items-center gap-1.5 md:flex-col' : 'flex-col gap-[6px]',
+            )}
+          >
+            {sortedBoards.map((board) => {
+              const isActiveBoard = activeBoardId === board.id
+              return (
+                <div key={board.id} className="flex flex-col">
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      {isSidebarCollapsed ? (
+                        <button
+                          id={`vocabulary-board-tab-${board.id}`}
+                          type="button"
+                          role="tab"
+                          aria-selected={isActiveBoard}
+                          aria-label={board.name}
+                          tabIndex={isActiveBoard ? 0 : -1}
+                          title={board.name}
+                          onClick={() => selectBoard(board.id)}
+                          onKeyDown={(event) => focusVerticalTab(event, sortedBoards, board.id, 'vocabulary-board-tab', selectBoard)}
+                          className={cn(
+                            'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[8px] transition-colors',
+                            isActiveBoard
+                              ? 'bg-secondary text-primary'
+                              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                          )}
+                        >
+                          <Folder className="size-[16px]" aria-hidden="true" />
+                        </button>
+                      ) : (
+                        <div
+                          className={cn(
+                            'flex items-center justify-between gap-2 rounded-[8px] px-[8px] py-[6px] transition-colors hover:bg-muted/50',
+                            isActiveBoard && 'bg-muted/35',
+                          )}
+                        >
                           <button
-                            id={`vocabulary-page-tab-${page.id}`}
+                            id={`vocabulary-board-tab-${board.id}`}
                             type="button"
                             role="tab"
-                            aria-selected={activePage?.id === page.id}
-                            tabIndex={activePage?.id === page.id ? 0 : -1}
-                            title={page.name}
-                            className={cn(
-                              'h-8 max-w-44 shrink-0 rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-                              activePage?.id === page.id && 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
-                            )}
-                            onClick={() => selectPage(page.id)}
-                            onKeyDown={(event) => focusHorizontalTab(event, visiblePages, page.id, 'vocabulary-page-tab', selectPage)}
+                            aria-selected={isActiveBoard}
+                            tabIndex={isActiveBoard ? 0 : -1}
+                            title={board.name}
+                            onClick={() => selectBoard(board.id)}
+                            onKeyDown={(event) => focusVerticalTab(event, sortedBoards, board.id, 'vocabulary-board-tab', selectBoard)}
+                            className="flex min-w-0 flex-1 cursor-pointer items-center gap-[8px] border-0 bg-transparent p-0 text-left"
                           >
-                            <span className="block max-w-36 truncate">{page.name}</span>
+                            <Folder
+                              className={cn('size-[15px] shrink-0', isActiveBoard ? 'text-primary' : 'text-muted-foreground')}
+                              aria-hidden="true"
+                            />
+                            <span
+                              className={cn(
+                                'truncate text-[13px] font-bold leading-[18px]',
+                                isActiveBoard ? 'text-foreground' : 'text-[#3d4f4b]',
+                              )}
+                            >
+                              {board.name}
+                            </span>
                           </button>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <ContextMenuItem onSelect={() => setRenameTarget({ boardId: activeBoard.id, pageId: page.id, name: page.name })}>Update Page</ContextMenuItem>
-                          <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deletePage.reset(); setDeleteTarget({ kind: 'page', boardId: activeBoard.id, pageId: page.id, name: page.name }) }}>Delete Page</ContextMenuItem>
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    ))}
-                    {!boardQuery.isLoading && visiblePages.length === 0 ? <span className="px-2 text-xs text-muted-foreground">No pages found</span> : null}
-                  </div>
+                          <button
+                            id={isActiveBoard ? 'vocabulary-add-page' : undefined}
+                            type="button"
+                            aria-label={isActiveBoard ? 'New page' : `New page in ${board.name}`}
+                            title={`Add page to ${board.name}`}
+                            onClick={() => openCreatePageDialog(board)}
+                            className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-[6px] bg-muted px-[6px] py-[4px] text-foreground/75 transition-colors hover:bg-secondary hover:text-secondary-foreground"
+                          >
+                            <Plus className="size-[14px]" aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onSelect={() => {
+                          renameBoard.reset()
+                          setRenameBoardTarget({ boardId: board.id, name: board.name, language: board.language })
+                        }}
+                      >
+                        Rename
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => { void openBoardSettingsDialog(board) }}>
+                        Setting
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => {
+                          deleteBoard.reset()
+                          setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name })
+                        }}
+                      >
+                        Delete
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+
+                  {!isSidebarCollapsed && isActiveBoard && activeBoard ? (
+                    <div
+                      role="tablist"
+                      aria-label={`${activeBoard.name} pages`}
+                      aria-orientation="vertical"
+                      className="mt-[4px] flex flex-col gap-[4px]"
+                    >
+                      {sortedPages.map((page) => {
+                        const isActivePage = activePage?.id === page.id
+                        return (
+                          <ContextMenu key={page.id}>
+                            <ContextMenuTrigger asChild>
+                              <button
+                                id={`vocabulary-page-tab-${page.id}`}
+                                type="button"
+                                role="tab"
+                                aria-selected={isActivePage}
+                                tabIndex={isActivePage ? 0 : -1}
+                                title={page.name}
+                                onClick={() => selectPage(page.id)}
+                                onKeyDown={(event) => focusVerticalTab(event, sortedPages, page.id, 'vocabulary-page-tab', selectPage)}
+                                className={cn(
+                                  'flex w-full min-w-0 cursor-pointer items-center gap-[8px] rounded-[8px] py-[8px] pl-[14px] pr-[10px] text-left transition-colors',
+                                  isActivePage
+                                    ? 'bg-secondary text-secondary-foreground'
+                                    : 'text-[#3d4f4b] hover:bg-muted/60 hover:text-foreground',
+                                )}
+                              >
+                                <FileText
+                                  className={cn(
+                                    'size-[14px] shrink-0',
+                                    isActivePage ? 'text-secondary-foreground' : 'text-muted-foreground',
+                                  )}
+                                  aria-hidden="true"
+                                />
+                                <span className="truncate text-[13px] font-semibold leading-[18px]">{page.name}</span>
+                              </button>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem
+                                onSelect={() => {
+                                  renamePage.reset()
+                                  setRenamePageTarget({ boardId: activeBoard.id, pageId: page.id, name: page.name })
+                                }}
+                              >
+                                Rename
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => {
+                                  deletePage.reset()
+                                  setDeleteTarget({ kind: 'page', boardId: activeBoard.id, pageId: page.id, name: page.name })
+                                }}
+                              >
+                                Delete
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        )
+                      })}
+                      {!boardQuery.isLoading && sortedPages.length === 0 ? (
+                        <p className="m-0 py-1.5 pl-[14px] text-xs text-muted-foreground">No pages yet</p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-            </Card>
-          ) : null}
+              )
+            })}
 
-          {activeBoard ? (
-            <Card className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border bg-card px-3.5 py-1.5 sm:px-4 sm:py-2" data-testid="vocabulary-toolbar">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <h2 className="m-0 max-w-full truncate text-lg font-semibold tracking-[-0.02em] sm:text-xl">{activePage?.name ?? 'Create your first page'}</h2>
-                    {activePage ? <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{activeWordsQuery.data?.length ?? 0} Words</span> : null}
-                  </div>
-                  <div className="flex min-w-0 items-center gap-2">
-                    {activePage ? (
-                      <div className="relative min-w-0 w-44 sm:w-56">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                        <Input
-                          aria-label="Search vocabulary"
-                          className="h-9 rounded-full pl-8 text-xs"
-                          placeholder="Search vocabulary..."
-                          value={wordSearch}
-                          onChange={(event) => setWordSearch(event.target.value)}
-                        />
-                        {wordSearch ? (
-                          <button type="button" aria-label="Clear vocabulary search" className="absolute right-2 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-accent" onClick={() => setWordSearch('')}>
-                            <X className="size-3.5" />
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-            </Card>
-          ) : null}
+            {!isSidebarCollapsed && boardsQuery.isSuccess && sortedBoards.length === 0 ? (
+              <p className="m-0 px-2 py-1 text-xs text-muted-foreground">No boards yet.</p>
+            ) : null}
+          </div>
+        </aside>
 
-          {activeBoard && activePage && activeWordsQuery.isLoading ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="status" data-testid="vocabulary-loading-state">
-              <p className="m-0 text-sm text-muted-foreground">Loading vocabulary...</p>
-            </Card>
-          ) : activeBoard && activePage && activeWordsQuery.isError && !activeWordsQuery.data ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="alert">
-              <h2 className="m-0 text-lg font-semibold">Could not load this page&apos;s vocabulary</h2>
-              <p className="m-0 mt-2 text-sm text-muted-foreground">Check your connection and try again.</p>
-              <Button className="mx-auto mt-5" onClick={() => { void activeWordsQuery.refetch() }}>Retry</Button>
-            </Card>
-          ) : activeBoard && activePage ? (
-            <VocabTable
-              key={activePage.id}
-              page={activePage}
-              preferences={activeBoard.preferences}
-              searchTerm={wordSearch}
-              preferencesBusy={updatePreferences.isPending || updateBoard.isPending}
-              onPreferencesChange={async (preferences) => { await updatePreferences.mutateAsync({ boardId: activeBoard.id, preferences }) }}
-            />
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-[18px] overflow-hidden bg-background px-5 py-5 lg:px-[36px] lg:py-[28px]">
+          {activeBoard && activePage ? (
+            <>
+              <h2 className="m-0 shrink-0 truncate text-[24px] font-bold leading-[32px] tracking-[-0.01em] text-foreground">
+                {activePage.name}
+              </h2>
+              <VocabTable
+                key={activePage.id}
+                page={activePage}
+                boardLanguage={activeBoard.language}
+                preferences={activeBoard.preferences}
+                searchTerm={wordSearch}
+                onSearchChange={setWordSearch}
+                preferencesBusy={updatePreferences.isPending || updateBoardSettings.isPending || renameBoard.isPending}
+                onPreferencesChange={async (preferences) => {
+                  await updatePreferences.mutateAsync({ boardId: activeBoard.id, preferences })
+                }}
+              />
+            </>
           ) : activeBoard ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center">
               <FileText className="mx-auto mb-3 size-10 text-muted-foreground" />
               <h2 className="m-0 text-lg font-semibold">This board has no pages</h2>
               <p className="m-0 mt-2 text-sm text-muted-foreground">Create a page, then add your first vocabulary row.</p>
-              <Button className="mx-auto mt-5" onClick={openCreatePageDialog}><Plus /> Create page</Button>
+              <Button className="mx-auto mt-5" onClick={() => openCreatePageDialog(activeBoard)}>
+                <Plus /> Create page
+              </Button>
             </Card>
           ) : boardsQuery.isLoading && boards.length === 0 ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="status" data-testid="vocabulary-loading-state">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center" role="status" data-testid="vocabulary-loading-state">
               <p className="m-0 text-sm text-muted-foreground">Loading your vocabulary boards...</p>
             </Card>
           ) : boardsQuery.isError && boards.length === 0 ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="alert">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center" role="alert">
               <h2 className="m-0 text-lg font-semibold">Could not load your vocabulary boards</h2>
               <p className="m-0 mt-2 text-sm text-muted-foreground">Check your connection and try again.</p>
               <Button className="mx-auto mt-5" onClick={() => { void boardsQuery.refetch() }}>Retry</Button>
             </Card>
           ) : activeBoardId && boardQuery.isLoading ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="status" data-testid="vocabulary-loading-state">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center" role="status" data-testid="vocabulary-loading-state">
               <p className="m-0 text-sm text-muted-foreground">Loading your vocabulary board...</p>
             </Card>
           ) : activeBoardId && boardQuery.isError ? (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center" role="alert">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center" role="alert">
               <h2 className="m-0 text-lg font-semibold">Could not load this vocabulary board</h2>
               <p className="m-0 mt-2 text-sm text-muted-foreground">Check your connection and try again.</p>
               <Button className="mx-auto mt-5" onClick={() => { void boardQuery.refetch() }}>Retry</Button>
             </Card>
           ) : (
-            <Card className="grid min-h-0 flex-1 place-content-center text-center">
+            <Card className="grid min-h-0 flex-1 place-content-center rounded-[12px] border-border bg-card text-center">
               <BookOpenText className="mx-auto mb-4 size-12 text-muted-foreground" />
               <h2 className="m-0 text-xl font-semibold">Select or create a vocabulary board</h2>
-              <p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">Boards keep related pages and learning material together.</p>
-              <Button className="mx-auto mt-5" onClick={openCreateBoardDialog}><FolderPlus /> Create board</Button>
+              <p className="m-0 mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                Boards keep related pages and learning material together.
+              </p>
+              <Button className="mx-auto mt-5" onClick={openCreateBoardDialog}>
+                <FolderPlus /> Create board
+              </Button>
             </Card>
           )}
         </section>
       </div>
+
       {isCreatingBoard ? (
         <CreateBoardDialog
           pending={createBoard.isPending}
           error={createBoard.isError ? 'Could not create the board right now.' : null}
-          onOpenChange={(open) => { if (!open) { setIsCreatingBoard(false); createBoard.reset() } }}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsCreatingBoard(false)
+              createBoard.reset()
+            }
+          }}
           onConfirm={(name, language, includedOptionalColumns) => createBoard.mutate({ name, language, includedOptionalColumns })}
         />
       ) : null}
-      {isCreatingPage && activeBoard ? (
+
+      {createPageBoardTarget ? (
         <CreatePageDialog
-          boardName={activeBoard.name}
+          boardName={createPageBoardTarget.name}
           pending={createPage.isPending}
           error={createPage.isError ? 'Could not create the page right now.' : null}
-          onOpenChange={(open) => { if (!open) { setIsCreatingPage(false); createPage.reset() } }}
-          onConfirm={(name) => createPage.mutate({ boardId: activeBoard.id, name })}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCreatePageBoardTarget(null)
+              createPage.reset()
+            }
+          }}
+          onConfirm={(name) => createPage.mutate({ boardId: createPageBoardTarget.id, name })}
         />
       ) : null}
-      {boardUpdateTarget ? (
-        <UpdateBoardDialog
-          key={boardUpdateTarget.boardId}
-          initialName={boardUpdateTarget.name}
-          initialLanguage={boardUpdateTarget.language}
-          initialIncludedOptionalColumns={boardUpdateTarget.includedOptionalColumns}
-          pending={updateBoard.isPending || updatePreferences.isPending}
-          error={updateBoard.isError ? 'Could not update the board right now.' : null}
-          onOpenChange={(open) => { if (!open) { setBoardUpdateTarget(null); updateBoard.reset() } }}
-          onConfirm={(name, language, includedOptionalColumns) => updateBoard.mutate({ target: boardUpdateTarget, name, language, includedOptionalColumns })}
+
+      {boardSettingsTarget ? (
+        <BoardSettingsDialog
+          key={boardSettingsTarget.boardId}
+          boardName={boardSettingsTarget.name}
+          initialLanguage={boardSettingsTarget.language}
+          initialIncludedOptionalColumns={boardSettingsTarget.includedOptionalColumns}
+          pending={updateBoardSettings.isPending || updatePreferences.isPending}
+          error={updateBoardSettings.isError ? 'Could not save board settings right now.' : null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setBoardSettingsTarget(null)
+              updateBoardSettings.reset()
+            }
+          }}
+          onConfirm={(language, includedOptionalColumns) =>
+            updateBoardSettings.mutate({ target: boardSettingsTarget, language, includedOptionalColumns })
+          }
         />
       ) : null}
-      {renameTarget ? (
+
+      {renameBoardTarget ? (
         <RenameEntityDialog
-          key={renameTarget.pageId}
+          key={`board-${renameBoardTarget.boardId}`}
+          entity="Board"
+          initialName={renameBoardTarget.name}
+          maxLength={120}
+          pending={renameBoard.isPending}
+          error={renameBoard.isError ? 'Could not rename this board right now.' : null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setRenameBoardTarget(null)
+              renameBoard.reset()
+            }
+          }}
+          onConfirm={(name) => renameBoard.mutate({ target: renameBoardTarget, name })}
+        />
+      ) : null}
+
+      {renamePageTarget ? (
+        <RenameEntityDialog
+          key={`page-${renamePageTarget.pageId}`}
           entity="Page"
-          initialName={renameTarget.name}
+          initialName={renamePageTarget.name}
           maxLength={120}
           pending={renamePage.isPending}
           error={renamePage.isError ? 'Could not rename this page right now.' : null}
-          onOpenChange={(open) => { if (!open) setRenameTarget(null) }}
-          onConfirm={confirmRename}
+          onOpenChange={(open) => {
+            if (!open) {
+              setRenamePageTarget(null)
+              renamePage.reset()
+            }
+          }}
+          onConfirm={(name) => renamePage.mutate({ target: renamePageTarget, name })}
         />
       ) : null}
-      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteBoard.isPending || deletePage.isPending}
-        error={deleteBoard.isError || deletePage.isError} onCancel={() => setDeleteTarget(null)}
-        onConfirm={() => { if (deleteTarget?.kind === 'board') deleteBoard.mutate(deleteTarget); else if (deleteTarget) deletePage.mutate(deleteTarget) }} />
+
+      <ConfirmDeletionDialog
+        name={deleteTarget?.name ?? null}
+        pending={deleteBoard.isPending || deletePage.isPending}
+        error={deleteBoard.isError || deletePage.isError}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget?.kind === 'board') deleteBoard.mutate(deleteTarget)
+          else if (deleteTarget) deletePage.mutate(deleteTarget)
+        }}
+      />
     </>
   )
 }
