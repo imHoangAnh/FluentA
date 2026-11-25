@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
-import { todayInAppTimeZone } from '@/shared/lib/timezone'
+import { todayUtc } from '@/shared/lib/date'
 import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
 import { formatWeekRange, weekDates } from '../model/todo-date'
 import { TodoPage } from './TodoPage'
@@ -30,7 +30,7 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     id: 'todo-1',
     title: 'Review vocabulary',
     note: null,
-    date: todayInAppTimeZone(),
+    date: todayUtc(),
     sortOrder: 0,
     isCompleted: false,
     isImportant: false,
@@ -109,7 +109,7 @@ describe('TodoPage My Day workspace', () => {
     expect(details).toBeInTheDocument()
     expect(api.createTodo).toHaveBeenCalledWith({
       title: 'Plan speaking practice',
-      date: todayInAppTimeZone(),
+      date: todayUtc(),
     })
     expect(screen.getByLabelText('Task title')).toHaveFocus()
   })
@@ -222,7 +222,7 @@ describe('TodoPage My Day workspace', () => {
       isImportant: true,
       repeatPattern: 'Weekly',
     })]
-    const dates = weekDates(todayInAppTimeZone())
+    const dates = weekDates(todayUtc())
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'My Day menu' }))

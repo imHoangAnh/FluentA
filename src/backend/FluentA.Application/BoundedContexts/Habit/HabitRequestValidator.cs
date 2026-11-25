@@ -9,22 +9,21 @@ internal static class HabitRequestValidator
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string MonthFormat = "yyyy-MM";
+
     public static (
         Dictionary<string, string[]> Errors,
         HabitIcon Icon,
         HabitFrequency Frequency,
         IReadOnlyList<DayOfWeek> CustomDays,
-        DateTime StartDate,
-        TimeZoneInfo? TimeZone) ValidateCreate(CreateHabitRequest request)
+        DateTime StartDate) ValidateCreate(CreateHabitRequest request)
     {
         var errors = ValidateNameAndDescription(request.Name, request.Description);
         var icon = ValidateIcon(request.Icon, errors, HabitIcon.Default);
         var schedule = ValidateSchedule(request.Frequency, request.CustomDays);
         Merge(errors, schedule.Errors);
 
-        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: true);
         var startDate = ValidateDate(request.StartDate, "startDate", errors);
-        if (timeZone is not null && startDate < HabitStatisticsCalculator.LocalToday(timeZone))
+        if (startDate < HabitStatisticsCalculator.UtcToday())
         {
             errors["startDate"] = ["Start date must be today or a future date."];
         }
@@ -34,7 +33,7 @@ internal static class HabitRequestValidator
             errors["goalDays"] = ["Goal days must be a positive whole number or null for Forever."];
         }
 
-        return (errors, icon, schedule.Frequency, schedule.CustomDays, startDate, timeZone);
+        return (errors, icon, schedule.Frequency, schedule.CustomDays, startDate);
     }
 
     public static (
@@ -45,8 +44,7 @@ internal static class HabitRequestValidator
         HabitFrequency Frequency,
         IReadOnlyList<DayOfWeek> CustomDays,
         DateTime StartDate,
-        int? GoalDays,
-        TimeZoneInfo? TimeZone) ValidateUpdate(HabitEntity habit, int entryCount, UpdateHabitRequest request)
+        int? GoalDays) ValidateUpdate(HabitEntity habit, int entryCount, UpdateHabitRequest request)
     {
         var name = request.Name ?? habit.Name;
         var description = request.Description ?? habit.Description;
@@ -57,14 +55,12 @@ internal static class HabitRequestValidator
         var schedule = ValidateSchedule(frequency, customDays);
         Merge(errors, schedule.Errors);
 
-        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: request.StartDate is not null);
         var startDate = request.StartDate is null
             ? habit.StartDate
             : ValidateDate(request.StartDate, "startDate", errors);
         if (request.StartDate is not null
             && startDate != habit.StartDate
-            && timeZone is not null
-            && startDate < HabitStatisticsCalculator.LocalToday(timeZone))
+            && startDate < HabitStatisticsCalculator.UtcToday())
         {
             errors["startDate"] = ["Start date must be today or a future date."];
         }
@@ -92,8 +88,7 @@ internal static class HabitRequestValidator
             schedule.Frequency,
             schedule.CustomDays,
             startDate,
-            goalDays,
-            timeZone);
+            goalDays);
     }
 
     private static Dictionary<string, string[]> ValidateNameAndDescription(string name, string? description)
@@ -166,9 +161,7 @@ internal static class HabitRequestValidator
         return (errors, parsedFrequency, uniqueDays);
     }
 
-    public static (Dictionary<string, string[]> Errors, DateTime MonthStart, TimeZoneInfo? TimeZone) ValidateMonthAndTimeZone(
-        string? month,
-        string? timeZoneId)
+    public static (Dictionary<string, string[]> Errors, DateTime MonthStart) ValidateMonth(string? month)
     {
         var errors = new Dictionary<string, string[]>();
         if (!DateTime.TryParseExact(month, MonthFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedMonth))
@@ -176,38 +169,16 @@ internal static class HabitRequestValidator
             errors["month"] = ["month must be in YYYY-MM format."];
         }
 
-        var timeZone = ValidateTimeZone(timeZoneId, errors, required: true);
         return (
             errors,
-            DateTime.SpecifyKind(new DateTime(parsedMonth.Year, parsedMonth.Month, 1), DateTimeKind.Utc),
-            timeZone);
+            DateTime.SpecifyKind(new DateTime(parsedMonth.Year, parsedMonth.Month, 1), DateTimeKind.Utc));
     }
 
-    public static (Dictionary<string, string[]> Errors, DateTime Date, TimeZoneInfo? TimeZone) ValidateToggle(ToggleHabitEntryRequest request)
+    public static (Dictionary<string, string[]> Errors, DateTime Date) ValidateToggle(ToggleHabitEntryRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         var parsedDate = ValidateDate(request.Date, "date", errors);
-        var timeZone = ValidateTimeZone(request.TimeZoneId, errors, required: true);
-        return (errors, parsedDate, timeZone);
-    }
-
-    private static TimeZoneInfo? ValidateTimeZone(
-        string? timeZoneId,
-        Dictionary<string, string[]> errors,
-        bool required)
-    {
-        if (string.IsNullOrWhiteSpace(timeZoneId) && !required)
-        {
-            return null;
-        }
-
-        if (TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            return timeZone;
-        }
-
-        errors["timeZoneId"] = ["A valid browser timezone id is required."];
-        return null;
+        return (errors, parsedDate);
     }
 
     private static DateTime ValidateDate(string? value, string field, Dictionary<string, string[]> errors)
@@ -221,35 +192,11 @@ internal static class HabitRequestValidator
         return DateTime.SpecifyKind(DateTime.MinValue.Date, DateTimeKind.Utc);
     }
 
-
-    public static bool TryFindTimeZone(string? timeZoneId, out TimeZoneInfo? timeZone)
-    {
-        timeZone = null;
-        if (string.IsNullOrWhiteSpace(timeZoneId))
-        {
-            return false;
-        }
-
-        try
-        {
-            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim());
-            return true;
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return false;
-        }
-        catch (InvalidTimeZoneException)
-        {
-            return false;
-        }
-    }
-
-    public static bool TryParseMonth(string? month, DateTime localToday, out DateTime monthStart)
+    public static bool TryParseMonth(string? month, DateTime utcToday, out DateTime monthStart)
     {
         if (string.IsNullOrWhiteSpace(month))
         {
-            monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            monthStart = new DateTime(utcToday.Year, utcToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             return true;
         }
 

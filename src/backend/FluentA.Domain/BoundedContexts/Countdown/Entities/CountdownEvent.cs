@@ -50,8 +50,7 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
 
     public bool IsCompletedAt(DateTime utcNow)
     {
-        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam());
-        return vietnamNow.Date > TargetDate.Date;
+        return NormalizeUtc(utcNow).Date > TargetDate.Date;
     }
 
     private static DateTime NormalizeDate(DateTime targetDate)

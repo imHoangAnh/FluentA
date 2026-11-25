@@ -4,7 +4,7 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { CardContent } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
-import { formatVietnamDateOnly } from '@/shared/lib/timezone'
+import { formatDateOnly } from '@/shared/lib/date'
 import * as habitApi from '@/features/habits'
 import * as todoApi from '@/features/todo'
 import type { ProjectBoardSummary } from '@/features/project'
@@ -84,7 +84,7 @@ export function CountdownWidget({ countdown, remainingText }: CountdownWidgetPro
       <div className="rounded-xl border border-primary/15 bg-secondary/75 p-4 text-center sm:p-5">
         <p className="m-0 text-2xl font-bold tracking-[-0.03em] text-secondary-foreground sm:text-3xl">{countdown ? remainingText(countdown.targetDate) : '--:--'}</p>
         <p className="m-0 mt-2 truncate text-sm font-medium text-foreground">{countdown?.name ?? 'No upcoming events'}</p>
-        {countdown ? <time className="mt-1 block text-xs text-muted-foreground" dateTime={countdown.targetDate}>Until {formatVietnamDateOnly(countdown.targetDate)}</time> : null}
+        {countdown ? <time className="mt-1 block text-xs text-muted-foreground" dateTime={countdown.targetDate}>Until {formatDateOnly(countdown.targetDate)}</time> : null}
       </div>
     </CardContent>
   )

@@ -15,20 +15,11 @@ public sealed class HabitService : IHabitService
 
     public async Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(
         Guid userId,
-        string? timeZoneId,
         string? month = null,
         CancellationToken cancellationToken = default)
     {
-        if (!HabitRequestValidator.TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            return OperationResult<IReadOnlyList<HabitDto>>.Failure(HabitError.Validation(new Dictionary<string, string[]>
-            {
-                ["timeZoneId"] = ["A valid browser timezone id is required."]
-            }));
-        }
-
-        var localToday = HabitStatisticsCalculator.LocalToday(timeZone!);
-        if (!HabitRequestValidator.TryParseMonth(month, localToday, out var monthStart))
+        var utcToday = HabitStatisticsCalculator.UtcToday();
+        if (!HabitRequestValidator.TryParseMonth(month, utcToday, out var monthStart))
         {
             return OperationResult<IReadOnlyList<HabitDto>>.Failure(HabitError.Validation(new Dictionary<string, string[]>
             {
@@ -44,7 +35,7 @@ public sealed class HabitService : IHabitService
 
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
         var entryStart = habits.Min(habit => habit.StartDate);
-        var entryEnd = monthEnd > localToday ? monthEnd : localToday;
+        var entryEnd = monthEnd > utcToday ? monthEnd : utcToday;
         var entries = await _repository.ListCheckInDatesAsync(
             habits.Select(habit => habit.Id).ToList(),
             entryStart,
@@ -57,7 +48,7 @@ public sealed class HabitService : IHabitService
         return OperationResult<IReadOnlyList<HabitDto>>.Success(habits
             .Select(habit => HabitStatisticsCalculator.ToDto(
                 habit,
-                localToday,
+                utcToday,
                 entriesByHabit.GetValueOrDefault(habit.Id, []),
                 monthStart,
                 monthEnd))
@@ -86,9 +77,9 @@ public sealed class HabitService : IHabitService
             request.GoalDays);
         await _repository.AddAsync(habit, cancellationToken);
 
-        var localToday = HabitStatisticsCalculator.LocalToday(validation.TimeZone!);
-        var monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return OperationResult<HabitDto>.Success(HabitStatisticsCalculator.ToDto(habit, localToday, [], monthStart, monthStart.AddMonths(1).AddDays(-1)));
+        var utcToday = HabitStatisticsCalculator.UtcToday();
+        var monthStart = new DateTime(utcToday.Year, utcToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return OperationResult<HabitDto>.Success(HabitStatisticsCalculator.ToDto(habit, utcToday, [], monthStart, monthStart.AddMonths(1).AddDays(-1)));
     }
 
     public async Task<OperationResult<HabitDto>> UpdateAsync(
@@ -122,16 +113,15 @@ public sealed class HabitService : IHabitService
 
         await _repository.UpdateAsync(habit, cancellationToken);
 
-        var timeZone = validation.TimeZone ?? TimeZoneInfo.Utc;
-        var localToday = HabitStatisticsCalculator.LocalToday(timeZone);
-        var monthStart = new DateTime(localToday.Year, localToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var utcToday = HabitStatisticsCalculator.UtcToday();
+        var monthStart = new DateTime(utcToday.Year, utcToday.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var entries = entryCount == 0
             ? []
-            : await _repository.ListCheckInDatesAsync([habit.Id], habit.StartDate, localToday, cancellationToken);
+            : await _repository.ListCheckInDatesAsync([habit.Id], habit.StartDate, utcToday, cancellationToken);
         var completedDates = entries.Select(entry => entry.Date.Date).ToHashSet();
         return OperationResult<HabitDto>.Success(HabitStatisticsCalculator.ToDto(
             habit,
-            localToday,
+            utcToday,
             completedDates,
             monthStart,
             monthStart.AddMonths(1).AddDays(-1)));
@@ -149,10 +139,9 @@ public sealed class HabitService : IHabitService
         Guid userId,
         Guid habitId,
         string? month,
-        string? timeZoneId,
         CancellationToken cancellationToken = default)
     {
-        var validation = HabitRequestValidator.ValidateMonthAndTimeZone(month, timeZoneId);
+        var validation = HabitRequestValidator.ValidateMonth(month);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<IReadOnlyList<HabitEntryDto>>.Failure(HabitError.Validation(validation.Errors));
@@ -186,8 +175,8 @@ public sealed class HabitService : IHabitService
             return OperationResult<HabitEntryToggleDto>.Failure(HabitError.Validation(validation.Errors));
         }
 
-        var localToday = HabitStatisticsCalculator.LocalToday(validation.TimeZone!);
-        if (validation.Date > localToday)
+        var utcToday = HabitStatisticsCalculator.UtcToday();
+        if (validation.Date > utcToday)
         {
             return OperationResult<HabitEntryToggleDto>.Failure(HabitError.Validation(new Dictionary<string, string[]>
             {

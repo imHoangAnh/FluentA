@@ -1,9 +1,7 @@
-using System.Security.Claims;
 using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
-using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,14 +19,13 @@ public sealed class HabitsController : ApiControllerBase
         _habits = habits;
     }
 
-    /// <summary>Lists habits with learner-local summary data for the authenticated user.</summary>
+    /// <summary>Lists habits with summary data for the authenticated user.</summary>
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] string? timeZoneId,
         [FromQuery] string? month,
         CancellationToken cancellationToken)
     {
-        var result = await _habits.ListAsync(CurrentUserId(), timeZoneId, month, cancellationToken);
+        var result = await _habits.ListAsync(CurrentUserId(), month, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<IReadOnlyList<HabitDto>>.Ok(result.Value!))
             : ToErrorResult(result);
@@ -69,10 +66,9 @@ public sealed class HabitsController : ApiControllerBase
     public async Task<IActionResult> ListEntries(
         Guid habitId,
         [FromQuery] string? month,
-        [FromQuery] string? timeZoneId,
         CancellationToken cancellationToken)
     {
-        var result = await _habits.ListEntriesAsync(CurrentUserId(), habitId, month, timeZoneId, cancellationToken);
+        var result = await _habits.ListEntriesAsync(CurrentUserId(), habitId, month, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<IReadOnlyList<HabitEntryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
@@ -87,5 +83,4 @@ public sealed class HabitsController : ApiControllerBase
             ? Ok(ApiResponse<HabitEntryToggleDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
-
 }

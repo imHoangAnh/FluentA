@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
-import { todayInAppTimeZone } from '@/shared/lib/timezone'
+import { todayUtc } from '@/shared/lib/date'
 import { HabitPage } from './HabitPage'
 import { habitsRoutes } from '../habits.routes'
 
@@ -21,7 +21,7 @@ vi.mock('../api/habit.api', async (importOriginal) => ({
 }))
 
 function todayInput() {
-  return todayInAppTimeZone()
+  return todayUtc()
 }
 
 function habit(overrides = {}) {

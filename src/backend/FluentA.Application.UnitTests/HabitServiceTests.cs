@@ -42,7 +42,7 @@ public sealed class HabitServiceTests
             run = completed.Contains(date) ? run + 1 : 0;
             longest = Math.Max(longest, run);
         }
-        var result = await new HabitService(repository).ListAsync(owner, "UTC");
+        var result = await new HabitService(repository).ListAsync(owner);
         var item = Assert.Single(result.Value!);
         Assert.Equal(longest, item.LongestStreak);
         Assert.Equal(completed.Count, item.TotalCheckIns);
@@ -60,7 +60,7 @@ public sealed class HabitServiceTests
         repository.SeedHabit(habit);
         repository.SeedEntry(habit.Id, today.AddDays(-1));
         repository.SeedEntry(habit.Id, today);
-        var item = Assert.Single((await new HabitService(repository).ListAsync(owner, "UTC")).Value!);
+        var item = Assert.Single((await new HabitService(repository).ListAsync(owner)).Value!);
         Assert.Equal(2, item.LongestStreak);
         Assert.Equal(2, item.CurrentStreak);
         Assert.Equal(2, item.TotalCheckIns);
@@ -74,13 +74,13 @@ public sealed class HabitServiceTests
         var userId = Guid.NewGuid();
 
         var created = await service.CreateAsync(userId, CreateRequest(" Read ", description: " Daily ", icon: "Book"));
-        var listed = await service.ListAsync(userId, "UTC");
+        var listed = await service.ListAsync(userId);
         var updated = await service.UpdateAsync(
             userId,
             created.Value!.Id,
-            new UpdateHabitRequest { Name = "Read English", TimeZoneId = "UTC" });
+            new UpdateHabitRequest { Name = "Read English" });
         var deleted = await service.DeleteAsync(userId, created.Value.Id);
-        var afterDelete = await service.ListAsync(userId, "UTC");
+        var afterDelete = await service.ListAsync(userId);
 
         Assert.True(created.IsSuccess);
         Assert.Equal("Read", created.Value.Name);
@@ -127,15 +127,15 @@ public sealed class HabitServiceTests
         var future = await service.ToggleEntryAsync(
             userId,
             custom.Value!.Id,
-            new ToggleHabitEntryRequest(tomorrow.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(tomorrow.ToString("yyyy-MM-dd")));
         var notScheduled = await service.ToggleEntryAsync(
             userId,
             custom.Value.Id,
-            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")));
         var beforeStart = await service.ToggleEntryAsync(
             userId,
             futureStart.Value!.Id,
-            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")));
 
         Assert.False(future.IsSuccess);
         Assert.False(notScheduled.IsSuccess);
@@ -153,10 +153,10 @@ public sealed class HabitServiceTests
         var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
         var habit = await service.CreateAsync(userId, CreateRequest("Read"));
 
-        var checkedResult = await service.ToggleEntryAsync(userId, habit.Value!.Id, new ToggleHabitEntryRequest(today, "UTC"));
-        var entriesAfterCheck = await service.ListEntriesAsync(userId, habit.Value.Id, DateTime.UtcNow.ToString("yyyy-MM"), "UTC");
-        var uncheckedResult = await service.ToggleEntryAsync(userId, habit.Value.Id, new ToggleHabitEntryRequest(today, "UTC"));
-        var entriesAfterUncheck = await service.ListEntriesAsync(userId, habit.Value.Id, DateTime.UtcNow.ToString("yyyy-MM"), "UTC");
+        var checkedResult = await service.ToggleEntryAsync(userId, habit.Value!.Id, new ToggleHabitEntryRequest(today));
+        var entriesAfterCheck = await service.ListEntriesAsync(userId, habit.Value.Id, DateTime.UtcNow.ToString("yyyy-MM"));
+        var uncheckedResult = await service.ToggleEntryAsync(userId, habit.Value.Id, new ToggleHabitEntryRequest(today));
+        var entriesAfterUncheck = await service.ListEntriesAsync(userId, habit.Value.Id, DateTime.UtcNow.ToString("yyyy-MM"));
 
         Assert.True(checkedResult.Value!.IsCompleted);
         Assert.Equal(1, checkedResult.Value.TotalCheckIns);
@@ -189,15 +189,15 @@ public sealed class HabitServiceTests
         var blocked = await service.ToggleEntryAsync(
             userId,
             habit.Id,
-            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")));
         var uncheckedResult = await service.ToggleEntryAsync(
             userId,
             habit.Id,
-            new ToggleHabitEntryRequest(yesterday.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(yesterday.ToString("yyyy-MM-dd")));
         var reactivated = await service.ToggleEntryAsync(
             userId,
             habit.Id,
-            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")));
 
         Assert.False(blocked.IsSuccess);
         var blockedDetails = Assert.IsType<Dictionary<string, string[]>>(Assert.IsType<HabitError>(blocked.Error).Details);
@@ -228,7 +228,7 @@ public sealed class HabitServiceTests
         repository.SeedEntry(habit.Id, today.AddDays(-1));
         repository.SeedEntry(habit.Id, today);
 
-        var result = await service.ListAsync(userId, "UTC", today.ToString("yyyy-MM"));
+        var result = await service.ListAsync(userId, today.ToString("yyyy-MM"));
 
         var item = Assert.Single(result.Value!);
         Assert.Equal(3, item.TotalCheckIns);
@@ -262,15 +262,15 @@ public sealed class HabitServiceTests
         var lockedStart = await service.UpdateAsync(
             userId,
             habit.Id,
-            new UpdateHabitRequest { StartDate = today.AddDays(1).ToString("yyyy-MM-dd"), TimeZoneId = "UTC" });
+            new UpdateHabitRequest { StartDate = today.AddDays(1).ToString("yyyy-MM-dd") });
         var tooSmallGoal = await service.UpdateAsync(
             userId,
             habit.Id,
-            new UpdateHabitRequest { GoalDays = 1, TimeZoneId = "UTC" });
+            new UpdateHabitRequest { GoalDays = 1 });
         var forever = await service.UpdateAsync(
             userId,
             habit.Id,
-            new UpdateHabitRequest { GoalDays = null, TimeZoneId = "UTC" });
+            new UpdateHabitRequest { GoalDays = null });
 
         Assert.False(lockedStart.IsSuccess);
         Assert.False(tooSmallGoal.IsSuccess);
@@ -289,23 +289,20 @@ public sealed class HabitServiceTests
         var result = await service.ToggleEntryAsync(
             Guid.NewGuid(),
             habit.Value!.Id,
-            new ToggleHabitEntryRequest(DateTime.UtcNow.Date.ToString("yyyy-MM-dd"), "UTC"));
+            new ToggleHabitEntryRequest(DateTime.UtcNow.Date.ToString("yyyy-MM-dd")));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("HABIT_NOT_FOUND", Assert.IsType<HabitError>(result.Error).Code);
     }
 
     [Fact]
-    public async Task List_RequiresValidTimeZoneAndMonth()
+    public async Task List_RequiresValidMonth()
     {
         var service = new HabitService(new FakeHabitRepository());
 
-        var invalidTimeZone = await service.ListAsync(Guid.NewGuid(), "Invalid/Zone");
-        var invalidMonth = await service.ListAsync(Guid.NewGuid(), "UTC", "2026-99");
+        var invalidMonth = await service.ListAsync(Guid.NewGuid(), "2026-99");
 
-        Assert.False(invalidTimeZone.IsSuccess);
         Assert.False(invalidMonth.IsSuccess);
-        Assert.Equal("VALIDATION_ERROR", Assert.IsType<HabitError>(invalidTimeZone.Error).Code);
         Assert.Equal("VALIDATION_ERROR", Assert.IsType<HabitError>(invalidMonth.Error).Code);
     }
 
@@ -333,19 +330,19 @@ public sealed class HabitServiceTests
         var today = DateTime.UtcNow.Date;
         var created = await service.CreateAsync(owner, CreateRequest("Read"));
         var id = created.Value!.Id;
-        await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+        await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")));
 
         var foreign = await service.DeleteAsync(Guid.NewGuid(), id);
         Assert.False(foreign.IsSuccess);
-        Assert.Single((await service.ListAsync(owner, "UTC")).Value!);
+        Assert.Single((await service.ListAsync(owner)).Value!);
         Assert.True((await service.DeleteAsync(owner, id)).IsSuccess);
         Assert.Equal(1, await repository.CountEntriesAsync(id));
-        Assert.Empty((await service.ListAsync(owner, "UTC")).Value!);
+        Assert.Empty((await service.ListAsync(owner)).Value!);
 
         Assert.False((await service.DeleteAsync(owner, id)).IsSuccess);
         Assert.False((await service.UpdateAsync(owner, id, new UpdateHabitRequest { Name = "Renamed" })).IsSuccess);
-        Assert.False((await service.ListEntriesAsync(owner, id, today.ToString("yyyy-MM"), "UTC")).IsSuccess);
-        Assert.False((await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"))).IsSuccess);
+        Assert.False((await service.ListEntriesAsync(owner, id, today.ToString("yyyy-MM"))).IsSuccess);
+        Assert.False((await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd")))).IsSuccess);
         Assert.Equal(1, await repository.CountEntriesAsync(id));
     }
 
@@ -365,8 +362,7 @@ public sealed class HabitServiceTests
             frequency,
             customDays,
             StartDate: startDate ?? DateTime.UtcNow.Date.ToString("yyyy-MM-dd"),
-            GoalDays: goalDays,
-            TimeZoneId: "UTC");
+            GoalDays: goalDays);
     }
 
     private sealed class FakeHabitRepository : IHabitRepository
@@ -498,5 +494,4 @@ public sealed class HabitServiceTests
 
         public void SeedEntry(Guid habitId, DateTime date) => _entries.Add(HabitEntry.Create(habitId, date));
     }
-
 }

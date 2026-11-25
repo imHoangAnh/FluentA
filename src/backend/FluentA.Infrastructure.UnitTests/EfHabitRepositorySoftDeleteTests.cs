@@ -49,7 +49,7 @@ public sealed class EfHabitRepositorySoftDeleteTests
             Assert.Null(await repository.GetAsync(owner, id));
             Assert.Equal(HabitEntryMutationStatus.NotFound, (await repository.ToggleEntryAsync(owner, id, today)).Status);
             var service = new HabitService(repository);
-            Assert.False((await service.ListEntriesAsync(owner, id, today.ToString("yyyy-MM"), "UTC")).IsSuccess);
+            Assert.False((await service.ListEntriesAsync(owner, id, today.ToString("yyyy-MM"))).IsSuccess);
             Assert.False((await service.UpdateAsync(owner, id, new UpdateHabitRequest { Name = "Renamed" })).IsSuccess);
         }
 

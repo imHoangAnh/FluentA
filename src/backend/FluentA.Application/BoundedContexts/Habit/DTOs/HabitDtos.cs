@@ -9,8 +9,7 @@ public sealed record CreateHabitRequest(
     string Frequency = "Daily",
     IReadOnlyList<string>? CustomDays = null,
     string? StartDate = null,
-    int? GoalDays = null,
-    string? TimeZoneId = null);
+    int? GoalDays = null);
 
 public sealed record UpdateHabitRequest
 {
@@ -31,13 +30,12 @@ public sealed record UpdateHabitRequest
             GoalDaysSpecified = true;
         }
     }
-    public string? TimeZoneId { get; init; }
 
     [JsonIgnore]
     public bool GoalDaysSpecified { get; private init; }
 }
 
-public sealed record ToggleHabitEntryRequest(string Date, string TimeZoneId);
+public sealed record ToggleHabitEntryRequest(string Date);
 
 public sealed record HabitDto(
     Guid Id,

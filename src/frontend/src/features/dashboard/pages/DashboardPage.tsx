@@ -15,7 +15,7 @@ import { reviewKeys } from '@/features/review'
 import * as todoApi from '@/features/todo'
 import { todoKeys } from '@/features/todo'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { APP_TIME_ZONE, appHour, differenceInCalendarDays, formatVietnamDateOnly, todayInAppTimeZone } from '@/shared/lib/timezone'
+import { differenceInCalendarDays, formatDateOnly, todayUtc, utcHour } from '@/shared/lib/date'
 import { cn } from '@/shared/lib/utils'
 import { DashboardWidgetMenu } from '../components/DashboardWidgetMenu'
 import { CountdownAction, CountdownWidget, HabitWidget, ProjectAction, ProjectWidget, ReviewQueueAction, ReviewQueueWidget, TodoAction, TodoWidget } from '../components/DashboardWidgetCards'
@@ -38,7 +38,7 @@ function GreetingIcon({ hour }: { hour: number }) {
 }
 
 function remainingText(targetDate: string, now: Date) {
-  const days = differenceInCalendarDays(targetDate, todayInAppTimeZone(now))
+  const days = differenceInCalendarDays(targetDate, todayUtc(now))
   if (!Number.isFinite(days)) return 'Unknown'
   if (days < 0) return 'Completed'
   if (days === 0) return 'Today'
@@ -79,8 +79,7 @@ export function DashboardPage() {
   const [activeWidget, setActiveWidget] = useState<DashboardWidgetId | null>(null)
   const previousTodayRef = useRef<string | null>(null)
 
-  const today = useMemo(() => todayInAppTimeZone(now), [now])
-  const timeZoneId = APP_TIME_ZONE
+  const today = useMemo(() => todayUtc(now), [now])
   const displayName = user?.fullName?.split(' ')[0] || 'Learner'
   const visible = (id: DashboardWidgetId) => visibleWidgets.includes(id)
 
@@ -106,9 +105,9 @@ export function DashboardPage() {
   }, [queryClient, today])
 
   const todosQuery = useQuery({ queryKey: todoKeys.day(today), queryFn: () => todoApi.listByDate(today), enabled: visible('todo') })
-  const habitsQuery = useQuery({ queryKey: habitKeys.list(timeZoneId), queryFn: () => habitApi.listHabits(timeZoneId), enabled: visible('habits') })
+  const habitsQuery = useQuery({ queryKey: habitKeys.list(), queryFn: () => habitApi.listHabits(), enabled: visible('habits') })
   const countdownsQuery = useQuery({ queryKey: countdownKeys.events, queryFn: countdownApi.listCountdowns, enabled: visible('countdown') })
-  const reviewDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(timeZoneId), enabled: visible('review') })
+  const reviewDashboardQuery = useQuery({ queryKey: reviewKeys.dashboard, queryFn: () => getReviewDashboard(), enabled: visible('review') })
   const projectBoardsQuery = useQuery({ queryKey: projectKeys.boards, queryFn: projectApi.listBoards, enabled: visible('project') })
 
   const todoToggle = useMutation({
@@ -117,7 +116,7 @@ export function DashboardPage() {
   })
 
   const habitToggle = useMutation({
-    mutationFn: ({ habit, date }: { habit: habitApi.Habit; date: string }) => habitApi.toggleHabitEntry(habit.id, date, timeZoneId),
+    mutationFn: ({ habit, date }: { habit: habitApi.Habit; date: string }) => habitApi.toggleHabitEntry(habit.id, date),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: habitKeys.all }) },
   })
 
@@ -203,36 +202,36 @@ export function DashboardPage() {
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/20 bg-secondary">
-              <GreetingIcon hour={appHour(now)} />
+              <GreetingIcon hour={utcHour(now)} />
             </span>
-            <h2 id="welcome-heading" className="m-0 truncate text-2xl font-bold tracking-[-0.03em] text-foreground sm:text-[28px]">{greetingText(appHour(now), displayName)}</h2>
+            <h2 id="welcome-heading" className="m-0 truncate text-2xl font-bold tracking-[-0.03em] text-foreground sm:text-[28px]">{greetingText(utcHour(now), displayName)}</h2>
           </div>
-          <p className="m-0 mt-1.5 text-sm text-muted-foreground">{formatVietnamDateOnly(today, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <p className="m-0 mt-1.5 text-sm text-muted-foreground">{formatDateOnly(today, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
         <DashboardWidgetMenu visibleWidgets={visibleWidgets} onToggle={handleWidgetToggle} />
       </section>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveWidget(null)} onDragEnd={handleDragEnd}>
-          <SortableContext items={visibleWidgets} strategy={rectSortingStrategy}>
-            <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} data-testid="dashboard-widget-grid">
-              {visibleWidgets.map((id, index) => (
-                <SortableDashboardWidget
-                  key={id}
-                  id={id}
-                  index={index}
-                  title={dashboardWidgetLabel(id)}
-                  description={widgetMeta[id].description}
-                  icon={widgetMeta[id].icon}
-                  removeDisabled={visibleWidgets.length <= 3}
-                  onRemove={() => handleWidgetToggle(id)}
-                  footer={renderWidgetFooter(id)}
-                >
-                  {renderWidget(id)}
-                </SortableDashboardWidget>
-              ))}
-            </div>
-          </SortableContext>
-          <div className="sr-only" aria-live="polite">{activeWidget ? `Moving ${dashboardWidgetLabel(activeWidget)} widget` : ''}</div>
+        <SortableContext items={visibleWidgets} strategy={rectSortingStrategy}>
+          <div className={cn('grid min-h-0 flex-1 grid-cols-12 gap-3', dashboardWidgetRows(visibleWidgets.length))} data-testid="dashboard-widget-grid">
+            {visibleWidgets.map((id, index) => (
+              <SortableDashboardWidget
+                key={id}
+                id={id}
+                index={index}
+                title={dashboardWidgetLabel(id)}
+                description={widgetMeta[id].description}
+                icon={widgetMeta[id].icon}
+                removeDisabled={visibleWidgets.length <= 3}
+                onRemove={() => handleWidgetToggle(id)}
+                footer={renderWidgetFooter(id)}
+              >
+                {renderWidget(id)}
+              </SortableDashboardWidget>
+            ))}
+          </div>
+        </SortableContext>
+        <div className="sr-only" aria-live="polite">{activeWidget ? `Moving ${dashboardWidgetLabel(activeWidget)} widget` : ''}</div>
       </DndContext>
     </div>
   )

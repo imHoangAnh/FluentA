@@ -8,11 +8,7 @@ import { useAuthStore } from '@/features/auth'
 
 function todayInput() {
   const date = new Date()
-  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`
-}
-
-function currentTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  return `${date.getUTCFullYear()}-${`${date.getUTCMonth() + 1}`.padStart(2, '0')}-${`${date.getUTCDate()}`.padStart(2, '0')}`
 }
 
 function currentWeek() {
@@ -39,7 +35,6 @@ function createQueryClient() {
 
   const today = todayInput()
   const [weekStart, weekEnd] = currentWeek()
-  const timeZone = currentTimeZone()
 
   queryClient.setQueryData(['todo', 'items', today], [])
   queryClient.setQueryData(['todo', 'range', weekStart, weekEnd], [])
@@ -53,7 +48,7 @@ function createQueryClient() {
     bio: '',
   })
   queryClient.setQueryData(['countdown', 'events'], [])
-  queryClient.setQueryData(['habit', 'list', timeZone], [])
+  queryClient.setQueryData(['habit', 'list'], [])
   queryClient.setQueryData(['journal', 'entries'], [])
   queryClient.setQueryData(['note', 'boards'], [])
   queryClient.setQueryData(['project', 'boards'], [])

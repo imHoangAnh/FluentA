@@ -124,10 +124,9 @@ public sealed class PracticeController : ApiControllerBase
     [HttpPost("sessions/{sessionId:guid}/complete")]
     public async Task<IActionResult> CompleteSession(
         Guid sessionId,
-        CompletePracticeSessionRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _practice.CompleteSessionAsync(CurrentUserId(), sessionId, request, cancellationToken);
+        var result = await _practice.CompleteSessionAsync(CurrentUserId(), sessionId, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<PracticeSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);

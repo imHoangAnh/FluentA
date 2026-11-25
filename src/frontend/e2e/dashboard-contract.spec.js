@@ -44,7 +44,7 @@ for (const width of [1440, 768]) {
       if (path.endsWith('/todos')) return fulfill([todo])
       if (path.endsWith('/habits/dashboard-habit/entries')) {
         if (failHabit) return fulfill(null, 503)
-        expect(request.postDataJSON()).toEqual({ date: '2026-10-08', timeZoneId: 'Asia/Ho_Chi_Minh' })
+        expect(request.postDataJSON()).toEqual({ date: '2026-10-08' })
         habit.isCheckedToday = !habit.isCheckedToday
         return fulfill({ habitId: habit.id, date: '2026-10-08', isCompleted: habit.isCheckedToday })
       }

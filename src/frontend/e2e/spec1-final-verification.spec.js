@@ -16,7 +16,7 @@ test('final SPEC1 retains Habit tracking without reminders or an inbox', async (
   await expect(page.getByRole('checkbox', { name: 'Reminder', exact: true })).toHaveCount(0);
   await page.getByTestId('save-habit-button').click();
   await expect(page.getByRole('heading', { name: 'No reminder habit' })).toBeVisible();
-  const habits = await (await page.request.get(`https://localhost:7000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers })).json();
+  const habits = await (await page.request.get('https://localhost:7000/api/v1/habits', { headers })).json();
   expect(habits.data.find((habit) => habit.name === 'No reminder habit')).not.toHaveProperty('reminderEnabled');
 
   await page.getByRole('link', { name: 'Go to overview' }).click();

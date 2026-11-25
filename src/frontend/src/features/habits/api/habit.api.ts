@@ -46,13 +46,12 @@ export type CreateHabitInput = {
   customDays?: string[] | null
   startDate: string
   goalDays?: number | null
-  timeZoneId: string
 }
 
 export type UpdateHabitInput = Partial<CreateHabitInput>
 
-export async function listHabits(timeZoneId: string, month?: string) {
-  const response = await apiClient.get<ApiResponse<Habit[]>>('/habits', { params: { timeZoneId, month } })
+export async function listHabits(month?: string) {
+  const response = await apiClient.get<ApiResponse<Habit[]>>('/habits', { params: { month } })
   return response.data.data ?? []
 }
 
@@ -71,12 +70,12 @@ export async function deleteHabit(id: string) {
   return response.data.data!
 }
 
-export async function listHabitEntries(id: string, month: string, timeZoneId: string) {
-  const response = await apiClient.get<ApiResponse<HabitEntry[]>>(`/habits/${id}/entries`, { params: { month, timeZoneId } })
+export async function listHabitEntries(id: string, month: string) {
+  const response = await apiClient.get<ApiResponse<HabitEntry[]>>(`/habits/${id}/entries`, { params: { month } })
   return response.data.data ?? []
 }
 
-export async function toggleHabitEntry(id: string, date: string, timeZoneId: string) {
-  const response = await apiClient.post<ApiResponse<HabitEntryToggle>>(`/habits/${id}/entries`, { date, timeZoneId })
+export async function toggleHabitEntry(id: string, date: string) {
+  const response = await apiClient.post<ApiResponse<HabitEntryToggle>>(`/habits/${id}/entries`, { date })
   return response.data.data!
 }

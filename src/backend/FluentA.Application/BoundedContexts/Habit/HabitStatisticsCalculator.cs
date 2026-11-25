@@ -146,9 +146,9 @@ internal static class HabitStatisticsCalculator
         }
     }
 
-    public static DateTime LocalToday(TimeZoneInfo timeZone)
+    public static DateTime UtcToday()
     {
-        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone).Date;
+        return DateTime.UtcNow.Date;
     }
 
     public static string FormatDate(DateTime date)

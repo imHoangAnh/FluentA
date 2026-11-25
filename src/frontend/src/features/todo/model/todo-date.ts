@@ -1,4 +1,4 @@
-import { formatVietnamDateOnly } from '@/shared/lib/timezone'
+import { formatDateOnly } from '@/shared/lib/date'
 
 export function toDateInput(date: Date) {
   const year = date.getFullYear()
@@ -28,7 +28,7 @@ export function weekDates(dateValue: string) {
 }
 
 export function formatMyDayDate(dateValue: string) {
-  return formatVietnamDateOnly(dateValue, {
+  return formatDateOnly(dateValue, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -36,7 +36,7 @@ export function formatMyDayDate(dateValue: string) {
 }
 
 export function formatWeekday(dateValue: string) {
-  return formatVietnamDateOnly(dateValue, { weekday: 'long' })
+  return formatDateOnly(dateValue, { weekday: 'long' })
 }
 
 export function formatWeekRange(startDateValue: string, endDateValue: string) {
@@ -44,7 +44,7 @@ export function formatWeekRange(startDateValue: string, endDateValue: string) {
   const endParts = endDateValue.split('-').map(Number)
   const start = { year: startParts[0], month: startParts[1], day: startParts[2] }
   const end = { year: endParts[0], month: endParts[1], day: endParts[2] }
-  const month = (value: string) => formatVietnamDateOnly(value, { month: 'long' })
+  const month = (value: string) => formatDateOnly(value, { month: 'long' })
 
   if (start.year === end.year && start.month === end.month) {
     return `${month(startDateValue)} ${start.day}\u2013${end.day}, ${end.year}`

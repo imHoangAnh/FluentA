@@ -1,5 +1,5 @@
 import type { Habit } from '../api/habit.api'
-import { formatVietnamDateOnly } from '@/shared/lib/timezone'
+import { formatDateOnly } from '@/shared/lib/date'
 
 export const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -61,11 +61,11 @@ function dayOfWeek(value: string) {
 }
 
 export function formatMonth(value: string) {
-  return formatVietnamDateOnly(`${value}-01`, { month: 'long', year: 'numeric' })
+  return formatDateOnly(`${value}-01`, { month: 'long', year: 'numeric' })
 }
 
 export function formatShortDate(value: string) {
-  return formatVietnamDateOnly(value, { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDateOnly(value, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function isScheduled(habit: Habit, date: string) {

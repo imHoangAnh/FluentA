@@ -6,7 +6,6 @@ import { AppProviders } from '@/app/providers'
 import { useAuthStore } from '@/features/auth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { DASHBOARD_WIDGET_STORAGE_KEY } from '@/features/dashboard/model/dashboard-widget-preferences'
-import { APP_TIME_ZONE } from '@/shared/lib/timezone'
 
 const adapters = vi.hoisted(() => ({
   listByDate: vi.fn(),
@@ -27,7 +26,7 @@ vi.mock('@/features/habits', () => ({
   listHabits: adapters.listHabits,
   toggleHabitEntry: adapters.toggleHabitEntry,
   HabitIconGlyph: () => null,
-  habitKeys: { all: ['habit'], list: (timeZoneId: string) => ['habit', 'list', timeZoneId] },
+  habitKeys: { all: ['habit'], list: () => ['habit', 'list'] },
 }))
 vi.mock('@/features/countdown', () => ({
   listCountdowns: adapters.listCountdowns,
@@ -47,9 +46,9 @@ function renderDashboard(order = ['review', 'todo', 'countdown']) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return {
     ...render(
-    <AppProviders queryClient={queryClient}>
-      <MemoryRouter><DashboardPage /></MemoryRouter>
-    </AppProviders>,
+      <AppProviders queryClient={queryClient}>
+        <MemoryRouter><DashboardPage /></MemoryRouter>
+      </AppProviders>,
     ),
     queryClient,
   }
@@ -111,7 +110,7 @@ describe('DashboardPage', () => {
     vi.useRealTimers()
   })
 
-  it('renders current empty states, links, and local date/timezone queries', async () => {
+  it('renders current empty states, links, and UTC date queries', async () => {
     renderDashboard(['review', 'todo', 'countdown', 'habits'])
 
     expect(await screen.findByText('No reviews due today.')).toBeInTheDocument()
@@ -123,8 +122,8 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: 'Open countdowns' })).toHaveAttribute('href', '/countdowns')
 
     expect(adapters.listByDate).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
-    expect(adapters.listHabits).toHaveBeenCalledWith(APP_TIME_ZONE)
-    expect(adapters.getReviewDashboard).toHaveBeenCalledWith(APP_TIME_ZONE)
+    expect(adapters.listHabits).toHaveBeenCalledWith()
+    expect(adapters.getReviewDashboard).toHaveBeenCalledWith()
     expect(adapters.listBoards).not.toHaveBeenCalled()
   })
 
@@ -186,7 +185,7 @@ describe('DashboardPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Check habit Read English' }))
     const expectedDate = expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
-    await waitFor(() => expect(adapters.toggleHabitEntry).toHaveBeenCalledWith('habit-1', expectedDate, APP_TIME_ZONE))
+    await waitFor(() => expect(adapters.toggleHabitEntry).toHaveBeenCalledWith('habit-1', expectedDate))
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['habit'] }))
   })
 
@@ -250,14 +249,14 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: 'Check habit Read English' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Retry Habit update' }))
     expect(await screen.findByRole('button', { name: 'Uncheck habit Read English' })).toBeEnabled()
-    expect(adapters.toggleHabitEntry).toHaveBeenLastCalledWith('habit-1', '2026-07-14', APP_TIME_ZONE)
+    expect(adapters.toggleHabitEntry).toHaveBeenLastCalledWith('habit-1', '2026-07-14')
   })
 
   it.each([
     ['2026-07-14', 'Today'],
     ['2026-07-15', '1 day left'],
     ['2026-07-16', '2 days left'],
-  ])('counts calendar days until %s near Vietnam midnight', async (targetDate, expected) => {
+  ])('counts calendar days until %s in UTC', async (targetDate, expected) => {
     adapters.listCountdowns.mockResolvedValue([
       { id: 'old', name: 'Past event', targetDate: '2026-07-13', isCompleted: false },
       { id: 'later', name: 'Later event', targetDate: '2026-08-01', isCompleted: false },
@@ -300,9 +299,9 @@ describe('DashboardPage', () => {
     expect(projectWidget.queryByText('Board 4')).not.toBeInTheDocument()
   })
 
-  it('refreshes day-dependent widgets across Vietnam midnight', async () => {
+  it('refreshes day-dependent widgets across UTC midnight', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
-    vi.setSystemTime(new Date('2026-07-14T16:59:30Z'))
+    vi.setSystemTime(new Date('2026-07-14T23:59:30Z'))
     adapters.listHabits.mockResolvedValue([habit()])
     adapters.toggleHabitEntry.mockRejectedValue(new Error('save failed'))
     adapters.listCountdowns.mockResolvedValue([
@@ -314,7 +313,7 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Today event')).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Check habit Read English' }))
     expect(await screen.findByRole('button', { name: 'Retry Habit update' })).toBeEnabled()
-    expect(adapters.toggleHabitEntry).toHaveBeenLastCalledWith('habit-1', '2026-07-14', APP_TIME_ZONE)
+    expect(adapters.toggleHabitEntry).toHaveBeenLastCalledWith('habit-1', '2026-07-14')
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
     expect(await screen.findByText('Tomorrow event')).toBeInTheDocument()
     expect(screen.queryByText('Today event')).not.toBeInTheDocument()

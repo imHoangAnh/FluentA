@@ -54,7 +54,6 @@ test('Dashboard Overview is the default authenticated home with actionable widge
       frequency: 'Daily',
       startDate: today,
       goalDays: null,
-      timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   });
   await page.request.post('https://localhost:7000/api/v1/countdowns', {
@@ -79,7 +78,7 @@ test('Dashboard Overview is the default authenticated home with actionable widge
   const todos = (await todoResponse.json()).data;
   expect(todos.find((todo) => todo.title === 'Dashboard planning task')?.isCompleted).toBe(true);
 
-  const habitResponse = await page.request.get(`https://localhost:7000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers });
+  const habitResponse = await page.request.get('https://localhost:7000/api/v1/habits', { headers });
   const habits = (await habitResponse.json()).data;
   expect(habits.find((habit) => habit.name === 'Dashboard reading habit')?.isCheckedToday).toBe(true);
   expect(consoleErrors).toEqual([]);

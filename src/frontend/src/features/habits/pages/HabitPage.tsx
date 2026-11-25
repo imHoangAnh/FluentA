@@ -5,7 +5,7 @@ import * as habitApi from '../api/habit.api'
 import { habitKeys } from '../api/habit.queries'
 import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { toast } from '@/shared/lib/toast'
-import { APP_TIME_ZONE, todayInAppTimeZone } from '@/shared/lib/timezone'
+import { todayUtc } from '@/shared/lib/date'
 import { HabitDetailsPanel } from '../components/HabitDetailsPanel'
 import { HabitFormDialog } from '../components/HabitFormDialog'
 import { HabitList } from '../components/HabitList'
@@ -23,8 +23,7 @@ import {
 
 export function HabitPage() {
   const queryClient = useQueryClient()
-  const timeZoneId = APP_TIME_ZONE
-  const today = useMemo(() => todayInAppTimeZone(), [])
+  const today = useMemo(() => todayUtc(), [])
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedMonth, setSelectedMonth] = useState(() => today.slice(0, 7))
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => toDateInput(startOfWeek(parseDateInput(today))))
@@ -49,8 +48,8 @@ export function HabitPage() {
   }, [selectedWeekStart, today])
 
   const habitsQuery = useQuery({
-    queryKey: habitKeys.list(timeZoneId, selectedMonth),
-    queryFn: () => habitApi.listHabits(timeZoneId, selectedMonth),
+    queryKey: habitKeys.list(selectedMonth),
+    queryFn: () => habitApi.listHabits(selectedMonth),
   })
   const habits = useMemo(
     () => (habitsQuery.data ?? []).toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.name.localeCompare(right.name)),
@@ -70,8 +69,8 @@ export function HabitPage() {
 
   const entryQueries = useQueries({
     queries: entryQueryKeys.map(({ habitId, month }) => ({
-      queryKey: habitKeys.entries(habitId, month, timeZoneId),
-      queryFn: () => habitApi.listHabitEntries(habitId, month, timeZoneId),
+      queryKey: habitKeys.entries(habitId, month),
+      queryFn: () => habitApi.listHabitEntries(habitId, month),
     })),
   })
   const entriesByHabit = useMemo(() => {
@@ -127,7 +126,7 @@ export function HabitPage() {
     onError: () => toast.error('Could not delete the habit. Please try again.'),
   })
   const toggleEntry = useMutation({
-    mutationFn: ({ habitId, date }: { habitId: string; date: string }) => habitApi.toggleHabitEntry(habitId, date, timeZoneId),
+    mutationFn: ({ habitId, date }: { habitId: string; date: string }) => habitApi.toggleHabitEntry(habitId, date),
     onSuccess: refresh,
   })
 
@@ -222,7 +221,6 @@ export function HabitPage() {
           key={formHabitId}
           habit={formHabit}
           today={today}
-          timeZoneId={timeZoneId}
           isSaving={createHabit.isPending || updateHabit.isPending}
           error={formError}
           onClose={closeForm}

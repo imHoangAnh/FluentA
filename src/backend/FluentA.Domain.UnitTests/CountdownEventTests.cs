@@ -29,13 +29,13 @@ public sealed class CountdownEventTests
     }
 
     [Fact]
-    public void IsCompletedAt_MovesToCompleteAtVietnamMidnightAfterTargetDate()
+    public void IsCompletedAt_MovesToCompleteAtUtcMidnightAfterTargetDate()
     {
         var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", new DateTime(2026, 7, 2));
 
-        Assert.False(countdown.IsCompletedAt(new DateTime(2026, 7, 2, 16, 59, 59, DateTimeKind.Utc)));
-        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 7, 2, 17, 0, 0, DateTimeKind.Utc)));
-        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 8, 2, 17, 0, 0, DateTimeKind.Utc)));
+        Assert.False(countdown.IsCompletedAt(new DateTime(2026, 7, 2, 23, 59, 59, DateTimeKind.Utc)));
+        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc)));
+        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 8, 3, 0, 0, 0, DateTimeKind.Utc)));
     }
 
     [Fact]

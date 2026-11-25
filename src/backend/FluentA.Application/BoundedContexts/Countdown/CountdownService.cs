@@ -112,7 +112,7 @@ public sealed class CountdownService : ICountdownService
         }
 
         var targetDate = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
-        var vietnamToday = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, CountdownTimeZone.Vietnam()).Date;
+        var vietnamToday = DateTime.UtcNow.Date;
         if (targetDate.Date < vietnamToday)
         {
             errors["targetDate"] = ["Target date cannot be in the past."];

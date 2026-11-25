@@ -77,7 +77,6 @@ test('todo Week v2 keeps its compact layout and durable task lifecycle', async (
       repeatPattern: 'Weekly',
       reminder: {
         time: '10:30',
-        timeZoneId: 'UTC',
         scheduledAtUtc: `${dates.monday}T10:30:00.000Z`,
       },
     },
@@ -191,7 +190,6 @@ test('todo Week v2 keeps its compact layout and durable task lifecycle', async (
     repeatPattern: 'Weekly',
     reminder: {
       time: '10:30',
-      timeZoneId: 'UTC',
       scheduledAtUtc: `${dates.tuesday}T10:30:00Z`,
       sentAtUtc: null,
     },

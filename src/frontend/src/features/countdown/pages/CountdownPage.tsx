@@ -9,16 +9,16 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { cn } from '@/shared/lib/utils'
-import { addCalendarDays, differenceInCalendarDays, formatVietnamDateOnly, todayInAppTimeZone } from '@/shared/lib/timezone'
+import { addCalendarDays, differenceInCalendarDays, formatDateOnly, todayUtc } from '@/shared/lib/date'
 import * as countdownApi from '../api/countdown.api'
 import { countdownKeys } from '../api/countdown.queries'
 
 function defaultTargetDate(now = new Date()) {
-  return addCalendarDays(todayInAppTimeZone(now), 7)
+  return addCalendarDays(todayUtc(now), 7)
 }
 
 function formatTargetDate(value: string) {
-  return formatVietnamDateOnly(value, {
+  return formatDateOnly(value, {
     month: 'short',
     day: '2-digit',
     year: 'numeric',
@@ -30,7 +30,7 @@ function statusText(item: countdownApi.CountdownEvent, now = new Date()) {
     return ''
   }
 
-  const diff = differenceInCalendarDays(item.targetDate, todayInAppTimeZone(now))
+  const diff = differenceInCalendarDays(item.targetDate, todayUtc(now))
   if (!Number.isFinite(diff)) return 'Unknown'
   return diff <= 0 ? 'Today' : `${diff} day${diff === 1 ? '' : 's'} left`
 }
@@ -46,7 +46,7 @@ export function CountdownPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
-  const appDateRef = useRef(todayInAppTimeZone())
+  const appDateRef = useRef(todayUtc())
   const dialogTitleId = useId()
   const createTriggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -75,7 +75,7 @@ export function CountdownPage() {
       const nextNow = new Date()
       setNow(nextNow)
 
-      const nextAppDate = todayInAppTimeZone(nextNow)
+      const nextAppDate = todayUtc(nextNow)
       if (appDateRef.current === nextAppDate) return
 
       appDateRef.current = nextAppDate

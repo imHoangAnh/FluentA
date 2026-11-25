@@ -59,10 +59,10 @@ public sealed class HabitDeleteResponseTests
             return Task.FromResult(found ? OperationResult<bool>.Success(true) : OperationResult<bool>.Failure(HabitError.NotFound()));
         }
 
-        public Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(Guid userId, string? timeZoneId, string? month = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<OperationResult<IReadOnlyList<HabitDto>>> ListAsync(Guid userId, string? month = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<HabitDto>> CreateAsync(Guid userId, CreateHabitRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<HabitDto>> UpdateAsync(Guid userId, Guid habitId, UpdateHabitRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<OperationResult<IReadOnlyList<HabitEntryDto>>> ListEntriesAsync(Guid userId, Guid habitId, string? month, string? timeZoneId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<OperationResult<IReadOnlyList<HabitEntryDto>>> ListEntriesAsync(Guid userId, Guid habitId, string? month, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OperationResult<HabitEntryToggleDto>> ToggleEntryAsync(Guid userId, Guid habitId, ToggleHabitEntryRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

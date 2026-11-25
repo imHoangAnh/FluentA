@@ -11,7 +11,6 @@ const goalPresets = [7, 21, 30, 100, 365]
 type HabitFormDialogProps = {
   habit?: Habit
   today: string
-  timeZoneId: string
   isSaving: boolean
   error?: string
   onClose: () => void
@@ -46,7 +45,6 @@ function initialState(habit: Habit | undefined, today: string): FormState {
 export function HabitFormDialog({
   habit,
   today,
-  timeZoneId,
   isSaving,
   error,
   onClose,
@@ -90,7 +88,6 @@ export function HabitFormDialog({
       customDays: form.frequency === 'Custom' ? form.customDays : null,
       startDate: form.startDate,
       goalDays: parsedGoal,
-      timeZoneId,
     })
   }
 
