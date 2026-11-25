@@ -5,8 +5,12 @@ namespace FluentA.Application.BoundedContexts.Practice;
 public interface IReviewEnrollmentPort
 {
     Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
-        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
-        int initialLevel, CancellationToken cancellationToken = default) =>
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        DateTime utcNow,
+        int initialLevel,
+        CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Review enrollment must support staging inside the Practice transaction.");
 
     // Keep the original contract for callers compiled against the level-zero
@@ -16,7 +20,6 @@ public interface IReviewEnrollmentPort
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
@@ -24,9 +27,8 @@ public interface IReviewEnrollmentPort
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         int initialLevel,
         CancellationToken cancellationToken = default) =>
-        EnrollMissingPracticeWordsAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
+        EnrollMissingPracticeWordsAsync(userId, pageId, wordId, utcNow, cancellationToken);
 }

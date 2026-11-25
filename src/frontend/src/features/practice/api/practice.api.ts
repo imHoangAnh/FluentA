@@ -159,18 +159,16 @@ export async function setPracticeReviewLevel(input: {
   sessionId: string
   wordId: string
   level: PracticeReviewLevel
-  timeZoneId: string
 }) {
   const response = await apiClient.put<ApiResponse<SetPracticeReviewLevelResult>>(
     `/practice/sessions/${input.sessionId}/words/${input.wordId}/review-level`,
-    { level: input.level, timeZoneId: input.timeZoneId },
+    { level: input.level },
   )
   return response.data.data!
 }
 
-export async function completePracticeSession(input: { sessionId: string; timeZoneId: string }) {
+export async function completePracticeSession(input: { sessionId: string }) {
   await apiClient.post<ApiResponse<unknown>>(
     `/practice/sessions/${input.sessionId}/complete`,
-    { timeZoneId: input.timeZoneId },
   )
 }

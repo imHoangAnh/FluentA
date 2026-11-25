@@ -27,7 +27,6 @@ public sealed class EfReviewVocabularySafetyTests
 
         var dashboard = await repository.GetDashboardAsync(
             Guid.NewGuid(),
-            TimeZoneInfo.Utc,
             new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc));
 
         Assert.Equal(new DateOnly(2026, 10, 1), dashboard.LocalDate);

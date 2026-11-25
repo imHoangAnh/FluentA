@@ -1,6 +1,4 @@
 using System.Data;
-using System.Text.Json;
-using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
@@ -26,14 +24,12 @@ public sealed class EfReviewRepository : IReviewRepository
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default) =>
         AddPracticeWordsToReviewAsync(
             userId,
             pageId,
             wordId,
-            timeZone,
             utcNow,
             initialLevel: 0,
             cancellationToken: cancellationToken);
@@ -42,22 +38,25 @@ public sealed class EfReviewRepository : IReviewRepository
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         int initialLevel,
         CancellationToken cancellationToken = default)
     {
         await using var transaction = _dbContext.Database.CurrentTransaction is null
             ? await _dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
-        var result = await StagePracticeWordEnrollmentAsync(userId, pageId, wordId, timeZone, utcNow, initialLevel, cancellationToken);
+        var result = await StagePracticeWordEnrollmentAsync(userId, pageId, wordId, utcNow, initialLevel, cancellationToken);
         if (result is not null) await _dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return result;
     }
 
     public async Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
-        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
-        int initialLevel, CancellationToken cancellationToken = default)
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        DateTime utcNow,
+        int initialLevel,
+        CancellationToken cancellationToken = default)
     {
         var intervalDays = FluentAsrsScheduler.IntervalDaysForLevel(initialLevel);
 
@@ -95,7 +94,7 @@ public sealed class EfReviewRepository : IReviewRepository
             return null;
         }
 
-        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, intervalDays, timeZone);
+        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, intervalDays);
         var existingState = await _dbContext.WordReviewStates
             .SingleOrDefaultAsync(
                 state => state.UserId == userId
@@ -122,11 +121,10 @@ public sealed class EfReviewRepository : IReviewRepository
 
     public async Task<ReviewSessionDto> CreateReviewSessionAsync(
         Guid userId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
+        var utcToday = ReviewTime.UtcDate(utcNow);
         var activeSessions = await _dbContext.ReviewSessions
             .Where(session => session.UserId == userId
                 && session.Status == ReviewSessionStatus.Active
@@ -149,7 +147,7 @@ public sealed class EfReviewRepository : IReviewRepository
                 && word.DeletedAt == null
                 && page.DeletedAt == null
                 && board.DeletedAt == null
-                && state.NextReviewDate <= localToday
+                && state.NextReviewDate <= utcToday
             select new
             {
                 WordId = word.Id,
@@ -170,13 +168,13 @@ public sealed class EfReviewRepository : IReviewRepository
             .ThenBy(item => item.WordId)
             .ToListAsync(cancellationToken);
 
-        var session = ReviewSession.CreateActive(userId, timeZone.Id, localToday, utcNow);
+        var session = ReviewSession.CreateActive(userId, utcToday, utcNow);
         var items = dueWords
             .Select((item, position) => ReviewSessionItem.Create(
                 session.Id,
                 item.WordId,
                 position,
-                PickRandomReviewMode(),
+                ReviewMode.MeaningToWord,
                 item.Language,
                 item.Word,
                 item.Meaning,
@@ -198,21 +196,20 @@ public sealed class EfReviewRepository : IReviewRepository
         // One SaveChanges keeps prior-session abandonment and the new persisted queue together.
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return await BuildSessionDtoAsync(session, items, cancellationToken);
+        return BuildSessionDto(session, items);
     }
 
     public async Task<ReviewDashboardDto> GetDashboardAsync(
         Guid userId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
+        var utcToday = ReviewTime.UtcDate(utcNow);
         var dueCount = await _dashboardQueries
             .QueryActiveReviewStates(userId)
-            .CountAsync(state => state.NextReviewDate <= localToday, cancellationToken);
+            .CountAsync(state => state.NextReviewDate <= utcToday, cancellationToken);
 
-        return new ReviewDashboardDto(localToday, dueCount);
+        return new ReviewDashboardDto(utcToday, dueCount);
     }
 
     public async Task<ReviewSessionDto?> GetSessionAsync(
@@ -262,7 +259,7 @@ public sealed class EfReviewRepository : IReviewRepository
                 .ToList();
         }
 
-        return await BuildSessionDtoAsync(session, items, cancellationToken);
+        return BuildSessionDto(session, items);
     }
 
     public async Task<ReviewAnswerTargetDto?> GetAnswerTargetAsync(
@@ -288,7 +285,7 @@ public sealed class EfReviewRepository : IReviewRepository
                 && page.DeletedAt == null
                 && board.UserId == userId
                 && board.DeletedAt == null
-            select new ReviewAnswerTargetDto(item.VocabWordId, item.Mode, item.WordSnapshot, item.LanguageSnapshot))
+            select new ReviewAnswerTargetDto(item.VocabWordId, ReviewMode.MeaningToWord, item.WordSnapshot, item.LanguageSnapshot))
             .SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -311,23 +308,23 @@ public sealed class EfReviewRepository : IReviewRepository
         }
 
         var item = await GetOpenItemAsync(sessionId, itemId, cancellationToken);
-        if (item is null || item.Mode is not (ReviewMode.Dictation or ReviewMode.MeaningToWord))
+        if (item is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return null;
         }
 
-        var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
+        var reviewState = await GetDueStateAsync(userId, item.VocabWordId, utcNow, cancellationToken);
         if (reviewState is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return null;
         }
 
-        CompleteItem(session, item, reviewState, correct, utcNow);
+        CompleteItem(item, reviewState, correct, utcNow);
         _dbContext.Set<ReviewAttempt>().Add(ReviewAttempt.CreateTyped(
             item.Id,
-            item.Mode,
+            ReviewMode.MeaningToWord,
             answerText,
             correct,
             timeSpentSeconds,
@@ -335,96 +332,7 @@ public sealed class EfReviewRepository : IReviewRepository
         await SaveFinalAttemptAsync(session, item, userId, timeSpentSeconds, utcNow, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return await BuildAnswerResultAsync(session, item, attemptsUsed: 1, attemptsRemaining: 0, assessment: null, correct, cancellationToken);
-    }
-
-    public async Task<ReviewAnswerResultDto?> AddPronunciationAttemptAsync(
-        Guid userId,
-        Guid sessionId,
-        Guid itemId,
-        PronunciationAssessmentDto assessment,
-        int timeSpentSeconds,
-        DateTime utcNow,
-        CancellationToken cancellationToken = default)
-    {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var session = await GetActiveSessionAsync(userId, sessionId, cancellationToken);
-        if (session is null)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return null;
-        }
-
-        var item = await GetOpenItemAsync(sessionId, itemId, cancellationToken);
-        if (item is null || item.Mode != ReviewMode.ListenAndRepeat)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return null;
-        }
-
-        var reviewState = await GetDueStateAsync(userId, session, item.VocabWordId, utcNow, cancellationToken);
-        if (reviewState is null)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return null;
-        }
-
-        var attempts = _dbContext.Set<ReviewAttempt>()
-            .Where(attempt => attempt.ReviewSessionItemId == itemId && attempt.DeletedAt == null);
-        var attemptsUsedBefore = await attempts.CountAsync(cancellationToken);
-        if (attemptsUsedBefore >= 2)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return null;
-        }
-
-        var attemptNumber = attemptsUsedBefore + 1;
-        var timeSpentBefore = await attempts.SumAsync(attempt => (int?)attempt.TimeSpentSeconds, cancellationToken) ?? 0;
-        var feedbackJson = JsonSerializer.Serialize(assessment);
-        _dbContext.Set<ReviewAttempt>().Add(ReviewAttempt.CreatePronunciation(
-            item.Id,
-            attemptNumber,
-            assessment.Correct,
-            assessment.AccuracyScore,
-            assessment.CompletenessScore,
-            assessment.FeedbackMode,
-            feedbackJson,
-            timeSpentSeconds,
-            utcNow));
-
-        var attemptsUsed = attemptNumber;
-        if (assessment.Correct || attemptsUsed == 2)
-        {
-            CompleteItem(
-                session,
-                item,
-                reviewState,
-                assessment.Correct,
-                utcNow);
-            await SaveFinalAttemptAsync(
-                session,
-                item,
-                userId,
-                timeSpentBefore + timeSpentSeconds,
-                utcNow,
-                cancellationToken);
-        }
-        else
-        {
-            // Save the successful provider assessment; provider failures never reach this method.
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-
-        return await BuildAnswerResultAsync(
-            session,
-            item,
-            attemptsUsed,
-            Math.Max(0, 2 - attemptsUsed),
-            assessment,
-            assessment.Correct,
-            cancellationToken);
+        return await BuildAnswerResultAsync(session, item, correct, cancellationToken);
     }
 
     private async Task<ReviewSession?> GetActiveSessionAsync(
@@ -451,26 +359,11 @@ public sealed class EfReviewRepository : IReviewRepository
 
     private async Task<WordReviewState?> GetDueStateAsync(
         Guid userId,
-        ReviewSession session,
         Guid wordId,
         DateTime utcNow,
         CancellationToken cancellationToken)
     {
-        TimeZoneInfo timeZone;
-        try
-        {
-            timeZone = TimeZoneInfo.FindSystemTimeZoneById(session.TimeZoneId);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return null;
-        }
-        catch (InvalidTimeZoneException)
-        {
-            return null;
-        }
-
-        var localToday = ReviewTime.LocalDate(utcNow, timeZone);
+        var utcToday = ReviewTime.UtcDate(utcNow);
         var state = await (
             from item in _dbContext.WordReviewStates
             join word in _dbContext.Words on item.WordId equals word.Id
@@ -486,11 +379,10 @@ public sealed class EfReviewRepository : IReviewRepository
                 && board.DeletedAt == null
             select item)
             .SingleOrDefaultAsync(cancellationToken);
-        return state is { } && state.NextReviewDate <= localToday ? state : null;
+        return state is { } && state.NextReviewDate <= utcToday ? state : null;
     }
 
     private static void CompleteItem(
-        ReviewSession session,
         ReviewSessionItem item,
         WordReviewState reviewState,
         bool correct,
@@ -502,22 +394,8 @@ public sealed class EfReviewRepository : IReviewRepository
             ? FluentAsrsScheduler.ApplyCorrect(reviewState.Level, reviewState.LapseCount)
             : FluentAsrsScheduler.ApplyWrong(reviewState.Level, reviewState.LapseCount);
 
-        TimeZoneInfo timeZone;
-        try
-        {
-            timeZone = TimeZoneInfo.FindSystemTimeZoneById(session.TimeZoneId);
-        }
-        catch (TimeZoneNotFoundException exception)
-        {
-            throw new InvalidOperationException("Review session timezone is no longer available.", exception);
-        }
-        catch (InvalidTimeZoneException exception)
-        {
-            throw new InvalidOperationException("Review session timezone is no longer available.", exception);
-        }
-
-        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, schedule.IntervalDays, timeZone);
-        var reviewedOn = ReviewTime.LocalDate(utcNow, timeZone);
+        var nextReviewDate = ReviewTime.NextReviewDate(utcNow, schedule.IntervalDays);
+        var reviewedOn = ReviewTime.UtcDate(utcNow);
         reviewState.ApplyResult(schedule.LevelAfter, nextReviewDate, schedule.LapseCountAfter, reviewedOn);
         item.Complete(
             correct ? FluentAsrsReviewResult.Correct : FluentAsrsReviewResult.Wrong,
@@ -564,26 +442,13 @@ public sealed class EfReviewRepository : IReviewRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<ReviewSessionDto> BuildSessionDtoAsync(
+    private static ReviewSessionDto BuildSessionDto(
         ReviewSession session,
-        IReadOnlyCollection<ReviewSessionItem> items,
-        CancellationToken cancellationToken)
+        IReadOnlyCollection<ReviewSessionItem> items)
     {
-        var itemIds = items.Select(item => item.Id).ToArray();
-        var attemptCounts = itemIds.Length == 0
-            ? new Dictionary<Guid, int>()
-            : await _dbContext.Set<ReviewAttempt>()
-                .AsNoTracking()
-                .Where(attempt => itemIds.Contains(attempt.ReviewSessionItemId)
-                    && attempt.Mode == ReviewMode.ListenAndRepeat
-                    && attempt.DeletedAt == null)
-                .GroupBy(attempt => attempt.ReviewSessionItemId)
-                .Select(group => new { ItemId = group.Key, Count = group.Count() })
-                .ToDictionaryAsync(row => row.ItemId, row => row.Count, cancellationToken);
-
         var itemDtos = items
             .OrderBy(item => item.Position)
-            .Select(item => ToSessionItemDto(item, attemptCounts.GetValueOrDefault(item.Id)))
+            .Select(ToSessionItemDto)
             .ToArray();
         var currentItemIndex = Array.FindIndex(itemDtos, item => !item.IsReviewed);
         return new ReviewSessionDto(
@@ -601,9 +466,6 @@ public sealed class EfReviewRepository : IReviewRepository
     private async Task<ReviewAnswerResultDto> BuildAnswerResultAsync(
         ReviewSession session,
         ReviewSessionItem item,
-        int attemptsUsed,
-        int attemptsRemaining,
-        PronunciationAssessmentDto? assessment,
         bool correct,
         CancellationToken cancellationToken)
     {
@@ -613,8 +475,6 @@ public sealed class EfReviewRepository : IReviewRepository
             item.Id,
             item.VocabWordId,
             correct,
-            attemptsUsed,
-            attemptsRemaining,
             itemDto.IsReviewed,
             itemDto.Result,
             itemDto.LevelBefore,
@@ -623,16 +483,15 @@ public sealed class EfReviewRepository : IReviewRepository
             itemDto.NextReviewDateAfter,
             sessionDto.CompletedWords,
             sessionDto.CurrentItemIndex,
-            sessionDto.Status,
-            assessment);
+            sessionDto.Status);
     }
 
-    private static ReviewSessionItemDto ToSessionItemDto(ReviewSessionItem item, int pronunciationAttemptCount) =>
+    private static ReviewSessionItemDto ToSessionItemDto(ReviewSessionItem item) =>
         new(
             item.Id,
             item.VocabWordId,
             item.Position,
-            item.Mode,
+            item.IsReviewed ? item.Mode : ReviewMode.MeaningToWord,
             item.LanguageSnapshot,
             item.WordSnapshot,
             item.MeaningSnapshot,
@@ -647,8 +506,7 @@ public sealed class EfReviewRepository : IReviewRepository
             item.LevelBefore,
             item.LevelAfter,
             item.NextReviewDateBefore,
-            item.NextReviewDateAfter,
-            pronunciationAttemptCount);
+            item.NextReviewDateAfter);
 
     private static string ToStatus(ReviewSessionStatus status) => status switch
     {
@@ -663,12 +521,5 @@ public sealed class EfReviewRepository : IReviewRepository
         FluentAsrsReviewResult.Correct => "correct",
         FluentAsrsReviewResult.Wrong => "wrong",
         _ => throw new ArgumentOutOfRangeException(nameof(result)),
-    };
-
-    private static string PickRandomReviewMode() => Random.Shared.Next(ReviewMode.All.Count) switch
-    {
-        0 => ReviewMode.Dictation,
-        1 => ReviewMode.MeaningToWord,
-        _ => ReviewMode.ListenAndRepeat,
     };
 }

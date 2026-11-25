@@ -30,7 +30,6 @@ const session = {
     levelAfter: null,
     nextReviewDateBefore: null,
     nextReviewDateAfter: null,
-    pronunciationAttemptCount: 0,
   }],
 }
 
@@ -64,8 +63,6 @@ async function mockReviewApis(page) {
         itemId: 'item-1',
         wordId: 'word-1',
         correct: true,
-        attemptsUsed: 1,
-        attemptsRemaining: 0,
         isReviewed: true,
         result: 'correct',
         levelBefore: 0,
@@ -75,19 +72,18 @@ async function mockReviewApis(page) {
         completedWords: 1,
         currentItemIndex: null,
         sessionStatus: 'completed',
-        assessment: null,
       })
     }
     return json({ message: 'Unexpected Review request' }, 503)
   })
 }
 
-test('Review opens its due-count modal and grades one persisted mode per due word', async ({ page }) => {
+test('Review opens its due-count modal and grades Meaning to Word for each due word', async ({ page }) => {
   await mockReviewApis(page)
   await page.goto('/review')
   await expect(page.getByTestId('review-page')).toContainText('Open the Review dialog')
 
-  await page.getByRole('button', { name: 'Review', exact: true }).click()
+  await page.getByRole('button', { name: 'Open Review' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByTestId('review-due-count')).toHaveText('1')
   await expect(page.getByText('word ready to review')).toBeVisible()
@@ -97,10 +93,11 @@ test('Review opens its due-count modal and grades one persisted mode per due wor
   await expect(page.getByTestId('active-review-card')).toBeVisible()
   await expect(page.getByText('Read the meaning, type the word.')).toBeVisible()
   await expect(page.getByText('the first letter of the Greek alphabet')).toBeVisible()
-  await expect(page.getByText('Usage context')).toHaveCount(0)
+  await expect(page.getByText('CONTEXT', { exact: true })).toHaveCount(0)
   await page.getByLabel('Type the word').fill('alpha')
   await page.getByLabel('Type the word').press('Enter')
   await expect(page.getByRole('status')).toContainText('Correct')
   await page.getByRole('button', { name: 'Continue' }).click()
-  await expect(page.getByText('Review complete')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Review Complete' })).toBeVisible()
+  await expect(page.getByText('100% Accuracy')).toBeVisible()
 })

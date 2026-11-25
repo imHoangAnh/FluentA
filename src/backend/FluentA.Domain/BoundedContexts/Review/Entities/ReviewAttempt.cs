@@ -82,27 +82,4 @@ public sealed class ReviewAttempt : BaseEntity
             feedbackJson: null,
             timeSpentSeconds,
             attemptedAtUtc);
-
-    public static ReviewAttempt CreatePronunciation(
-        Guid reviewSessionItemId,
-        int attemptNumber,
-        bool isCorrect,
-        double accuracyScore,
-        double? completenessScore,
-        string feedbackMode,
-        string feedbackJson,
-        int timeSpentSeconds,
-        DateTime attemptedAtUtc) =>
-        new(
-            reviewSessionItemId,
-            attemptNumber,
-            mode: "listenAndRepeat",
-            answerText: null,
-            isCorrect,
-            accuracyScore,
-            completenessScore,
-            feedbackMode,
-            feedbackJson,
-            timeSpentSeconds,
-            attemptedAtUtc);
 }

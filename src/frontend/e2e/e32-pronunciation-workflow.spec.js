@@ -15,13 +15,6 @@ const countryside = [
   syllable('tɹi', 69, [['t', 67], ['ɹ', 66], ['i', 74]]),
   syllable('saɪd', 86, [['s', 100], ['aɪ', 88], ['d', 73]]),
 ]
-const phrase = [
-  ['Today', [syllable('tə', 79, [['t', 77], ['ə', 87]]), syllable('deɪ', 90, [['d', 94], ['eɪ', 88]])]],
-  ['was', [syllable('wɑz', 100, [['w', 100], ['ɑ', 100], ['z', 100]])]],
-  ['a', [syllable('ə', 100, [['ə', 100]])]],
-  ['beautiful', [syllable('bju', 100, [['b', 100], ['ju', 100]]), syllable('tɪ', 100, [['t', 100], ['ɪ', 100]]), syllable('fəl', 100, [['f', 100], ['ə', 100], ['l', 100]])]],
-  ['day', [syllable('deɪ', 55, [['d', 65], ['eɪ', 53]])]],
-].map(([text, syllables]) => ({ text, accuracyScore: 94, units: [], syllables }))
 
 async function installFakeMicrophone(page) {
   await page.addInitScript(() => {
@@ -51,13 +44,6 @@ function practiceSession() {
     boardName: 'Practice board', boardLanguage: 'en', status: 'active', currentItemIndex: 0,
     items: [{ ...word, currentStep: 'pronunciation', alreadyInReview: true, answerSlots: [], selectedLevel: null, isCompleted: false }],
     startedAt: '2026-07-20T00:00:00Z', completedAt: null,
-  }
-}
-function reviewSession() {
-  return {
-    sessionId: 'review-session-1', localDate: '2026-07-20', startedAt: '2026-07-20T00:00:00Z', completedAt: null,
-    status: 'active', totalWords: 1, completedWords: 0, currentItemIndex: 0,
-    items: [{ ...word, word: 'Today was a beautiful day.', ipaPronunciation: null, type: null, mode: 'listenAndRepeat' }],
   }
 }
 
@@ -147,61 +133,4 @@ test('Practice shows syllables, keeps unlimited retries, and honors Already in r
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   expect(audioBodies).toHaveLength(6)
   expect(audioBodies.every(body => body && body.length > 0)).toBe(true)
-})
-
-for (const assessedOutcomes of [[false, false], [false, true], [true]]) test(`Review phrase follows retry limit (${assessedOutcomes.join(',')})`, async ({ page }, testInfo) => {
-  await installFakeMicrophone(page)
-  const outcomes = [422, ...assessedOutcomes]
-  let assessmentCount = 0
-  let current = reviewSession()
-  await page.route('**/api/v1/**', async route => {
-    const path = new URL(route.request().url()).pathname
-    const json = data => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data }) })
-    if (path.endsWith('/auth/me')) return json(user)
-    if (path.endsWith('/review/sessions/review-session-1')) return json(current)
-    if (path.endsWith('/review/sessions/review-session-1/pronunciation-attempts')) {
-      const correct = outcomes.shift()
-      if (correct === 422) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ errors: [{ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'No speech' }] }) })
-      assessmentCount += 1
-      const isFinal = correct || assessmentCount === 2
-      const result = isFinal ? (correct ? 'correct' : 'wrong') : null
-      current = { ...current, status: isFinal ? 'completed' : 'active', completedWords: isFinal ? 1 : 0,
-        currentItemIndex: isFinal ? null : 0, items: [{ ...current.items[0], pronunciationAttemptCount: assessmentCount, isReviewed: isFinal, result }] }
-      return json({
-        itemId: 'item-1', wordId: 'word-1', correct, attemptsUsed: assessmentCount, attemptsRemaining: isFinal ? 0 : 1,
-        isReviewed: isFinal, result, levelBefore: isFinal ? 1 : null, levelAfter: isFinal ? 0 : null,
-        nextReviewDateBefore: null, nextReviewDateAfter: null, completedWords: isFinal ? 1 : 0,
-        currentItemIndex: isFinal ? null : 0, sessionStatus: isFinal ? 'completed' : 'active',
-        assessment: { correct, accuracyScore: 98, completenessScore: 100, feedbackMode: 'syllable', words: phrase },
-      })
-    }
-    return json({ message: path })
-  })
-  await page.goto('/review/sessions/review-session-1')
-  await recordOnce(page)
-  await expect(page.getByText(/No speech was recognized/)).toBeVisible()
-  await expect(page.getByText('Attempt 1 of 2')).toBeVisible()
-  await recordOnce(page)
-  await expect(page.getByTestId('pronunciation-feedback')).toHaveText('/tə//deɪ//wɑz//ə//bju//tɪ//fəl//deɪ/')
-  await expect(page.getByText('Attempt 1 of 2')).toBeVisible()
-  expect(assessmentCount).toBe(1)
-  if (!assessedOutcomes[0]) {
-    await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Try again' }).click()
-    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible()
-    await expect(page.getByTestId('pronunciation-feedback')).toHaveCount(0)
-    await expect(page.getByText('Attempt 2 of 2')).toBeVisible()
-    await page.getByRole('button', { name: 'Stop recording' }).click()
-  }
-  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Red syllable /deɪ/' }).hover()
-  await expect(page.locator('.pronunciation-phoneme-tooltip')).toHaveText('/d//eɪ/')
-  await expect(page.getByLabel('Red phoneme eɪ')).toHaveCSS('color', 'rgb(192, 57, 43)')
-  await expect(page.getByText('Today was a beautiful day.', { exact: true })).toHaveCount(1)
-  await expect(page.getByText(/Pronunciation needs another try|Not quite|Nice work/)).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Continue' })).toBeEnabled()
-  await page.screenshot({ path: testInfo.outputPath('phrase-feedback.png'), fullPage: true })
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await expect(page.getByRole('heading', { name: 'Review complete' })).toBeVisible()
-  expect(assessmentCount).toBe(assessedOutcomes.length)
 })

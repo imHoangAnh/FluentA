@@ -116,6 +116,14 @@
   line-height: 20px;
 }
 
+.review-setup__caught-up {
+  margin: 4px 0 0;
+  color: var(--ds-muted-foreground, #5b6d69);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
 .review-setup__loading {
   width: 28px;
   height: 28px;

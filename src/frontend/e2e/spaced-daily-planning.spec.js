@@ -24,7 +24,7 @@ test('Review modal reports the due count for all owned vocabulary boards', async
     expect(response.status()).toBe(201)
   }
 
-  const dashboardResponse = await page.request.get('https://localhost:7000/api/v1/review/dashboard?timeZoneId=UTC', { headers })
+  const dashboardResponse = await page.request.get('https://localhost:7000/api/v1/review/dashboard', { headers })
   expect(dashboardResponse.status()).toBe(200)
   const dashboard = (await dashboardResponse.json()).data
   expect(dashboard).toEqual(expect.objectContaining({ localDate: expect.any(String), dueCount: expect.any(Number) }))

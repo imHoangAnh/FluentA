@@ -31,7 +31,9 @@ public interface IPracticeService
         CancellationToken cancellationToken = default);
 
     Task<OperationResult<PracticeRetryStepResultDto>> RetryStepAsync(
-        Guid userId, Guid sessionId, RetryPracticeStepRequest request,
+        Guid userId,
+        Guid sessionId,
+        RetryPracticeStepRequest request,
         CancellationToken cancellationToken = default);
 
     Task<OperationResult<PracticePronunciationAttemptResultDto>> SubmitPronunciationAttemptAsync(
@@ -53,7 +55,6 @@ public interface IPracticeService
     Task<OperationResult<PracticeSessionDto>> CompleteSessionAsync(
         Guid userId,
         Guid sessionId,
-        CompletePracticeSessionRequest request,
         CancellationToken cancellationToken = default);
 
     // Retained for existing internal callers; no public endpoint accepts client summaries.
@@ -66,5 +67,4 @@ public interface IPracticeService
         Guid userId,
         AddPracticeWordsToReviewRequest request,
         CancellationToken cancellationToken = default);
-
 }

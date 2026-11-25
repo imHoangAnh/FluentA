@@ -15,7 +15,6 @@ public sealed class ReviewSessionConfiguration : IEntityTypeConfiguration<Review
 
         builder.Property(session => session.Id).HasColumnName("id");
         builder.Property(session => session.UserId).HasColumnName("user_id").IsRequired();
-        builder.Property(session => session.TimeZoneId).HasColumnName("time_zone_id").HasMaxLength(128).IsRequired();
         builder.Property(session => session.SessionDate).HasColumnName("session_date").IsRequired();
         builder.Property(session => session.StartedAt).HasColumnName("started_at").IsRequired();
         builder.Property(session => session.CompletedAt).HasColumnName("completed_at");

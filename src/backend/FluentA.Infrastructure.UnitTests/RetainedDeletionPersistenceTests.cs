@@ -211,7 +211,7 @@ public sealed class RetainedDeletionPersistenceTests
         var attempt = PracticeAttempt.Create(practice.Id, item.Id, PracticeStep.Dictation, PracticeAttemptKind.Answer,
             word.Word, null, true, 100, null, null, null, null, now);
         var summary = PracticeSessionSummary.Create(userId, page.Id, page.Name, PracticeMode.FixedSequence, 1, 1, 0, now);
-        var review = ReviewSession.CreateActive(userId, "Asia/Ho_Chi_Minh", DateOnly.FromDateTime(now), now);
+        var review = ReviewSession.CreateActive(userId, DateOnly.FromDateTime(now), now);
         var reviewItem = ReviewSessionItem.Create(review.Id, word.Id, 0, "dictation", "en", word.Word, word.Meaning,
             word.IpaPronunciation, "noun", null, word.Example, null, null);
         var due = DateOnly.FromDateTime(now);

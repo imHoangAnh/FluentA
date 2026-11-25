@@ -26,7 +26,6 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
         int totalCards,
         int correctCards,
         int wrongCards,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
@@ -104,5 +103,4 @@ public sealed partial class EfPracticeRepository : IPracticeRepository, IPractic
                 summary.WrongCards,
                 summary.CompletedAt));
     }
-
 }

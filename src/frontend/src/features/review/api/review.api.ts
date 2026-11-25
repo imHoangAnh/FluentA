@@ -1,8 +1,7 @@
 import { apiClient } from '@/shared/api/client'
 import type { ApiResponse } from '@/shared/api/contracts'
-import type { PronunciationAssessment } from '@/features/pronunciation'
 
-export type ReviewMode = 'dictation' | 'meaningToWord' | 'listenAndRepeat'
+export type ReviewMode = 'meaningToWord'
 export type ReviewSessionStatus = string
 export type ReviewItemResult = string | null
 
@@ -26,7 +25,6 @@ export type ReviewSessionItem = {
   levelAfter: number | null
   nextReviewDateBefore: string | null
   nextReviewDateAfter: string | null
-  pronunciationAttemptCount: number
 }
 
 export type ReviewSession = {
@@ -51,8 +49,6 @@ export type ReviewAnswerResult = {
   wordId: string
   correct: boolean
   isReviewed: boolean
-  attemptsUsed: number
-  attemptsRemaining: number
   result: string | null
   levelBefore: number | null
   levelAfter: number | null
@@ -61,20 +57,15 @@ export type ReviewAnswerResult = {
   completedWords: number
   currentItemIndex: number | null
   sessionStatus: ReviewSessionStatus
-  assessment: PronunciationAssessment | null
 }
 
-export type ReviewPronunciationResult = ReviewAnswerResult
-
-export async function getReviewDashboard(timeZoneId: string) {
-  const response = await apiClient.get<ApiResponse<ReviewDashboard>>('/review/dashboard', {
-    params: { timeZoneId },
-  })
+export async function getReviewDashboard() {
+  const response = await apiClient.get<ApiResponse<ReviewDashboard>>('/review/dashboard')
   return response.data.data!
 }
 
-export async function createReviewSession(input: { timeZoneId: string }) {
-  const response = await apiClient.post<ApiResponse<ReviewSession>>('/review/sessions', input)
+export async function createReviewSession() {
+  const response = await apiClient.post<ApiResponse<ReviewSession>>('/review/sessions')
   return response.data.data!
 }
 
@@ -93,24 +84,6 @@ export async function submitReviewAnswer(input: {
   const response = await apiClient.post<ApiResponse<ReviewAnswerResult>>(
     `/review/sessions/${sessionId}/answers`,
     body,
-  )
-  return response.data.data!
-}
-
-export async function submitReviewPronunciation(input: {
-  sessionId: string
-  itemId: string
-  audio: Blob
-  timeSpentSeconds: number
-}) {
-  const form = new FormData()
-  form.append('itemId', input.itemId)
-  form.append('audio', input.audio, 'review-pronunciation.wav')
-  form.append('timeSpentSeconds', String(input.timeSpentSeconds))
-
-  const response = await apiClient.post<ApiResponse<ReviewPronunciationResult>>(
-    `/review/sessions/${input.sessionId}/pronunciation-attempts`,
-    form,
   )
   return response.data.data!
 }

@@ -1,10 +1,8 @@
 using FluentA.API.Common;
 using FluentA.API.Contracts;
-using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Review.DTOs;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FluentA.API.Controllers;
@@ -22,18 +20,18 @@ public sealed class ReviewController : ApiControllerBase
     }
 
     [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard([FromQuery] string? timeZoneId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
-        var result = await _review.GetDashboardAsync(CurrentUserId(), timeZoneId, cancellationToken);
+        var result = await _review.GetDashboardAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<ReviewDashboardDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
     [HttpPost("sessions")]
-    public async Task<IActionResult> CreateReviewSession(CreateReviewSessionRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateReviewSession(CancellationToken cancellationToken)
     {
-        var result = await _review.CreateReviewSessionAsync(CurrentUserId(), request, cancellationToken);
+        var result = await _review.CreateReviewSessionAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<ReviewSessionDto>.Ok(result.Value!))
             : ToErrorResult(result);
@@ -59,57 +57,4 @@ public sealed class ReviewController : ApiControllerBase
             ? Ok(ApiResponse<ReviewAnswerResultDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
-
-    [HttpPost("sessions/{sessionId:guid}/pronunciation-attempts")]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> SubmitPronunciationAttempt(
-        Guid sessionId,
-        [FromForm] ReviewPronunciationAttemptForm request,
-        CancellationToken cancellationToken)
-    {
-        var audio = request.Audio is null
-            ? Array.Empty<byte>()
-            : await ReadAudioAsync(request.Audio, cancellationToken);
-        var result = await _review.SubmitPronunciationAttemptAsync(
-            CurrentUserId(),
-            sessionId,
-            request.ItemId,
-            audio,
-            request.TimeSpentSeconds,
-            cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiResponse<ReviewAnswerResultDto>.Ok(result.Value!))
-            : ToErrorResult(result);
-    }
-
-    private static async Task<byte[]> ReadAudioAsync(IFormFile audio, CancellationToken cancellationToken)
-    {
-        if (audio.Length > PronunciationAudioValidator.MaxAudioBytes)
-        {
-            return [0];
-        }
-
-        await using var stream = audio.OpenReadStream();
-        var buffer = new byte[PronunciationAudioValidator.MaxAudioBytes + 1];
-        var totalRead = 0;
-        while (totalRead < buffer.Length)
-        {
-            var bytesRead = await stream.ReadAsync(buffer.AsMemory(totalRead), cancellationToken);
-            if (bytesRead == 0)
-            {
-                break;
-            }
-
-            totalRead += bytesRead;
-        }
-
-        return buffer[..totalRead];
-    }
-}
-
-public sealed class ReviewPronunciationAttemptForm
-{
-    public Guid ItemId { get; set; }
-    public IFormFile? Audio { get; set; }
-    public int TimeSpentSeconds { get; set; }
 }

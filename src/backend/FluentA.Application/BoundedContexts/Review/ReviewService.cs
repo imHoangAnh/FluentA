@@ -1,5 +1,3 @@
-using FluentA.Application.BoundedContexts.Pronunciation;
-using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review.DTOs;
@@ -11,33 +9,29 @@ namespace FluentA.Application.BoundedContexts.Review;
 public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 {
     private readonly IReviewRepository _repository;
-    private readonly IPronunciationService _pronunciation;
 
     public Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
-        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
+        Guid userId, Guid pageId, Guid wordId, DateTime utcNow,
         int initialLevel, CancellationToken cancellationToken = default) =>
-        _repository.StagePracticeWordEnrollmentAsync(userId, pageId, wordId, timeZone, utcNow, initialLevel, cancellationToken);
+        _repository.StagePracticeWordEnrollmentAsync(userId, pageId, wordId, utcNow, initialLevel, cancellationToken);
 
-    public ReviewService(IReviewRepository repository, IPronunciationService pronunciation)
+    public ReviewService(IReviewRepository repository)
     {
         _repository = repository;
-        _pronunciation = pronunciation;
     }
 
     public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default) =>
-        _repository.AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
+        _repository.AddPracticeWordsToReviewAsync(userId, pageId, wordId, utcNow, cancellationToken);
 
     public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         int initialLevel,
         CancellationToken cancellationToken = default) =>
@@ -45,24 +39,16 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             userId,
             pageId,
             wordId,
-            timeZone,
             utcNow,
             initialLevel,
             cancellationToken);
 
     public async Task<OperationResult<ReviewSessionDto>> CreateReviewSessionAsync(
         Guid userId,
-        CreateReviewSessionRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!ReviewTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
-        {
-            return OperationResult<ReviewSessionDto>.Failure(InvalidTimeZoneError());
-        }
-
         var session = await _repository.CreateReviewSessionAsync(
             userId,
-            timeZone!,
             DateTime.UtcNow,
             cancellationToken);
         return OperationResult<ReviewSessionDto>.Success(session);
@@ -70,17 +56,10 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 
     public async Task<OperationResult<ReviewDashboardDto>> GetDashboardAsync(
         Guid userId,
-        string? timeZoneId,
         CancellationToken cancellationToken = default)
     {
-        if (!ReviewTime.TryFindTimeZone(timeZoneId, out var timeZone))
-        {
-            return OperationResult<ReviewDashboardDto>.Failure(InvalidTimeZoneError());
-        }
-
         var dashboard = await _repository.GetDashboardAsync(
             userId,
-            timeZone!,
             DateTime.UtcNow,
             cancellationToken);
         return OperationResult<ReviewDashboardDto>.Success(dashboard);
@@ -129,7 +108,7 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             return OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.ItemNotFound());
         }
 
-        if (target.Mode is not (ReviewMode.Dictation or ReviewMode.MeaningToWord))
+        if (target.Mode != ReviewMode.MeaningToWord)
         {
             return OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.InvalidMode());
         }
@@ -145,55 +124,6 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
             answerText,
             correct,
             request.TimeSpentSeconds,
-            DateTime.UtcNow,
-            cancellationToken);
-
-        return result is null
-            ? OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.ItemNotFound())
-            : OperationResult<ReviewAnswerResultDto>.Success(result);
-    }
-
-    public async Task<OperationResult<ReviewAnswerResultDto>> SubmitPronunciationAttemptAsync(
-        Guid userId,
-        Guid sessionId,
-        Guid itemId,
-        ReadOnlyMemory<byte> wavAudio,
-        int timeSpentSeconds,
-        CancellationToken cancellationToken = default)
-    {
-        var errors = ValidateAnswerRequest(sessionId, itemId, timeSpentSeconds);
-        if (errors.Count > 0)
-        {
-            return OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.Validation(errors));
-        }
-
-        var target = await _repository.GetAnswerTargetAsync(userId, sessionId, itemId, cancellationToken);
-        if (target is null)
-        {
-            return OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.ItemNotFound());
-        }
-
-        if (target.Mode != ReviewMode.ListenAndRepeat)
-        {
-            return OperationResult<ReviewAnswerResultDto>.Failure(ReviewError.InvalidMode());
-        }
-
-        var assessment = await _pronunciation.AssessFromSessionAsync(
-            userId,
-            new PronunciationTarget(target.ExpectedAnswer, target.Language),
-            wavAudio,
-            cancellationToken);
-        if (!assessment.IsSuccess)
-        {
-            return OperationResult<ReviewAnswerResultDto>.Failure(assessment.Error!);
-        }
-
-        var result = await _repository.AddPronunciationAttemptAsync(
-            userId,
-            sessionId,
-            itemId,
-            assessment.Value!,
-            timeSpentSeconds,
             DateTime.UtcNow,
             cancellationToken);
 
@@ -225,10 +155,4 @@ public sealed class ReviewService : IReviewService, IReviewEnrollmentPort
 
         return errors;
     }
-
-    private static ReviewError InvalidTimeZoneError() =>
-        ReviewError.Validation(new Dictionary<string, string[]>
-        {
-            ["timeZoneId"] = ["A valid browser timezone id is required."],
-        });
 }

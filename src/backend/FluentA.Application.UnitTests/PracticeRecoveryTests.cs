@@ -60,7 +60,7 @@ public sealed class PracticeRecoveryTests
         public List<string> Events { get; } = [];
         public bool AdvanceConflict, FailSave, Replay, AlreadyActive;
         public Task<OperationResult<PracticeReviewLevelResultDto>> Save() =>
-            new PracticeService(this, this, null!, this).SetReviewLevelAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new(3, "UTC"));
+            new PracticeService(this, this, null!, this).SetReviewLevelAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new(3));
 
         public async Task<OperationResult<T>> ExecuteAsync<T>(Guid userId, Guid sessionId, Func<CancellationToken, Task<OperationResult<T>>> operation, CancellationToken cancellationToken = default)
         {
@@ -85,7 +85,7 @@ public sealed class PracticeRecoveryTests
             return Task.FromResult(new PracticeRepositoryOperationResult<PracticeReviewEnrollmentContextDto>(PracticeRepositoryOperationStatus.Success,
                 new(Guid.NewGuid(), wordId, Replay ? new("added", true, 1) : null)));
         }
-        public Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow, int initialLevel, CancellationToken cancellationToken = default)
+        public Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(Guid userId, Guid pageId, Guid wordId, DateTime utcNow, int initialLevel, CancellationToken cancellationToken = default)
         {
             Events.Add("stage-review");
             return Task.FromResult<AddPracticeWordsToReviewDto?>(new(pageId, wordId, AlreadyActive ? "alreadyInReview" : "added", new(2026, 10, 18)));
@@ -96,7 +96,7 @@ public sealed class PracticeRecoveryTests
             return Task.FromResult(new PracticeRepositoryOperationResult<PracticeReviewLevelResultDto>(AdvanceConflict ? PracticeRepositoryOperationStatus.Conflict : PracticeRepositoryOperationStatus.Success,
                 AdvanceConflict ? null : new(alreadyActive ? "alreadyInReview" : "added", true, 1)));
         }
-        public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException("Recap must stage, not independently save enrollment.");
+        public Task<AddPracticeWordsToReviewDto?> EnrollMissingPracticeWordsAsync(Guid userId, Guid pageId, Guid wordId, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException("Recap must stage, not independently save enrollment.");
         public Task<PracticeDeckQueryResult> GetDecksAsync(Guid userId, Guid boardId, string? search, int page, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<PracticeRepositoryOperationResult<PracticeSessionDto>> CreateSessionAsync(Guid userId, Guid pageId, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<PracticeRepositoryOperationResult<PracticeSessionDto>> GetSessionAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -106,6 +106,6 @@ public sealed class PracticeRecoveryTests
         public Task<PracticeRepositoryOperationResult<PracticePronunciationAttemptResultDto>> RecordPronunciationAttemptAsync(Guid userId, Guid sessionId, Guid itemId, PronunciationAssessmentDto assessment, long durationMs, DateTime utcNow, CancellationToken cancellationToken = default, Guid? requestId = null) => throw new NotSupportedException();
         public Task<PracticeRepositoryOperationResult<PracticeRetryStepResultDto>> RetryStepAsync(Guid userId, Guid sessionId, Guid itemId, PracticeStep step, Guid attemptId, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<PracticeRepositoryOperationResult<PracticeSessionDto>> CompleteSessionAsync(Guid userId, Guid sessionId, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(Guid userId, Guid pageId, PracticeMode mode, int totalCards, int correctCards, int wrongCards, TimeZoneInfo timeZone, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<PracticeSessionSummarySaveResult> CreatePracticeSessionSummaryAsync(Guid userId, Guid pageId, PracticeMode mode, int totalCards, int correctCards, int wrongCards, DateTime utcNow, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

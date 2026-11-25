@@ -10,13 +10,11 @@ public sealed record CreatePracticeSessionSummaryRequest(
     string Mode,
     int TotalCards,
     int CorrectCards,
-    int WrongCards,
-    string TimeZoneId);
+    int WrongCards);
 
 public sealed record AddPracticeWordsToReviewRequest(
     Guid PageId,
     Guid WordId,
-    string TimeZoneId,
     int InitialLevel = 0);
 
 public sealed record AddPracticeWordsToReviewDto(
@@ -79,8 +77,13 @@ public sealed record PracticeSessionItemDto(
     int PronunciationAttemptCount = 0,
     PracticeSavedAttemptDto? LastAttempt = null);
 
-public sealed record PracticeSavedAttemptDto(Guid RequestId, string Step, bool Correctness,
-    bool IsSkip, int? AttemptNumber, PronunciationAssessmentDto? Assessment);
+public sealed record PracticeSavedAttemptDto(
+    Guid RequestId,
+    string Step,
+    bool Correctness,
+    bool IsSkip,
+    int? AttemptNumber,
+    PronunciationAssessmentDto? Assessment);
 
 public sealed record PracticeSessionDto(
     Guid SessionId,
@@ -129,16 +132,17 @@ public sealed record PracticePronunciationAttemptResultDto(
 
 public sealed record PracticePronunciationTargetDto(string Word, string Language, int NextAttemptNumber);
 
-public sealed record SetPracticeReviewLevelRequest(int Level, string TimeZoneId);
+public sealed record SetPracticeReviewLevelRequest(int Level);
 
-public sealed record PracticeReviewEnrollmentContextDto(Guid PageId, Guid WordId, PracticeReviewLevelResultDto? CompletedResult = null);
+public sealed record PracticeReviewEnrollmentContextDto(
+    Guid PageId,
+    Guid WordId,
+    PracticeReviewLevelResultDto? CompletedResult = null);
 
 public sealed record PracticeReviewLevelResultDto(
     string Status,
     bool ItemCompleted,
     int CurrentItemIndex);
-
-public sealed record CompletePracticeSessionRequest(string TimeZoneId);
 
 public enum PracticeRepositoryOperationStatus
 {

@@ -7,12 +7,10 @@ public interface IReviewService
 {
     Task<OperationResult<ReviewSessionDto>> CreateReviewSessionAsync(
         Guid userId,
-        CreateReviewSessionRequest request,
         CancellationToken cancellationToken = default);
 
     Task<OperationResult<ReviewDashboardDto>> GetDashboardAsync(
         Guid userId,
-        string? timeZoneId,
         CancellationToken cancellationToken = default);
 
     Task<OperationResult<ReviewSessionDto>> GetSessionAsync(
@@ -24,13 +22,5 @@ public interface IReviewService
         Guid userId,
         Guid sessionId,
         SubmitReviewAnswerRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<OperationResult<ReviewAnswerResultDto>> SubmitPronunciationAttemptAsync(
-        Guid userId,
-        Guid sessionId,
-        Guid itemId,
-        ReadOnlyMemory<byte> wavAudio,
-        int timeSpentSeconds,
         CancellationToken cancellationToken = default);
 }

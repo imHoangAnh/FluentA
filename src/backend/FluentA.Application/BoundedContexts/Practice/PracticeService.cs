@@ -305,11 +305,6 @@ public sealed class PracticeService : IPracticeService
             errors["level"] = ["Level must be between 0 and 5."];
         }
 
-        if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
-        {
-            errors["timeZoneId"] = ["A valid browser timezone id is required."];
-        }
-
         if (errors.Count > 0)
         {
             return OperationResult<PracticeReviewLevelResultDto>.Failure(PracticeError.Validation(errors));
@@ -330,7 +325,6 @@ public sealed class PracticeService : IPracticeService
                 userId,
                 context.Value.PageId,
                 context.Value.WordId,
-                timeZone!,
                 DateTime.UtcNow,
                 request.Level,
                 token);
@@ -356,17 +350,8 @@ public sealed class PracticeService : IPracticeService
     public async Task<OperationResult<PracticeSessionDto>> CompleteSessionAsync(
         Guid userId,
         Guid sessionId,
-        CompletePracticeSessionRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out _))
-        {
-            return OperationResult<PracticeSessionDto>.Failure(PracticeError.Validation(new Dictionary<string, string[]>
-            {
-                ["timeZoneId"] = ["A valid browser timezone id is required."],
-            }));
-        }
-
         return await Transaction.ExecuteAsync(userId, sessionId, async token =>
             MapRepositoryResult(await Sessions.CompleteSessionAsync(userId, sessionId, DateTime.UtcNow, token)), cancellationToken);
     }
@@ -407,11 +392,6 @@ public sealed class PracticeService : IPracticeService
             errors["summary"] = ["Correct cards plus wrong cards must equal total cards."];
         }
 
-        if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
-        {
-            errors["timeZoneId"] = ["A valid browser timezone id is required."];
-        }
-
         if (errors.Count > 0)
         {
             return OperationResult<PracticeSessionSummaryDto>.Failure(PracticeError.Validation(errors));
@@ -424,7 +404,6 @@ public sealed class PracticeService : IPracticeService
             request.TotalCards,
             request.CorrectCards,
             request.WrongCards,
-            timeZone!,
             DateTime.UtcNow,
             cancellationToken);
 
@@ -464,11 +443,6 @@ public sealed class PracticeService : IPracticeService
             errors["initialLevel"] = ["Initial level must be between 0 and 5."];
         }
 
-        if (!PracticeTime.TryFindTimeZone(request.TimeZoneId, out var timeZone))
-        {
-            errors["timeZoneId"] = ["A valid browser timezone id is required."];
-        }
-
         if (errors.Count > 0)
         {
             return OperationResult<AddPracticeWordsToReviewDto>.Failure(PracticeError.Validation(errors));
@@ -478,7 +452,6 @@ public sealed class PracticeService : IPracticeService
             userId,
             request.PageId,
             request.WordId,
-            timeZone!,
             DateTime.UtcNow,
             request.InitialLevel,
             cancellationToken);

@@ -1,13 +1,8 @@
-using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
-
 namespace FluentA.Application.BoundedContexts.Review.DTOs;
 
 public sealed record ReviewDashboardDto(
     DateOnly LocalDate,
     int DueCount);
-
-public sealed record CreateReviewSessionRequest(
-    string TimeZoneId);
 
 public sealed record ReviewSessionDto(
     Guid SessionId,
@@ -39,8 +34,7 @@ public sealed record ReviewSessionItemDto(
     int? LevelBefore,
     int? LevelAfter,
     DateOnly? NextReviewDateBefore,
-    DateOnly? NextReviewDateAfter,
-    int PronunciationAttemptCount);
+    DateOnly? NextReviewDateAfter);
 
 public sealed record SubmitReviewAnswerRequest(
     Guid ItemId,
@@ -57,8 +51,6 @@ public sealed record ReviewAnswerResultDto(
     Guid ItemId,
     Guid WordId,
     bool Correct,
-    int AttemptsUsed,
-    int AttemptsRemaining,
     bool IsReviewed,
     string? Result,
     int? LevelBefore,
@@ -67,5 +59,4 @@ public sealed record ReviewAnswerResultDto(
     DateOnly? NextReviewDateAfter,
     int CompletedWords,
     int? CurrentItemIndex,
-    string SessionStatus,
-    PronunciationAssessmentDto? Assessment);
+    string SessionStatus);

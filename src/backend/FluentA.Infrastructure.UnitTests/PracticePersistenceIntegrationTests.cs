@@ -26,7 +26,7 @@ public sealed class PracticePersistenceIntegrationTests
         await using (var context = database.Context())
         {
             var transaction = new FailAfterSave(new EfPracticeTransaction(context));
-            await Assert.ThrowsAsync<IOException>(() => Service(context, transaction).SetReviewLevelAsync(userId, sessionId, wordId, new(3, "UTC")));
+            await Assert.ThrowsAsync<IOException>(() => Service(context, transaction).SetReviewLevelAsync(userId, sessionId, wordId, new(3)));
         }
         await using (var verify = database.Context())
         {
@@ -35,7 +35,7 @@ public sealed class PracticePersistenceIntegrationTests
             Assert.Equal(0, (await verify.PracticeSessions.SingleAsync()).CurrentItemIndex);
         }
         await using (var context = database.Context())
-            Assert.True((await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(3, "UTC"))).IsSuccess);
+            Assert.True((await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(3))).IsSuccess);
         DateOnly scheduled;
         await using (var verify = database.Context())
         {
@@ -46,7 +46,7 @@ public sealed class PracticePersistenceIntegrationTests
             Assert.Equal(1, (await verify.PracticeSessions.SingleAsync()).CurrentItemIndex);
         }
         await using (var context = database.Context())
-            Assert.True((await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(3, "UTC"))).IsSuccess);
+            Assert.True((await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(3))).IsSuccess);
         await using (var verify = database.Context())
         {
             Assert.Equal(scheduled, (await verify.WordReviewStates.SingleAsync()).NextReviewDate);
@@ -100,7 +100,7 @@ public sealed class PracticePersistenceIntegrationTests
         async Task<PracticeReviewLevelResultDto> Enroll(Guid sessionId, int level)
         {
             await using var context = database.Context();
-            var result = await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(level, "UTC"));
+            var result = await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(level));
             Assert.True(result.IsSuccess);
             return result.Value!;
         }
@@ -123,7 +123,7 @@ public sealed class PracticePersistenceIntegrationTests
         {
             context.WordReviewStates.Add(WordReviewState.CreateAtLevel(userId, wordId, 5, due));
             await context.SaveChangesAsync();
-            var result = await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(0, "UTC"));
+            var result = await Service(context).SetReviewLevelAsync(userId, sessionId, wordId, new(0));
             Assert.Equal("alreadyInReview", result.Value!.Status);
         }
         await using (var verify = database.Context())
@@ -263,7 +263,7 @@ public sealed class PracticePersistenceIntegrationTests
     }
 
     private static PracticeService Service(AppDbContext context, IPracticeTransaction? transaction = null) =>
-        new(new EfPracticeRepository(context), new ReviewService(new EfReviewRepository(context), null!), null!, transaction ?? new EfPracticeTransaction(context));
+        new(new EfPracticeRepository(context), new ReviewService(new EfReviewRepository(context)), null!, transaction ?? new EfPracticeTransaction(context));
 
     private sealed class FailAfterSave(IPracticeTransaction inner) : IPracticeTransaction
     {

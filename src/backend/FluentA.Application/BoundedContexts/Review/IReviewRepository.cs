@@ -1,4 +1,3 @@
-using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
 using FluentA.Application.BoundedContexts.Review.DTOs;
 
@@ -7,8 +6,12 @@ namespace FluentA.Application.BoundedContexts.Review;
 public interface IReviewRepository
 {
     Task<AddPracticeWordsToReviewDto?> StagePracticeWordEnrollmentAsync(
-        Guid userId, Guid pageId, Guid wordId, TimeZoneInfo timeZone, DateTime utcNow,
-        int initialLevel, CancellationToken cancellationToken = default) =>
+        Guid userId,
+        Guid pageId,
+        Guid wordId,
+        DateTime utcNow,
+        int initialLevel,
+        CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Review repository must support staged enrollment.");
 
     // Practice still uses this enrollment contract; keep both overloads stable.
@@ -16,7 +19,6 @@ public interface IReviewRepository
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
@@ -24,21 +26,18 @@ public interface IReviewRepository
         Guid userId,
         Guid pageId,
         Guid wordId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         int initialLevel,
         CancellationToken cancellationToken = default) =>
-        AddPracticeWordsToReviewAsync(userId, pageId, wordId, timeZone, utcNow, cancellationToken);
+        AddPracticeWordsToReviewAsync(userId, pageId, wordId, utcNow, cancellationToken);
 
     Task<ReviewSessionDto> CreateReviewSessionAsync(
         Guid userId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
     Task<ReviewDashboardDto> GetDashboardAsync(
         Guid userId,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
@@ -59,15 +58,6 @@ public interface IReviewRepository
         Guid itemId,
         string answerText,
         bool correct,
-        int timeSpentSeconds,
-        DateTime utcNow,
-        CancellationToken cancellationToken = default);
-
-    Task<ReviewAnswerResultDto?> AddPronunciationAttemptAsync(
-        Guid userId,
-        Guid sessionId,
-        Guid itemId,
-        PronunciationAssessmentDto assessment,
         int timeSpentSeconds,
         DateTime utcNow,
         CancellationToken cancellationToken = default);

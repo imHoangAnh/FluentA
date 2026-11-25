@@ -11,7 +11,6 @@ import {
   type PronunciationAssessment,
 } from '@/features/pronunciation'
 import { getLanguageProfile, selectSpeechVoice } from '@/shared/lib/language'
-import { APP_TIME_ZONE } from '@/shared/lib/timezone'
 import { toast } from '@/shared/lib/toast'
 import { PracticeModeSurface } from '../components/session/PracticeModeSurface'
 import { PracticeProgress } from '../components/session/PracticeProgress'
@@ -76,7 +75,7 @@ function SessionPracticePage() {
   const reviewLevelMutation = useMutation({ mutationFn: practiceApi.setPracticeReviewLevel, onMutate: cancelSessionRead })
   const completeMutation = useMutation({
     onMutate: cancelSessionRead,
-    mutationFn: async (input: { sessionId: string; timeZoneId: string }) => {
+    mutationFn: async (input: { sessionId: string }) => {
       try { await practiceApi.completePracticeSession(input) } catch (error) {
         // Completion can succeed even if the HTTP response is lost.
         try {
@@ -155,7 +154,7 @@ function SessionPracticePage() {
 
   const finishSession = useCallback(() => {
     if (!sessionId || completeMutation.isPending) return
-    completeMutation.mutate({ sessionId, timeZoneId: APP_TIME_ZONE })
+    completeMutation.mutate({ sessionId })
   }, [completeMutation, sessionId])
 
   const moveToServerPosition = useCallback((nextIndex: number, nextStep: PracticeStep | null) => {
@@ -477,7 +476,6 @@ function SessionPracticePage() {
         sessionId: session.sessionId,
         wordId: currentItem.wordId,
         level,
-        timeZoneId: APP_TIME_ZONE,
       })
       setReviewStatuses((current) => ({ ...current, [currentItem.wordId]: result.status }))
       if (result.itemCompleted) {

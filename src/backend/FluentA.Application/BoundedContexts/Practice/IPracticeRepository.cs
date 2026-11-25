@@ -12,8 +12,6 @@ public interface IPracticeRepository
         int totalCards,
         int correctCards,
         int wrongCards,
-        TimeZoneInfo timeZone,
         DateTime utcNow,
         CancellationToken cancellationToken = default);
-
 }
