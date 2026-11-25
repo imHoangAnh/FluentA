@@ -10,6 +10,7 @@ import { projectRoutes } from '@/features/project'
 import { journalRoutes } from '@/features/journal'
 import { notesRoutes } from '@/features/notes'
 import { countdownRoutes } from '@/features/countdown'
+import { analyticsRoutes } from '@/features/analytics'
 import { habitsRoutes } from '@/features/habits'
 import { RouteError, RouteLoading } from '@/shared/components/feedback/RouteFeedback'
 import { AppShellRouteLayout } from './layouts/AppShellRouteLayout'
@@ -28,6 +29,7 @@ export const protectedAppRoutes: RouteObject[] = [
   ...practiceRoutes,
   ...reviewRoutes,
   ...reviewSessionRoutes,
+  ...analyticsRoutes,
   ...todoRoutes,
   ...projectRoutes,
   ...journalRoutes,

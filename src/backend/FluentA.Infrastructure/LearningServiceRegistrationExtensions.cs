@@ -1,8 +1,10 @@
+using FluentA.Application.BoundedContexts.Analytics;
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Review;
 using FluentA.Application.BoundedContexts.Vocabulary;
 using FluentA.Infrastructure.ExternalServices.Pronunciation;
+using FluentA.Infrastructure.Persistence.Repositories.Analytics;
 using FluentA.Infrastructure.Persistence.Repositories.Practice;
 using FluentA.Infrastructure.Persistence.Repositories.Pronunciation;
 using FluentA.Infrastructure.Persistence.Repositories.Review;
@@ -34,6 +36,8 @@ internal static class LearningServiceRegistrationExtensions
             ?? throw new InvalidOperationException("Review service must implement review enrollment."));
         services.AddScoped<IVocabularyRepository, VocabularyRepository>();
         services.AddScoped<IVocabularyService, VocabularyService>();
+        services.AddScoped<IAnalyticsRepository, EfAnalyticsRepository>();
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
         return services;
     }
 }

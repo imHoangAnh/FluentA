@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CalendarClock,
   Dumbbell,
   FolderKanban,
@@ -37,6 +38,11 @@ export const shellNavigationSections: ShellNavigationSection[] = [
         icon: RotateCcw,
         dialogQueryParam: 'review',
         renderDialog: (open, onOpenChange) => createElement(ReviewSetup, { open, onOpenChange }),
+      },
+      {
+        to: '/analytics',
+        label: 'Analytics',
+        icon: BarChart3,
       },
     ],
   },
