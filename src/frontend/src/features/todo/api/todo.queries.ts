@@ -4,4 +4,6 @@ export const todoKeys = {
   day: (date: string) => ['todo', 'items', date] as const,
   range: (from: string, to: string) => ['todo', 'range', from, to] as const,
   item: (taskId?: string | null) => ['todo-item', taskId] as const,
+  priorities: ['todo', 'priorities'] as const,
+  tags: ['todo', 'tags'] as const,
 }

@@ -27,12 +27,18 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
             .HasDefaultValue(false)
             .IsRequired();
         builder.Property(item => item.CompletedAt).HasColumnName("completed_at");
+        builder.Property(item => item.PriorityId).HasColumnName("priority_id");
+        builder.Property(item => item.ScheduledStartTime).HasColumnName("scheduled_start_time").HasColumnType("time");
+        builder.Property(item => item.ScheduledEndTime).HasColumnName("scheduled_end_time").HasColumnType("time");
+        builder.Property(item => item.EstimatedMinutes).HasColumnName("estimated_minutes");
         builder.Property(item => item.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(item => item.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(item => item.DeletedAt).HasColumnName("deleted_at");
 
         builder.HasIndex(item => new { item.UserId, item.Date, item.SortOrder });
         builder.HasIndex(item => new { item.UserId, item.IsCompleted, item.Date });
+        builder.HasIndex(item => item.PriorityId);
+
         builder.HasOne<TodoItem>()
             .WithMany()
             .HasForeignKey(item => item.GeneratedFromTodoId)
@@ -40,5 +46,23 @@ public sealed class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
         builder.HasIndex(item => item.GeneratedFromTodoId)
             .IsUnique()
             .HasFilter("generated_from_todo_id IS NOT NULL AND deleted_at IS NULL");
+
+        builder.HasOne(item => item.Priority)
+            .WithMany()
+            .HasForeignKey(item => item.PriorityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(item => item.Subtasks)
+            .WithOne()
+            .HasForeignKey(subtask => subtask.TodoItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(item => item.TodoItemTags)
+            .WithOne()
+            .HasForeignKey(link => link.TodoItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(item => item.Subtasks).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(item => item.TodoItemTags).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

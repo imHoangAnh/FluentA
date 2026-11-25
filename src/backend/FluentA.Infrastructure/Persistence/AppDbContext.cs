@@ -41,6 +41,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitEntryEntity> HabitEntries => Set<HabitEntryEntity>();
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
+    public DbSet<TodoPriority> TodoPriorities => Set<TodoPriority>();
+    public DbSet<TodoTag> TodoTags => Set<TodoTag>();
+    public DbSet<TodoItemTag> TodoItemTags => Set<TodoItemTag>();
+    public DbSet<TodoSubtask> TodoSubtasks => Set<TodoSubtask>();
     public DbSet<CountdownEventEntity> CountdownEvents => Set<CountdownEventEntity>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryAsset> JournalEntryAssets => Set<JournalEntryAsset>();

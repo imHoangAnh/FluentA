@@ -4,8 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { todayUtc } from '@/shared/lib/date'
-import type { CreateTodoInput, TodoItem, UpdateTodoInput } from '../api/todo.api'
-import { formatWeekRange, weekDates } from '../model/todo-date'
+import type {
+  CreatePriorityInput,
+  CreateTodoInput,
+  TodoItem,
+  TodoPriority,
+  TodoSubtask,
+  TodoTag,
+  UpdateTodoInput,
+} from '../api/todo.api'
+import { formatWeekShortRange, weekDates } from '../model/todo-date'
 import { TodoPage } from './TodoPage'
 
 const api = vi.hoisted(() => ({
@@ -16,6 +24,16 @@ const api = vi.hoisted(() => ({
   updateTodo: vi.fn(),
   duplicateTodo: vi.fn(),
   deleteTodo: vi.fn(),
+  listPriorities: vi.fn(),
+  createPriority: vi.fn(),
+  updatePriority: vi.fn(),
+  deletePriority: vi.fn(),
+  listTags: vi.fn(),
+  createTag: vi.fn(),
+  deleteTag: vi.fn(),
+  createSubtask: vi.fn(),
+  updateSubtask: vi.fn(),
+  deleteSubtask: vi.fn(),
 }))
 
 vi.mock('../api/todo.api', async (importOriginal) => ({
@@ -24,6 +42,8 @@ vi.mock('../api/todo.api', async (importOriginal) => ({
 }))
 
 let items: TodoItem[]
+let priorities: TodoPriority[]
+let tags: TodoTag[]
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
   return {
@@ -38,6 +58,13 @@ function todo(overrides: Partial<TodoItem> = {}): TodoItem {
     completedAt: null,
     createdAt: '2026-07-22T01:00:00Z',
     updatedAt: '2026-07-22T01:00:00Z',
+    priorityId: null,
+    priority: null,
+    scheduledStartTime: null,
+    scheduledEndTime: null,
+    estimatedMinutes: null,
+    tags: [],
+    subtasks: [],
     ...overrides,
   }
 }
@@ -53,25 +80,55 @@ function renderPage(initialEntry = '/todo') {
   )
 }
 
-describe('TodoPage My Day workspace', () => {
+describe('TodoPage My Day & My Week workspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.localStorage.clear()
+    priorities = [{ id: 'prio-high', name: 'High', tone: 'warning', sortOrder: 0 }]
+    tags = [{ id: 'tag-ielts', name: 'IELTS', }]
     items = [todo()]
+
     api.listByDate.mockImplementation(async () => [...items])
     api.listByRange.mockImplementation(async () => [...items])
+    api.listPriorities.mockImplementation(async () => [...priorities])
+    api.listTags.mockImplementation(async () => [...tags])
     api.getTodo.mockImplementation(async (id: string) => items.find((item) => item.id === id) ?? Promise.reject(new Error('not found')))
+
     api.createTodo.mockImplementation(async (input: CreateTodoInput) => {
-      const created = todo({ id: 'todo-created', title: input.title, date: input.date, note: input.note ?? null })
+      const priority = priorities.find((p) => p.id === input.priorityId) ?? null
+      const attachedTags = tags.filter((t) => (input.tagIds ?? []).includes(t.id))
+      const created = todo({
+        id: `todo-created-${items.length + 1}`,
+        title: input.title,
+        date: input.date,
+        note: input.note ?? null,
+        priorityId: priority?.id ?? null,
+        priority,
+        tags: attachedTags,
+      })
       items = [...items, created]
       return created
     })
+
     api.updateTodo.mockImplementation(async (id: string, patch: UpdateTodoInput) => {
-      let updated = items.find((item) => item.id === id)!
-      updated = { ...updated, ...patch, updatedAt: '2026-07-22T02:00:00Z' }
-      items = items.map((item) => item.id === id ? updated : item)
+      const existing = items.find((item) => item.id === id)!
+      const nextPriority = patch.priorityId !== undefined
+        ? (priorities.find((p) => p.id === patch.priorityId) ?? null)
+        : existing.priority ?? null
+      const nextTags = patch.tagIds !== undefined
+        ? tags.filter((t) => patch.tagIds!.includes(t.id))
+        : existing.tags ?? []
+      const updated: TodoItem = {
+        ...existing,
+        ...patch,
+        priority: nextPriority,
+        tags: nextTags,
+        updatedAt: '2026-07-22T02:00:00Z',
+      }
+      items = items.map((item) => (item.id === id ? updated : item))
       return updated
     })
+
     api.duplicateTodo.mockImplementation(async (id: string) => {
       const source = items.find((item) => item.id === id)!
       const duplicate = todo({
@@ -84,24 +141,87 @@ describe('TodoPage My Day workspace', () => {
       items = [...items, duplicate]
       return duplicate
     })
+
     api.deleteTodo.mockImplementation(async (id: string) => {
       items = items.filter((item) => item.id !== id)
     })
+
+    api.createPriority.mockImplementation(async (input: CreatePriorityInput) => {
+      const created: TodoPriority = {
+        id: `prio-${priorities.length + 1}`,
+        name: input.name,
+        tone: input.tone ?? 'warning',
+        sortOrder: priorities.length,
+      }
+      priorities = [...priorities, created]
+      return created
+    })
+
+    api.deletePriority.mockImplementation(async (id: string) => {
+      priorities = priorities.filter((p) => p.id !== id)
+      items = items.map((item) => (item.priorityId === id ? { ...item, priorityId: null, priority: null } : item))
+    })
+
+    api.createTag.mockImplementation(async (name: string) => {
+      const created: TodoTag = { id: `tag-${tags.length + 1}`, name }
+      tags = [...tags, created]
+      return created
+    })
+
+    api.deleteTag.mockImplementation(async (id: string) => {
+      tags = tags.filter((t) => t.id !== id)
+      items = items.map((item) => ({ ...item, tags: (item.tags ?? []).filter((t) => t.id !== id) }))
+    })
+
+    api.createSubtask.mockImplementation(async (todoId: string, title: string) => {
+      const existing = items.find((item) => item.id === todoId)!
+      const created: TodoSubtask = {
+        id: `sub-${(existing.subtasks ?? []).length + 1}`,
+        title,
+        isCompleted: false,
+        sortOrder: (existing.subtasks ?? []).length,
+      }
+      items = items.map((item) =>
+        item.id === todoId ? { ...item, subtasks: [...(item.subtasks ?? []), created] } : item,
+      )
+      return created
+    })
+
+    api.updateSubtask.mockImplementation(async (todoId: string, subtaskId: string, patch: { isCompleted?: boolean }) => {
+      let updatedSubtask!: TodoSubtask
+      items = items.map((item) => {
+        if (item.id !== todoId) return item
+        const nextSubtasks = (item.subtasks ?? []).map((subtask) => {
+          if (subtask.id !== subtaskId) return subtask
+          updatedSubtask = { ...subtask, ...patch }
+          return updatedSubtask
+        })
+        return { ...item, subtasks: nextSubtasks }
+      })
+      return updatedSubtask
+    })
+
+    api.deleteSubtask.mockImplementation(async (todoId: string, subtaskId: string) => {
+      items = items.map((item) =>
+        item.id === todoId
+          ? { ...item, subtasks: (item.subtasks ?? []).filter((subtask) => subtask.id !== subtaskId) }
+          : item,
+      )
+    })
   })
 
-  it('keeps My Day list-first and opens details after quick creation', async () => {
+  it('renders My Day sidebar + list and opens details after quick creation', async () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'My Day' })).toBeInTheDocument()
-    expect(screen.queryByText('Grid')).not.toBeInTheDocument()
-    expect(screen.queryByText('Group')).not.toBeInTheDocument()
-    expect(screen.queryByText('Suggestions')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /My Week/ })).toBeInTheDocument()
 
     const titleInput = screen.getByTestId('todo-title-input')
     fireEvent.change(titleInput, { target: { value: '   ' } })
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
     fireEvent.submit(titleInput.closest('form')!)
     expect(api.createTodo).not.toHaveBeenCalled()
+
     fireEvent.change(titleInput, { target: { value: 'Plan speaking practice' } })
     fireEvent.submit(titleInput.closest('form')!)
 
@@ -110,6 +230,8 @@ describe('TodoPage My Day workspace', () => {
     expect(api.createTodo).toHaveBeenCalledWith({
       title: 'Plan speaking practice',
       date: todayUtc(),
+      priorityId: undefined,
+      tagIds: undefined,
     })
     expect(screen.getByLabelText('Task title')).toHaveFocus()
   })
@@ -117,7 +239,7 @@ describe('TodoPage My Day workspace', () => {
   it('renders explicit loading, empty, and error feedback', async () => {
     api.listByDate.mockImplementationOnce(() => new Promise(() => undefined))
     const loadingView = renderPage()
-    expect(await screen.findByRole('status', { name: '' })).toHaveTextContent('Loading tasks...')
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading tasks...')
     loadingView.unmount()
 
     api.listByDate.mockResolvedValueOnce([])
@@ -130,49 +252,109 @@ describe('TodoPage My Day workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load My Day tasks.')
   })
 
-  it('shares completion and importance between the row and details panel', async () => {
+  it('saves Task Details edits explicitly when clicking Save and toggles completion immediately', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mark as important' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { isImportant: true }))
-    expect(screen.getByRole('button', { name: 'Remove importance from Review vocabulary' })).toHaveAttribute('aria-pressed', 'true')
-
-    const details = screen.getByLabelText('Details for Review vocabulary')
-    fireEvent.click(within(details).getByRole('button', { name: 'Mark Review vocabulary as completed' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { isCompleted: true }))
-    expect(await screen.findByRole('button', { name: /Completed/ })).toHaveTextContent('1')
-  })
-
-  it('autosaves title on Enter and note on blur', async () => {
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
+    expect(screen.queryByLabelText('Task date')).not.toBeInTheDocument()
 
     const title = screen.getByLabelText('Task title')
     fireEvent.change(title, { target: { value: 'Review lesson 12' } })
-    fireEvent.keyDown(title, { key: 'Enter' })
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { title: 'Review lesson 12' }))
 
-    const note = screen.getByLabelText('Note')
-    fireEvent.change(note, { target: { value: 'Focus on the new expressions.' } })
-    fireEvent.blur(note)
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { note: 'Focus on the new expressions.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Scheduled start time' }))
+    fireEvent.click(within(screen.getByRole('listbox', { name: 'Scheduled start time options' })).getByRole('option', { name: '09:00' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
-    expect(screen.queryByLabelText('Details for Review lesson 12')).not.toBeInTheDocument()
-  })
+    fireEvent.click(screen.getByRole('button', { name: 'Scheduled end time' }))
+    const endOptions = screen.getByRole('listbox', { name: 'Scheduled end time options' })
+    expect(within(endOptions).getByRole('option', { name: '09:00' })).toBeDisabled()
+    fireEvent.click(within(endOptions).getByRole('option', { name: '10:30' }))
+    expect(screen.queryByText(/Duration:/i)).not.toBeInTheDocument()
 
-  it('sets and clears one optional repeat pattern from the details menu', async () => {
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
+    // Shifting start preserves the 1 h 30 min duration
+    fireEvent.click(screen.getByRole('button', { name: 'Scheduled start time' }))
+    fireEvent.click(within(screen.getByRole('listbox', { name: 'Scheduled start time options' })).getByRole('option', { name: '10:00' }))
+    expect(screen.getByRole('button', { name: 'Scheduled end time' })).toHaveTextContent('11:30')
 
     fireEvent.click(screen.getByRole('button', { name: 'Repeat: Does not repeat' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Monthly' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: 'Monthly' }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Repeat: Monthly' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Does not repeat' }))
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { repeatPattern: null }))
+    fireEvent.click(screen.getByRole('button', { name: 'Priority: None' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'High' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit task tags' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Select tags' })).getByRole('button', { name: '#IELTS' }))
+
+    const note = screen.getByLabelText('NOTES')
+    fireEvent.change(note, { target: { value: 'Focus on the new expressions.' } })
+
+    // Has not saved yet before clicking Save
+    expect(api.updateTodo).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', {
+      title: 'Review lesson 12',
+      scheduledStartTime: '10:00',
+      scheduledEndTime: '11:30',
+      repeatPattern: 'Monthly',
+      priorityId: 'prio-high',
+      tagIds: ['tag-ielts'],
+      note: 'Focus on the new expressions.',
+    }))
+
+    // Checkbox toggles completion immediately
+    const row = screen.getByTestId('todo-row-todo-1')
+    fireEvent.click(within(row).getByRole('button', { name: 'Mark Review lesson 12 as completed' }))
+    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { isCompleted: true }))
+    expect(await screen.findByRole('button', { name: /COMPLETED \(1\)/ })).toBeInTheDocument()
+  })
+
+  it('adds, toggles, and deletes subtasks immediately inside Task Details', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Review vocabulary' }))
+
+    const subtaskInput = screen.getByLabelText('Add subtask')
+    fireEvent.change(subtaskInput, { target: { value: 'Read 10 cards' } })
+    fireEvent.submit(subtaskInput.closest('form')!)
+
+    await waitFor(() => expect(api.createSubtask).toHaveBeenCalledWith('todo-1', 'Read 10 cards'))
+    expect(await screen.findByText('SUBTASKS (0 / 1)')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark subtask Read 10 cards as completed' }))
+    await waitFor(() => expect(api.updateSubtask).toHaveBeenCalledWith('todo-1', 'sub-1', { isCompleted: true }))
+    expect(await screen.findByText('100%')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete subtask Read 10 cards' }))
+    await waitFor(() => expect(api.deleteSubtask).toHaveBeenCalledWith('todo-1', 'sub-1'))
+  })
+
+  it('supports manual tag and custom priority creation and filtering from sidebar', async () => {
+    items = [
+      todo({ id: 'todo-1', title: 'Task A', tags: [{ id: 'tag-ielts', name: 'IELTS' }], priorityId: 'prio-high', priority: { id: 'prio-high', name: 'High', tone: 'warning', sortOrder: 0 } }),
+      todo({ id: 'todo-2', title: 'Task B' }),
+    ]
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Task A' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Task B' })).toBeInTheDocument()
+
+    // Create a manual tag from sidebar
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }))
+    const tagInput = screen.getByLabelText('New tag name')
+    fireEvent.change(tagInput, { target: { value: 'FluentA' } })
+    fireEvent.submit(tagInput.closest('form')!)
+    await waitFor(() => expect(api.createTag).toHaveBeenCalledWith('FluentA'))
+
+    // Create a custom priority from sidebar
+    fireEvent.click(screen.getByRole('button', { name: 'Add priority' }))
+    const prioInput = screen.getByLabelText('New priority name')
+    fireEvent.change(prioInput, { target: { value: 'Urgent' } })
+    fireEvent.submit(prioInput.closest('form')!)
+    await waitFor(() => expect(api.createPriority).toHaveBeenCalledWith({ name: 'Urgent', tone: 'warning' }))
+
+    // Filter by #IELTS
+    fireEvent.click(screen.getByRole('button', { name: '#IELTS' }))
+    expect(screen.getByRole('button', { name: 'Task A' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Task B' })).not.toBeInTheDocument()
   })
 
   it('opens an owned deep-linked task outside My Day and handles unavailable ids safely', async () => {
@@ -201,55 +383,46 @@ describe('TodoPage My Day workspace', () => {
     expect(api.deleteTodo.mock.calls[0]?.[0]).toBe('todo-1')
   })
 
-  it('keeps completed tasks collapsed and restores them to active from the context menu', async () => {
-    items = [todo({ isCompleted: true, completedAt: '2026-07-22T03:00:00Z' })]
-    renderPage()
-
-    const completedToggle = await screen.findByRole('button', { name: /Completed/ })
-    expect(completedToggle).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(completedToggle)
-    const row = screen.getByTestId('todo-row-todo-1')
-    fireEvent.contextMenu(row)
-
-    const activate = await screen.findByRole('menuitem', { name: 'Mark as active' })
-    fireEvent.click(activate)
-    await waitFor(() => expect(api.updateTodo).toHaveBeenCalledWith('todo-1', { isCompleted: false }))
-  })
-
-  it('renders the compact Week workspace with per-day quick add, shared details, and duplicate', async () => {
+  it('renders My Week 7-day strip, day switching, quick add, and duplicate', async () => {
+    const dates = weekDates(todayUtc())
     items = [todo({
       note: 'Only visible in details',
-      isImportant: true,
       repeatPattern: 'Weekly',
+      scheduledStartTime: '09:00',
+      scheduledEndTime: '10:30',
+      estimatedMinutes: 90,
+      priorityId: 'prio-high',
+      priority: priorities[0],
+      tags: [tags[0]],
     })]
-    const dates = weekDates(todayUtc())
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My Day menu' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Week' }))
+    fireEvent.click(await screen.findByRole('button', { name: /My Week/ }))
 
-    expect(await screen.findByRole('heading', { name: 'Week' })).toBeInTheDocument()
-    expect(screen.getByText(formatWeekRange(dates[0], dates[6]))).toBeInTheDocument()
-    expect(await screen.findAllByPlaceholderText('Add a task')).toHaveLength(7)
-    for (const weekday of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
-      expect(screen.getByRole('heading', { name: weekday })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'My Week' })).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(formatWeekShortRange(dates[0], dates[6])))).toBeInTheDocument()
+    for (const date of dates) {
+      expect(screen.getByTestId(`week-day-${date}`)).toBeInTheDocument()
     }
 
-    const mondayInput = screen.getByLabelText('Add a task for Monday')
-    fireEvent.change(mondayInput, { target: { value: 'Plan the week' } })
-    fireEvent.submit(mondayInput.closest('form')!)
-    await waitFor(() => expect(api.createTodo).toHaveBeenCalledWith({ title: 'Plan the week', date: dates[0] }))
-    expect(screen.queryByLabelText('Details for Plan the week')).not.toBeInTheDocument()
+    // Select Monday in the 7-day strip
+    fireEvent.click(screen.getByTestId(`week-day-${dates[0]}`))
+    const weekInput = screen.getByTestId('todo-week-title-input')
+    fireEvent.change(weekInput, { target: { value: 'Plan the week' } })
+    fireEvent.submit(weekInput.closest('form')!)
+    await waitFor(() => expect(api.createTodo).toHaveBeenCalledWith({
+      title: 'Plan the week',
+      date: dates[0],
+      priorityId: undefined,
+      tagIds: undefined,
+    }))
 
+    // Switch back to today and inspect the card
+    fireEvent.click(screen.getByTestId(`week-day-${todayUtc()}`))
     const row = await screen.findByTestId('week-todo-todo-1')
-    expect(within(row).getByRole('button', { name: 'Review vocabulary' })).toBeInTheDocument()
-    expect(within(row).getByRole('button', { name: 'Remove importance from Review vocabulary' })).toBeInTheDocument()
-    expect(within(row).queryByText('Only visible in details')).not.toBeInTheDocument()
-    expect(within(row).queryByText('Weekly')).not.toBeInTheDocument()
-
-    fireEvent.click(within(row).getByRole('button', { name: 'Review vocabulary' }))
-    expect(await screen.findByLabelText('Details for Review vocabulary')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Close details' }))
+    expect(within(row).getByText('09:00')).toBeInTheDocument()
+    expect(within(row).getByText('High')).toBeInTheDocument()
+    expect(within(row).getByText('#IELTS')).toBeInTheDocument()
 
     fireEvent.contextMenu(row)
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Duplicate task' }))

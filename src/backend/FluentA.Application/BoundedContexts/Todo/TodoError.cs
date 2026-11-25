@@ -5,6 +5,11 @@ public sealed record TodoError(string Code, string Message, int StatusCode, obje
     public static TodoError Validation(object details) =>
         new("VALIDATION_ERROR", "One or more validation errors occurred.", 400, details);
 
-    public static TodoError NotFound() =>
-        new("TODO_NOT_FOUND", "The requested todo item could not be found.", 404);
+    public static TodoError NotFound(
+        string code = "TODO_NOT_FOUND",
+        string message = "The requested todo item could not be found.") =>
+        new(code, message, 404);
+
+    public static TodoError Conflict(string code, string message) =>
+        new(code, message, 409);
 }

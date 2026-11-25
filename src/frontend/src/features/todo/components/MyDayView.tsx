@@ -9,50 +9,62 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CheckCircle2, ChevronRight, Plus } from 'lucide-react'
+import { CheckCircle2, Plus } from 'lucide-react'
 import type { TodoItem } from '../api/todo.api'
-import { sortTodoItems, type TodoSortMode } from '../model/todo-sort'
-import { TodoTaskRow } from './TodoTaskRow'
+import { computeTaskMinutes, formatMyDaySubtitleDate, formatScheduledDuration } from '../model/todo-date'
+import { sortTodoItems } from '../model/todo-sort'
+import { TodoTaskCard } from './TodoTaskCard'
 
 type MyDayViewProps = {
+  today: string
   items: TodoItem[]
   selectedId: string | null
-  sortMode: TodoSortMode | null
+  activeFilterLabel: string | null
   loading: boolean
   error: boolean
   creating: boolean
+  onClearFilter: () => void
   onCreate: (title: string) => Promise<boolean>
   onSelect: (item: TodoItem) => void
   onToggle: (item: TodoItem) => void
-  onToggleImportant: (item: TodoItem) => void
+  onDuplicate: (item: TodoItem) => void
   onDelete: (item: TodoItem) => void
-  onPersistOrder: (orderedIds: string[], disableSort: boolean) => void
+  onPersistOrder: (orderedIds: string[]) => void
 }
 
 export function MyDayView({
+  today,
   items,
   selectedId,
-  sortMode,
+  activeFilterLabel,
   loading,
   error,
   creating,
+  onClearFilter,
   onCreate,
   onSelect,
   onToggle,
-  onToggleImportant,
+  onDuplicate,
   onDelete,
   onPersistOrder,
 }: MyDayViewProps) {
   const [title, setTitle] = useState('')
-  const [completedExpanded, setCompletedExpanded] = useState(false)
+  const [completedExpanded, setCompletedExpanded] = useState(true)
+
   const openTasks = useMemo(
-    () => sortTodoItems(items.filter((item) => !item.isCompleted), sortMode, false),
-    [items, sortMode],
+    () => sortTodoItems(items.filter((item) => !item.isCompleted), null, false),
+    [items],
   )
   const completedTasks = useMemo(
-    () => sortTodoItems(items.filter((item) => item.isCompleted), sortMode, true),
-    [items, sortMode],
+    () => sortTodoItems(items.filter((item) => item.isCompleted), null, true),
+    [items],
   )
+  const totalScheduledMinutes = useMemo(
+    () => openTasks.reduce((sum, item) => sum + computeTaskMinutes(item), 0),
+    [openTasks],
+  )
+  const scheduledLabel = formatScheduledDuration(totalScheduledMinutes)
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -66,55 +78,70 @@ export function MyDayView({
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    if (!event.over || event.active.id === event.over.id) {
-      if (sortMode) onPersistOrder(openTasks.map((item) => item.id), true)
-      return
-    }
+    if (!event.over || event.active.id === event.over.id) return
     const oldIndex = openTasks.findIndex((item) => item.id === event.active.id)
     const newIndex = openTasks.findIndex((item) => item.id === event.over?.id)
     if (oldIndex < 0 || newIndex < 0) return
-    onPersistOrder(arrayMove(openTasks, oldIndex, newIndex).map((item) => item.id), Boolean(sortMode))
-  }
-
-  function handleDragCancel() {
-    if (sortMode) onPersistOrder(openTasks.map((item) => item.id), true)
+    onPersistOrder(arrayMove(openTasks, oldIndex, newIndex).map((item) => item.id))
   }
 
   return (
-    <section className="todo-my-day" aria-label="My Day tasks">
+    <section className="todo-center-pane" aria-label="My Day tasks">
+      <header className="todo-center-header">
+        <div>
+          <h1>My Day</h1>
+          <p className="todo-center-subtitle">
+            {formatMyDaySubtitleDate(today)}
+            {'  \u2022  '}
+            {openTasks.length} {openTasks.length === 1 ? 'active task' : 'active tasks'}
+            {scheduledLabel ? `  \u2022  ${scheduledLabel} scheduled` : ''}
+          </p>
+        </div>
+
+        {activeFilterLabel ? (
+          <button type="button" className="todo-filter-chip" onClick={onClearFilter}>
+            <span>Filtered: {activeFilterLabel}</span>
+            <span aria-hidden="true">{'\u00d7'}</span>
+          </button>
+        ) : null}
+      </header>
+
       <form className="todo-quick-add" onSubmit={submitTask}>
         <Plus aria-hidden="true" />
-        <label className="sr-only" htmlFor="todo-quick-title">Add a task</label>
+        <label className="sr-only" htmlFor="todo-quick-title">Add a task for today</label>
         <input
           id="todo-quick-title"
           data-testid="todo-title-input"
           value={title}
           maxLength={240}
           autoComplete="off"
-          placeholder="Add a task"
+          placeholder="Add a task for today..."
           onChange={(event) => setTitle(event.target.value)}
         />
-        <button type="submit" disabled={creating || !title.trim()}>{creating ? 'Adding...' : 'Add'}</button>
+        <button type="submit" disabled={creating || !title.trim()}>
+          {creating ? 'Adding...' : 'Add'}
+        </button>
       </form>
 
-      {loading ? <p className="todo-my-day__status" role="status">Loading tasks...</p> : null}
-      {error ? <p className="todo-my-day__status todo-my-day__status--error" role="alert">Could not load My Day tasks.</p> : null}
+      {loading ? <p className="todo-status-message" role="status">Loading tasks...</p> : null}
+      {error ? <p className="todo-status-message todo-status-message--error" role="alert">Could not load My Day tasks.</p> : null}
 
       {!loading && !error ? (
-        <div className="todo-my-day__lists">
-          {openTasks.length ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragCancel={handleDragCancel} onDragEnd={handleDragEnd}>
+        <div className="todo-task-sections">
+          {openTasks.length > 0 ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={openTasks.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-                <div className="todo-my-day__task-list" role="list" aria-label="Incomplete tasks">
+                <div className="todo-task-list" role="list" aria-label="Incomplete tasks">
                   {openTasks.map((item) => (
-                    <TodoTaskRow
+                    <TodoTaskCard
                       key={item.id}
                       item={item}
                       selected={selectedId === item.id}
-                      draggable
+                      sortable
+                      testId={`todo-row-${item.id}`}
                       onSelect={onSelect}
                       onToggle={onToggle}
-                      onToggleImportant={onToggleImportant}
+                      onDuplicate={onDuplicate}
                       onDelete={onDelete}
                     />
                   ))}
@@ -123,37 +150,40 @@ export function MyDayView({
             </DndContext>
           ) : null}
 
-          {!items.length ? (
-            <div className="todo-my-day__empty" role="status">
+          {items.length === 0 ? (
+            <div className="todo-empty-state" role="status">
               <CheckCircle2 aria-hidden="true" />
-              <h2>Your day is clear</h2>
-              <p>Add one task when you are ready.</p>
+              <h2>{activeFilterLabel ? 'No matching tasks' : 'Your day is clear'}</h2>
+              <p>
+                {activeFilterLabel
+                  ? 'Clear the active filter or add a new task.'
+                  : 'Add one task when you are ready.'}
+              </p>
             </div>
           ) : null}
 
-          {completedTasks.length ? (
-            <section className="todo-completed" aria-label="Completed tasks">
+          {completedTasks.length > 0 ? (
+            <section className="todo-completed-section" aria-label="Completed tasks">
               <button
-                className="todo-completed__toggle"
                 type="button"
+                className="todo-completed-section__heading"
                 aria-expanded={completedExpanded}
                 onClick={() => setCompletedExpanded((expanded) => !expanded)}
               >
-                <ChevronRight className={completedExpanded ? 'todo-completed__chevron--open' : ''} aria-hidden="true" />
-                <span>Completed</span>
-                <span className="todo-completed__count">{completedTasks.length}</span>
+                COMPLETED ({completedTasks.length})
               </button>
+
               {completedExpanded ? (
-                <div className="todo-my-day__task-list" role="list">
+                <div className="todo-task-list" role="list">
                   {completedTasks.map((item) => (
-                    <TodoTaskRow
+                    <TodoTaskCard
                       key={item.id}
                       item={item}
                       selected={selectedId === item.id}
-                      draggable={false}
+                      testId={`todo-row-${item.id}`}
                       onSelect={onSelect}
                       onToggle={onToggle}
-                      onToggleImportant={onToggleImportant}
+                      onDuplicate={onDuplicate}
                       onDelete={onDelete}
                     />
                   ))}
