@@ -1,57 +1,67 @@
 import {
-  CalendarDays,
-  CircleCheckBig,
-  CircleDashed,
-  Clock3,
+  CheckSquare,
   FolderPlus,
-  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react'
 import { type DragEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as ContextMenu from '@radix-ui/react-context-menu'
-import { contextMenuContentClassName, contextMenuItemClassName } from '@/shared/components/ui/context-menu-styles'
-import { AlertDialog, AlertDialogActionButton, AlertDialogCancelButton, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
-import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/shared/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogActionButton,
+  AlertDialogCancelButton,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/shared/components/ui/dialog'
 import { SelectMenu } from '@/shared/components/ui/select-menu'
+import { toast } from '@/shared/lib/toast'
+import { todayUtc } from '@/shared/lib/date'
+import { ProjectBoardSwitcher } from '../components/ProjectBoardSwitcher'
 import { ProjectCardDetailPanel } from '../components/ProjectCardDetailPanel'
+import { ProjectMilestoneDialog } from '../components/ProjectMilestoneDialog'
 import { type ProjectCardForm, projectPriorities } from '../components/project-card-editor'
 import * as projectApi from '../api/project.api'
 import { projectKeys } from '../api/project.queries'
-import { toast } from '@/shared/lib/toast'
-
-const today = new Date()
-const todayInput = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
+import '../project.css'
 
 type CardEditor =
   | { mode: 'create'; boardId: string; columnId: string }
-  | { mode: 'edit'; boardId: string; card: projectApi.ProjectCard }
+  | { mode: 'edit'; boardId: string; cardId: string }
 
-function getTomorrowDateInput(): string {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const year = tomorrow.getFullYear()
-  const month = `${tomorrow.getMonth() + 1}`.padStart(2, '0')
-  const day = `${tomorrow.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
+function formatCardDate(deadline: string | null | undefined, isDoneColumn: boolean, today: string) {
+  if (isDoneColumn) return 'Done'
+  if (!deadline) return null
+  const dateOnly = deadline.slice(0, 10)
+  if (dateOnly === today) return 'Today'
+  const [year, month, day] = dateOnly.split('-').map(Number)
+  if (!year || !month || !day) return deadline
+  const utc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' }).format(utc)
 }
 
-function deadlineState(deadline?: string | null) {
+function deadlineState(deadline: string | null | undefined, today: string) {
   if (!deadline) return 'none'
-  const dateOnly = deadline.includes('T') ? deadline.split('T')[0] : deadline
-  if (dateOnly! < todayInput) return 'overdue'
-  const deadlineDate = new Date(`${dateOnly}T00:00:00`)
-  const weekEnd = new Date()
-  weekEnd.setDate(weekEnd.getDate() + 7)
-  return deadlineDate <= weekEnd ? 'this-week' : 'later'
+  const dateOnly = deadline.slice(0, 10)
+  if (dateOnly < today) return 'overdue'
+  const [y, m, d] = dateOnly.split('-').map(Number)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const diffDays = (Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86_400_000
+  return diffDays <= 7 ? 'this-week' : 'later'
 }
 
-function cardMatches(card: projectApi.ProjectCard, filters: { priority: string; deadline: string }) {
+function cardMatches(
+  card: projectApi.ProjectCard,
+  filters: { priority: string; deadline: string; milestoneId: string },
+  today: string,
+) {
   if (filters.priority && card.priority !== filters.priority) return false
+  if (filters.milestoneId && card.milestoneId !== filters.milestoneId) return false
   if (filters.deadline === 'has' && !card.deadline) return false
-  if (filters.deadline === 'overdue' && deadlineState(card.deadline) !== 'overdue') return false
-  if (filters.deadline === 'week' && deadlineState(card.deadline) !== 'this-week') return false
+  if (filters.deadline === 'overdue' && deadlineState(card.deadline, today) !== 'overdue') return false
+  if (filters.deadline === 'week' && deadlineState(card.deadline, today) !== 'this-week') return false
   return true
 }
 
@@ -61,47 +71,43 @@ function emptyCardForm(columnId = ''): ProjectCardForm {
     title: '',
     description: '',
     priority: 'Medium',
-    deadline: getTomorrowDateInput(),
+    deadline: '',
+    milestoneId: null,
+    labelId: null,
+    initialChecklistTitles: [],
   }
 }
 
-function ColumnStatusIcon({ name }: { name: string }) {
-  const normalizedName = name.trim().toLowerCase()
+function isDoneColumnName(name: string) {
+  const normalized = name.trim().toLowerCase()
+  return normalized === 'done' || normalized === 'completed' || normalized.includes('done')
+}
 
-  if (normalizedName.includes('done') || normalizedName.includes('complete')) {
-    return <CircleCheckBig aria-hidden="true" />
-  }
-
-  if (normalizedName.includes('progress') || normalizedName.includes('doing')) {
-    return <Clock3 aria-hidden="true" />
-  }
-
-  return <CircleDashed aria-hidden="true" />
+function priorityFallbackTone(priority: projectApi.ProjectCard['priority']): projectApi.ProjectLabelTone {
+  if (priority === 'Critical' || priority === 'High') return 'warning'
+  if (priority === 'Low') return 'primary'
+  return 'neutral'
 }
 
 export function ProjectPage() {
   const queryClient = useQueryClient()
+  const today = useMemo(() => todayUtc(), [])
   const [boardName, setBoardName] = useState('')
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null)
   const [columnName, setColumnName] = useState('')
   const [columnComposerOpen, setColumnComposerOpen] = useState(false)
+  const [milestoneDialogOpen, setMilestoneDialogOpen] = useState(false)
   const [cardEditor, setCardEditor] = useState<CardEditor | null>(null)
   const [cardForm, setCardForm] = useState<ProjectCardForm>(() => emptyCardForm())
-  const [filters, setFilters] = useState({ priority: '', deadline: '' })
+  const [filters, setFilters] = useState({ priority: '', deadline: '', milestoneId: '' })
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
-  const [editingBoardName, setEditingBoardName] = useState('')
   const [deletingBoard, setDeletingBoard] = useState<projectApi.ProjectBoardSummary | null>(null)
   const [deletingColumn, setDeletingColumn] = useState<{ boardId: string; columnId: string; name: string } | null>(null)
   const [deletingCard, setDeletingCard] = useState<{ boardId: string; cardId: string; title: string } | null>(null)
   const [emptyBoardComposerOpen, setEmptyBoardComposerOpen] = useState(false)
   const editorTriggerRef = useRef<HTMLElement | null>(null)
-  const boardDeletePendingRef = useRef(false)
-  const boardTabRefs = useRef(new Map<string, HTMLButtonElement>())
   const newBoardInputRef = useRef<HTMLInputElement>(null)
   const columnInputRef = useRef<HTMLInputElement>(null)
-  const editingBoardInputRef = useRef<HTMLInputElement>(null)
 
   const closeEditor = useCallback(() => {
     const trigger = editorTriggerRef.current
@@ -130,23 +136,50 @@ export function ProjectPage() {
     () => (board?.columns ?? []).toSorted((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt)),
     [board?.columns],
   )
+  const milestones = useMemo(() => board?.milestones ?? [], [board?.milestones])
+  const labels = useMemo(() => board?.labels ?? [], [board?.labels])
+
   const visibleColumns = useMemo(
     () => columns.map((column) => ({
       ...column,
       cards: column.cards
-        .filter((card) => cardMatches(card, filters))
+        .filter((card) => cardMatches(card, filters, today))
         .toSorted((left, right) => left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt)),
     })),
-    [columns, filters],
+    [columns, filters, today],
   )
+
+  const allBoardCards = useMemo(() => columns.flatMap((col) => col.cards), [columns])
+  const doneColumnIds = useMemo(() => {
+    const explicit = columns.filter((col) => isDoneColumnName(col.name)).map((col) => col.id)
+    if (explicit.length > 0) return new Set(explicit)
+    const last = columns[columns.length - 1]
+    return last ? new Set([last.id]) : new Set<string>()
+  }, [columns])
+
+  const activeMilestone = useMemo(() => {
+    if (filters.milestoneId) {
+      return milestones.find((m) => m.id === filters.milestoneId) ?? milestones[0] ?? null
+    }
+    return milestones[0] ?? null
+  }, [filters.milestoneId, milestones])
+
+  const milestoneProgress = useMemo(() => {
+    if (!activeMilestone) return null
+    const assigned = allBoardCards.filter((card) => card.milestoneId === activeMilestone.id)
+    const done = assigned.filter((card) => doneColumnIds.has(card.columnId)).length
+    const percent = assigned.length > 0 ? Math.round((done / assigned.length) * 100) : 0
+    return { milestone: activeMilestone, total: assigned.length, done, percent }
+  }, [activeMilestone, allBoardCards, doneColumnIds])
+
+  const editingCard = useMemo(() => {
+    if (cardEditor?.mode !== 'edit') return null
+    return allBoardCards.find((card) => card.id === cardEditor.cardId) ?? null
+  }, [allBoardCards, cardEditor])
 
   useEffect(() => {
     if (columnComposerOpen) columnInputRef.current?.focus()
   }, [columnComposerOpen])
-
-  useEffect(() => {
-    if (editingBoardId) editingBoardInputRef.current?.focus()
-  }, [editingBoardId])
 
   useEffect(() => {
     if (emptyBoardComposerOpen) newBoardInputRef.current?.focus()
@@ -160,11 +193,12 @@ export function ProjectPage() {
   }
 
   const createBoard = useMutation({
-    mutationFn: projectApi.createBoard,
+    mutationFn: (name: string) => projectApi.createBoard(name),
     onSuccess: async (created) => {
       setBoardName('')
       setEmptyBoardComposerOpen(false)
       setActiveBoardId(created.id)
+      setFilters({ priority: '', deadline: '', milestoneId: '' })
       await refresh(created.id)
       toast.success('Project created.')
     },
@@ -174,7 +208,6 @@ export function ProjectPage() {
   const updateBoard = useMutation({
     mutationFn: ({ boardId, name }: { boardId: string; name: string }) => projectApi.updateBoard(boardId, name),
     onSuccess: async (updated) => {
-      setEditingBoardId(null)
       await refresh(updated.id)
       toast.success('Project renamed.')
     },
@@ -187,24 +220,15 @@ export function ProjectPage() {
       const nextBoardId = selectedBoardId === boardId
         ? boards.find((item) => item.id !== boardId)?.id ?? null
         : selectedBoardId
-
-      setMessage(null)
       setDeletingBoard(null)
-      if (selectedBoardId === boardId) setActiveBoardId(nextBoardId)
+      if (selectedBoardId === boardId) {
+        setActiveBoardId(nextBoardId)
+        setFilters({ priority: '', deadline: '', milestoneId: '' })
+      }
       await refresh(nextBoardId)
-      window.requestAnimationFrame(() => {
-        if (nextBoardId) boardTabRefs.current.get(nextBoardId)?.focus()
-        else newBoardInputRef.current?.focus()
-      })
       toast.success('Project deleted.')
     },
-    onError: () => {
-      boardDeletePendingRef.current = false
-      toast.error('Could not delete project.')
-    },
-    onSettled: () => {
-      boardDeletePendingRef.current = false
-    },
+    onError: () => toast.error('Could not delete project.'),
   })
 
   const createColumn = useMutation({
@@ -235,7 +259,7 @@ export function ProjectPage() {
     },
     onError: (error) => {
       const errorData = (error as { response?: { data?: { error?: { code?: string } } } }).response?.data?.error
-      if (errorData?.code === 'COLUMN_NOT_EMPTY') {
+      if (errorData?.code === 'PROJECT_COLUMN_NOT_EMPTY' || errorData?.code === 'COLUMN_NOT_EMPTY') {
         toast.error('Remove all cards from the column before deleting it.')
         return
       }
@@ -244,7 +268,8 @@ export function ProjectPage() {
   })
 
   const createCard = useMutation({
-    mutationFn: ({ boardId, input }: { boardId: string; input: projectApi.CreateProjectCardInput }) => projectApi.createCard(boardId, input),
+    mutationFn: ({ boardId, input }: { boardId: string; input: projectApi.CreateProjectCardInput }) =>
+      projectApi.createCard(boardId, input),
     onSuccess: async (_, { boardId }) => {
       setCardEditor(null)
       await refresh(boardId)
@@ -254,8 +279,23 @@ export function ProjectPage() {
   })
 
   const updateCard = useMutation({
-    mutationFn: ({ cardId, patch }: { boardId: string; cardId: string; patch: projectApi.UpdateProjectCardInput }) =>
-      projectApi.updateCard(cardId, patch),
+    mutationFn: async ({
+      cardId,
+      patch,
+      moveToColumnId,
+      targetSortOrder,
+    }: {
+      boardId: string
+      cardId: string
+      patch: projectApi.UpdateProjectCardInput
+      moveToColumnId?: string
+      targetSortOrder?: number
+    }) => {
+      await projectApi.updateCard(cardId, patch)
+      if (moveToColumnId !== undefined) {
+        await projectApi.moveCard(cardId, moveToColumnId, targetSortOrder ?? 0)
+      }
+    },
     onSuccess: async (_, { boardId }) => {
       setCardEditor(null)
       await refresh(boardId)
@@ -275,19 +315,80 @@ export function ProjectPage() {
   })
 
   const moveCard = useMutation({
-    mutationFn: ({ id, columnId, sortOrder }: { id: string; columnId: string; sortOrder: number }) => projectApi.moveCard(id, columnId, sortOrder),
+    mutationFn: ({ id, columnId, sortOrder }: { id: string; columnId: string; sortOrder: number }) =>
+      projectApi.moveCard(id, columnId, sortOrder),
     onSuccess: async () => {
       await refresh()
     },
     onError: () => toast.error('Could not move card.'),
   })
 
-  function selectBoard(id: string) {
-    setActiveBoardId(id)
-    setMessage(null)
-  }
+  const createMilestoneMutation = useMutation({
+    mutationFn: ({ boardId, name }: { boardId: string; name: string }) => projectApi.createMilestone(boardId, name),
+    onSuccess: async (_, { boardId }) => {
+      await refresh(boardId)
+    },
+    onError: () => toast.error('Could not create milestone.'),
+  })
 
-  function submitBoard(event: FormEvent) {
+  const updateMilestoneMutation = useMutation({
+    mutationFn: ({ boardId, milestoneId, name }: { boardId: string; milestoneId: string; name: string }) =>
+      projectApi.updateMilestone(boardId, milestoneId, { name }),
+    onSuccess: async (_, { boardId }) => {
+      await refresh(boardId)
+    },
+    onError: () => toast.error('Could not update milestone.'),
+  })
+
+  const deleteMilestoneMutation = useMutation({
+    mutationFn: ({ boardId, milestoneId }: { boardId: string; milestoneId: string }) =>
+      projectApi.deleteMilestone(boardId, milestoneId),
+    onSuccess: async (_, { boardId, milestoneId }) => {
+      if (filters.milestoneId === milestoneId) {
+        setFilters((current) => ({ ...current, milestoneId: '' }))
+      }
+      await refresh(boardId)
+    },
+    onError: () => toast.error('Could not delete milestone.'),
+  })
+
+  const createLabelMutation = useMutation({
+    mutationFn: ({ boardId, name, tone }: { boardId: string; name: string; tone: projectApi.ProjectLabelTone }) =>
+      projectApi.createLabel(boardId, { name, tone }),
+    onSuccess: async (_, { boardId }) => {
+      await refresh(boardId)
+    },
+    onError: () => toast.error('Could not create label.'),
+  })
+
+  const createChecklistMutation = useMutation({
+    mutationFn: ({ cardId, title }: { cardId: string; title: string }) =>
+      projectApi.createChecklistItem(cardId, title),
+    onSuccess: async () => {
+      await refresh()
+    },
+    onError: () => toast.error('Could not add checklist item.'),
+  })
+
+  const updateChecklistMutation = useMutation({
+    mutationFn: ({ cardId, itemId, isCompleted }: { cardId: string; itemId: string; isCompleted: boolean }) =>
+      projectApi.updateChecklistItem(cardId, itemId, { isCompleted }),
+    onSuccess: async () => {
+      await refresh()
+    },
+    onError: () => toast.error('Could not update checklist item.'),
+  })
+
+  const deleteChecklistMutation = useMutation({
+    mutationFn: ({ cardId, itemId }: { cardId: string; itemId: string }) =>
+      projectApi.deleteChecklistItem(cardId, itemId),
+    onSuccess: async () => {
+      await refresh()
+    },
+    onError: () => toast.error('Could not delete checklist item.'),
+  })
+
+  function submitEmptyBoard(event: FormEvent) {
     event.preventDefault()
     if (!boardName.trim() || createBoard.isPending) return
     createBoard.mutate(boardName.trim())
@@ -312,9 +413,12 @@ export function ProjectPage() {
       title: card.title,
       description: card.description ?? '',
       priority: card.priority,
-      deadline: card.deadline || getTomorrowDateInput(),
+      deadline: card.deadline ? card.deadline.slice(0, 10) : '',
+      milestoneId: card.milestoneId ?? null,
+      labelId: card.labelId ?? null,
+      initialChecklistTitles: [],
     })
-    setCardEditor({ mode: 'edit', boardId, card })
+    setCardEditor({ mode: 'edit', boardId, cardId: card.id })
   }
 
   function submitCard() {
@@ -324,168 +428,100 @@ export function ProjectPage() {
       createCard.mutate({
         boardId: cardEditor.boardId,
         input: {
-          columnId: cardEditor.columnId,
+          columnId: cardForm.columnId || cardEditor.columnId,
           title: cardForm.title.trim(),
           description: cardForm.description.trim() || null,
           priority: cardForm.priority,
           deadline: cardForm.deadline || null,
+          milestoneId: cardForm.milestoneId,
+          labelId: cardForm.labelId,
+          checklistTitles: cardForm.initialChecklistTitles.length > 0 ? cardForm.initialChecklistTitles : undefined,
         },
       })
       return
     }
 
+    const originalColumnId = editingCard?.columnId
+    const moved = Boolean(originalColumnId && cardForm.columnId && cardForm.columnId !== originalColumnId)
+    const targetColumn = moved ? columns.find((col) => col.id === cardForm.columnId) : undefined
+
     updateCard.mutate({
       boardId: cardEditor.boardId,
-      cardId: cardEditor.card.id,
+      cardId: cardEditor.cardId,
       patch: {
         title: cardForm.title.trim(),
         description: cardForm.description.trim(),
         priority: cardForm.priority,
         deadline: cardForm.deadline,
+        milestoneId: cardForm.milestoneId,
+        labelId: cardForm.labelId,
       },
+      moveToColumnId: moved ? cardForm.columnId : undefined,
+      targetSortOrder: targetColumn?.cards.length ?? 0,
     })
   }
 
   function handleDrop(event: DragEvent, columnId: string) {
     event.preventDefault()
     if (!draggedCardId) return
-    const card = board?.columns.flatMap((col) => col.cards).find((item) => item.id === draggedCardId)
-    if (!card) return
-    moveCardToColumn(card, columnId)
+    const card = allBoardCards.find((item) => item.id === draggedCardId)
+    if (!card || card.columnId === columnId) {
+      setDraggedCardId(null)
+      return
+    }
+    const targetColumn = columns.find((column) => column.id === columnId)
+    moveCard.mutate({ id: card.id, columnId, sortOrder: targetColumn?.cards.length ?? 0 })
     setDraggedCardId(null)
   }
 
-  function moveCardToColumn(card: projectApi.ProjectCard, columnId: string) {
-    if (columnId === card.columnId) return
-    const targetColumn = columns.find((column) => column.id === columnId)
-    moveCard.mutate({ id: card.id, columnId, sortOrder: targetColumn?.cards.length ?? 0 })
-  }
-
   const cardMutationPending = createCard.isPending || updateCard.isPending || deleteCard.isPending
-  const hasActiveFilters = Boolean(filters.priority || filters.deadline)
+  const hasActiveFilters = Boolean(filters.priority || filters.deadline || filters.milestoneId)
+  const activeBoardTitle = board?.name ?? boards.find((b) => b.id === selectedBoardId)?.name ?? (boardsQuery.isLoading ? 'Loading project...' : 'Project')
 
   return (
-    <main className="project-main-wrapper" data-testid="project-page">
-      <div className="project-workspace">
-        <div className="project-content" data-testid="project-route-workspace">
-          <nav className="project-board-tabs" aria-label="Project" data-testid="project-navigation">
-            <span className="project-board-tabs__label">Project</span>
-            {boardsQuery.isLoading ? <span className="project-loading-label">Loading projects...</span> : null}
-            {boards.map((item) =>
-              editingBoardId === item.id ? (
-                <div
-                  key={item.id}
-                  className={`project-tab project-tab--active ${item.id === selectedBoardId ? 'project-tab--active' : ''}`}
-                >
-                  <input
-                    ref={editingBoardInputRef}
-                    className="project-tab-rename-input"
-                    value={editingBoardName}
-                    onChange={(event) => setEditingBoardName(event.target.value)}
-                    onBlur={() => {
-                      const trimmed = editingBoardName.trim()
-                      if (trimmed && trimmed !== item.name) {
-                        updateBoard.mutate({ boardId: item.id, name: trimmed })
-                      } else {
-                        setEditingBoardId(null)
-                      }
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        const trimmed = editingBoardName.trim()
-                        if (trimmed && trimmed !== item.name) {
-                          updateBoard.mutate({ boardId: item.id, name: trimmed })
-                        } else {
-                          setEditingBoardId(null)
-                        }
-                      } else if (event.key === 'Escape') {
-                        setEditingBoardId(null)
-                      }
-                    }}
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <ContextMenu.Root key={item.id}>
-                  <ContextMenu.Trigger asChild>
-                    <button
-                      ref={(element) => {
-                        if (element) boardTabRefs.current.set(item.id, element)
-                        else boardTabRefs.current.delete(item.id)
-                      }}
-                      type="button"
-                      className={`project-tab ${item.id === selectedBoardId ? 'project-tab--active' : ''}`}
-                      aria-current={item.id === selectedBoardId ? 'page' : undefined}
-                      title="Right-click for options"
-                      onClick={() => selectBoard(item.id)}
-                    >
-                      {item.name}
-                    </button>
-                  </ContextMenu.Trigger>
-                  <ContextMenu.Portal>
-                    <ContextMenu.Content className={contextMenuContentClassName} data-testid="project-board-context-menu">
-                      <ContextMenu.Item
-                        className={contextMenuItemClassName}
-                        onSelect={() => {
-                          setEditingBoardId(item.id)
-                          setEditingBoardName(item.name)
-                        }}
-                      >
-                        <Pencil className="size-4 mr-2" aria-hidden="true" />
-                        <span>Rename</span>
-                      </ContextMenu.Item>
-                      <ContextMenu.Item
-                        className={`${contextMenuItemClassName} text-red-600 dark:text-red-400`}
-                        onSelect={() => setDeletingBoard(item)}
-                      >
-                        <Trash2 className="size-4 mr-2" aria-hidden="true" />
-                        <span>Delete</span>
-                      </ContextMenu.Item>
-                    </ContextMenu.Content>
-                  </ContextMenu.Portal>
-                </ContextMenu.Root>
-              ),
-            )}
+    <div className="project-workspace-shell" data-testid="project-page">
+      <div className="project-content" data-testid="project-route-workspace">
+        {boards.length > 0 ? (
+          <>
+            {/* Row 1: Board Switcher */}
+            <header className="project-topbar-row">
+              <ProjectBoardSwitcher
+                boards={boards}
+                selectedBoardId={selectedBoardId}
+                activeBoardName={activeBoardTitle}
+                creating={createBoard.isPending}
+                onSelectBoard={(id) => {
+                  setActiveBoardId(id)
+                  setFilters({ priority: '', deadline: '', milestoneId: '' })
+                }}
+                onCreateBoard={async (name) => {
+                  await createBoard.mutateAsync(name).catch(() => undefined)
+                }}
+                onRenameBoard={async (boardId, name) => {
+                  await updateBoard.mutateAsync({ boardId, name }).catch(() => undefined)
+                }}
+                onRequestDeleteBoard={setDeletingBoard}
+              />
+            </header>
 
-            {boards.length > 0 ? (
-              <form className="project-new-board-form" onSubmit={submitBoard}>
-                <Plus aria-hidden="true" />
-                <label className="sr-only" htmlFor="project-new-project">New project name</label>
-                <input
-                  ref={newBoardInputRef}
-                  id="project-new-project"
-                  value={boardName}
-                  onChange={(event) => setBoardName(event.target.value)}
-                  placeholder="New project"
-                  data-testid="project-board-name-input"
-                  className="project-new-board-input"
-                  maxLength={180}
-                />
-              </form>
-            ) : null}
-          </nav>
-
-          <section className="project-header">
-            <div className="project-title-area">
-              <div>
-                <h2>{board?.name ?? (boardsQuery.isLoading || boardQuery.isLoading ? 'Loading project...' : 'Project')}</h2>
-              </div>
-            </div>
-
-            <div className="project-column-tools">
-              <div className="project-filter-bar" aria-label="Project card filters">
+            {/* Row 2: Filters + Add Column + Milestone Progress Pill */}
+            <section className="project-toolbar-row" aria-label="Project toolbar">
+              <div className="project-toolbar-left" aria-label="Project card filters">
                 <SelectMenu
-                  className="project-filter-control"
-                  buttonClassName="!min-h-[34px] h-[34px] flex items-center rounded-lg border-[var(--ds-input)] px-3 !py-0 text-xs font-medium"
+                  className="project-filter-select"
+                  buttonClassName="project-filter-pill"
                   aria-label="Filter by priority"
                   value={filters.priority}
                   onChange={(priority) => setFilters((current) => ({ ...current, priority }))}
-                  options={[{ value: '', label: 'All priorities' }, ...projectPriorities.map((priority) => ({ value: priority, label: priority }))]}
+                  options={[
+                    { value: '', label: 'All priorities' },
+                    ...projectPriorities.map((priority) => ({ value: priority, label: priority })),
+                  ]}
                 />
+
                 <SelectMenu
-                  className="project-filter-control"
-                  buttonClassName="!min-h-[34px] h-[34px] flex items-center rounded-lg border-[var(--ds-input)] px-3 !py-0 text-xs font-medium"
+                  className="project-filter-select"
+                  buttonClassName="project-filter-pill"
                   aria-label="Filter by deadline"
                   value={filters.deadline}
                   onChange={(deadline) => setFilters((current) => ({ ...current, deadline }))}
@@ -496,171 +532,247 @@ export function ProjectPage() {
                     { value: 'week', label: 'Due this week' },
                   ]}
                 />
+
+                <SelectMenu
+                  className="project-filter-select"
+                  buttonClassName="project-filter-pill"
+                  aria-label="Filter by milestone"
+                  value={filters.milestoneId}
+                  onChange={(milestoneId) => setFilters((current) => ({ ...current, milestoneId }))}
+                  options={[
+                    { value: '', label: 'All milestones' },
+                    ...milestones.map((m) => ({ value: m.id, label: m.name })),
+                  ]}
+                />
+
+                <button
+                  type="button"
+                  className="project-add-column-btn"
+                  disabled={!selectedBoardId}
+                  onClick={() => {
+                    setColumnName('')
+                    setColumnComposerOpen(true)
+                  }}
+                >
+                  + Add Column
+                </button>
+
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="project-clear-filters-btn"
+                    onClick={() => setFilters({ priority: '', deadline: '', milestoneId: '' })}
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
               </div>
 
-              <button
-                type="button"
-                className="project-add-column-control"
-                disabled={!selectedBoardId}
-                onClick={() => {
-                  setColumnName('')
-                  setColumnComposerOpen(true)
-                }}
-              >
-                <Plus aria-hidden="true" />
-                <span>Add column</span>
-              </button>
-            </div>
-          </section>
-
-          <div className="project-board-container" aria-label="Project board" data-testid="project-board-surface">
-            {selectedBoardId && boardQuery.isLoading ? <p className="project-board-loading" role="status">Loading project board...</p> : null}
-            {!selectedBoardId && !boardsQuery.isLoading ? (
-              <div className="empty-panel project-empty" role="status">
-                <div className="project-empty-icon" aria-hidden="true">
-                  <FolderPlus />
-                </div>
-                <h2>No projects</h2>
-                <p>Get started by creating a new project.</p>
-                {emptyBoardComposerOpen ? (
-                  <form className="project-empty-form" onSubmit={submitBoard}>
-                    <label htmlFor="project-empty-project">Project name</label>
-                    <input
-                      ref={newBoardInputRef}
-                      id="project-empty-project"
-                      value={boardName}
-                      onChange={(event) => setBoardName(event.target.value)}
-                      placeholder="Project name"
-                      data-testid="project-empty-project-input"
-                      maxLength={180}
-                      autoFocus
-                    />
-                    <div className="project-empty-form-actions">
-                      <button type="button" className="project-secondary-btn" onClick={() => { setBoardName(''); setEmptyBoardComposerOpen(false) }}>
-                        Cancel
-                      </button>
-                      <button type="submit" className="project-primary-btn" disabled={!boardName.trim() || createBoard.isPending}>
-                        {createBoard.isPending ? 'Creating...' : 'Create Project'}
-                      </button>
-                    </div>
-                  </form>
+              <div className="project-toolbar-right">
+                {milestoneProgress ? (
+                  <button
+                    type="button"
+                    className="project-milestone-pill"
+                    data-testid="project-milestone-progress"
+                    aria-label={`Manage milestones (${milestoneProgress.milestone.name}: ${milestoneProgress.percent}%)`}
+                    onClick={() => setMilestoneDialogOpen(true)}
+                  >
+                    <span className="project-milestone-pill__name">{milestoneProgress.milestone.name}</span>
+                    <span className="project-milestone-pill__track" aria-hidden="true">
+                      <span
+                        className="project-milestone-pill__fill"
+                        style={{ width: `${milestoneProgress.percent}%` }}
+                      />
+                    </span>
+                    <span className="project-milestone-pill__pct">{milestoneProgress.percent}%</span>
+                  </button>
                 ) : (
                   <button
                     type="button"
-                    className="project-empty-create-button"
-                    data-testid="project-empty-new-project"
-                    onClick={() => {
-                      setEmptyBoardComposerOpen(true)
-                      window.requestAnimationFrame(() => newBoardInputRef.current?.focus())
-                    }}
+                    className="project-milestone-pill project-milestone-pill--empty"
+                    disabled={!selectedBoardId}
+                    onClick={() => setMilestoneDialogOpen(true)}
                   >
-                    <Plus aria-hidden="true" />
-                    <span>New Project</span>
+                    + Add Milestone
                   </button>
                 )}
               </div>
-            ) : null}
+            </section>
+          </>
+        ) : null}
 
-            {board ? (
-              <div className="project-columns-scroll" data-testid="project-columns">
-                {visibleColumns.map((column) => (
+        {/* Row 3: Kanban Columns */}
+        <div className="project-board-container" aria-label="Project board" data-testid="project-board-surface">
+          {selectedBoardId && boardQuery.isLoading ? (
+            <p className="project-board-loading" role="status">Loading project board...</p>
+          ) : null}
+
+          {!selectedBoardId && !boardsQuery.isLoading ? (
+            <div className="empty-panel project-empty" role="status">
+              <div className="project-empty-icon" aria-hidden="true">
+                <FolderPlus />
+              </div>
+              <h2>No projects</h2>
+              <p>Get started by creating a new project.</p>
+              {emptyBoardComposerOpen ? (
+                <form className="project-empty-form" onSubmit={submitEmptyBoard}>
+                  <label htmlFor="project-empty-project">Project name</label>
+                  <input
+                    ref={newBoardInputRef}
+                    id="project-empty-project"
+                    value={boardName}
+                    onChange={(event) => setBoardName(event.target.value)}
+                    placeholder="Project name"
+                    data-testid="project-empty-project-input"
+                    maxLength={180}
+                    autoFocus
+                  />
+                  <div className="project-empty-form-actions">
+                    <button
+                      type="button"
+                      className="project-secondary-btn"
+                      onClick={() => { setBoardName(''); setEmptyBoardComposerOpen(false) }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="project-primary-btn"
+                      disabled={!boardName.trim() || createBoard.isPending}
+                    >
+                      {createBoard.isPending ? 'Creating...' : 'Create Project'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="project-empty-create-button"
+                  data-testid="project-empty-new-project"
+                  onClick={() => {
+                    setEmptyBoardComposerOpen(true)
+                    window.requestAnimationFrame(() => newBoardInputRef.current?.focus())
+                  }}
+                >
+                  <Plus aria-hidden="true" />
+                  <span>New Project</span>
+                </button>
+              )}
+            </div>
+          ) : null}
+
+          {board ? (
+            <div className="project-columns-scroll" data-testid="project-columns">
+              {visibleColumns.map((column) => {
+                const isDoneCol = doneColumnIds.has(column.id) && isDoneColumnName(column.name)
+                return (
                   <section
-                    className="project-column-modern"
+                    className="project-column"
                     key={column.id}
                     data-testid={`project-column-${column.name}`}
                     aria-label={`${column.name} column`}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => handleDrop(event, column.id)}
                   >
-                    <header className="project-column-header">
-                      <div className="project-column-title">
-                        <span className="project-column-icon"><ColumnStatusIcon name={column.name} /></span>
-                        <input
-                          aria-label={`Rename column ${column.name}`}
-                          defaultValue={column.name}
-                          maxLength={180}
-                          onBlur={(event) => {
-                            const name = event.target.value.trim()
-                            if (name && name !== column.name) {
-                              updateColumn.mutate({ boardId: board.id, columnId: column.id, patch: { name } })
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="project-column-actions">
-                        <span className="project-column-count" aria-label={`${column.cards.length} cards`}>{column.cards.length}</span>
+                    <header className="project-column__header">
+                      <input
+                        className="project-column__title-input"
+                        aria-label={`Rename column ${column.name}`}
+                        defaultValue={column.name}
+                        maxLength={180}
+                        onBlur={(event) => {
+                          const name = event.target.value.trim()
+                          if (name && name !== column.name) {
+                            updateColumn.mutate({ boardId: board.id, columnId: column.id, patch: { name } })
+                          }
+                        }}
+                      />
+
+                      <div className="project-column__header-right">
                         <button
-                          className="project-column-menu"
                           type="button"
+                          className="project-column__icon-btn project-column__icon-btn--danger"
                           aria-label={`Delete column ${column.name}`}
                           onClick={() => setDeletingColumn({ boardId: board.id, columnId: column.id, name: column.name })}
                         >
                           <Trash2 aria-hidden="true" />
                         </button>
+                        <span className="project-column__count" aria-label={`${column.cards.length} cards`}>
+                          {column.cards.length}
+                        </span>
                       </div>
                     </header>
 
-                    <button
-                      type="button"
-                      className="project-add-card-btn"
-                      onClick={(event) => openCreateEditor(board.id, column.id, event.currentTarget)}
-                    >
-                      <Plus aria-hidden="true" />
-                      Add Card
-                    </button>
+                    <div className="project-column__cards">
+                      {column.cards.map((card) => {
+                        const isSelected = cardEditor?.mode === 'edit' && cardEditor.cardId === card.id
+                        const checklist = card.checklistItems ?? []
+                        const doneItems = checklist.filter((item) => item.isCompleted).length
+                        const dateLabel = formatCardDate(card.deadline, isDoneCol, today)
+                        const badgeText = card.label?.name ?? card.priority
+                        const badgeTone = card.label?.tone ?? priorityFallbackTone(card.priority)
 
-                    <div className="project-cards-list">
+                        return (
+                          <article
+                            key={card.id}
+                            draggable
+                            onDragStart={() => setDraggedCardId(card.id)}
+                            onDragEnd={() => setDraggedCardId(null)}
+                            data-testid={`project-card-${card.title}`}
+                            className={`project-kanban-card${isSelected ? ' project-kanban-card--selected' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className="project-kanban-card__btn"
+                              data-testid={`project-card-edit-${card.id}`}
+                              aria-label={`Edit ${card.title}`}
+                              onClick={(event) => openEditEditor(board.id, card, event.currentTarget)}
+                            >
+                              <span className="project-kanban-card__title">{card.title}</span>
+                              <div className="project-kanban-card__footer">
+                                <span className={`project-badge project-badge--${badgeTone}`}>
+                                  {badgeText}
+                                </span>
+
+                                <div className="project-kanban-card__meta">
+                                  {checklist.length > 0 ? (
+                                    <span className="project-kanban-card__checklist">
+                                      <CheckSquare aria-hidden="true" />
+                                      <span>{doneItems}/{checklist.length}</span>
+                                    </span>
+                                  ) : null}
+                                  {dateLabel ? (
+                                    <span className="project-kanban-card__date">{dateLabel}</span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </button>
+                          </article>
+                        )
+                      })}
+
                       {column.cards.length === 0 ? (
-                        <div className="project-column-empty" role="status">
-                          <span className="project-column-empty__icon"><ColumnStatusIcon name={column.name} /></span>
+                        <div className="project-column__empty" role="status">
                           <strong>{hasActiveFilters ? 'No matching cards' : 'No cards yet'}</strong>
-                          <span>{hasActiveFilters ? 'Try another priority or deadline.' : 'Add a card to get started.'}</span>
+                          <span>{hasActiveFilters ? 'Try another filter.' : 'Add a card below.'}</span>
                         </div>
                       ) : null}
-                      {column.cards.map((card) => (
-                        <article
-                          className="project-card-modern"
-                          key={card.id}
-                          draggable
-                          onDragStart={() => setDraggedCardId(card.id)}
-                          onDragEnd={() => setDraggedCardId(null)}
-                          data-testid={`project-card-${card.title}`}
-                        >
-                          <button
-                            type="button"
-                            className="project-card-edit-btn"
-                            data-testid={`project-card-edit-${card.id}`}
-                            aria-label={`Edit ${card.title}`}
-                            onClick={(event) => openEditEditor(board.id, card, event.currentTarget)}
-                          >
-                            <div className="project-card-content-layout">
-                              <div className="project-card-left">
-                                <span className="project-card-title">{card.title}</span>
-                              </div>
-                              <div className="project-card-right">
-                                <span className={`project-priority project-priority--${card.priority.toLowerCase()}`}>
-                                  {card.priority}
-                                </span>
-                                {card.deadline ? (
-                                  <div className="project-card-date">
-                                    <CalendarDays aria-hidden="true" />
-                                    <span>{deadlineState(card.deadline) === 'overdue' ? `Overdue ${card.deadline}` : card.deadline}</span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </button>
-                        </article>
-                      ))}
+
+                      <button
+                        type="button"
+                        className="project-column__add-card"
+                        onClick={(event) => openCreateEditor(board.id, column.id, event.currentTarget)}
+                      >
+                        <Plus aria-hidden="true" />
+                        <span>Add Card</span>
+                      </button>
                     </div>
                   </section>
-                ))}
-              </div>
-            ) : null}
-          </div>
+                )
+              })}
+            </div>
+          ) : null}
         </div>
-
-
 
         {/* Add Column Dialog */}
         <Dialog open={columnComposerOpen} onOpenChange={(open) => { if (!open) { setColumnName(''); setColumnComposerOpen(false) } }}>
@@ -694,6 +806,24 @@ export function ProjectPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Manage Milestones Dialog */}
+        {selectedBoardId ? (
+          <ProjectMilestoneDialog
+            open={milestoneDialogOpen}
+            milestones={milestones}
+            pending={createMilestoneMutation.isPending || updateMilestoneMutation.isPending || deleteMilestoneMutation.isPending}
+            onOpenChange={setMilestoneDialogOpen}
+            onCreateMilestone={async (name) => {
+              await createMilestoneMutation.mutateAsync({ boardId: selectedBoardId, name }).catch(() => undefined)
+            }}
+            onRenameMilestone={async (milestoneId, name) => {
+              await updateMilestoneMutation.mutateAsync({ boardId: selectedBoardId, milestoneId, name }).catch(() => undefined)
+            }}
+            onDeleteMilestone={async (milestoneId) => {
+              await deleteMilestoneMutation.mutateAsync({ boardId: selectedBoardId, milestoneId }).catch(() => undefined)
+            }}
+          />
+        ) : null}
 
         {/* Delete Project AlertDialog */}
         <AlertDialog open={!!deletingBoard} onOpenChange={(open) => { if (!open && !deleteBoard.isPending) setDeletingBoard(null) }}>
@@ -714,7 +844,6 @@ export function ProjectPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-
         {/* Card Editor Right Slide-Over Sheet */}
         <Dialog open={!!cardEditor} onOpenChange={(open) => { if (!open && !deletingCard) closeEditor() }}>
           <DialogContent
@@ -725,18 +854,51 @@ export function ProjectPage() {
           >
             <ProjectCardDetailPanel
               mode={cardEditor?.mode ?? 'create'}
-              editorKey={cardEditor ? (cardEditor.mode === 'create' ? `create-${cardEditor.columnId}` : `edit-${cardEditor.card.id}`) : 'none'}
+              editorKey={cardEditor ? (cardEditor.mode === 'create' ? `create-${cardEditor.columnId}` : `edit-${cardEditor.cardId}`) : 'none'}
               form={cardForm}
+              columns={columns}
+              milestones={milestones}
+              labels={labels}
+              checklistItems={editingCard?.checklistItems ?? []}
               pending={cardMutationPending}
               suspendEscape={Boolean(deletingCard)}
               onChange={setCardForm}
               onSubmit={submitCard}
               onClose={closeEditor}
-              onDelete={cardEditor?.mode === 'edit'
-                ? () => {
-                    const card = (cardEditor as { mode: 'edit'; boardId: string; card: projectApi.ProjectCard }).card
-                    setDeletingCard({ boardId: (cardEditor as { mode: 'edit'; boardId: string; card: projectApi.ProjectCard }).boardId, cardId: card.id, title: card.title })
-                  }
+              onCreateMilestone={async (name) => {
+                if (!selectedBoardId) return null
+                try {
+                  return await createMilestoneMutation.mutateAsync({ boardId: selectedBoardId, name })
+                } catch {
+                  return null
+                }
+              }}
+              onCreateLabel={async (name, tone) => {
+                if (!selectedBoardId) return null
+                try {
+                  return await createLabelMutation.mutateAsync({ boardId: selectedBoardId, name, tone })
+                } catch {
+                  return null
+                }
+              }}
+              onAddChecklistItem={async (title) => {
+                if (!editingCard) return
+                await createChecklistMutation.mutateAsync({ cardId: editingCard.id, title }).catch(() => undefined)
+              }}
+              onToggleChecklistItem={async (item) => {
+                if (!editingCard) return
+                await updateChecklistMutation.mutateAsync({
+                  cardId: editingCard.id,
+                  itemId: item.id,
+                  isCompleted: !item.isCompleted,
+                }).catch(() => undefined)
+              }}
+              onDeleteChecklistItem={async (itemId) => {
+                if (!editingCard) return
+                await deleteChecklistMutation.mutateAsync({ cardId: editingCard.id, itemId }).catch(() => undefined)
+              }}
+              onDelete={editingCard && cardEditor?.mode === 'edit'
+                ? () => setDeletingCard({ boardId: cardEditor.boardId, cardId: editingCard.id, title: editingCard.title })
                 : undefined}
             />
           </DialogContent>
@@ -781,8 +943,11 @@ export function ProjectPage() {
         </AlertDialog>
       </div>
 
-      {message ? <p className="status-message status-message--error project-status-notice" role="alert">{message}</p> : null}
-      {(boardQuery.isError || boardsQuery.isError) ? <p className="status-message status-message--error project-status-notice" role="alert">Could not load Project data.</p> : null}
-    </main>
+      {(boardQuery.isError || boardsQuery.isError) ? (
+        <p className="status-message status-message--error project-status-notice" role="alert">
+          Could not load Project data.
+        </p>
+      ) : null}
+    </div>
   )
 }

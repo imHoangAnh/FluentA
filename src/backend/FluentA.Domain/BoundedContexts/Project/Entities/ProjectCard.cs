@@ -5,6 +5,8 @@ namespace FluentA.Domain.BoundedContexts.Project.Entities;
 
 public sealed class ProjectCard : BaseEntity
 {
+    private readonly List<ProjectCardChecklistItem> _checklistItems = [];
+
     private ProjectCard()
     {
         Title = string.Empty;
@@ -16,7 +18,9 @@ public sealed class ProjectCard : BaseEntity
         string? description,
         CardPriority priority,
         DateTime? deadline,
-        int sortOrder)
+        int sortOrder,
+        Guid? milestoneId = null,
+        Guid? labelId = null)
     {
         if (columnId == Guid.Empty)
         {
@@ -29,6 +33,8 @@ public sealed class ProjectCard : BaseEntity
         Priority = priority;
         Deadline = NormalizeDeadline(deadline);
         SortOrder = ValidateSortOrder(sortOrder);
+        MilestoneId = milestoneId;
+        LabelId = labelId;
     }
 
     public Guid ColumnId { get; private set; }
@@ -37,15 +43,23 @@ public sealed class ProjectCard : BaseEntity
     public CardPriority Priority { get; private set; }
     public DateTime? Deadline { get; private set; }
     public int SortOrder { get; private set; }
+    public Guid? MilestoneId { get; private set; }
+    public ProjectMilestone? Milestone { get; private set; }
+    public Guid? LabelId { get; private set; }
+    public ProjectLabel? Label { get; private set; }
+    public IReadOnlyList<ProjectCardChecklistItem> ChecklistItems => _checklistItems.AsReadOnly();
+
     public static ProjectCard Create(
         Guid columnId,
         string title,
         string? description,
         CardPriority priority,
         DateTime? deadline,
-        int sortOrder)
+        int sortOrder,
+        Guid? milestoneId = null,
+        Guid? labelId = null)
     {
-        return new ProjectCard(columnId, title, description, priority, deadline, sortOrder);
+        return new ProjectCard(columnId, title, description, priority, deadline, sortOrder, milestoneId, labelId);
     }
 
     public void Update(
@@ -82,6 +96,30 @@ public sealed class ProjectCard : BaseEntity
         Touch();
     }
 
+    public void SetMilestone(Guid? milestoneId)
+    {
+        if (MilestoneId == milestoneId)
+        {
+            return;
+        }
+
+        MilestoneId = milestoneId;
+        Milestone = null;
+        Touch();
+    }
+
+    public void SetLabel(Guid? labelId)
+    {
+        if (LabelId == labelId)
+        {
+            return;
+        }
+
+        LabelId = labelId;
+        Label = null;
+        Touch();
+    }
+
     public void MoveToColumn(Guid columnId, int sortOrder)
     {
         if (columnId == Guid.Empty)
@@ -96,9 +134,14 @@ public sealed class ProjectCard : BaseEntity
 
     public void SoftDelete(DateTime? nowUtc = null)
     {
-        var now = nowUtc ?? DateTime.UtcNow;
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
         DeletedAt = now;
         UpdatedAt = now;
+
+        foreach (var item in _checklistItems.Where(item => item.DeletedAt is null))
+        {
+            item.SoftDelete(now);
+        }
     }
 
     private void Touch()

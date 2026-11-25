@@ -24,6 +24,19 @@ public sealed class ProjectBoardConfiguration : IEntityTypeConfiguration<Project
             .HasForeignKey(column => column.BoardId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(board => board.Milestones)
+            .WithOne()
+            .HasForeignKey(milestone => milestone.BoardId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(board => board.Labels)
+            .WithOne()
+            .HasForeignKey(label => label.BoardId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(board => board.Milestones).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(board => board.Labels).UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(board => new { board.UserId, board.DeletedAt });
         builder.HasIndex(board => new { board.UserId, board.Name });
     }

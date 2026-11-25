@@ -9,7 +9,7 @@ public interface IProjectService
     Task<OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default);
     /// <summary>Creates a Project board with default columns.</summary>
     Task<OperationResult<ProjectBoardDetailDto>> CreateBoardAsync(Guid userId, CreateProjectBoardRequest request, CancellationToken cancellationToken = default);
-    /// <summary>Gets one Project board with active columns and cards.</summary>
+    /// <summary>Gets one Project board with active columns, cards, milestones, and labels.</summary>
     Task<OperationResult<ProjectBoardDetailDto>> GetBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     /// <summary>Updates an owned Project board.</summary>
     Task<OperationResult<ProjectBoardDetailDto>> UpdateBoardAsync(Guid userId, Guid boardId, UpdateProjectBoardRequest request, CancellationToken cancellationToken = default);
@@ -29,4 +29,16 @@ public interface IProjectService
     Task<OperationResult<ProjectCardDto>> MoveCardAsync(Guid userId, Guid cardId, MoveProjectCardRequest request, CancellationToken cancellationToken = default);
     /// <summary>Soft-deletes an owned Project card.</summary>
     Task<OperationResult<bool>> DeleteCardAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default);
+
+    Task<OperationResult<ProjectMilestoneDto>> CreateMilestoneAsync(Guid userId, Guid boardId, CreateProjectMilestoneRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<ProjectMilestoneDto>> UpdateMilestoneAsync(Guid userId, Guid boardId, Guid milestoneId, UpdateProjectMilestoneRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<bool>> DeleteMilestoneAsync(Guid userId, Guid boardId, Guid milestoneId, CancellationToken cancellationToken = default);
+
+    Task<OperationResult<ProjectLabelDto>> CreateLabelAsync(Guid userId, Guid boardId, CreateProjectLabelRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<ProjectLabelDto>> UpdateLabelAsync(Guid userId, Guid boardId, Guid labelId, UpdateProjectLabelRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<bool>> DeleteLabelAsync(Guid userId, Guid boardId, Guid labelId, CancellationToken cancellationToken = default);
+
+    Task<OperationResult<ProjectCardChecklistItemDto>> CreateChecklistItemAsync(Guid userId, Guid cardId, CreateProjectChecklistItemRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<ProjectCardChecklistItemDto>> UpdateChecklistItemAsync(Guid userId, Guid cardId, Guid itemId, UpdateProjectChecklistItemRequest request, CancellationToken cancellationToken = default);
+    Task<OperationResult<bool>> DeleteChecklistItemAsync(Guid userId, Guid cardId, Guid itemId, CancellationToken cancellationToken = default);
 }

@@ -7,6 +7,7 @@ namespace FluentA.Application.BoundedContexts.Project;
 internal static class ProjectDtoMapper
 {
     private const string DateFormat = "yyyy-MM-dd";
+
     public static ProjectBoardSummaryDto ToSummary(ProjectBoard board)
     {
         var activeColumns = board.Columns.Where(column => column.DeletedAt is null).ToList();
@@ -21,6 +22,19 @@ internal static class ProjectDtoMapper
 
     public static ProjectBoardDetailDto ToDetail(ProjectBoard board)
     {
+        var milestones = board.Milestones
+            .Where(milestone => milestone.DeletedAt is null)
+            .OrderBy(milestone => milestone.SortOrder)
+            .ThenBy(milestone => milestone.CreatedAt)
+            .Select(ToMilestoneDto)
+            .ToList();
+
+        var labels = board.Labels
+            .Where(label => label.DeletedAt is null)
+            .OrderBy(label => label.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(ToLabelDto)
+            .ToList();
+
         return new ProjectBoardDetailDto(
             board.Id,
             board.Name,
@@ -31,7 +45,9 @@ internal static class ProjectDtoMapper
                 .Select(ToColumnDto)
                 .ToList(),
             board.CreatedAt,
-            board.UpdatedAt);
+            board.UpdatedAt,
+            milestones,
+            labels);
     }
 
     public static ProjectColumnDto ToColumnDto(ProjectColumn column)
@@ -52,6 +68,23 @@ internal static class ProjectDtoMapper
 
     public static ProjectCardDto ToCardDto(ProjectCard card)
     {
+        var activeMilestone = card.Milestone is { DeletedAt: null } milestone
+            ? ToMilestoneDto(milestone)
+            : null;
+        var milestoneId = activeMilestone?.Id ?? (card.Milestone is null ? card.MilestoneId : null);
+
+        var activeLabel = card.Label is { DeletedAt: null } label
+            ? ToLabelDto(label)
+            : null;
+        var labelId = activeLabel?.Id ?? (card.Label is null ? card.LabelId : null);
+
+        var checklistItems = card.ChecklistItems
+            .Where(item => item.DeletedAt is null)
+            .OrderBy(item => item.SortOrder)
+            .ThenBy(item => item.CreatedAt)
+            .Select(ToChecklistItemDto)
+            .ToList();
+
         return new ProjectCardDto(
             card.Id,
             card.ColumnId,
@@ -61,6 +94,26 @@ internal static class ProjectDtoMapper
             card.Deadline is null ? null : card.Deadline.Value.ToString(DateFormat, CultureInfo.InvariantCulture),
             card.SortOrder,
             card.CreatedAt,
-            card.UpdatedAt);
+            card.UpdatedAt,
+            milestoneId,
+            activeMilestone,
+            labelId,
+            activeLabel,
+            checklistItems);
+    }
+
+    public static ProjectMilestoneDto ToMilestoneDto(ProjectMilestone milestone)
+    {
+        return new ProjectMilestoneDto(milestone.Id, milestone.BoardId, milestone.Name, milestone.SortOrder);
+    }
+
+    public static ProjectLabelDto ToLabelDto(ProjectLabel label)
+    {
+        return new ProjectLabelDto(label.Id, label.BoardId, label.Name, label.Tone);
+    }
+
+    public static ProjectCardChecklistItemDto ToChecklistItemDto(ProjectCardChecklistItem item)
+    {
+        return new ProjectCardChecklistItemDto(item.Id, item.Title, item.IsCompleted, item.SortOrder);
     }
 }

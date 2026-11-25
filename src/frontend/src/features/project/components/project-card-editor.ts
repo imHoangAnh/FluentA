@@ -20,4 +20,7 @@ export type ProjectCardForm = {
   description: string
   priority: ProjectCard['priority']
   deadline: string
+  milestoneId: string | null
+  labelId: string | null
+  initialChecklistTitles: string[]
 }

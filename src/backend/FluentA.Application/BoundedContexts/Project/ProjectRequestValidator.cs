@@ -1,19 +1,33 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Project.DTOs;
-using FluentA.Domain.BoundedContexts.Project.Enums;
 using FluentA.Domain.BoundedContexts.Project.Entities;
+using FluentA.Domain.BoundedContexts.Project.Enums;
 
 namespace FluentA.Application.BoundedContexts.Project;
 
 internal static class ProjectRequestValidator
 {
     private const string DateFormat = "yyyy-MM-dd";
+
     public static (Dictionary<string, string[]> Errors, CardPriority Priority, DateTime? Deadline) ValidateCardCreate(CreateProjectCardRequest request)
     {
         var errors = ValidateCardCommon(request.Title, request.Description, request.Priority, request.Deadline, titleRequired: true, out var priority, out var deadline);
         if (request.ColumnId == Guid.Empty)
         {
             errors["columnId"] = ["Column id is required."];
+        }
+
+        if (request.ChecklistTitles is not null)
+        {
+            for (var index = 0; index < request.ChecklistTitles.Count; index++)
+            {
+                var itemTitle = request.ChecklistTitles[index];
+                if (string.IsNullOrWhiteSpace(itemTitle) || itemTitle.Trim().Length > 240)
+                {
+                    errors["checklistTitles"] = ["Each checklist item title must be between 1 and 240 characters."];
+                    break;
+                }
+            }
         }
 
         return (errors, priority ?? CardPriority.Medium, deadline);
@@ -95,5 +109,44 @@ internal static class ProjectRequestValidator
         }
 
         return [];
+    }
+
+    public static Dictionary<string, string[]> ValidateLabelCreate(CreateProjectLabelRequest request)
+    {
+        var errors = ValidateName(request.Name, "name", 32);
+        if (request.Tone is not null)
+        {
+            ValidateLabelTone(request.Tone, errors);
+        }
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> ValidateLabelUpdate(UpdateProjectLabelRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.Name is not null)
+        {
+            foreach (var error in ValidateName(request.Name, "name", 32))
+            {
+                errors[error.Key] = error.Value;
+            }
+        }
+
+        if (request.Tone is not null)
+        {
+            ValidateLabelTone(request.Tone, errors);
+        }
+
+        return errors;
+    }
+
+    private static void ValidateLabelTone(string tone, Dictionary<string, string[]> errors)
+    {
+        var normalized = tone.Trim().ToLowerInvariant();
+        if (!ProjectLabel.AllowedTones.Contains(normalized, StringComparer.Ordinal))
+        {
+            errors["tone"] = ["tone must be primary, neutral, success, warning, or info."];
+        }
     }
 }

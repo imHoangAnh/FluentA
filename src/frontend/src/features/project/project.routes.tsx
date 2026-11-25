@@ -6,7 +6,7 @@ export const projectRoutes: RouteObject[] = [{
   handle: appShellRoute({
     title: 'Project',
     description: 'Organize work across boards and columns.',
-    contentClassName: 'h-screen max-w-none overflow-hidden p-3 lg:p-4',
+    contentClassName: 'h-screen max-w-none overflow-hidden p-0 lg:p-0',
   }),
   lazy: async () => ({ Component: (await import('./pages/ProjectPage')).ProjectPage }),
 }]

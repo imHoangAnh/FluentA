@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Project;
@@ -41,7 +40,7 @@ public sealed class ProjectController : ApiControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Gets one owned Project board with all active columns and cards.</summary>
+    /// <summary>Gets one owned Project board with all active columns, cards, milestones, and labels.</summary>
     [HttpGet("boards/{boardId:guid}")]
     public async Task<IActionResult> GetBoard(Guid boardId, CancellationToken cancellationToken)
     {
@@ -61,7 +60,7 @@ public sealed class ProjectController : ApiControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Moves an owned Project board to Trash.</summary>
+    /// <summary>Soft-deletes an owned Project board.</summary>
     [HttpDelete("boards/{boardId:guid}")]
     public async Task<IActionResult> DeleteBoard(Guid boardId, CancellationToken cancellationToken)
     {
@@ -91,11 +90,71 @@ public sealed class ProjectController : ApiControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Moves an empty owned Project column to Trash.</summary>
+    /// <summary>Soft-deletes an empty owned Project column.</summary>
     [HttpDelete("boards/{boardId:guid}/columns/{columnId:guid}")]
     public async Task<IActionResult> DeleteColumn(Guid boardId, Guid columnId, CancellationToken cancellationToken)
     {
         var result = await _project.DeleteColumnAsync(CurrentUserId(), boardId, columnId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Creates a milestone on an owned Project board.</summary>
+    [HttpPost("boards/{boardId:guid}/milestones")]
+    public async Task<IActionResult> CreateMilestone(Guid boardId, CreateProjectMilestoneRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.CreateMilestoneAsync(CurrentUserId(), boardId, request, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectMilestoneDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Updates a milestone on an owned Project board.</summary>
+    [HttpPatch("boards/{boardId:guid}/milestones/{milestoneId:guid}")]
+    public async Task<IActionResult> UpdateMilestone(Guid boardId, Guid milestoneId, UpdateProjectMilestoneRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.UpdateMilestoneAsync(CurrentUserId(), boardId, milestoneId, request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<ProjectMilestoneDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Deletes a milestone from an owned Project board.</summary>
+    [HttpDelete("boards/{boardId:guid}/milestones/{milestoneId:guid}")]
+    public async Task<IActionResult> DeleteMilestone(Guid boardId, Guid milestoneId, CancellationToken cancellationToken)
+    {
+        var result = await _project.DeleteMilestoneAsync(CurrentUserId(), boardId, milestoneId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Creates a label on an owned Project board.</summary>
+    [HttpPost("boards/{boardId:guid}/labels")]
+    public async Task<IActionResult> CreateLabel(Guid boardId, CreateProjectLabelRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.CreateLabelAsync(CurrentUserId(), boardId, request, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectLabelDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Updates a label on an owned Project board.</summary>
+    [HttpPatch("boards/{boardId:guid}/labels/{labelId:guid}")]
+    public async Task<IActionResult> UpdateLabel(Guid boardId, Guid labelId, UpdateProjectLabelRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.UpdateLabelAsync(CurrentUserId(), boardId, labelId, request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<ProjectLabelDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Deletes a label from an owned Project board.</summary>
+    [HttpDelete("boards/{boardId:guid}/labels/{labelId:guid}")]
+    public async Task<IActionResult> DeleteLabel(Guid boardId, Guid labelId, CancellationToken cancellationToken)
+    {
+        var result = await _project.DeleteLabelAsync(CurrentUserId(), boardId, labelId, cancellationToken);
         return result.IsSuccess
             ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
@@ -131,7 +190,7 @@ public sealed class ProjectController : ApiControllerBase
             : ToErrorResult(result);
     }
 
-    /// <summary>Moves an owned Project card to Trash.</summary>
+    /// <summary>Soft-deletes an owned Project card.</summary>
     [HttpDelete("cards/{cardId:guid}")]
     public async Task<IActionResult> DeleteCard(Guid cardId, CancellationToken cancellationToken)
     {
@@ -141,4 +200,33 @@ public sealed class ProjectController : ApiControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Adds a checklist item to an owned Project card.</summary>
+    [HttpPost("cards/{cardId:guid}/checklist")]
+    public async Task<IActionResult> CreateChecklistItem(Guid cardId, CreateProjectChecklistItemRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.CreateChecklistItemAsync(CurrentUserId(), cardId, request, cancellationToken);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectCardChecklistItemDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Updates a checklist item on an owned Project card.</summary>
+    [HttpPatch("cards/{cardId:guid}/checklist/{itemId:guid}")]
+    public async Task<IActionResult> UpdateChecklistItem(Guid cardId, Guid itemId, UpdateProjectChecklistItemRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _project.UpdateChecklistItemAsync(CurrentUserId(), cardId, itemId, request, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<ProjectCardChecklistItemDto>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
+    /// <summary>Deletes a checklist item from an owned Project card.</summary>
+    [HttpDelete("cards/{cardId:guid}/checklist/{itemId:guid}")]
+    public async Task<IActionResult> DeleteChecklistItem(Guid cardId, Guid itemId, CancellationToken cancellationToken)
+    {
+        var result = await _project.DeleteChecklistItemAsync(CurrentUserId(), cardId, itemId, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
+            : ToErrorResult(result);
+    }
 }

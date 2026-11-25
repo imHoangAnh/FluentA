@@ -54,6 +54,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<ProjectBoard> ProjectBoards => Set<ProjectBoard>();
     public DbSet<ProjectColumn> ProjectColumns => Set<ProjectColumn>();
     public DbSet<ProjectCard> ProjectCards => Set<ProjectCard>();
+    public DbSet<ProjectMilestone> ProjectMilestones => Set<ProjectMilestone>();
+    public DbSet<ProjectLabel> ProjectLabels => Set<ProjectLabel>();
+    public DbSet<ProjectCardChecklistItem> ProjectCardChecklistItems => Set<ProjectCardChecklistItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

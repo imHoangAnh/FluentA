@@ -11,8 +11,8 @@ public sealed class ProjectTests
         var board = ProjectBoard.Create(Guid.NewGuid(), " Language Project ");
 
         Assert.Equal("Language Project", board.Name);
-        Assert.Equal(["To Do", "In Progress", "Done"], board.Columns.Select(column => column.Name).ToArray());
-        Assert.Equal([0, 1, 2], board.Columns.Select(column => column.SortOrder).ToArray());
+        Assert.Equal(["Backlog", "To Do", "In Progress", "Done"], board.Columns.Select(column => column.Name).ToArray());
+        Assert.Equal([0, 1, 2, 3], board.Columns.Select(column => column.SortOrder).ToArray());
     }
 
     [Fact]
@@ -20,6 +20,8 @@ public sealed class ProjectTests
     {
         var columnId = Guid.NewGuid();
         var targetColumnId = Guid.NewGuid();
+        var milestoneId = Guid.NewGuid();
+        var labelId = Guid.NewGuid();
         var deadline = new DateTime(2026, 6, 18, 14, 30, 0, DateTimeKind.Local);
         var card = ProjectCard.Create(
             columnId,
@@ -27,11 +29,15 @@ public sealed class ProjectTests
             "  Write plan  ",
             CardPriority.High,
             deadline,
-            2);
+            2,
+            milestoneId,
+            labelId);
 
         Assert.Equal("Draft lesson", card.Title);
         Assert.Equal("Write plan", card.Description);
         Assert.Equal(CardPriority.High, card.Priority);
+        Assert.Equal(milestoneId, card.MilestoneId);
+        Assert.Equal(labelId, card.LabelId);
         Assert.Equal(new DateTime(2026, 6, 18, 0, 0, 0, DateTimeKind.Utc), card.Deadline);
 
         card.MoveToColumn(targetColumnId, 0);
@@ -47,6 +53,9 @@ public sealed class ProjectTests
         Assert.Throws<ArgumentException>(() => ProjectBoard.Create(Guid.NewGuid(), ""));
         Assert.Throws<ArgumentException>(() => ProjectColumn.Create(Guid.NewGuid(), new string('x', 181), 0));
         Assert.Throws<ArgumentException>(() => ProjectCard.Create(Guid.NewGuid(), "", null, CardPriority.Low, null, 0));
+        Assert.Throws<ArgumentException>(() => ProjectMilestone.Create(Guid.NewGuid(), ""));
+        Assert.Throws<ArgumentException>(() => ProjectLabel.Create(Guid.NewGuid(), "Tag", "invalid-tone"));
+        Assert.Throws<ArgumentException>(() => ProjectCardChecklistItem.Create(Guid.NewGuid(), ""));
 
         var board = ProjectBoard.Create(Guid.NewGuid(), "Board");
         var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);

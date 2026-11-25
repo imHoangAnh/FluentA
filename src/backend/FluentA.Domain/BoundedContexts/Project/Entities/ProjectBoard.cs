@@ -5,6 +5,8 @@ namespace FluentA.Domain.BoundedContexts.Project.Entities;
 public sealed class ProjectBoard : BaseEntity, IAggregateRoot
 {
     private readonly List<ProjectColumn> _columns = [];
+    private readonly List<ProjectMilestone> _milestones = [];
+    private readonly List<ProjectLabel> _labels = [];
 
     private ProjectBoard()
     {
@@ -25,13 +27,16 @@ public sealed class ProjectBoard : BaseEntity, IAggregateRoot
     public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public IReadOnlyList<ProjectColumn> Columns => _columns.AsReadOnly();
+    public IReadOnlyList<ProjectMilestone> Milestones => _milestones.AsReadOnly();
+    public IReadOnlyList<ProjectLabel> Labels => _labels.AsReadOnly();
 
     public static ProjectBoard Create(Guid userId, string name)
     {
         var board = new ProjectBoard(userId, name);
-        board.AddColumn("To Do", 0);
-        board.AddColumn("In Progress", 1);
-        board.AddColumn("Done", 2);
+        board.AddColumn("Backlog", 0);
+        board.AddColumn("To Do", 1);
+        board.AddColumn("In Progress", 2);
+        board.AddColumn("Done", 3);
         return board;
     }
 
@@ -51,13 +56,23 @@ public sealed class ProjectBoard : BaseEntity, IAggregateRoot
 
     public void SoftDelete(DateTime? nowUtc = null)
     {
-        var now = nowUtc ?? DateTime.UtcNow;
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
         DeletedAt = now;
         UpdatedAt = now;
 
         foreach (var column in _columns.Where(column => column.DeletedAt is null))
         {
             column.SoftDelete(now, deleteCards: true);
+        }
+
+        foreach (var milestone in _milestones.Where(milestone => milestone.DeletedAt is null))
+        {
+            milestone.SoftDelete(now);
+        }
+
+        foreach (var label in _labels.Where(label => label.DeletedAt is null))
+        {
+            label.SoftDelete(now);
         }
     }
 
