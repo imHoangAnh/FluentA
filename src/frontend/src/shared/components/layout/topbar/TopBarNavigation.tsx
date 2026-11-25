@@ -45,7 +45,7 @@ export function TopBarNavigation({
           onClick={onCloseAll}
           className={cn(
             'group inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-semibold text-foreground/80 underline-offset-4 transition-colors duration-150 hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            !isHomeActive && 'hover:underline',
+            isHomeActive ? 'bg-secondary text-secondary-foreground' : 'hover:underline',
           )}
         >
           <span>Home</span>

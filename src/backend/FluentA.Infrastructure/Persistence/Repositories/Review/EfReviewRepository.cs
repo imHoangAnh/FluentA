@@ -209,7 +209,28 @@ public sealed class EfReviewRepository : IReviewRepository
             .QueryActiveReviewStates(userId)
             .CountAsync(state => state.NextReviewDate <= utcToday, cancellationToken);
 
-        return new ReviewDashboardDto(utcToday, dueCount);
+        var previewWords = await (
+            from state in _dbContext.WordReviewStates.AsNoTracking()
+            join word in _dbContext.Words.AsNoTracking() on state.WordId equals word.Id
+            join page in _dbContext.Pages.AsNoTracking() on word.PageId equals page.Id
+            join board in _dbContext.Boards.AsNoTracking() on page.BoardId equals board.Id
+            where state.UserId == userId
+                && board.UserId == userId
+                && state.DeletedAt == null
+                && state.Status == WordReviewStatus.Active
+                && word.DeletedAt == null
+                && page.DeletedAt == null
+                && board.DeletedAt == null
+                && state.NextReviewDate <= utcToday
+            orderby state.NextReviewDate, word.CreatedAt, word.Id
+            select new ReviewDashboardPreviewWordDto(
+                word.Id,
+                word.Word,
+                word.IpaPronunciation))
+            .Take(2)
+            .ToArrayAsync(cancellationToken);
+
+        return new ReviewDashboardDto(utcToday, dueCount, previewWords);
     }
 
     public async Task<ReviewSessionDto?> GetSessionAsync(

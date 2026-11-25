@@ -39,9 +39,16 @@ export type ReviewSession = {
   items: ReviewSessionItem[]
 }
 
+export type ReviewDashboardPreviewWord = {
+  wordId: string
+  word: string
+  ipaPronunciation: string
+}
+
 export type ReviewDashboard = {
   localDate: string
   dueCount: number
+  previewWords?: ReviewDashboardPreviewWord[]
 }
 
 export type ReviewAnswerResult = {

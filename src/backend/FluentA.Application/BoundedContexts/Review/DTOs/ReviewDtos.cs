@@ -1,8 +1,14 @@
 namespace FluentA.Application.BoundedContexts.Review.DTOs;
 
+public sealed record ReviewDashboardPreviewWordDto(
+    Guid WordId,
+    string Word,
+    string IpaPronunciation);
+
 public sealed record ReviewDashboardDto(
     DateOnly LocalDate,
-    int DueCount);
+    int DueCount,
+    IReadOnlyList<ReviewDashboardPreviewWordDto>? PreviewWords = null);
 
 public sealed record ReviewSessionDto(
     Guid SessionId,
