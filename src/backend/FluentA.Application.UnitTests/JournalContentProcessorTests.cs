@@ -20,8 +20,8 @@ public sealed class JournalContentProcessorTests
         var note = await new NoteContentProcessor(new TestAssetRepository()).ProcessAsync(Guid.NewGuid(), html);
         Assert.Equal(journal.Html, note.Html);
         for (var n = 1; n <= 6; n++) Assert.Contains($"<h{n}>", journal.Html);
-        foreach (var expected in new[] { "text-align", "color", "background-color", "<s>", "<u>", "<ol", "<ul>", "<li>", "<hr" }) Assert.Contains(expected, journal.Html);
-        foreach (var forbidden in new[] { "<script", "onclick", "javascript:", "position:", "<a ", "<code", "<pre", "<blockquote", "<input" }) Assert.DoesNotContain(forbidden, journal.Html);
+        foreach (var expected in new[] { "text-align", "color", "background-color", "<s>", "<u>", "<blockquote>", "<ol", "<ul>", "<li>", "<hr" }) Assert.Contains(expected, journal.Html);
+        foreach (var forbidden in new[] { "<script", "onclick", "javascript:", "position:", "<a ", "<code", "<pre", "<input" }) Assert.DoesNotContain(forbidden, journal.Html);
     }
 
     [Theory]

@@ -18,7 +18,7 @@ internal sealed class AssetRichTextProcessor(IAssetRepository assets, AssetType 
             throw new RichTextImageException("Embedded base64 images are not allowed.");
         var sanitizer = new HtmlSanitizer();
         sanitizer.AllowedTags.Clear();
-        foreach (var tag in new[] { "p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "mark", "hr", "span", "img" })
+        foreach (var tag in new[] { "p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "b", "em", "i", "u", "s", "blockquote", "ul", "ol", "li", "mark", "hr", "span", "img" })
             sanitizer.AllowedTags.Add(tag);
         sanitizer.AllowedAttributes.Clear();
         foreach (var attribute in new[] { "style", "src", "alt", "width", "height", "start", AssetAttribute, "data-note-asset-id", "data-image-align" })

@@ -1,4 +1,4 @@
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Highlighter, ImagePlus, Italic, List, ListOrdered, Minus, Redo2, Strikethrough, Underline, Undo2 } from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Highlighter, ImagePlus, Italic, List, ListOrdered, Minus, Quote, Redo2, Strikethrough, Underline, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -9,10 +9,18 @@ import Highlight from '@tiptap/extension-highlight'
 import { BlockImage } from './BlockImage'
 import { cn } from '@/shared/lib/utils'
 
+export type RichTextEditorHandle = {
+  openImagePicker: () => void
+  insertText: (text: string) => void
+  insertQuote: (text: string) => void
+  focus: () => void
+}
+
 type RichTextEditorProps = {
   contentClassName?: string
   disabled?: boolean
   content: string
+  editorApiRef?: React.MutableRefObject<RichTextEditorHandle | null>
   onChange: (html: string) => void
   onBlur?: () => void
   onImageFiles?: (files: File[]) => Promise<Array<{ id: string; displayUrl: string; alt?: string }>>
@@ -37,7 +45,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const [colorPicker, setColorPicker] = useState(false)
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ link: false, code: false, codeBlock: false, blockquote: false, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
+      StarterKit.configure({ link: false, code: false, codeBlock: false, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
       TextStyle, Color, Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }), BlockImage,
     ],
@@ -71,6 +79,34 @@ export function RichTextEditor(props: RichTextEditorProps) {
   useEffect(() => {
     if (editor && !editor.isDestroyed && editor.schema && content !== editor.getHTML()) editor.commands.setContent(content, { emitUpdate: false })
   }, [content, editor])
+  useEffect(() => {
+    const ref = latest.current.editorApiRef
+    if (!ref) return
+    if (!editor || editor.isDestroyed) {
+      ref.current = null
+      return
+    }
+    ref.current = {
+      openImagePicker: () => fileInput.current?.click(),
+      insertText: (text: string) => {
+        if (!editor.isDestroyed) editor.chain().focus().insertContent(text).run()
+      },
+      insertQuote: (text: string) => {
+        if (!editor.isDestroyed) {
+          editor.chain().focus().insertContent({
+            type: 'blockquote',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+          }).run()
+        }
+      },
+      focus: () => {
+        if (!editor.isDestroyed) editor.chain().focus().run()
+      },
+    }
+    return () => {
+      ref.current = null
+    }
+  }, [editor, props.editorApiRef])
 
   async function insertImages(files: File[]) {
     if (!editor || editor.isDestroyed || !latest.current.onImageFiles || latest.current.disabled || uploading.current) return
@@ -129,6 +165,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       {colorPicker && <div className="journal-color-picker-dropdown" role="dialog" aria-label="Choose text color">{COLORS.map(color => <button key={color.name} type="button" aria-label={`Color ${color.name}`} className="journal-color-swatch" style={{ backgroundColor: color.value || 'var(--ds-foreground)' }} onClick={() => { if (color.value) editor.chain().focus().setColor(color.value).run(); else editor.chain().focus().unsetColor().run(); setColorPicker(false) }} />)}</div>}
     </div>
     {button('Highlight', <Highlighter size={16} />, () => { editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run() }, editor.isActive('highlight'))}
+    {button('Blockquote', <Quote size={16} />, () => { editor.chain().focus().toggleBlockquote().run() }, editor.isActive('blockquote'))}
     {button('Bullet list', <List size={16} />, () => { editor.chain().focus().toggleBulletList().run() }, editor.isActive('bulletList'))}
     {button('Ordered list', <ListOrdered size={16} />, () => { editor.chain().focus().toggleOrderedList().run() }, editor.isActive('orderedList'))}
     {button('Align left', <AlignLeft size={16} />, () => align('left'))}

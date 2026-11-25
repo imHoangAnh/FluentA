@@ -42,4 +42,49 @@ public sealed class JournalEntryTests
         Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), " ", new DateTime(2026, 6, 11)));
         Assert.Throws<ArgumentException>(() => JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), new string('a', 100_001)));
     }
+
+    [Fact]
+    public void CreateAndUpdate_NormalizesMoodStarredAndTags()
+    {
+        var entry = JournalEntry.Create(
+            Guid.NewGuid(),
+            "Evening calm",
+            new DateTime(2026, 6, 11),
+            "<p>Tea time</p>",
+            " Peaceful ",
+            true,
+            ["#Reflection", "English", "reflection"]);
+
+        Assert.Equal("peaceful", entry.Mood);
+        Assert.True(entry.IsStarred);
+        Assert.Equal(["reflection", "english"], entry.Tags);
+
+        entry.UpdateMood("Grateful");
+        entry.SetStarred(false);
+        entry.UpdateTags(["#Gratitude"]);
+
+        Assert.Equal("grateful", entry.Mood);
+        Assert.False(entry.IsStarred);
+        Assert.Equal(["gratitude"], entry.Tags);
+
+        entry.UpdateMood(" ");
+        Assert.Null(entry.Mood);
+    }
+
+    [Fact]
+    public void MoodAndTags_RejectInvalidValues()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), mood: "angry"));
+        Assert.Throws<ArgumentException>(() =>
+            JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), tags: ["#"]));
+        Assert.Throws<ArgumentException>(() =>
+            JournalEntry.Create(Guid.NewGuid(), "Entry", new DateTime(2026, 6, 11), tags: [new string('a', 33)]));
+        Assert.Throws<ArgumentException>(() =>
+            JournalEntry.Create(
+                Guid.NewGuid(),
+                "Entry",
+                new DateTime(2026, 6, 11),
+                tags: Enumerable.Range(1, 11).Select(index => $"tag-{index}")));
+    }
 }

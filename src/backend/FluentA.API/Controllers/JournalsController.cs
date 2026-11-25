@@ -51,6 +51,16 @@ public sealed class JournalsController : ApiControllerBase
             : ToErrorResult(result);
     }
 
+    /// <summary>Gets random active vocabulary suggestions for the authenticated user.</summary>
+    [HttpGet("vocab-suggestions")]
+    public async Task<IActionResult> VocabSuggestions([FromQuery] int count = 5, CancellationToken cancellationToken = default)
+    {
+        var result = await _journals.GetVocabSuggestionsAsync(CurrentUserId(), count, cancellationToken);
+        return result.IsSuccess
+            ? Ok(ApiResponse<IReadOnlyList<JournalVocabSuggestionDto>>.Ok(result.Value!))
+            : ToErrorResult(result);
+    }
+
     /// <summary>Gets one active owned journal entry.</summary>
     [HttpGet("{journalId:guid}")]
     public async Task<IActionResult> Get(Guid journalId, CancellationToken cancellationToken)

@@ -16,6 +16,7 @@ vi.mock('../api/journal.api', async () => {
     listJournalEntries: vi.fn(),
     searchJournalEntries: vi.fn(),
     getJournalCalendar: vi.fn(),
+    getJournalVocabSuggestions: vi.fn(),
     getJournalEntry: vi.fn(),
     createJournalEntry: vi.fn(),
     updateJournalEntry: vi.fn(),
@@ -23,13 +24,51 @@ vi.mock('../api/journal.api', async () => {
   }
 })
 
-const journalEntry: journalApi.JournalEntry = {
-  id: 'journal-1',
-  title: 'A focused study day',
-  content: '<p>Reviewed vocabulary and practiced speaking.</p>',
+function localTodayStr() {
+  const now = new Date()
+  return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`
+}
+
+function makeTodayEntry(overrides: Partial<journalApi.JournalEntry> = {}): journalApi.JournalEntry {
+  const today = localTodayStr()
+  return {
+    id: 'journal-today',
+    title: 'Today focus reflection',
+    content: '<p>Reviewed resilient vocabulary and practiced speaking.</p>',
+    date: today,
+    createdAt: `${today}T08:00:00Z`,
+    updatedAt: `${today}T09:00:00Z`,
+    mood: 'peaceful',
+    isStarred: false,
+    tags: ['reflection', 'english'],
+    ...overrides,
+  }
+}
+
+const pastEntry: journalApi.JournalEntry = {
+  id: 'journal-past',
+  title: 'Rainy past thoughts',
+  content: '<p>Looked back at resilient moments from last month.</p>',
   date: '2026-07-22',
   createdAt: '2026-07-22T08:00:00Z',
   updatedAt: '2026-07-22T09:00:00Z',
+  mood: 'reflective',
+  isStarred: false,
+  tags: ['evening'],
+}
+
+function toSummary(entry: journalApi.JournalEntry): journalApi.JournalEntrySummary {
+  return {
+    id: entry.id,
+    title: entry.title,
+    date: entry.date,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+    mood: entry.mood,
+    isStarred: entry.isStarred,
+    tags: entry.tags,
+    preview: entry.content.replace(/<[^>]*>/g, ' ').trim(),
+  }
 }
 
 function renderPage() {
@@ -48,7 +87,7 @@ function renderPage() {
   )
 }
 
-describe('JournalPage workspace redesign', () => {
+describe('JournalPage auto-today and view-only history', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useAuthStore.setState({
@@ -59,11 +98,31 @@ describe('JournalPage workspace redesign', () => {
         avatarUrl: null,
       },
     })
-    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry])
+    const todayEntry = makeTodayEntry()
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([toSummary(todayEntry), toSummary(pastEntry)])
     vi.mocked(journalApi.searchJournalEntries).mockResolvedValue([])
-    vi.mocked(journalApi.getJournalCalendar).mockResolvedValue([{ date: journalEntry.date, count: 1 }])
-    vi.mocked(journalApi.getJournalEntry).mockResolvedValue(journalEntry)
-    vi.mocked(journalApi.updateJournalEntry).mockResolvedValue(journalEntry)
+    vi.mocked(journalApi.getJournalCalendar).mockResolvedValue([
+      { date: todayEntry.date, count: 1, mood: 'peaceful' },
+      { date: pastEntry.date, count: 1, mood: 'reflective' },
+    ])
+    vi.mocked(journalApi.getJournalVocabSuggestions).mockResolvedValue([
+      { id: 'vocab-1', word: 'resilient', meaning: 'able to recover', type: 'Adjective' },
+      { id: 'vocab-2', word: 'serendipity', meaning: 'happy accident', type: 'Noun' },
+    ])
+    vi.mocked(journalApi.getJournalEntry).mockImplementation(async (id) =>
+      id === pastEntry.id ? pastEntry : makeTodayEntry(),
+    )
+    vi.mocked(journalApi.updateJournalEntry).mockImplementation(async (id, input) => {
+      const base = id === pastEntry.id ? pastEntry : makeTodayEntry()
+      return {
+        ...base,
+        title: input.title ?? base.title,
+        content: input.content ?? base.content,
+        mood: input.mood === '' ? null : ((input.mood as journalApi.JournalMoodId | undefined) ?? base.mood),
+        isStarred: input.isStarred ?? base.isStarred,
+        tags: input.tags ?? base.tags,
+      }
+    })
     vi.mocked(journalApi.deleteJournalEntry).mockResolvedValue({ deleted: true })
   })
 
@@ -71,207 +130,207 @@ describe('JournalPage workspace redesign', () => {
     vi.useRealTimers()
   })
 
-  it('renders the approved full-width hierarchy for a persisted entry', async () => {
+  it('auto-opens Today entry in editable mode with 3-pane layout, Daily Quote, Random Vocab, and Format toolbar', async () => {
     const user = userEvent.setup()
+    const todayEntry = makeTodayEntry()
     renderPage()
 
-    const search = await screen.findByTestId('journal-search-input')
-    const workspace = screen.getByTestId('journal-workspace')
-    const sidebar = workspace.querySelector('.journal-sidebar')
-    expect(screen.queryByText('My Journal')).not.toBeInTheDocument()
-    expect(sidebar).toContainElement(search)
-
-    const entryButton = await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` })
-    expect(entryButton).toHaveTextContent(journalEntry.title)
-    expect(within(entryButton).getByTestId('journal-entry-date')).toBeInTheDocument()
-    expect(within(entryButton).getAllByText(journalEntry.title)).toHaveLength(1)
-
-    await user.click(entryButton)
-
-    const editorHeader = await screen.findByTestId('journal-editor-header')
-    const titleInput = within(editorHeader).getByLabelText('Journal title')
-    const dateDisplay = within(editorHeader).getByTestId('journal-date-display')
-    const actions = within(editorHeader).getByTestId('journal-editor-actions')
-    expect(within(actions).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    const deleteButton = within(actions).getByRole('button', { name: `Delete journal ${journalEntry.title}` })
-
-    expect(titleInput).toHaveValue(journalEntry.title)
-    expect(dateDisplay).toHaveAttribute('data-date', journalEntry.date)
-    expect(within(editorHeader).queryByLabelText('Journal date')).not.toBeInTheDocument()
-    expect(deleteButton).toBeInTheDocument()
-    expect(within(actions).getByTestId('journal-save-status')).toHaveTextContent('Saved')
-
-    const editorBody = screen.getByTestId('journal-editor-body')
-    const toolbar = await screen.findByRole('toolbar', { name: 'Journal formatting tools' }, { timeout: 5_000 })
-    const writingSurface = within(editorBody).getByLabelText('Journal rich text editor')
-    expect(editorHeader.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(toolbar.compareDocumentPosition(writingSurface) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(document.querySelector('.journal-editor-footer')).not.toBeInTheDocument()
-  })
-
-  it('auto-saves a new entry without a Save button and keeps its date read-only', async () => {
-    vi.mocked(journalApi.createJournalEntry).mockImplementation(async input => ({ ...journalEntry, title: input.title, date: input.date, content: input.content ?? '' }))
-    renderPage()
-    const create = await screen.findByTestId('create-journal-button')
-    await waitFor(() => expect(create).toBeEnabled())
-    fireEvent.click(create)
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    vi.useFakeTimers()
-    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'New daily entry' } })
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
-    expect(journalApi.createJournalEntry).toHaveBeenCalledWith(expect.objectContaining({ title: 'New daily entry', date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }))
-    expect(screen.getByTestId('journal-save-status')).toHaveTextContent('Saved')
-    expect(screen.queryByTestId('journal-date-input')).not.toBeInTheDocument()
-  })
-
-  it('warns before leaving an unsaved draft and only discards after confirmation', async () => {
-    const second = { ...journalEntry, id: 'journal-2', title: 'Another day', date: '2026-07-23' }
-    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry, second])
-    vi.mocked(journalApi.getJournalEntry).mockImplementation(async id => id === second.id ? second : journalEntry)
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
-    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
-    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'Unsaved draft' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Open journal Another day' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('may be lost')
-    fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
-    expect(screen.getByLabelText('Journal title')).toHaveValue('Unsaved draft')
-    fireEvent.click(screen.getByRole('button', { name: 'Open journal Another day' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Discard and continue' }))
-    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(second.title))
-    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
-  })
-
-  it('renders the Figma first-entry state with a New Journal action', async () => {
-    vi.mocked(journalApi.listJournalEntries).mockResolvedValueOnce([])
-
-    renderPage()
-
-    expect(await screen.findByRole('heading', { name: 'Your story starts here' })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('How do you feel today?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Start wherever you are…' })).toBeInTheDocument()
-
-    const newJournalButton = screen.getByRole('button', { name: 'New Journal' })
-    await userEvent.click(newJournalButton)
-
-    expect(screen.getByLabelText('Journal title')).toHaveValue('New Journal')
-  })
-
-  it('filters the current in-memory draft without discarding it and removes it after autosave', async () => {
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
-    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
-    vi.useFakeTimers()
-    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'Current unsaved entry' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Drafts' }))
-    expect(screen.getByRole('button', { name: 'Open current draft Current unsaved entry' })).toBeInTheDocument()
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: `Open journal ${journalEntry.title}` })).not.toBeInTheDocument()
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
-    expect(screen.queryByRole('button', { name: 'Open current draft Current unsaved entry' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'No unsaved drafts' })).toBeInTheDocument()
-  })
-
-  it('keeps editing disabled when opening another entry fails instead of saving the previous content into it', async () => {
-    const second = { ...journalEntry, id: 'journal-2', title: 'Unavailable entry', date: '2026-07-23' }
-    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([journalEntry, second])
-    vi.mocked(journalApi.getJournalEntry).mockImplementation(async id => {
-      if (id === second.id) throw new Error('Network failed')
-      return journalEntry
-    })
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
-    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
-
-    fireEvent.click(screen.getByRole('button', { name: `Open journal ${second.title}` }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open journal.')
-    expect(screen.getByLabelText('Journal title')).toBeDisabled()
-    const editor = await screen.findByRole('textbox', { name: 'Journal rich text editor' })
-    await waitFor(() => expect(editor).toHaveAttribute('contenteditable', 'false'))
-    expect(editor).not.toHaveTextContent('Reviewed vocabulary')
-    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
-  })
-
-  it('keeps the two-second autosave behavior for persisted entries', async () => {
-    renderPage()
-
-    fireEvent.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
     const titleInput = await screen.findByLabelText('Journal title')
-    await waitFor(() => expect(titleInput).toHaveValue(journalEntry.title))
+    await waitFor(() => expect(titleInput).toHaveValue(todayEntry.title))
+    expect(titleInput).toBeEnabled()
+    expect(document.querySelector('.journal-utility-bar')).not.toBeInTheDocument()
+
+    const sidebar = screen.getByTestId('journal-workspace').querySelector('.journal-sidebar')
+    expect(sidebar).toContainElement(screen.getByTestId('journal-search-input'))
+    expect(screen.getByText(/day streak/i)).toBeInTheDocument()
+    expect(screen.getByText('All 2')).toBeInTheDocument()
+
+    // Daily quote & author + cycle action
+    const quoteText = await screen.findByTestId('journal-daily-quote-text')
+    const initialQuote = quoteText.textContent
+    expect(screen.getByTestId('journal-daily-quote-author').textContent?.length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: 'Next daily quote' }))
+    expect(screen.getByTestId('journal-daily-quote-text').textContent).not.toBe(initialQuote)
+
+    // Vocab chip auto-checks off words present in active Today entry
+    const vocabChips = await screen.findByTestId('journal-vocab-chips')
+    expect(within(vocabChips).getByRole('button', { name: 'resilient' })).toHaveAttribute('data-used', 'true')
+    expect(within(vocabChips).getByRole('button', { name: 'serendipity' })).toHaveAttribute('data-used', 'false')
+
+    // Format dock toggles formatting toolbar
+    expect(screen.queryByRole('toolbar', { name: 'Journal formatting tools' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Format' }))
+    expect(await screen.findByRole('toolbar', { name: 'Journal formatting tools' }, { timeout: 5_000 })).toBeInTheDocument()
+  })
+
+  it('auto-opens a fresh editable sheet for Today when none exists and autosaves without a create button', async () => {
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([toSummary(pastEntry)])
+    vi.mocked(journalApi.createJournalEntry).mockImplementation(async (input) => ({
+      ...makeTodayEntry(),
+      id: 'journal-created',
+      title: input.title,
+      date: input.date,
+      content: input.content ?? '',
+      mood: input.mood ?? null,
+      isStarred: Boolean(input.isStarred),
+      tags: input.tags ?? [],
+    }))
+
+    renderPage()
+
+    const titleInput = await screen.findByLabelText('Journal title')
+    await waitFor(() => expect(titleInput).toBeEnabled())
+    expect(titleInput).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'New Journal' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
 
     vi.useFakeTimers()
-    fireEvent.change(titleInput, { target: { value: 'A focused study day, updated' } })
-    expect(screen.getByTestId('journal-save-status')).toHaveTextContent('Unsaved changes')
+    fireEvent.change(titleInput, { target: { value: 'New daily entry' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Grateful' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Star entry' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }))
+    const tagInput = screen.getByLabelText('New tag')
+    fireEvent.change(tagInput, { target: { value: '#Morning' } })
+    fireEvent.keyDown(tagInput, { key: 'Enter' })
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000)
     })
 
-    expect(journalApi.updateJournalEntry).toHaveBeenCalledWith(journalEntry.id, {
-      title: 'A focused study day, updated',
-      content: journalEntry.content,
-      date: journalEntry.date,
+    expect(journalApi.createJournalEntry).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'New daily entry',
+      date: localTodayStr(),
+      mood: 'grateful',
+      isStarred: true,
+      tags: ['morning'],
+    }))
+  })
+
+  it('opens non-today entries as view-only while keeping Star, Delete, and jumping back to Today working', async () => {
+    const user = userEvent.setup()
+    const todayEntry = makeTodayEntry()
+    renderPage()
+
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(todayEntry.title))
+
+    await user.click(screen.getByRole('button', { name: `Open journal ${pastEntry.title}` }))
+
+    const titleInput = await screen.findByLabelText('Journal title')
+    await waitFor(() => expect(titleInput).toHaveValue(pastEntry.title))
+    expect(titleInput).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reflective' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Writing dock' })).not.toBeInTheDocument()
+
+    const editor = await screen.findByRole('textbox', { name: 'Journal rich text editor' })
+    await waitFor(() => expect(editor).toHaveAttribute('contenteditable', 'false'))
+
+    // Star remains enabled and updates immediately on read-only entries
+    const starBtn = screen.getByRole('button', { name: 'Star entry' })
+    expect(starBtn).toBeEnabled()
+    await user.click(starBtn)
+    expect(journalApi.updateJournalEntry).toHaveBeenCalledWith(pastEntry.id, { isStarred: true })
+
+    // 7-day streak strip returns to Today editable entry
+    await user.click(screen.getByRole('button', { name: new RegExp(`Jump to ${localTodayStr()}`) }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(todayEntry.title))
+    expect(screen.getByLabelText('Journal title')).toBeEnabled()
+  })
+
+  it('shows a view-only sheet when selecting an empty past date on Calendar', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-08T10:00:00Z'))
+    const augToday = makeTodayEntry()
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([toSummary(augToday), toSummary(pastEntry)])
+
+    renderPage()
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(augToday.title))
+
+    fireEvent.click(screen.getByLabelText('Choose journal date'))
+    const headerCalendar = screen.getByLabelText('Journal date calendar')
+    const prevMonthButton = await within(headerCalendar).findByRole('button', { name: /previous month/i })
+    fireEvent.click(prevMonthButton)
+
+    const emptyDate = '2026-07-15'
+    fireEvent.click(within(headerCalendar).getByTestId(`journal-calendar-day-${emptyDate}`))
+    await waitFor(() => {
+      expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate)
     })
+    const emptyTitle = screen.getByLabelText('Journal title')
+    expect(emptyTitle).toBeDisabled()
+    expect(emptyTitle).toHaveValue('')
+    expect(emptyTitle).toHaveAttribute('placeholder', 'No entry for this day')
+    expect(screen.getByRole('button', { name: 'Peaceful' })).toBeDisabled()
+    const editor = await screen.findByRole('textbox', { name: 'Journal rich text editor' })
+    await waitFor(() => expect(editor).toHaveAttribute('contenteditable', 'false'))
+    expect(screen.queryByRole('group', { name: 'Writing dock' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Star entry' })).not.toBeInTheDocument()
+
+    // Jump back to Today via sidebar entry
+    fireEvent.click(screen.getByRole('button', { name: `Open journal ${augToday.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(augToday.title))
+  })
+
+  it('warns before leaving an unsaved Today draft and only discards after confirmation', async () => {
+    const todayEntry = makeTodayEntry()
+    renderPage()
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(todayEntry.title))
+
+    fireEvent.change(screen.getByLabelText('Journal title'), { target: { value: 'Unsaved Today draft' } })
+    fireEvent.click(screen.getByRole('button', { name: `Open journal ${pastEntry.title}` }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('may be lost')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    expect(screen.getByLabelText('Journal title')).toHaveValue('Unsaved Today draft')
+
+    fireEvent.click(screen.getByRole('button', { name: `Open journal ${pastEntry.title}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and continue' }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(pastEntry.title))
+    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
+  })
+
+  it('keeps editing disabled when opening another entry fails instead of saving previous content into it', async () => {
+    const todayEntry = makeTodayEntry()
+    vi.mocked(journalApi.getJournalEntry).mockImplementation(async (id) => {
+      if (id === pastEntry.id) throw new Error('Network failed')
+      return todayEntry
+    })
+    renderPage()
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(todayEntry.title))
+
+    fireEvent.click(screen.getByRole('button', { name: `Open journal ${pastEntry.title}` }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open journal.')
+    expect(screen.getByLabelText('Journal title')).toBeDisabled()
+    const editor = await screen.findByRole('textbox', { name: 'Journal rich text editor' })
+    await waitFor(() => expect(editor).toHaveAttribute('contenteditable', 'false'))
+    expect(editor).not.toHaveTextContent('Reviewed resilient vocabulary')
+    expect(journalApi.updateJournalEntry).not.toHaveBeenCalled()
   })
 
   it('confirms deletion, supports cancellation and keeps a failed delete available for retry', async () => {
     const user = userEvent.setup()
+    const todayEntry = makeTodayEntry()
     vi.mocked(journalApi.deleteJournalEntry).mockRejectedValueOnce(new Error('Network failed')).mockResolvedValue({ deleted: true })
     renderPage()
-    await user.click(await screen.findByRole('button', { name: `Open journal ${journalEntry.title}` }))
-    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(journalEntry.title))
-    await user.click(screen.getByRole('button', { name: `Delete journal ${journalEntry.title}` }))
+    await waitFor(() => expect(screen.getByLabelText('Journal title')).toHaveValue(todayEntry.title))
+
+    await user.click(screen.getByRole('button', { name: `Delete journal ${todayEntry.title}` }))
     expect(journalApi.deleteJournalEntry).not.toHaveBeenCalled()
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
     expect(journalApi.deleteJournalEntry).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: `Delete journal ${journalEntry.title}` }))
+
+    await user.click(screen.getByRole('button', { name: `Delete journal ${todayEntry.title}` }))
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
     expect(await within(screen.getByRole('alertdialog')).findByRole('alert')).toHaveTextContent('Could not delete')
-    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([])
+
+    vi.mocked(journalApi.listJournalEntries).mockResolvedValue([toSummary(pastEntry)])
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(journalApi.deleteJournalEntry).toHaveBeenCalledTimes(2)
-    expect(journalApi.deleteJournalEntry).toHaveBeenCalledWith(journalEntry.id)
-    expect(screen.queryByRole('button', { name: `Open journal ${journalEntry.title}` })).not.toBeInTheDocument()
-  })
-
-  it('interacts with the shadcn UI calendar to open populated and prepare empty dates', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-08-08T10:00:00Z'))
-    renderPage()
-
-    fireEvent.click(screen.getByLabelText('Choose journal date'))
-    const prevMonthButton = await screen.findByRole('button', { name: /previous month/i })
-    fireEvent.click(prevMonthButton)
-
-    await waitFor(async () => {
-      const populatedButton = screen.getByTestId(`journal-calendar-day-${journalEntry.date}`)
-      expect(populatedButton).toHaveAccessibleName(`${journalEntry.date}, 1 journal entry`)
-      expect(within(populatedButton).getByText('1')).toBeInTheDocument()
-    })
-
-    const populatedButton = screen.getByTestId(`journal-calendar-day-${journalEntry.date}`)
-    fireEvent.click(populatedButton)
-    await waitFor(() => {
-      expect(screen.getByTestId('journal-title-input')).toHaveValue(journalEntry.title)
-    })
-
-    const emptyDate = '2026-07-15'
-    fireEvent.click(screen.getByLabelText('Choose journal date'))
-    const emptyButton = screen.getByTestId(`journal-calendar-day-${emptyDate}`)
-    fireEvent.click(emptyButton)
-    await waitFor(() => {
-      expect(screen.getByTestId('journal-editor-empty-state')).toBeInTheDocument()
-      expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate)
-    })
-
-    const createButton = screen.getByTestId('create-journal-button')
-    fireEvent.click(createButton)
-    await waitFor(() => {
-      expect(screen.queryByTestId('journal-editor-empty-state')).not.toBeInTheDocument()
-      expect(screen.getByTestId('journal-title-input')).toHaveValue('New Journal')
-      expect(screen.getByTestId('journal-date-display')).toHaveAttribute('data-date', emptyDate)
-    })
+    expect(journalApi.deleteJournalEntry).toHaveBeenCalledWith(todayEntry.id)
+    // After deleting Today's entry, resets to a fresh editable Today sheet
+    expect(screen.getByLabelText('Journal title')).toHaveValue('')
+    expect(screen.getByLabelText('Journal title')).toBeEnabled()
   })
 })

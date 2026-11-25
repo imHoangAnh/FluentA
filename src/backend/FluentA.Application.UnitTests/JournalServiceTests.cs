@@ -145,22 +145,80 @@ public sealed class JournalServiceTests
         Assert.True((await service.CreateAsync(owner, new("Replacement", "2026-10-08"))).IsSuccess);
     }
 
+    [Fact]
+    public async Task MoodStarredTagsPreviewAndVocabSuggestions_WorkEndToEnd()
+    {
+        var repository = new FakeJournalRepository();
+        repository.SeedVocab(new JournalVocabSuggestionItem(Guid.NewGuid(), "resilient", "able to recover quickly", "Adjective"));
+        var service = new JournalService(repository, new FakeJournalContentProcessor(), new TestAssetRepository(), new TestAssetStorage());
+        var owner = Guid.NewGuid();
+
+        var created = await service.CreateAsync(
+            owner,
+            new CreateJournalEntryRequest(
+                "Slow afternoon tea",
+                "2026-11-23",
+                "Calm rest after work",
+                "Peaceful",
+                true,
+                ["#Reflection", "English"]));
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal("peaceful", created.Value!.Mood);
+        Assert.True(created.Value.IsStarred);
+        Assert.Equal(["reflection", "english"], created.Value.Tags);
+
+        var summary = Assert.Single((await service.ListAsync(owner)).Value!);
+        Assert.Equal("peaceful", summary.Mood);
+        Assert.True(summary.IsStarred);
+        Assert.Equal(["reflection", "english"], summary.Tags);
+        Assert.Equal("Calm rest after work", summary.Preview);
+
+        var tagSearch = await service.SearchAsync(owner, "#english");
+        Assert.Single(tagSearch.Value!);
+
+        var updated = await service.UpdateAsync(
+            owner,
+            created.Value.Id,
+            new UpdateJournalEntryRequest(Mood: "", IsStarred: false, Tags: ["grateful"]));
+        Assert.True(updated.IsSuccess);
+        Assert.Null(updated.Value!.Mood);
+        Assert.False(updated.Value.IsStarred);
+        Assert.Equal(["grateful"], updated.Value.Tags);
+
+        var invalidMood = await service.UpdateAsync(owner, created.Value.Id, new UpdateJournalEntryRequest(Mood: "invalid"));
+        Assert.Equal("VALIDATION_ERROR", invalidMood.Error!.Code);
+
+        var vocab = await service.GetVocabSuggestionsAsync(owner, 5);
+        Assert.True(vocab.IsSuccess);
+        var suggestion = Assert.Single(vocab.Value!);
+        Assert.Equal("resilient", suggestion.Word);
+    }
+
     private sealed class FakeJournalRepository : IJournalRepository
     {
         private readonly List<JournalEntry> _entries = [];
+        private readonly List<JournalVocabSuggestionItem> _vocab = [];
+
+        public void SeedVocab(JournalVocabSuggestionItem item) => _vocab.Add(item);
 
         public Task<IReadOnlyList<JournalEntryListItem>> ListAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<JournalEntryListItem>>(_entries
                 .Where(entry => entry.UserId == userId && entry.DeletedAt is null)
-                .OrderByDescending(entry => entry.CreatedAt)
+                .OrderByDescending(entry => entry.Date)
+                .ThenByDescending(entry => entry.CreatedAt)
                 .ThenByDescending(entry => entry.Id)
                 .Select(entry => new JournalEntryListItem(
                     entry.Id,
                     entry.Title,
                     entry.Date,
                     entry.CreatedAt,
-                    entry.UpdatedAt))
+                    entry.UpdatedAt,
+                    entry.Mood,
+                    entry.IsStarred,
+                    entry.Tags,
+                    entry.Content))
                 .ToList());
         }
 
@@ -172,12 +230,16 @@ public sealed class JournalServiceTests
 
         public Task<IReadOnlyList<JournalEntrySearchItem>> SearchAsync(Guid userId, string query, CancellationToken cancellationToken = default)
         {
+            var tagQuery = query.Trim().TrimStart('#');
             return Task.FromResult<IReadOnlyList<JournalEntrySearchItem>>(_entries
                 .Where(entry =>
                     entry.UserId == userId &&
                     entry.DeletedAt is null &&
-                    entry.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(entry => entry.CreatedAt)
+                    (entry.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                     entry.Content.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                     entry.Tags.Any(tag => tag.Contains(tagQuery, StringComparison.OrdinalIgnoreCase))))
+                .OrderByDescending(entry => entry.Date)
+                .ThenByDescending(entry => entry.CreatedAt)
                 .ThenByDescending(entry => entry.Id)
                 .Take(50)
                 .Select(entry => new JournalEntrySearchItem(
@@ -185,7 +247,11 @@ public sealed class JournalServiceTests
                     entry.Title,
                     entry.Date,
                     entry.CreatedAt,
-                    entry.UpdatedAt))
+                    entry.UpdatedAt,
+                    entry.Mood,
+                    entry.IsStarred,
+                    entry.Tags,
+                    entry.Content))
                 .ToList());
         }
 
@@ -203,9 +269,15 @@ public sealed class JournalServiceTests
                     entry.Date < monthEnd)
                 .GroupBy(entry => entry.Date)
                 .OrderBy(group => group.Key)
-                .Select(group => new JournalCalendarDayItem(group.Key, group.Count()))
+                .Select(group => new JournalCalendarDayItem(group.Key, group.Count(), group.Select(entry => entry.Mood).FirstOrDefault()))
                 .ToList());
         }
+
+        public Task<IReadOnlyList<JournalVocabSuggestionItem>> ListVocabSuggestionsAsync(
+            Guid userId,
+            int count,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<JournalVocabSuggestionItem>>(_vocab.Take(count).ToList());
 
         public Task<bool> DateExistsAsync(Guid userId, DateTime date, Guid? excludingId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(_entries.Any(entry => entry.UserId == userId && entry.Date == date && entry.Id != excludingId && entry.DeletedAt is null));

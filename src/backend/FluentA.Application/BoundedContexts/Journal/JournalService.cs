@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Text.RegularExpressions;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
@@ -12,6 +14,7 @@ public sealed class JournalService : IJournalService
     private const string DateFormat = "yyyy-MM-dd";
     private const string MonthFormat = "yyyy-MM";
     private const int SearchQueryMaxLength = 100;
+    private const int PreviewMaxLength = 140;
     private readonly IJournalRepository _repository;
     private readonly IJournalContentProcessor _contentProcessor;
 
@@ -68,7 +71,19 @@ public sealed class JournalService : IJournalService
         var monthEnd = monthStart.AddMonths(1);
         var days = await _repository.CalendarAsync(userId, monthStart, monthEnd, cancellationToken);
         return OperationResult<IReadOnlyList<JournalCalendarDayDto>>.Success(days
-            .Select(day => new JournalCalendarDayDto(day.Date.ToString(DateFormat, CultureInfo.InvariantCulture), day.Count))
+            .Select(day => new JournalCalendarDayDto(day.Date.ToString(DateFormat, CultureInfo.InvariantCulture), day.Count, day.Mood))
+            .ToList());
+    }
+
+    public async Task<OperationResult<IReadOnlyList<JournalVocabSuggestionDto>>> GetVocabSuggestionsAsync(
+        Guid userId,
+        int count = 5,
+        CancellationToken cancellationToken = default)
+    {
+        var clamped = Math.Clamp(count, 1, 10);
+        var items = await _repository.ListVocabSuggestionsAsync(userId, clamped, cancellationToken);
+        return OperationResult<IReadOnlyList<JournalVocabSuggestionDto>>.Success(items
+            .Select(item => new JournalVocabSuggestionDto(item.Id, item.Word, item.Meaning, item.Type))
             .ToList());
     }
 
@@ -103,7 +118,14 @@ public sealed class JournalService : IJournalService
             return OperationResult<JournalEntryDto>.Failure(ContentTooLong());
         if ((await _repository.GetAttachedAssetEntryIdsAsync(content.ReferencedAssetIds.ToArray(), cancellationToken)).Count > 0)
             return OperationResult<JournalEntryDto>.Failure(ImageAlreadyAttached());
-        var entry = JournalEntry.Create(userId, request.Title, validation.Date, content.Html);
+        var entry = JournalEntry.Create(
+            userId,
+            request.Title,
+            validation.Date,
+            content.Html,
+            request.Mood,
+            request.IsStarred,
+            request.Tags);
         await _repository.AddAsync(entry, cancellationToken);
         await _repository.ReplaceEntryAssetLinksAsync(entry.Id, content.ReferencedAssetIds, cancellationToken);
         if (!await _repository.SaveChangesAsync(cancellationToken))
@@ -149,6 +171,9 @@ public sealed class JournalService : IJournalService
         }
         if (request.Title is not null) entry.Rename(request.Title);
         if (validation.Date is not null) entry.UpdateDate(validation.Date.Value);
+        if (request.Mood is not null) entry.UpdateMood(request.Mood);
+        if (request.IsStarred is not null) entry.SetStarred(request.IsStarred.Value);
+        if (request.Tags is not null) entry.UpdateTags(request.Tags);
         await _repository.UpdateAsync(entry, cancellationToken);
         if (!await _repository.SaveChangesAsync(cancellationToken))
             return OperationResult<JournalEntryDto>.Failure(JournalError.DateConflict());
@@ -186,6 +211,8 @@ public sealed class JournalService : IJournalService
     {
         var errors = ValidateFields(request.Title, request.Content);
         var date = ParseDate(request.Date, "date", errors);
+        ValidateMood(request.Mood, errors);
+        ValidateTags(request.Tags, errors);
         return (errors, date);
     }
 
@@ -208,6 +235,9 @@ public sealed class JournalService : IJournalService
             date = ParseDate(request.Date, "date", errors);
         }
 
+        ValidateMood(request.Mood, errors);
+        ValidateTags(request.Tags, errors);
+
         return (errors, date);
     }
 
@@ -229,6 +259,50 @@ public sealed class JournalService : IJournalService
         }
 
         return errors;
+    }
+
+    private static void ValidateMood(string? mood, Dictionary<string, string[]> errors)
+    {
+        if (string.IsNullOrWhiteSpace(mood))
+        {
+            return;
+        }
+
+        var normalized = mood.Trim().ToLowerInvariant();
+        if (!JournalEntry.AllowedMoods.Contains(normalized))
+        {
+            errors["mood"] = [$"Mood must be one of: {string.Join(", ", JournalEntry.AllowedMoods)}."];
+        }
+    }
+
+    private static void ValidateTags(IReadOnlyList<string>? tags, Dictionary<string, string[]> errors)
+    {
+        if (tags is null)
+        {
+            return;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rawTag in tags)
+        {
+            var normalized = (rawTag ?? string.Empty).Trim().TrimStart('#').Trim().ToLowerInvariant();
+            if (normalized.Length is < 1 or > JournalEntry.MaxTagLength)
+            {
+                errors["tags"] = [$"Each tag must contain between 1 and {JournalEntry.MaxTagLength} characters."];
+                return;
+            }
+
+            if (!seen.Add(normalized))
+            {
+                continue;
+            }
+
+            if (seen.Count > JournalEntry.MaxTags)
+            {
+                errors["tags"] = [$"At most {JournalEntry.MaxTags} tags are allowed."];
+                return;
+            }
+        }
     }
 
     private static DateTime ParseDate(string? value, string field, Dictionary<string, string[]> errors)
@@ -279,7 +353,10 @@ public sealed class JournalService : IJournalService
             _contentProcessor.HydrateImageSources(entry.Content, urls),
             entry.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
             entry.CreatedAt,
-            entry.UpdatedAt);
+            entry.UpdatedAt,
+            entry.Mood,
+            entry.IsStarred,
+            entry.Tags.ToList());
     }
 
     private static JournalEntrySummaryDto ToSummaryDto(JournalEntryListItem entry)
@@ -289,7 +366,11 @@ public sealed class JournalService : IJournalService
             entry.Title,
             entry.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
             entry.CreatedAt,
-            entry.UpdatedAt);
+            entry.UpdatedAt,
+            entry.Mood,
+            entry.IsStarred,
+            (entry.Tags ?? []).ToList(),
+            BuildPreview(entry.ContentSnippet));
     }
 
     private static JournalSearchResultDto ToSearchDto(JournalEntrySearchItem entry, string query)
@@ -305,6 +386,28 @@ public sealed class JournalService : IJournalService
             highlights,
             entry.Date.ToString(DateFormat, CultureInfo.InvariantCulture),
             entry.CreatedAt,
-            entry.UpdatedAt);
+            entry.UpdatedAt,
+            entry.Mood,
+            entry.IsStarred,
+            (entry.Tags ?? []).ToList(),
+            BuildPreview(entry.ContentSnippet));
+    }
+
+    private static string BuildPreview(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        var withoutTags = Regex.Replace(html, "<[^>]*>", " ");
+        var decoded = WebUtility.HtmlDecode(withoutTags);
+        var collapsed = Regex.Replace(decoded, @"\s+", " ").Trim();
+        if (collapsed.Length <= PreviewMaxLength)
+        {
+            return collapsed;
+        }
+
+        return string.Concat(collapsed.AsSpan(0, PreviewMaxLength).TrimEnd(), "…");
     }
 }

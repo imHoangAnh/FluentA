@@ -8,6 +8,7 @@ namespace FluentA.Infrastructure.Persistence.Repositories.Journal;
 
 public sealed class EfJournalRepository : IJournalRepository
 {
+    private const int SnippetSourceMaxLength = 600;
     private readonly AppDbContext _dbContext;
 
     public EfJournalRepository(AppDbContext dbContext)
@@ -19,14 +20,21 @@ public sealed class EfJournalRepository : IJournalRepository
     {
         return await _dbContext.JournalEntries
             .Where(entry => entry.UserId == userId && entry.DeletedAt == null)
-            .OrderByDescending(entry => entry.CreatedAt)
+            .OrderByDescending(entry => entry.Date)
+            .ThenByDescending(entry => entry.CreatedAt)
             .ThenByDescending(entry => entry.Id)
             .Select(entry => new JournalEntryListItem(
                 entry.Id,
                 entry.Title,
                 entry.Date,
                 entry.CreatedAt,
-                entry.UpdatedAt))
+                entry.UpdatedAt,
+                entry.Mood,
+                entry.IsStarred,
+                entry.Tags,
+                entry.Content.Length > SnippetSourceMaxLength
+                    ? entry.Content.Substring(0, SnippetSourceMaxLength)
+                    : entry.Content))
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -36,18 +44,22 @@ public sealed class EfJournalRepository : IJournalRepository
         string query,
         CancellationToken cancellationToken = default)
     {
-        var escaped = query
-            .Replace(@"\", @"\\", StringComparison.Ordinal)
-            .Replace("%", @"\%", StringComparison.Ordinal)
-            .Replace("_", @"\_", StringComparison.Ordinal);
-        var pattern = $"%{escaped}%";
+        var normalized = EscapeLikePattern(query);
+        var pattern = $"%{normalized}%";
+        var cleanedTagQuery = query.Trim().TrimStart('#');
+        var tagPattern = string.IsNullOrWhiteSpace(cleanedTagQuery)
+            ? pattern
+            : $"%{EscapeLikePattern(cleanedTagQuery)}%";
 
         return await _dbContext.JournalEntries
             .Where(entry =>
                 entry.UserId == userId &&
                 entry.DeletedAt == null &&
-                EF.Functions.ILike(entry.Title, pattern, @"\"))
-            .OrderByDescending(entry => entry.CreatedAt)
+                (EF.Functions.ILike(entry.Title, pattern, @"\") ||
+                 EF.Functions.ILike(entry.Content, pattern, @"\") ||
+                 entry.Tags.Any(tag => EF.Functions.ILike(tag, tagPattern, @"\"))))
+            .OrderByDescending(entry => entry.Date)
+            .ThenByDescending(entry => entry.CreatedAt)
             .ThenByDescending(entry => entry.Id)
             .Take(50)
             .Select(entry => new JournalEntrySearchItem(
@@ -55,7 +67,13 @@ public sealed class EfJournalRepository : IJournalRepository
                 entry.Title,
                 entry.Date,
                 entry.CreatedAt,
-                entry.UpdatedAt))
+                entry.UpdatedAt,
+                entry.Mood,
+                entry.IsStarred,
+                entry.Tags,
+                entry.Content.Length > SnippetSourceMaxLength
+                    ? entry.Content.Substring(0, SnippetSourceMaxLength)
+                    : entry.Content))
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -74,9 +92,37 @@ public sealed class EfJournalRepository : IJournalRepository
                 entry.Date < monthEnd)
             .GroupBy(entry => entry.Date)
             .OrderBy(group => group.Key)
-            .Select(group => new JournalCalendarDayItem(group.Key, group.Count()))
+            .Select(group => new JournalCalendarDayItem(
+                group.Key,
+                group.Count(),
+                group.Select(entry => entry.Mood).FirstOrDefault()))
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<JournalVocabSuggestionItem>> ListVocabSuggestionsAsync(
+        Guid userId,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        return await (
+            from word in _dbContext.Words
+            join page in _dbContext.Pages on word.PageId equals page.Id
+            join board in _dbContext.Boards on page.BoardId equals board.Id
+            where board.UserId == userId
+                && board.DeletedAt == null
+                && page.DeletedAt == null
+                && word.DeletedAt == null
+            orderby EF.Functions.Random()
+            select new JournalVocabSuggestionItem(
+                word.Id,
+                word.Word,
+                word.Meaning,
+                word.Type.ToString())
+        )
+        .Take(count)
+        .AsNoTracking()
+        .ToListAsync(cancellationToken);
     }
 
     public Task<JournalEntry?> GetAsync(Guid userId, Guid journalId, CancellationToken cancellationToken = default)
@@ -88,7 +134,6 @@ public sealed class EfJournalRepository : IJournalRepository
     public async Task AddAsync(JournalEntry entry, CancellationToken cancellationToken = default)
     {
         await _dbContext.JournalEntries.AddAsync(entry, cancellationToken);
-
     }
 
     public Task UpdateAsync(JournalEntry entry, CancellationToken cancellationToken = default)
@@ -149,5 +194,9 @@ public sealed class EfJournalRepository : IJournalRepository
         await _dbContext.JournalEntryAssets.AddRangeAsync(additions, cancellationToken);
     }
 
-
+    private static string EscapeLikePattern(string value) =>
+        value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
 }

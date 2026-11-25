@@ -27,7 +27,10 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('textbox').querySelector('ul > li')).toHaveTextContent('Journal entry')
     await userEvent.click(screen.getByRole('button', { name: 'Ordered list' }))
     expect(screen.getByRole('textbox').querySelector('ol > li')).toHaveTextContent('Journal entry')
-    for (const name of ['Link', 'Code', 'Code block', 'Blockquote', 'Task list', 'Table', 'Font size']) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ordered list' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Blockquote' }))
+    expect(screen.getByRole('textbox').querySelector('blockquote')).toHaveTextContent('Journal entry')
+    for (const name of ['Link', 'Code', 'Code block', 'Task list', 'Table', 'Font size']) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
   })
 
   it('retains durable image references and layout even when storage gives no source', () => {

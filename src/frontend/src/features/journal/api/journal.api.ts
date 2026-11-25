@@ -2,6 +2,14 @@ import { apiClient } from '@/shared/api/client'
 import type { ApiResponse } from '@/shared/api/contracts'
 import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
+export type JournalMoodId =
+  | 'peaceful'
+  | 'grateful'
+  | 'energized'
+  | 'reflective'
+  | 'tired'
+  | 'stressed'
+
 export type JournalEntry = {
   id: string
   title: string
@@ -9,6 +17,9 @@ export type JournalEntry = {
   date: string
   createdAt: string
   updatedAt: string
+  mood?: JournalMoodId | null
+  isStarred?: boolean
+  tags?: string[]
 }
 
 export type JournalEntrySummary = {
@@ -17,6 +28,10 @@ export type JournalEntrySummary = {
   date: string
   createdAt: string
   updatedAt: string
+  mood?: JournalMoodId | null
+  isStarred?: boolean
+  tags?: string[]
+  preview?: string
 }
 
 export type JournalHighlightRange = {
@@ -31,18 +46,32 @@ export type JournalSearchResult = JournalEntrySummary & {
 export type JournalCalendarDay = {
   date: string
   count: number
+  mood?: JournalMoodId | null
+}
+
+export type JournalVocabSuggestion = {
+  id: string
+  word: string
+  meaning: string
+  type: string
 }
 
 export type CreateJournalEntryInput = {
   title: string
   date: string
   content?: string | null
+  mood?: JournalMoodId | null
+  isStarred?: boolean
+  tags?: string[]
 }
 
 export type UpdateJournalEntryInput = {
   title?: string
   content?: string
   date?: string
+  mood?: JournalMoodId | '' | null
+  isStarred?: boolean
+  tags?: string[]
 }
 
 export async function listJournalEntries() {
@@ -60,6 +89,13 @@ export async function searchJournalEntries(query: string) {
 export async function getJournalCalendar(month: string) {
   const response = await apiClient.get<ApiResponse<JournalCalendarDay[]>>('/journal/calendar', {
     params: { month },
+  })
+  return response.data.data ?? []
+}
+
+export async function getJournalVocabSuggestions(count = 5) {
+  const response = await apiClient.get<ApiResponse<JournalVocabSuggestion[]>>('/journal/vocab-suggestions', {
+    params: { count },
   })
   return response.data.data ?? []
 }
