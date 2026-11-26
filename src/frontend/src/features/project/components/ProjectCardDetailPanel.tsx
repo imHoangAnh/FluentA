@@ -9,6 +9,7 @@ type ProjectCardDetailPanelProps = {
   editorKey: string
   form: ProjectCardForm
   pending: boolean
+  suspendEscape?: boolean
   onChange: (form: ProjectCardForm) => void
   onSubmit: () => void
   onDelete?: () => void
@@ -20,6 +21,7 @@ export function ProjectCardDetailPanel({
   editorKey,
   form,
   pending,
+  suspendEscape = false,
   onChange,
   onSubmit,
   onDelete,
@@ -34,15 +36,14 @@ export function ProjectCardDetailPanel({
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) onClose()
+      if (event.key === 'Escape' && !suspendEscape && !event.defaultPrevented) onClose()
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [onClose])
+  }, [onClose, suspendEscape])
 
   return (
     <aside className="project-detail-panel" aria-labelledby={headingId} aria-busy={pending}>
-
       <form
         className="project-detail-panel__form"
         onSubmit={(event) => {
@@ -52,6 +53,7 @@ export function ProjectCardDetailPanel({
       >
         <header className="project-detail-panel__header">
           <div>
+            <span>{mode === 'create' ? 'New card' : 'Project card'}</span>
             <h2 id={headingId} className="project-detail-panel-title">Card details</h2>
           </div>
           <button type="button" aria-label="Close card details" onClick={onClose} disabled={pending}>

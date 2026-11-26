@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Habit;
 using FluentA.Application.BoundedContexts.Habit.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,7 +30,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.ListAsync(CurrentUserId(), timeZoneId, month, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<HabitDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<HabitDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -41,7 +40,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.CreateAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<HabitDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<HabitDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -51,7 +50,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.UpdateAsync(CurrentUserId(), habitId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<HabitDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<HabitDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -61,7 +60,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.DeleteAsync(CurrentUserId(), habitId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = true }))
             : ToErrorResult(result);
     }
 
@@ -75,7 +74,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.ListEntriesAsync(CurrentUserId(), habitId, month, timeZoneId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<HabitEntryDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<HabitEntryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -85,7 +84,7 @@ public sealed class HabitsController : ApiControllerBase
     {
         var result = await _habits.ToggleEntryAsync(CurrentUserId(), habitId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<HabitEntryToggleDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<HabitEntryToggleDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

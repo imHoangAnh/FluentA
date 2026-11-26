@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using FluentA.Application.BoundedContexts.Pronunciation;
 using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
 using FluentA.Infrastructure.ExternalServices.Pronunciation;
@@ -203,6 +204,99 @@ public sealed class PronunciationServiceTests
             () => provider.AssessAsync("go", "en-US", CreatePcmWav(500)));
 
         Assert.Equal(expectedReason, exception.Reason);
+    }
+
+    [Theory]
+    [InlineData("countryside", "countryside", 3, 88)]
+    [InlineData("phrase", "Today was a beautiful day.", 8, 98)]
+    public async Task AzureProvider_MapsSuppliedSyllablesAndSiblingPhonemesWithoutChangingCorrectness(
+        string fixture, string reference, int syllableCount, double accuracy)
+    {
+        var handler = new RecordingHandler(await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pronunciation", $"{fixture}.json")));
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler), EnabledOptions(), NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+        var service = new PronunciationService(
+            new StubWordRepository(new PronunciationTarget(reference, "en")), provider, EnabledOptions());
+
+        var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
+
+        Assert.True(result.IsSuccess);
+        var assessment = result.Value!;
+        Assert.True(assessment.Correct);
+        Assert.Equal(accuracy, assessment.AccuracyScore);
+        Assert.Equal("syllable", assessment.FeedbackMode);
+        Assert.Equal(syllableCount, assessment.Words.Sum(word => word.Syllables!.Count));
+        Assert.All(assessment.Words, word => Assert.Equal(
+            word.Units.Select(unit => (unit.Text, unit.AccuracyScore)),
+            word.Syllables!.SelectMany(syllable => syllable.Phonemes).Select(unit => (unit.Text, unit.AccuracyScore))));
+        if (fixture == "phrase")
+        {
+            var last = assessment.Words[^1].Syllables![0];
+            Assert.Equal("deɪ", last.Text);
+            Assert.Equal(55, last.AccuracyScore);
+            Assert.Equal(new double?[] { 65, 53 }, last.Phonemes.Select(phoneme => phoneme.AccuracyScore));
+            Assert.Equal(90, assessment.Words[0].Syllables![1].AccuracyScore);
+        }
+        else
+        {
+            Assert.Equal(new[] { "kʌn", "tɹi", "saɪd" }, assessment.Words[0].Syllables!.Select(syllable => syllable.Text));
+        }
+
+        var saved = JsonSerializer.Deserialize<PronunciationAssessmentDto>(JsonSerializer.Serialize(assessment))!;
+        Assert.Equal(assessment.Words[^1].Syllables![0].AccuracyScore, saved.Words[^1].Syllables![0].AccuracyScore);
+    }
+
+    [Fact]
+    public async Task AzureProvider_UsesExclusiveSyllableEndAndSupportsNestedPhonemes()
+    {
+        var handler = new RecordingHandler("""
+            {"RecognitionStatus":"Success","NBest":[{"AccuracyScore":90,"Words":[
+              {"Word":"test","AccuracyScore":90,"Syllables":[
+                {"Syllable":"tɛ","AccuracyScore":80,"Offset":10,"Duration":10},
+                {"Syllable":"st","AccuracyScore":60,"Offset":20,"Duration":10}
+              ],"Phonemes":[{"Phoneme":"t","AccuracyScore":80,"Offset":10,"Duration":10},{"Phoneme":"s","AccuracyScore":60,"Offset":20,"Duration":10}]},
+              {"Word":"go","PronunciationAssessment":{"AccuracyScore":90},"Syllables":[
+                {"Syllable":"ɡoʊ","PronunciationAssessment":{"AccuracyScore":90},"Phonemes":[{"Phoneme":"ɡ","PronunciationAssessment":{"AccuracyScore":90}}]}
+              ]}
+            ]}]}
+            """);
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler), EnabledOptions(), NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+        var result = await provider.AssessAsync("test go", "en-US", CreatePcmWav(500));
+
+        Assert.Equal("t", Assert.Single(result.Words[0].Syllables![0].Phonemes).Text);
+        Assert.Equal("s", Assert.Single(result.Words[0].Syllables![1].Phonemes).Text);
+        Assert.Equal("ɡ", Assert.Single(result.Words[1].Syllables![0].Phonemes).Text);
+    }
+
+    [Theory]
+    [InlineData("\"bad\"", "10")]
+    [InlineData("90", "-1")]
+    public async Task AzureProvider_RetriesMalformedSyllableDetailsAndMapsUnavailable(string score, string offset)
+    {
+        var handler = new RecordingHandler($$"""
+            {"RecognitionStatus":"Success","NBest":[{"AccuracyScore":90,"Words":[{"Word":"go","AccuracyScore":90,"Syllables":[{"Syllable":"ɡoʊ","AccuracyScore":{{score}},"Offset":{{offset}},"Duration":10}]}]}]}
+            """);
+        var provider = new AzurePronunciationAssessmentProvider(
+            new HttpClient(handler), EnabledOptions(), NullLogger<AzurePronunciationAssessmentProvider>.Instance);
+        var service = new PronunciationService(
+            new StubWordRepository(new PronunciationTarget("go", "en")), provider, EnabledOptions());
+
+        var result = await service.AssessAsync(Guid.NewGuid(), Guid.NewGuid(), CreatePcmWav(500));
+
+        Assert.Equal(503, Assert.IsType<PronunciationError>(result.Error).StatusCode);
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
+    public void SavedAssessment_WithoutNewOptionalFieldsStillDeserializes()
+    {
+        var saved = JsonSerializer.Deserialize<PronunciationAssessmentDto>("""
+            {"Correct":false,"AccuracyScore":76,"CompletenessScore":100,"FeedbackMode":"phoneme","Words":[{"Text":"go","AccuracyScore":76,"Units":[{"Text":"ɡ","Correct":false}]}]}
+            """)!;
+        Assert.Null(saved.Words[0].Syllables);
+        Assert.Null(saved.Words[0].Units[0].AccuracyScore);
     }
 
     private static PronunciationAssessmentOptions EnabledOptions() =>

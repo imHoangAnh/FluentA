@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export type NotePageSummary = {
   id: string
@@ -43,41 +43,41 @@ export type UpdateNotePageInput = {
 }
 
 export async function listBoards() {
-  const response = await apiClient.get<ApiEnvelope<NoteBoardSummary[]>>('/notes/boards')
+  const response = await apiClient.get<ApiResponse<NoteBoardSummary[]>>('/notes/boards')
   return response.data.data ?? []
 }
 
 export async function createBoard(input: CreateNoteBoardInput) {
-  const response = await apiClient.post<ApiEnvelope<NoteBoardSummary>>('/notes/boards', input)
+  const response = await apiClient.post<ApiResponse<NoteBoardSummary>>('/notes/boards', input)
   return response.data.data!
 }
 
 export async function updateBoard(boardId: string, input: { name: string }) {
-  const response = await apiClient.patch<ApiEnvelope<NoteBoardSummary>>(`/notes/boards/${boardId}`, input)
+  const response = await apiClient.patch<ApiResponse<NoteBoardSummary>>(`/notes/boards/${boardId}`, input)
   return response.data.data!
 }
 
 export async function deleteBoard(boardId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/boards/${boardId}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/notes/boards/${boardId}`)
   return response.data.data!
 }
 
 export async function createPage(boardId: string, input: CreateNotePageInput) {
-  const response = await apiClient.post<ApiEnvelope<NotePage>>(`/notes/boards/${boardId}/pages`, input)
+  const response = await apiClient.post<ApiResponse<NotePage>>(`/notes/boards/${boardId}/pages`, input)
   return response.data.data!
 }
 
 export async function getPage(pageId: string) {
-  const response = await apiClient.get<ApiEnvelope<NotePage>>(`/notes/pages/${pageId}`)
+  const response = await apiClient.get<ApiResponse<NotePage>>(`/notes/pages/${pageId}`)
   return response.data.data!
 }
 
 export async function updatePage(pageId: string, input: UpdateNotePageInput) {
-  const response = await apiClient.patch<ApiEnvelope<NotePage>>(`/notes/pages/${pageId}`, input)
+  const response = await apiClient.patch<ApiResponse<NotePage>>(`/notes/pages/${pageId}`, input)
   return response.data.data!
 }
 
 export async function deletePage(pageId: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/notes/pages/${pageId}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/notes/pages/${pageId}`)
   return response.data.data!
 }

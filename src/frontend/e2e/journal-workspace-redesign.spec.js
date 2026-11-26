@@ -39,10 +39,10 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
   const titleInput = editorHeader.getByLabel('Journal title');
   const dateDisplay = editorHeader.getByTestId('journal-date-display');
   const actions = editorHeader.getByTestId('journal-editor-actions');
-  const saveButton = actions.getByTestId('save-journal-button');
-  const deleteButton = actions.getByRole('button', { name: `Delete journal ${title}` });
+  await expect(actions.getByTestId('save-journal-button')).toHaveCount(0);
+  await expect(actions.getByRole('button', { name: `Delete journal ${title}` })).toBeVisible();
   const editorBody = page.getByTestId('journal-editor-body');
-  const toolbar = editorHeader.getByTestId('journal-toolbar-host').getByRole('toolbar', { name: 'Journal formatting tools' });
+  const toolbar = page.getByTestId('journal-toolbar-host').getByRole('toolbar', { name: 'Journal formatting tools' });
   const writingSurface = editorBody.getByLabel('Journal rich text editor');
 
   await expect(titleInput).toHaveValue(title);
@@ -80,7 +80,9 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
   ]) {
     await page.setViewportSize(viewport);
     await expect(search).toBeVisible();
+    await page.getByLabel('Choose journal date', { exact: true }).click();
     await expect(page.getByLabel('Journal date calendar')).toBeVisible();
+    await page.getByLabel('Choose journal date', { exact: true }).click();
     await expect(entryButton).toBeVisible();
     await expect(editorHeader).toBeVisible();
     await expect(toolbar).toBeVisible();
@@ -115,8 +117,8 @@ test('Journal uses the approved full-width hierarchy without responsive overflow
     expect(geometry.hasVerticalOverflow).toBeFalsy();
     expect(Math.abs(geometry.mainWidth - geometry.journalWidth)).toBeLessThanOrEqual(40);
     if (viewport.width >= 1024) {
-      expect(geometry.editorWidth / geometry.railWidth).toBeGreaterThan(4.8);
-      expect(geometry.editorWidth / geometry.railWidth).toBeLessThan(5.2);
+      expect(geometry.railWidth).toBe(viewport.width > 1200 ? 288 : 248);
+      expect(geometry.editorWidth).toBeGreaterThan(geometry.railWidth);
     }
     expect(geometry.entryListOverflowY).toBe('auto');
     expect(geometry.editorBodyOverflowY).toBe('auto');

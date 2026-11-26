@@ -11,7 +11,7 @@ test('notes route is protected for anonymous users', async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('Note Workspace release smoke covers CRUD, persistence, sanitization, and cleanup lifecycle', async ({ browser, page }) => {
+test('Note Workspace release smoke covers CRUD, autosave, sanitization, and retained deletion', async ({ browser, page }) => {
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error' && message.text() !== 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
@@ -50,15 +50,15 @@ test('Note Workspace release smoke covers CRUD, persistence, sanitization, and c
   await editor.click();
   await page.keyboard.type('Autosave body for Feature 25.');
   await expect(page.getByTestId('note-save-status')).toHaveText('Unsaved changes');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByTestId('note-save-status')).toHaveText('Saved');
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('note-save-status')).toHaveText('Saved', { timeout: 10_000 });
 
   const pageDetailResponse = await page.request.get(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, { headers });
   expect(pageDetailResponse.ok()).toBe(true);
   const persistedPage = (await pageDetailResponse.json()).data;
   expect(persistedPage.name).toBe('Release Proof Page Updated');
 
-  const verbosePastedHtml = `<p>${'<span style="color:red">word</span>'.repeat(5_000)}</p>`;
+  const verbosePastedHtml = `<p>${'<span style="position:absolute">word</span>'.repeat(5_000)}</p>`;
   expect(verbosePastedHtml.length).toBeGreaterThan(100_000);
   const verboseSaveResponse = await page.request.patch(`https://localhost:7000/api/v1/notes/pages/${notePageId}`, {
     headers,
@@ -75,11 +75,11 @@ test('Note Workspace release smoke covers CRUD, persistence, sanitization, and c
     headers,
     data: { content: 'a'.repeat(100_001) },
   });
-  expect(oversizedSanitizedResponse.status()).toBe(422);
+  expect(oversizedSanitizedResponse.status()).toBe(400);
   const oversizedSanitizedPayload = await oversizedSanitizedResponse.json();
-  expect(oversizedSanitizedPayload.error.details.content).toContain(
-    'Content must be at most 100000 characters after formatting cleanup.',
-  );
+  expect(oversizedSanitizedPayload.errors).toEqual(expect.arrayContaining([
+    expect.objectContaining({ field: 'content', message: 'Content must be at most 100000 characters after formatting cleanup.' }),
+  ]));
 
   await page.goto('/journal');
   await expect(page).toHaveURL('/journal');
@@ -92,7 +92,7 @@ test('Note Workspace release smoke covers CRUD, persistence, sanitization, and c
       content: '<p>Bad image</p><p><img src="data:image/png;base64,AAAA" alt="bad" /></p>',
     },
   });
-  expect(base64Response.status()).toBe(422);
+  expect(base64Response.status()).toBe(400);
 
   await editor.click();
   await page.keyboard.press('Control+A');

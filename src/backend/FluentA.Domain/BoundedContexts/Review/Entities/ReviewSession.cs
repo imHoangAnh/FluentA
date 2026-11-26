@@ -10,20 +10,19 @@ public sealed class ReviewSession : BaseEntity
 
     private ReviewSession(
         Guid userId,
-        Guid boardId,
-        string orderType,
+        string timeZoneId,
         DateOnly sessionDate,
         DateTime startedAt,
         ReviewSessionStatus status)
     {
-        if (userId == Guid.Empty || boardId == Guid.Empty)
+        if (userId == Guid.Empty)
         {
-            throw new ArgumentException("User id and board id are required.");
+            throw new ArgumentException("User id is required.", nameof(userId));
         }
 
-        if (string.IsNullOrWhiteSpace(orderType))
+        if (string.IsNullOrWhiteSpace(timeZoneId))
         {
-            throw new ArgumentException("Order type is required.", nameof(orderType));
+            throw new ArgumentException("Time zone id is required.", nameof(timeZoneId));
         }
 
         if (startedAt == default)
@@ -32,16 +31,14 @@ public sealed class ReviewSession : BaseEntity
         }
 
         UserId = userId;
-        BoardId = boardId;
-        OrderType = orderType;
+        TimeZoneId = timeZoneId;
         SessionDate = sessionDate;
         StartedAt = startedAt;
         Status = status;
     }
 
     public Guid UserId { get; private set; }
-    public Guid BoardId { get; private set; }
-    public string OrderType { get; private set; } = string.Empty;
+    public string TimeZoneId { get; private set; } = string.Empty;
     public DateOnly SessionDate { get; private set; }
     public DateTime StartedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
@@ -49,11 +46,10 @@ public sealed class ReviewSession : BaseEntity
 
     public static ReviewSession CreateActive(
         Guid userId,
-        Guid boardId,
-        string orderType,
+        string timeZoneId,
         DateOnly sessionDate,
         DateTime startedAt) =>
-        new(userId, boardId, orderType, sessionDate, startedAt, ReviewSessionStatus.Active);
+        new(userId, timeZoneId, sessionDate, startedAt, ReviewSessionStatus.Active);
 
     public void Complete(DateTime completedAtUtc)
     {
@@ -63,14 +59,18 @@ public sealed class ReviewSession : BaseEntity
         }
 
         Status = ReviewSessionStatus.Completed;
-        CompletedAt = completedAtUtc;
-        UpdatedAt = DateTime.UtcNow;
+        CompletedAt = DateTime.SpecifyKind(completedAtUtc, DateTimeKind.Utc);
+        UpdatedAt = CompletedAt.Value;
     }
 
-    public void Replace()
+    public void Abandon(DateTime abandonedAtUtc)
     {
-        Status = ReviewSessionStatus.Replaced;
-        CompletedAt = null;
-        UpdatedAt = DateTime.UtcNow;
+        if (abandonedAtUtc == default)
+        {
+            throw new ArgumentException("Abandoned at is required.", nameof(abandonedAtUtc));
+        }
+
+        Status = ReviewSessionStatus.Abandoned;
+        UpdatedAt = DateTime.SpecifyKind(abandonedAtUtc, DateTimeKind.Utc);
     }
 }

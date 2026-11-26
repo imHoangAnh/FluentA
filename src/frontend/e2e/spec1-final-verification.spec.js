@@ -6,24 +6,21 @@ async function registerAndLogin(page, prefix) {
   return identity;
 }
 
-test('final SPEC1 preferences and notification ownership', async ({ page }) => {
+test('final SPEC1 retains Habit tracking without reminders or an inbox', async ({ page }) => {
   const { token } = await registerAndLogin(page, 'spec1-final');
   const headers = { Cookie: `access_token=${token}` };
 
   await page.getByRole('link', { name: 'Habits', exact: true }).click();
   await page.getByRole('button', { name: 'Create habit' }).click();
   await page.getByTestId('habit-name-input').fill('No reminder habit');
-  await page.getByRole('checkbox', { name: 'Reminder', exact: true }).uncheck();
+  await expect(page.getByRole('checkbox', { name: 'Reminder', exact: true })).toHaveCount(0);
   await page.getByTestId('save-habit-button').click();
   await expect(page.getByRole('heading', { name: 'No reminder habit' })).toBeVisible();
   const habits = await (await page.request.get(`https://localhost:7000/api/v1/habits?timeZoneId=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`, { headers })).json();
-  expect(habits.data.find((habit) => habit.name === 'No reminder habit').reminderEnabled).toBe(false);
+  expect(habits.data.find((habit) => habit.name === 'No reminder habit')).not.toHaveProperty('reminderEnabled');
 
   await page.getByRole('link', { name: 'Go to overview' }).click();
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
-  const unread = await (await page.request.get('https://localhost:7000/api/v1/notifications/unread-count', { headers })).json();
-  expect(unread.data.count).toBe(0);
-  await page.goto('/notifications');
-  await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
-  await expect(page.getByText('Your inbox is up to date.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Notifications', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toHaveCount(0);
 });

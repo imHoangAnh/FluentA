@@ -9,14 +9,14 @@ const AlertDialogCancel = AlertDialogPrimitive.Cancel
 const AlertDialogAction = AlertDialogPrimitive.Action
 
 function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
-  return <AlertDialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[1px]', className)} {...props} />
+  return <AlertDialogPrimitive.Overlay className={cn('fixed inset-0 z-[80] bg-[#14201e]/40 backdrop-blur-[2px]', className)} {...props} />
 }
 
 function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
-      <AlertDialogPrimitive.Content className={cn('fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-6 shadow-xl outline-none', className)} {...props} />
+      <AlertDialogPrimitive.Content className={cn('fixed left-1/2 top-1/2 z-[80] grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-[var(--ds-shadow-lg)] outline-none', className)} {...props} />
     </AlertDialogPortal>
   )
 }

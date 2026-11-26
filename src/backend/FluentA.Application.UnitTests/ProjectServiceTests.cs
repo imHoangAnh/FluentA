@@ -62,13 +62,12 @@ public sealed class ProjectServiceTests
     public async Task MoveCardAsync_AllowsOnlyOwnedTargetColumns()
     {
         var repository = new FakeProjectRepository();
-        var notifier = new RecordingProjectSyncNotifier();
         var ownerId = Guid.NewGuid();
         var foreignId = Guid.NewGuid();
         var board = SeedBoard(repository, ownerId);
         var foreignBoard = SeedBoard(repository, foreignId);
         var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
-        var service = new ProjectService(repository, notifier);
+        var service = new ProjectService(repository);
 
         var foreignMove = await service.MoveCardAsync(ownerId, card.Id, new MoveProjectCardRequest(foreignBoard.Columns[0].Id, 0));
         var ownedMove = await service.MoveCardAsync(ownerId, card.Id, new MoveProjectCardRequest(board.Columns[1].Id, 3));
@@ -78,31 +77,7 @@ public sealed class ProjectServiceTests
         Assert.True(ownedMove.IsSuccess);
         Assert.Equal(board.Columns[1].Id, ownedMove.Value!.ColumnId);
         Assert.Equal(3, ownedMove.Value.SortOrder);
-        var move = Assert.Single(notifier.Moves);
-        Assert.Equal(ownerId, move.UserId);
-        Assert.Equal(board.Id, move.BoardId);
-        Assert.Equal(card.Id, move.CardId);
-        Assert.Equal(board.Columns[0].Id, move.FromColumnId);
-        Assert.Equal(board.Columns[1].Id, move.ToColumnId);
-        Assert.Equal(3, move.SortOrder);
-    }
-
-    [Fact]
-    public async Task MoveCardAsync_DoesNotNotifyRejectedMoves()
-    {
-        var repository = new FakeProjectRepository();
-        var notifier = new RecordingProjectSyncNotifier();
-        var ownerId = Guid.NewGuid();
-        var foreignId = Guid.NewGuid();
-        var board = SeedBoard(repository, ownerId);
-        var foreignBoard = SeedBoard(repository, foreignId);
-        var card = board.Columns[0].AddCard("Card", null, CardPriority.Medium, null, 0);
-        var service = new ProjectService(repository, notifier);
-
-        var result = await service.MoveCardAsync(ownerId, card.Id, new MoveProjectCardRequest(foreignBoard.Columns[0].Id, 0));
-
-        Assert.False(result.IsSuccess);
-        Assert.Empty(notifier.Moves);
+        Assert.Equal(board.Columns[1].Id, card.ColumnId);
     }
 
     [Fact]
@@ -139,7 +114,7 @@ public sealed class ProjectServiceTests
         Assert.False(result.IsSuccess);
         var error = Assert.IsType<ProjectError>(result.Error);
         Assert.Equal("VALIDATION_ERROR", error.Code);
-        Assert.Equal(422, error.StatusCode);
+        Assert.Equal(400, error.StatusCode);
     }
 
     private static ProjectBoard SeedBoard(FakeProjectRepository repository, Guid userId)
@@ -153,9 +128,14 @@ public sealed class ProjectServiceTests
     {
         public List<ProjectBoard> Boards { get; } = [];
 
-        public Task<IReadOnlyList<ProjectBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<ProjectBoardSummaryDto>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            IReadOnlyList<ProjectBoard> boards = Boards.Where(board => board.UserId == userId && board.DeletedAt is null).ToList();
+            IReadOnlyList<ProjectBoardSummaryDto> boards = Boards.Where(board => board.UserId == userId && board.DeletedAt is null)
+                .OrderBy(board => board.CreatedAt)
+                .Select(board => new ProjectBoardSummaryDto(board.Id, board.Name,
+                    board.Columns.Count(column => column.DeletedAt is null),
+                    board.Columns.Where(column => column.DeletedAt is null).SelectMany(column => column.Cards).Count(card => card.DeletedAt is null),
+                    board.CreatedAt, board.UpdatedAt)).ToList();
             return Task.FromResult(boards);
         }
 
@@ -192,15 +172,6 @@ public sealed class ProjectServiceTests
                 .FirstOrDefault(column => column.Id == columnId && column.DeletedAt is null);
             return Task.FromResult(column);
         }
-
-        public Task<ProjectBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.FirstOrDefault(board => board.UserId == userId && board.Id == boardId && board.DeletedAt == trashedAt));
-
-        public Task<ProjectColumn?> GetTrashedColumnAsync(Guid userId, Guid columnId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).FirstOrDefault(column => column.Id == columnId && column.DeletedAt == trashedAt));
-
-        public Task<ProjectCard?> GetTrashedCardAsync(Guid userId, Guid cardId, DateTime trashedAt, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Boards.Where(board => board.UserId == userId && board.DeletedAt is null).SelectMany(board => board.Columns).Where(column => column.DeletedAt is null).SelectMany(column => column.Cards).FirstOrDefault(card => card.Id == cardId && card.DeletedAt == trashedAt));
 
         public Task<int> NextColumnSortOrderAsync(Guid boardId, CancellationToken cancellationToken = default)
         {
@@ -247,34 +218,6 @@ public sealed class ProjectServiceTests
 
         public Task UpdateCardAsync(ProjectCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task RemoveBoardAsync(ProjectBoard board, CancellationToken cancellationToken = default)
-        {
-            Boards.Remove(board);
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveColumnAsync(ProjectColumn column, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task RemoveCardAsync(ProjectCard card, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class RecordingProjectSyncNotifier : IProjectSyncNotifier
-    {
-        public List<MoveRecord> Moves { get; } = [];
-
-        public Task CardMovedAsync(
-            Guid userId,
-            Guid boardId,
-            Guid cardId,
-            Guid fromColumnId,
-            Guid toColumnId,
-            int sortOrder,
-            CancellationToken cancellationToken = default)
-        {
-            Moves.Add(new MoveRecord(userId, boardId, cardId, fromColumnId, toColumnId, sortOrder));
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed record MoveRecord(Guid UserId, Guid BoardId, Guid CardId, Guid FromColumnId, Guid ToColumnId, int SortOrder);
 }

@@ -10,9 +10,9 @@ const user = {
 const publicRoutes = [
   ['/login', 'Welcome back'],
   ['/register', 'Create your account'],
-  ['/verify-email', 'Verify your email'],
+  ['/verify-email', 'Welcome back'],
   ['/forgot-password', 'Reset your password'],
-  ['/reset-password', 'Choose a new password'],
+  ['/reset-password', 'Create a new password'],
 ]
 
 const protectedRoutes = [
@@ -20,20 +20,13 @@ const protectedRoutes = [
   ['/vocabulary', 'Vocabulary', 'Vocabulary'],
   ['/todo', 'Todo', 'Todo'],
   ['/countdowns', 'Countdowns', 'Countdowns'],
-  ['/flashcards', 'Flashcards', 'Flashcard'],
   ['/practice', 'Practice', 'Practice'],
   ['/habits', 'Habits', 'Habits'],
   ['/journal', 'Journal', 'Journal'],
   ['/notes', 'Notes', 'Notes'],
   ['/project', 'Project', 'Project'],
-  ['/pomodoro', 'Pomodoro', 'Pomodoro'],
-  ['/notifications', 'Notifications', null],
-  ['/settings', 'Settings', 'Settings'],
   ['/profile', 'Profile', null],
-  ['/settings/practice', 'Settings', 'Settings'],
-  ['/settings/level5', 'Settings', 'Settings'],
   ['/review', 'Review', 'Review'],
-  ['/flashcards/pages/route-proof', 'Flashcard viewer', 'Flashcard'],
   ['/practice/route-proof', 'Practice', 'Practice'],
 ]
 
@@ -48,24 +41,13 @@ async function mockReleaseApis(page, authState) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: user }) })
       return
     }
-    if (path === '/api/v1/settings') {
+    if (path === '/api/v1/profile') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: {
-            profile: { ...user, bio: '' },
-            practiceSettings: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] },
-          },
+          data: { ...user, bio: '' },
         }),
-      })
-      return
-    }
-    if (path === '/api/v1/practice/settings') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] } }),
       })
       return
     }
@@ -80,13 +62,13 @@ for (const viewport of [
   test(`E27 ${viewport.name} public and protected route manifest`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    const authState = { enabled: true }
+    const authState = { enabled: false }
     await mockReleaseApis(page, authState)
 
     for (const [path, heading] of publicRoutes) {
       await page.goto(path)
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
-      await expect(page.locator('main.ds-root')).toBeVisible()
+      await expect(page.locator('main')).toBeVisible()
       await expect(page.getByLabel('Primary navigation')).toHaveCount(0)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     }
@@ -103,12 +85,13 @@ for (const viewport of [
     await page.screenshot({ path: `test-results/e27-new-password-${viewport.name}.png`, fullPage: true })
 
     authState.enabled = false
-    await page.goto('/practice/route-proof?order=shuffle')
-    await expect(page).toHaveURL(/\/login$/)
+    await page.goto('/practice/route-proof')
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible()
     authState.enabled = true
     // Re-enter the protected shell after the anonymous-route assertion so the
     // auth store rehydrates from the now-enabled `/auth/me` fixture.
+    await page.evaluate(() => localStorage.removeItem('fluenta.auth.logout-epoch'))
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 
@@ -116,27 +99,29 @@ for (const viewport of [
       await page.goto(path)
       await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible()
       await expect(page.getByLabel('Primary navigation')).toBeVisible()
-      if (activeNavigation) {
+      if (activeNavigation === 'Review') {
+        await expect(page.getByLabel('Primary navigation').getByRole('button', { name: 'Review' })).toBeVisible()
+      } else if (activeNavigation) {
         await expect(page.getByLabel('Primary navigation').getByRole('link', { name: activeNavigation, exact: true })).toHaveAttribute('aria-current', 'page')
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     }
 
-    await page.goto('/settings/review')
-    await expect(page).toHaveURL(/\/settings\/practice$/)
-
-    await page.goto('/practice?deck=route-proof&order=shuffle')
-    await expect(page).toHaveURL(/\/practice\?deck=route-proof&order=shuffle$/)
+    await page.goto('/practice')
+    await expect(page).toHaveURL('/practice')
 
     await page.goto('/not-a-real-route')
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
 
-    await page.goto('/settings/profile')
+    await page.goto('/settings')
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.goto('/settings/review')
     await expect(page).toHaveURL(/\/$/)
 
     await page.goto('/pomodoro')
-    await expect(page.getByRole('heading', { name: 'Pomodoro', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
     await page.locator('body').click({ position: { x: 2, y: 2 } })
     await page.keyboard.press('Tab')
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true)
@@ -145,7 +130,7 @@ for (const viewport of [
       return candidate ? getComputedStyle(candidate).transitionDuration : ''
     })
     expect(reducedDuration).toMatch(/1e-05s|0\.00001s|0\.01ms|0s/)
-    await page.screenshot({ path: `test-results/e27-pomodoro-${viewport.name}.png`, fullPage: true })
+    await page.screenshot({ path: `test-results/e27-overview-${viewport.name}.png`, fullPage: true })
 
     await page.goto('/profile')
     await page.screenshot({ path: `test-results/e27-profile-${viewport.name}.png`, fullPage: true })

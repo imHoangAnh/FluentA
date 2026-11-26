@@ -7,22 +7,15 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# Local env / secrets
+# env
 .env
 .env.*
 !.env.example
 !src/frontend/.env.example
 *.local
 
-# Harness local state
-
-docs/
-.agents/
-.harness-backup/
-.harness-core/
-AGENTS.md
-
 # Logs / temp runtime files
+.local-docker/
 logs/
 *.log
 *.out
@@ -34,7 +27,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node / frontend build cache
+# Node/frontend build 
 node_modules/
 dist/
 dist-ssr/
@@ -43,7 +36,7 @@ coverage/
 test-results/
 docs/decisions
 
-# .NET build output
+# .NET build 
 bin/
 !deploy/production/bin/
 !deploy/production/bin/*.sh
@@ -51,5 +44,10 @@ obj/
 TestResults/
 *.user
 
-# Rust / generic build output
-target/
+# Harness
+.agents/
+.harness-core/
+design-system/
+docs/
+scripts/
+AGENTS.md

@@ -1,137 +1,66 @@
-import { expect, test } from '@playwright/test';
-import { loginSeededUser } from './support/auth-fixture.js';
+import { expect, test } from '@playwright/test'
+import { loginSeededUser } from './support/auth-fixture.js'
 
-async function registerAndLogin(page, prefix) {
-  const identity = await loginSeededUser(page, { prefix: prefix ?? 'practice-workflow' });
-  return identity;
-}
-
-async function createBoardWithWords(page, headers, boardName, pageName, words) {
-  const board = (await (await page.request.post('https://localhost:7000/api/v1/boards', {
+async function createPracticeDeck(page, headers) {
+  const boardResponse = await page.request.post('https://localhost:7000/api/v1/vocabs/boards', {
     headers,
-    data: { name: boardName, language: 'en' },
-  })).json()).data;
-  const vocabPage = (await (await page.request.post(`https://localhost:7000/api/v1/boards/${board.id}/pages`, {
+    data: { name: 'Practice Workflow Board', language: 'en' },
+  })
+  expect(boardResponse.status()).toBe(201)
+  const board = (await boardResponse.json()).data
+  const pageResponse = await page.request.post(`https://localhost:7000/api/v1/vocabs/boards/${board.id}/pages`, {
     headers,
-    data: { name: pageName },
-  })).json()).data;
-
-  for (const word of words) {
-    await page.request.post(`https://localhost:7000/api/v1/boards/${board.id}/pages/${vocabPage.id}/words`, {
+    data: { name: 'Practice Workflow Deck' },
+  })
+  expect(pageResponse.status()).toBe(201)
+  const vocabPage = (await pageResponse.json()).data
+  const words = [
+    ['mitigate', 'make less severe'],
+    ['nuance', 'a subtle difference'],
+    ['resilient', 'able to recover quickly'],
+    ['precise', 'marked by exactness'],
+  ]
+  for (const [word, meaning] of words) {
+    const response = await page.request.post(`https://localhost:7000/api/v1/vocabs/pages/${vocabPage.id}/words`, {
       headers,
-      data: {
-        word,
-        meaningVn: `${word} vn`,
-        ipaPronunciation: `/${word}/`,
-        definition: `${word} definition`,
-        class: 'other',
-        example: `${word} example.`,
-      },
-    });
+      data: { word, meaning, ipaPronunciation: `/${word}/`, type: 'other', context: `${word} context`, example: `${word} example.` },
+    })
+    expect(response.status()).toBe(201)
   }
-
-  return { board, vocabPage };
+  return vocabPage
 }
 
-async function listBoards(page, headers) {
-  return (await (await page.request.get('https://localhost:7000/api/v1/flashcards/pages', { headers })).json()).data;
-}
-
-function findPageBoard(boards, boardName) {
-  return boards.find((board) => board.boardName === boardName);
-}
-
-function reviewSnapshot(pageDeck) {
-  return [...pageDeck.words]
-    .map((card) => ({
-      word: card.word,
-      reviewLevel: card.reviewLevel,
-      lapseCount: card.lapseCount,
-      nextReviewDate: card.nextReviewDate,
-    }))
-    .sort((left, right) => left.word.localeCompare(right.word));
-}
-
-async function completeMeaningToWordPractice(page) {
-  await page.getByRole('button', { name: 'Start practice' }).click();
-
-  await expect(page.getByText('What word matches this meaning?')).toBeVisible();
-  await page.getByTestId('practice-answer-input').fill('wrong');
-  await page.getByRole('button', { name: 'Submit', exact: true }).click();
-  await expect(page.getByText(/Wrong/).first()).toBeVisible();
-  await page.getByTestId('practice-answer-input').fill('mitigate');
-  await page.getByRole('button', { name: 'Submit', exact: true }).click();
-  await expect(page.getByTestId('practice-answer-reveal')).toContainText('mitigate');
-  await page.getByTestId('practice-next-card').click();
-
-  await expect(page.getByText('What word matches this meaning?')).toBeVisible();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expect(page.getByText(/Wrong/).first()).toBeVisible();
-
-}
-
-test('practice completion keeps finish separate from per-word add-to-review', async ({ page }) => {
+test('Practice follows Dictation, Word to meaning, pronunciation, then level recap', async ({ page }) => {
   await page.addInitScript(() => {
-    window.speechSynthesis.speak = () => undefined;
-    window.speechSynthesis.cancel = () => undefined;
-  });
+    window.speechSynthesis.speak = () => undefined
+    window.speechSynthesis.cancel = () => undefined
+  })
 
-  const { headers } = await registerAndLogin(page, 'practice-workflow');
-  await createBoardWithWords(page, headers, 'Practice Workflow Board', 'Practice Workflow Page', ['mitigate', 'nuance']);
+  const { headers } = await loginSeededUser(page, { prefix: 'practice-workflow' })
+  const vocabPage = await createPracticeDeck(page, headers)
 
-  const initialBoards = await listBoards(page, headers);
-  const pageBoard = findPageBoard(initialBoards, 'Practice Workflow Board');
-  const pageDeck = pageBoard.pages.find((item) => item.pageName === 'Practice Workflow Page');
-  const initialSchedule = reviewSnapshot(pageDeck);
-  expect(initialSchedule).toEqual([
-    expect.objectContaining({ word: 'mitigate', reviewLevel: null, lapseCount: 0, nextReviewDate: null }),
-    expect.objectContaining({ word: 'nuance', reviewLevel: null, lapseCount: 0, nextReviewDate: null }),
-  ]);
+  await page.getByRole('link', { name: 'Practice', exact: true }).click()
+  const deck = page.getByTestId(`practice-deck-${vocabPage.id}`)
+  await expect(deck).toHaveAccessibleName('Practice Practice Workflow Deck, 4 words')
+  await deck.click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
 
-  const practiceSettingsResponse = await page.request.put('https://localhost:7000/api/v1/practice/settings', {
-    headers,
-    data: { modeSequence: ['meaningToWord'] },
-  });
-  expect(practiceSettingsResponse.status()).toBe(200);
+  await expect(page).toHaveURL(/\/practice\/[0-9a-f-]+$/i)
+  await expect(page.getByTestId('active-practice-card')).toHaveClass(/review-card--dictation/)
+  await page.getByTestId('practice-answer-input').fill('mitigate')
+  await page.getByRole('button', { name: 'Submit answer', exact: true }).click()
 
-  await page.getByRole('link', { name: 'Practice', exact: true }).click();
-  const pageCard = page.getByTestId(`flashcard-page-${pageDeck.pageId}`);
-  await expect(pageCard).toHaveAccessibleName('Practice Practice Workflow Page, 2 words');
+  await expect(page.getByTestId('active-practice-card')).toHaveClass(/review-card--wordToMeaning/)
+  await expect(page.getByText('Choose the meaning that matches this word')).toBeVisible()
+  await page.getByRole('button', { name: /make less severe/ }).click()
 
-  await pageCard.click();
-  await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible();
-  await expect(page.getByText('Meaning → Word')).toBeVisible();
+  await expect(page.getByTestId('active-practice-card')).toHaveClass(/review-card--pronunciation/)
+  await page.getByRole('button', { name: 'Skip', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
-  await page.getByRole('button', { name: 'Start practice' }).click();
-  await expect(page.getByText('What word matches this meaning?')).toBeVisible();
-  await page.goto('/practice');
-
-  const afterAbandonBoards = await listBoards(page, headers);
-  const afterAbandonPage = findPageBoard(afterAbandonBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
-  expect(reviewSnapshot(afterAbandonPage)).toEqual(initialSchedule);
-
-  await pageCard.click();
-  await completeMeaningToWordPractice(page);
-  return;
-
-  const finishSummaryResponsePromise = page.waitForResponse((response) =>
-    response.url().endsWith('/api/v1/practice/sessions') && response.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Finish' }).click();
-  const finishSummaryPayload = (await (await finishSummaryResponsePromise).json()).data;
-  expect(finishSummaryPayload.totalCards).toBe(2);
-  expect(finishSummaryPayload.correctCards).toBe(1);
-  expect(finishSummaryPayload.wrongCards).toBe(1);
-  await page.getByRole('link', { name: 'Done' }).click();
-
-  const afterFinishBoards = await listBoards(page, headers);
-  const afterFinishPage = findPageBoard(afterFinishBoards, 'Practice Workflow Board').pages.find((item) => item.pageId === pageDeck.pageId);
-  expect(reviewSnapshot(afterFinishPage)).toEqual(initialSchedule);
-
-  await pageCard.click();
-  await page.getByRole('button', { name: 'Start practice' }).click();
-  await page.getByTestId('practice-answer-input').fill('mitigate');
-  await page.getByRole('button', { name: 'Submit answer' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Add to Review' }).click();
-  await expect(page.getByRole('button', { name: 'Added' })).toBeDisabled();
-});
+  await expect(page.getByTestId('practice-answer-reveal')).toBeVisible()
+  await expect(page.getByText('Already in review')).toHaveCount(0)
+  await page.getByTestId('practice-review-level-0').click()
+  await expect(page.getByTestId('active-practice-card')).toHaveClass(/review-card--dictation/)
+})

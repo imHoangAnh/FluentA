@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Todo;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +27,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.GetAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -51,7 +50,7 @@ public sealed class TodosController : ApiControllerBase
         }
 
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<TodoItemDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<TodoItemDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -61,7 +60,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.CreateAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -71,7 +70,7 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.UpdateAsync(CurrentUserId(), todoId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -81,17 +80,17 @@ public sealed class TodosController : ApiControllerBase
     {
         var result = await _todos.DuplicateAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<TodoItemDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<TodoItemDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
-    /// <summary>Moves an owned todo item and its already-created future occurrences to Trash.</summary>
+    /// <summary>Hides an owned todo and its already-created future occurrences.</summary>
     [HttpDelete("{todoId:guid}")]
     public async Task<IActionResult> Delete(Guid todoId, CancellationToken cancellationToken)
     {
         var result = await _todos.DeleteAsync(CurrentUserId(), todoId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = true }))
             : ToErrorResult(result);
     }
 

@@ -17,10 +17,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         string? note,
         bool isImportant,
         TodoRepeatPattern? repeatPattern,
-        TimeOnly? reminderTime,
-        string? reminderTimeZoneId,
-        DateTime? reminderScheduledAtUtc,
-        DateTime? reminderSentAtUtc,
         int sortOrder,
         Guid? generatedFromTodoId,
         bool isGeneratedOccurrencePristine)
@@ -36,10 +32,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Note = CleanNote(note);
         IsImportant = isImportant;
         RepeatPattern = repeatPattern;
-        ReminderTime = reminderTime;
-        ReminderTimeZoneId = reminderTimeZoneId;
-        ReminderScheduledAtUtc = reminderScheduledAtUtc;
-        ReminderSentAtUtc = reminderSentAtUtc;
         SortOrder = ValidateSortOrder(sortOrder);
         GeneratedFromTodoId = generatedFromTodoId;
         IsGeneratedOccurrencePristine = isGeneratedOccurrencePristine;
@@ -53,10 +45,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
     public bool IsCompleted { get; private set; }
     public bool IsImportant { get; private set; }
     public TodoRepeatPattern? RepeatPattern { get; private set; }
-    public TimeOnly? ReminderTime { get; private set; }
-    public string? ReminderTimeZoneId { get; private set; }
-    public DateTime? ReminderScheduledAtUtc { get; private set; }
-    public DateTime? ReminderSentAtUtc { get; private set; }
     public Guid? GeneratedFromTodoId { get; private set; }
     public bool IsGeneratedOccurrencePristine { get; private set; }
     public DateTime? CompletedAt { get; private set; }
@@ -67,9 +55,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         string? note,
         bool isImportant = false,
         TodoRepeatPattern? repeatPattern = null,
-        TimeOnly? reminderTime = null,
-        string? reminderTimeZoneId = null,
-        DateTime? reminderScheduledAtUtc = null,
         int sortOrder = 0)
     {
         return new TodoItem(
@@ -79,10 +64,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
             note,
             isImportant,
             repeatPattern,
-            reminderTime,
-            reminderTimeZoneId,
-            reminderScheduledAtUtc,
-            null,
             sortOrder,
             null,
             false);
@@ -103,10 +84,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
             source.Note,
             source.IsImportant,
             source.RepeatPattern,
-            null,
-            null,
-            null,
-            null,
             sortOrder,
             source.Id,
             true);
@@ -158,62 +135,6 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
         Touch();
     }
 
-    public void SetReminder(TimeOnly time, string timeZoneId, DateTime scheduledAtUtc)
-    {
-        var cleanedTimeZoneId = timeZoneId.Trim();
-        if (cleanedTimeZoneId.Length is < 1 or > 100)
-        {
-            throw new ArgumentException("Reminder timezone id must be between 1 and 100 characters.", nameof(timeZoneId));
-        }
-
-        if (scheduledAtUtc.Kind != DateTimeKind.Utc)
-        {
-            throw new ArgumentException("Reminder scheduled instant must be UTC.", nameof(scheduledAtUtc));
-        }
-
-        ReminderTime = time;
-        ReminderTimeZoneId = cleanedTimeZoneId;
-        ReminderScheduledAtUtc = scheduledAtUtc;
-        ReminderSentAtUtc = null;
-        Touch();
-    }
-
-    public void ClearReminder()
-    {
-        if (ReminderTime is null
-            && ReminderTimeZoneId is null
-            && ReminderScheduledAtUtc is null
-            && ReminderSentAtUtc is null)
-        {
-            return;
-        }
-
-        ReminderTime = null;
-        ReminderTimeZoneId = null;
-        ReminderScheduledAtUtc = null;
-        ReminderSentAtUtc = null;
-        Touch();
-    }
-
-    public void CancelUnsentReminder()
-    {
-        if (ReminderScheduledAtUtc is not null && ReminderSentAtUtc is null)
-        {
-            ClearReminder();
-        }
-    }
-
-    public void MarkReminderSent(DateTime nowUtc)
-    {
-        if (ReminderScheduledAtUtc is null || ReminderSentAtUtc is not null)
-        {
-            return;
-        }
-
-        ReminderSentAtUtc = DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc);
-        Touch(ReminderSentAtUtc);
-    }
-
     public void MarkGeneratedOccurrenceEdited()
     {
         if (GeneratedFromTodoId is null || !IsGeneratedOccurrencePristine)
@@ -234,19 +155,13 @@ public sealed class TodoItem : BaseEntity, IAggregateRoot
 
     public void SoftDelete(DateTime? nowUtc = null)
     {
-        DeletedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
-        UpdatedAt = DeletedAt.Value;
-    }
-
-    public void RestoreFromTrash(DateTime? nowUtc = null)
-    {
-        if (DeletedAt is null)
+        if (DeletedAt.HasValue)
         {
             return;
         }
-
-        DeletedAt = null;
-        UpdatedAt = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
+        var now = DateTime.SpecifyKind(nowUtc ?? DateTime.UtcNow, DateTimeKind.Utc);
+        DeletedAt = now;
+        UpdatedAt = now;
     }
 
     private void Touch(DateTime? nowUtc = null)

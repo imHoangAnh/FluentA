@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers'
 import { todayInAppTimeZone } from '@/shared/lib/timezone'
@@ -32,10 +32,8 @@ function habit(overrides = {}) {
     icon: 'Book',
     frequency: 'Daily',
     customDays: [],
-    reminderEnabled: true,
     startDate: todayInput(),
     goalDays: 21,
-    reminderTime: '07:30',
     currentStreak: 2,
     longestStreak: 5,
     totalCheckIns: 4,
@@ -59,13 +57,11 @@ function renderPage() {
 
 describe('HabitPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     api.listHabits.mockResolvedValue([habit()])
     api.listHabitEntries.mockResolvedValue([])
     api.toggleHabitEntry.mockResolvedValue({ habitId: 'habit-1', date: todayInput(), isCompleted: true, totalCheckIns: 5, isGoalCompleted: false })
-    api.deleteHabit.mockResolvedValue({
-      id: 'trash-1', entityKind: 'Habit', entityId: 'habit-1', displayName: 'Read English', originalLocation: 'Habit tracker', trashedAt: '2026-07-28T00:00:00Z', purgeAfterAt: '2026-08-27T00:00:00Z',
-    })
+    api.deleteHabit.mockResolvedValue({ deleted: true })
   })
 
   it('renders selected-day rows and the four main detail statistics', async () => {
@@ -81,15 +77,24 @@ describe('HabitPage', () => {
     expect(screen.getByText(/First line/)).toHaveTextContent('First line Second line')
   })
 
-  it('adds Start Date, Goal Days, and custom reminder time to the existing form', async () => {
+  it('keeps Start Date and Goal Days without reminders and submits tracking fields', async () => {
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Create habit' }))
 
     expect(screen.getByRole('dialog', { name: 'Create Habit' })).toBeInTheDocument()
     expect(screen.getByTestId('habit-start-date-input')).toHaveValue(todayInput())
     expect(screen.getByTestId('habit-goal-days-select')).toHaveAttribute('data-value', 'Forever')
-    expect(screen.getByTestId('habit-reminder-time-input')).toHaveValue('20:00')
+    expect(screen.queryByTestId('habit-reminder-time-input')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Reminder' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Description')).toBeInTheDocument()
+    api.createHabit.mockResolvedValue(habit())
+    fireEvent.change(screen.getByTestId('habit-name-input'), { target: { value: 'Read daily' } })
+    fireEvent.click(screen.getByTestId('save-habit-button'))
+    await waitFor(() => expect(api.createHabit).toHaveBeenCalled())
+    const payload = api.createHabit.mock.calls[0][0]
+    expect(payload).toMatchObject({ name: 'Read daily', startDate: todayInput(), goalDays: null, frequency: 'Daily' })
+    expect(payload).not.toHaveProperty('reminderEnabled')
+    expect(payload).not.toHaveProperty('reminderTime')
   })
 
   it('allows choosing a different habit icon from the form dropdown', async () => {
@@ -107,11 +112,44 @@ describe('HabitPage', () => {
     expect(habitsRoutes.map((route) => route.path)).toEqual(['habits'])
   })
 
-  it('moves the selected Habit to Trash without confirmation', async () => {
+  it('cancels deletion without an API call, then hides a confirmed deleted Habit', async () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Delete Read English' }))
+    expect(api.deleteHabit).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    expect(api.deleteHabit).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Read English' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Read English' }))
+    api.listHabits.mockResolvedValue([])
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Habit' }))
     await waitFor(() => expect(api.deleteHabit).toHaveBeenCalled())
     expect(api.deleteHabit.mock.calls[0]?.[0]).toBe('habit-1')
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Read English' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the Habit and confirmation open after a failed delete, allowing retry', async () => {
+    api.deleteHabit.mockRejectedValueOnce(new Error('Storage unavailable'))
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Read English' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Habit' }))
+    await screen.findByText('Could not delete the habit. Please try again.')
+    expect(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Habit' })).toBeEnabled()
+    expect(screen.getByRole('heading', { name: 'Read English', hidden: true })).toBeInTheDocument()
+    api.listHabits.mockResolvedValue([])
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete Habit' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(api.deleteHabit).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes tracking locally after check-in without a realtime connection', async () => {
+    renderPage()
+    const checkButton = await screen.findByRole('button', { name: `Check Read English for selected date ${todayInput()}` })
+    api.listHabits.mockResolvedValue([habit({ totalCheckIns: 5, remainingGoalDays: 16, isCheckedToday: true })])
+    api.listHabitEntries.mockResolvedValue([{ habitId: 'habit-1', date: todayInput(), isCompleted: true }])
+    fireEvent.click(checkButton)
+    await waitFor(() => expect(screen.getByLabelText('Goal progress 5 of 21')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: `Uncheck Read English for selected date ${todayInput()}` })).toBeInTheDocument()
   })
 })

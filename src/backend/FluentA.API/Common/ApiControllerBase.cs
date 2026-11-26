@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentA.API.Contracts;
 using FluentA.Application.Common;
+using FluentA.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FluentA.API.Common;
@@ -12,7 +13,7 @@ public abstract class ApiControllerBase : ControllerBase
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         if (!Guid.TryParse(userId, out var id))
         {
-            throw new UnauthorizedAccessException("Missing authenticated user id.");
+            throw new UnauthorizedException("Missing authenticated user id.");
         }
 
         return id;
@@ -26,15 +27,15 @@ public static class ApiErrorMapper
 {
     public static IActionResult ToActionResult<T>(ControllerBase controller, OperationResult<T> result)
     {
-        if (result.Error is IApplicationError error)
+        if (result.Error is { } error)
         {
             return controller.StatusCode(
                 error.StatusCode,
-                ApiEnvelope<object>.Fail(new ApiErrorEnvelope(error.Code, error.Message, error.Details)));
+                ApiResponseFactory.Fail(error.Code, error.Message, error.Details, controller.HttpContext.TraceIdentifier));
         }
 
         return controller.StatusCode(
             500,
-            ApiEnvelope<object>.Fail(new ApiErrorEnvelope("INTERNAL_ERROR", "An unexpected error occurred.")));
+            ApiResponseFactory.Fail("INTERNAL_ERROR", "An unexpected error occurred.", traceId: controller.HttpContext.TraceIdentifier));
     }
 }

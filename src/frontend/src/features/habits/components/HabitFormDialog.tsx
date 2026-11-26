@@ -27,8 +27,6 @@ type FormState = {
   startDate: string
   goalMode: 'Forever' | 'Preset' | 'Custom'
   goalDays: string
-  reminderEnabled: boolean
-  reminderTime: string
 }
 
 function initialState(habit: Habit | undefined, today: string): FormState {
@@ -42,8 +40,6 @@ function initialState(habit: Habit | undefined, today: string): FormState {
     startDate: habit?.startDate ?? today,
     goalMode: !habit?.goalDays ? 'Forever' : isPreset ? 'Preset' : 'Custom',
     goalDays: habit?.goalDays?.toString() ?? '',
-    reminderEnabled: habit?.reminderEnabled ?? true,
-    reminderTime: habit?.reminderTime ?? '20:00',
   }
 }
 
@@ -82,7 +78,6 @@ export function HabitFormDialog({
     && startDateIsValid
     && goalIsValid
     && (form.frequency === 'Daily' || form.customDays.length > 0)
-    && /^([01]\d|2[0-3]):[0-5]\d$/.test(form.reminderTime)
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -93,10 +88,8 @@ export function HabitFormDialog({
       icon: form.icon,
       frequency: form.frequency,
       customDays: form.frequency === 'Custom' ? form.customDays : null,
-      reminderEnabled: form.reminderEnabled,
       startDate: form.startDate,
       goalDays: parsedGoal,
-      reminderTime: form.reminderTime,
       timeZoneId,
     })
   }
@@ -195,17 +188,6 @@ export function HabitFormDialog({
               Custom Goal Days
               <input type="number" min={1} step={1} data-testid="habit-custom-goal-input" value={form.goalDays} onChange={(event) => setForm((current) => ({ ...current, goalDays: event.target.value }))} />
               {!goalIsValid ? <small>A changed goal must be greater than the current {habit?.totalCheckIns ?? 0} check-ins.</small> : null}
-            </label>
-          ) : null}
-
-          <label className="habit-reminder-toggle">
-            <input type="checkbox" checked={form.reminderEnabled} onChange={(event) => setForm((current) => ({ ...current, reminderEnabled: event.target.checked }))} />
-            <span>Reminder</span>
-          </label>
-          {form.reminderEnabled ? (
-            <label>
-              Reminder Time
-              <input type="time" data-testid="habit-reminder-time-input" step={60} required value={form.reminderTime} onChange={(event) => setForm((current) => ({ ...current, reminderTime: event.target.value }))} />
             </label>
           ) : null}
 

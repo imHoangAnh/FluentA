@@ -185,38 +185,12 @@ public sealed class AzurePronunciationAssessmentProvider : IPronunciationAssessm
                 && errorElement.ValueKind == JsonValueKind.String
                 ? errorElement.GetString()
                 : null;
-            var units = new List<PronunciationUnitAssessment>();
-            if (wordElement.TryGetProperty("Syllables", out var syllables)
-                && syllables.ValueKind == JsonValueKind.Array)
+            if (!AzurePronunciationResponseParser.TryReadWordDetails(wordElement, out var units, out var syllables))
             {
-                foreach (var syllable in syllables.EnumerateArray())
-                {
-                    if (!syllable.TryGetProperty("Phonemes", out var phonemes)
-                        || phonemes.ValueKind != JsonValueKind.Array) continue;
-                    foreach (var phoneme in phonemes.EnumerateArray())
-                    {
-                        if (!AzurePronunciationResponseParser.TryReadUnit(phoneme, out var unit))
-                        {
-                            throw new InvalidAssessmentResponseException("a phoneme assessment was invalid.");
-                        }
-                        units.Add(unit);
-                    }
-                }
-            }
-            if (units.Count == 0 && wordElement.TryGetProperty("Phonemes", out var directPhonemes)
-                && directPhonemes.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var phoneme in directPhonemes.EnumerateArray())
-                {
-                    if (!AzurePronunciationResponseParser.TryReadUnit(phoneme, out var unit))
-                    {
-                        throw new InvalidAssessmentResponseException("a phoneme assessment was invalid.");
-                    }
-                    units.Add(unit);
-                }
+                throw new InvalidAssessmentResponseException("syllable or phoneme assessment details were invalid.");
             }
 
-            words.Add(new PronunciationWordAssessment(wordText.GetString()!, wordScore, errorType, units));
+            words.Add(new PronunciationWordAssessment(wordText.GetString()!, wordScore, errorType, units, syllables));
         }
 
         _logger.LogInformation(

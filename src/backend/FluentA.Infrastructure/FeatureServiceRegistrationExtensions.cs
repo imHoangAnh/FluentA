@@ -17,7 +17,6 @@ internal static class FeatureServiceRegistrationExtensions
         services.AddFluentAAuthServices(authSecurityOptions);
         services.AddFluentALearningServices(pronunciationOptions);
         services.AddFluentAProductivityServices();
-        services.AddFluentATrashServices();
         return services;
     }
 }

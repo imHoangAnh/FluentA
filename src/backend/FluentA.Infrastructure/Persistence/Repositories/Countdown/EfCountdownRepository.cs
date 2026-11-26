@@ -17,7 +17,6 @@ public sealed class EfCountdownRepository : ICountdownRepository
     public async Task<IReadOnlyList<CountdownEventEntity>> ListAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.CountdownEvents
-            .Include(countdownEvent => countdownEvent.Alerts)
             .Where(countdownEvent => countdownEvent.UserId == userId && countdownEvent.DeletedAt == null)
             .OrderBy(countdownEvent => countdownEvent.TargetDate)
             .ThenBy(countdownEvent => countdownEvent.CreatedAt)
@@ -27,7 +26,6 @@ public sealed class EfCountdownRepository : ICountdownRepository
     public Task<CountdownEventEntity?> GetAsync(Guid userId, Guid countdownId, CancellationToken cancellationToken = default)
     {
         return _dbContext.CountdownEvents
-            .Include(countdownEvent => countdownEvent.Alerts)
             .FirstOrDefaultAsync(
                 countdownEvent => countdownEvent.Id == countdownId
                     && countdownEvent.UserId == userId
@@ -35,40 +33,18 @@ public sealed class EfCountdownRepository : ICountdownRepository
                 cancellationToken);
     }
 
-    public Task<CountdownEventEntity?> GetTrashedAsync(Guid userId, Guid countdownId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.CountdownEvents
-            .Include(countdownEvent => countdownEvent.Alerts)
-            .FirstOrDefaultAsync(
-                countdownEvent => countdownEvent.Id == countdownId
-                    && countdownEvent.UserId == userId
-                    && countdownEvent.DeletedAt == trashedAt,
-                cancellationToken);
-    }
-
     public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
     {
         return _dbContext.CountdownEvents.AnyAsync(
-            countdownEvent => countdownEvent.CoverAssetId == coverAssetId && countdownEvent.DeletedAt == null,
+            countdownEvent => countdownEvent.CoverAssetId == coverAssetId,
             cancellationToken);
     }
 
     public async Task AddAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
     {
         await _dbContext.CountdownEvents.AddAsync(countdownEvent, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
-    {
-        _dbContext.CountdownEvents.Update(countdownEvent);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task RemoveAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
-    {
-        _dbContext.CountdownAlerts.RemoveRange(countdownEvent.Alerts);
-        _dbContext.CountdownEvents.Remove(countdownEvent);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+        => _dbContext.SaveChangesAsync(cancellationToken);
 }

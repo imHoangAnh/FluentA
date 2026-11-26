@@ -1,5 +1,6 @@
-import { BookOpenText, ChevronRight, FileText, FolderPlus, Layers3, Loader2, Plus, Save } from 'lucide-react'
-import { Suspense, lazy, useMemo, useRef, useState } from 'react'
+import { ConfirmDeletionDialog } from '@/shared/components/ConfirmDeletionDialog'
+import { BookOpenText, ChevronRight, FileText, FolderPlus, Layers3, Plus } from 'lucide-react'
+import { Suspense, lazy, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RenameEntityDialog } from '@/shared/components/RenameEntityDialog'
 import { Button } from '@/shared/components/ui/button'
@@ -7,12 +8,13 @@ import { Card } from '@/shared/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/shared/components/ui/context-menu'
 import { cn } from '@/shared/lib/utils'
 import { uploadAsset } from '@/features/assets'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 import { toast } from '@/shared/lib/toast'
-import { restoreTrashEntry } from '@/features/trash'
 import { CreateNoteDialog } from '../components/CreateNoteDialog'
 import * as noteApi from '../api/note.api'
 import { noteKeys } from '../api/note.queries'
+import { UnsavedChangesDialog } from '@/shared/components/UnsavedChangesDialog'
+import { RouteDraftGuard, useIsDataRouter, useUnsavedNavigation } from '@/shared/components/rich-text/useUnsavedNavigation'
 
 const JournalRichTextEditor = lazy(() =>
   import('@/shared/components/rich-text/RichTextEditor').then((module) => ({ default: module.RichTextEditor })),
@@ -42,8 +44,9 @@ function toPageSummary(page: noteApi.NotePage): noteApi.NotePageSummary {
 }
 
 function getNoteSaveErrorMessage(error: unknown) {
-  const response = (error as { response?: { data?: ApiEnvelope<never> } }).response
-  return response?.data?.error?.details?.content?.[0] ?? 'Could not save note page right now.'
+  const response = (error as { response?: { data?: ApiResponse<never> } }).response
+  return response?.data?.errors?.find((item) => item.field === 'content')?.message
+    ?? 'Could not save note page right now.'
 }
 
 type NoteEntityTarget =
@@ -63,9 +66,27 @@ export function NotesPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [editorError, setEditorError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<NoteEntityTarget | null>(null)
   const [renameTarget, setRenameTarget] = useState<NoteEntityTarget | null>(null)
   const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null)
   const savePromiseRef = useRef<Promise<boolean> | null>(null)
+  const revisionRef = useRef(0)
+  const sessionRef = useRef(0)
+  const [editorSession, setEditorSession] = useState(0)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const objectUrls = useRef<string[]>([])
+  useEffect(() => () => objectUrls.current.forEach(url => URL.revokeObjectURL(url)), [])
+  const navigation = useUnsavedNavigation(isDirty || uploadingImage)
+  const isDataRouter = useIsDataRouter()
+  function discardDraft() {
+    sessionRef.current++
+    setEditorSession(value => value + 1)
+    setIsDirty(false)
+    setDraftPageId(null)
+    setUploadingImage(false)
+    setSaveStatus('idle')
+    setEditorError(null)
+  }
   const railFocusRef = useRef<HTMLDivElement>(null)
   const createReturnFocusRef = useRef<HTMLElement | null>(null)
   const entityActionReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -166,7 +187,8 @@ export function NotesPage() {
   })
   const deleteBoard = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'board' }>) => noteApi.deleteBoard(target.boardId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
+      discardDraft()
       const current = queryClient.getQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards) ?? []
       const deletedBoard = current.find((board) => board.id === target.boardId)
       const remainingBoards = newestFirst(current.filter((board) => board.id !== target.boardId))
@@ -179,23 +201,15 @@ export function NotesPage() {
       setContent('')
       setIsDirty(false)
       requestAnimationFrame(() => railFocusRef.current?.focus())
-      toast.success('Board moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
-              .then(() => toast.success('Board restored.'))
-              .catch(() => toast.error('Could not restore the board.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      toast.success('Board deleted.')
       void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
   const deletePage = useMutation({
     mutationFn: (target: Extract<NoteEntityTarget, { kind: 'page' }>) => noteApi.deletePage(target.pageId),
-    onSuccess: (entry, target) => {
+    onSuccess: (_, target) => {
+      discardDraft()
       let nextPageId: string | null = null
       queryClient.setQueryData<noteApi.NoteBoardSummary[]>(noteKeys.boards, (current = []) => current.map((board) => {
         if (board.id !== target.boardId) return board
@@ -210,17 +224,8 @@ export function NotesPage() {
       setContent('')
       setIsDirty(false)
       requestAnimationFrame(() => railFocusRef.current?.focus())
-      toast.success('Page moved to Trash.', {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void restoreTrashEntry(entry.id)
-              .then(() => queryClient.invalidateQueries({ queryKey: noteKeys.boards }))
-              .then(() => toast.success('Page restored.'))
-              .catch(() => toast.error('Could not restore the page.'))
-          },
-        },
-      })
+      setDeleteTarget(null)
+      toast.success('Page deleted.')
       void queryClient.invalidateQueries({ queryKey: noteKeys.boards })
     },
   })
@@ -228,7 +233,6 @@ export function NotesPage() {
   const boardError = createBoard.isError ? 'Could not create board right now.' : null
   const pageError = editorError ?? (updatePage.isError ? 'Could not save note page right now.' : null)
   const isOpeningPage = pageQuery.isLoading
-  const isSaving = saveStatus === 'saving'
   // Server data is the clean draft. Local state becomes authoritative only after an edit,
   // which avoids a state-setting effect and prevents a refetch from overwriting a dirty draft.
   const hasServerDraft = Boolean(activePage && !isDirty && activePage.id !== draftPageId)
@@ -243,6 +247,8 @@ export function NotesPage() {
       return false
     }
 
+    const revision = revisionRef.current
+    const session = sessionRef.current
     setSaveStatus('saving')
     setEditorError(null)
     const promise = updatePage.mutateAsync({
@@ -262,15 +268,19 @@ export function NotesPage() {
             }
           : board),
       )
-      setDraftPageId(page.id)
-      setTitle(page.name)
-      setContent(page.content)
-      setIsDirty(false)
-      setSaveStatus('saved')
+      if (sessionRef.current === session) {
+        if (revisionRef.current === revision) {
+          setDraftPageId(page.id)
+          setIsDirty(false)
+          setSaveStatus('saved')
+        } else setSaveStatus('idle')
+      }
       return true
     }).catch((error: unknown) => {
-      setEditorError(getNoteSaveErrorMessage(error))
-      setSaveStatus('error')
+      if (sessionRef.current === session) {
+        setEditorError(getNoteSaveErrorMessage(error))
+        setSaveStatus(revisionRef.current === revision ? 'error' : 'idle')
+      }
       return false
     }).finally(() => {
       savePromiseRef.current = null
@@ -280,7 +290,15 @@ export function NotesPage() {
     return promise
   }
 
+  const saveOnTimer = useEffectEvent(() => { void persistDraft() })
+  useEffect(() => {
+    if (!isDirty || !activePage?.id || !draftTitle.trim() || updatePage.isPending || saveStatus === 'saving' || saveStatus === 'error' || uploadingImage || navigation.open) return
+    const timer = window.setTimeout(() => { saveOnTimer() }, 2_000)
+    return () => window.clearTimeout(timer)
+  }, [isDirty, activePage?.id, draftTitle, draftContent, updatePage.isPending, saveStatus, uploadingImage, navigation.open])
+
   function markChanged() {
+    revisionRef.current++
     setIsDirty(true)
     setSaveStatus('idle')
     setEditorError(null)
@@ -291,32 +309,22 @@ export function NotesPage() {
       const asset = await uploadAsset(file, 'note-image')
       return {
         id: asset.id,
-        displayUrl: URL.createObjectURL(file),
+        displayUrl: (() => { const url = URL.createObjectURL(file); objectUrls.current.push(url); return url })(),
         alt: file.name,
       }
     }))
-
-    if (uploads.length > 0) {
-      markChanged()
-    }
 
     return uploads
   }
 
   async function handleSelectBoard(boardId: string) {
     if (boardId === activeBoard?.id) return
-    const saved = await persistDraft()
-    if (!saved) return
-    setSelectedBoardId(boardId)
-    setSelectedPageId(null)
-    setIsCreatingPage(false)
+    navigation.request(() => { discardDraft(); setSelectedBoardId(boardId); setSelectedPageId(null); setIsCreatingPage(false) })
   }
 
   async function handleSelectPage(pageId: string) {
     if (pageId === activePageSummary?.id) return
-    const saved = await persistDraft()
-    if (!saved) return
-    setSelectedPageId(pageId)
+    navigation.request(() => { discardDraft(); setSelectedPageId(pageId) })
   }
 
   function confirmRename(name: string) {
@@ -327,19 +335,17 @@ export function NotesPage() {
 
   function openCreateBoardDialog(returnFocusTo: HTMLElement) {
     createReturnFocusRef.current = returnFocusTo
-    createBoard.reset()
-    setIsCreatingBoard(true)
+    navigation.request(() => { discardDraft(); createBoard.reset(); setIsCreatingBoard(true) })
   }
 
   function openCreatePageDialog(returnFocusTo: HTMLElement) {
     createReturnFocusRef.current = returnFocusTo
-    createPage.reset()
-    setIsCreatingPage(true)
+    navigation.request(() => { discardDraft(); createPage.reset(); setIsCreatingPage(true) })
   }
 
   return (
     <>
-      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,5fr)] min-[900px]:grid-rows-1">
+      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(12rem,32vh)_minmax(0,1fr)] gap-4 min-[900px]:grid-cols-[280px_minmax(0,1fr)] min-[900px]:grid-rows-1">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-3.5 py-2">
             <h2 className="m-0 text-sm font-semibold">Boards</h2>
@@ -367,7 +373,7 @@ export function NotesPage() {
                     <ContextMenuTrigger asChild>
                       <button
                         type="button"
-                        className={cn('flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', isActiveBoard && 'bg-secondary text-secondary-foreground')}
+                        className={cn('flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground', isActiveBoard && 'bg-secondary font-semibold text-secondary-foreground')}
                         onClick={() => { void handleSelectBoard(board.id) }}
                         onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectBoard(board.id) }}
                       >
@@ -378,7 +384,7 @@ export function NotesPage() {
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'board', boardId: board.id, name: board.name })}>Rename Board</ContextMenuItem>
-                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deleteBoard.mutate({ kind: 'board', boardId: board.id, name: board.name })}>Delete Board</ContextMenuItem>
+                      <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deleteBoard.reset(); setDeleteTarget({ kind: 'board', boardId: board.id, name: board.name }); }}>Delete Board</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                   {isActiveBoard ? (
@@ -389,7 +395,7 @@ export function NotesPage() {
                           <ContextMenuTrigger asChild>
                             <button
                               type="button"
-                              className={cn('flex min-h-9 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-accent', activePageSummary?.id === page.id && 'bg-accent font-semibold text-accent-foreground')}
+                              className={cn('flex min-h-9 w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg px-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground', activePageSummary?.id === page.id && 'bg-secondary font-semibold text-secondary-foreground [&_svg]:text-primary')}
                               onClick={() => { void handleSelectPage(page.id) }}
                               onContextMenu={(event) => { entityActionReturnFocusRef.current = event.currentTarget; void handleSelectPage(page.id) }}
                             >
@@ -398,7 +404,7 @@ export function NotesPage() {
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onSelect={() => setRenameTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Rename Page</ContextMenuItem>
-                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => deletePage.mutate({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name })}>Delete Page</ContextMenuItem>
+                            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => { deletePage.reset(); setDeleteTarget({ kind: 'page', boardId: board.id, pageId: page.id, name: page.name }); }}>Delete Page</ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
                       ))}
@@ -442,7 +448,6 @@ export function NotesPage() {
                             disabled={isOpeningPage}
                             maxLength={240}
                             value={draftTitle}
-                            onBlur={() => { void persistDraft() }}
                             onChange={(event) => { setContent(draftContent); setTitle(event.target.value); markChanged() }}
                           />
                           <p className="m-0 mt-0.5 text-[11px] text-muted-foreground">{formatDate(activePage.date)}</p>
@@ -451,10 +456,7 @@ export function NotesPage() {
                           <small data-testid="note-save-status" className="text-[10px] text-muted-foreground">
                             {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : isDirty ? 'Unsaved changes' : 'Saved'}
                           </small>
-                          <Button type="button" size="sm" className="h-[30px] min-h-[30px] px-3.5 text-xs gap-1.5" disabled={isSaving || !isDirty || !draftTitle.trim()} onClick={() => { void persistDraft() }}>
-                            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                            {saveStatus === 'error' ? 'Retry save' : 'Save'}
-                          </Button>
+
                         </div>
                       </div>
                       <div
@@ -466,6 +468,7 @@ export function NotesPage() {
                       <Suspense fallback={<div className="journal-rich-text-shell journal-rich-text-shell--loading">Loading editor...</div>}>
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                           <JournalRichTextEditor
+                            key={`${activePage.id}:${editorSession}`}
                             disabled={isOpeningPage}
                             content={draftContent}
                             toolbarAriaLabel="Note formatting tools"
@@ -473,9 +476,9 @@ export function NotesPage() {
                             toolbarHost={toolbarHost}
                             shellClassName="border-0 bg-transparent outline-none shadow-none focus-within:border-0 focus-within:outline-none focus-within:ring-0"
                             contentClassName="min-h-[32rem] border-0 outline-none shadow-none focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none! focus-visible:ring-0"
-                            onBlur={() => { void persistDraft() }}
                             onChange={(html) => { setTitle(draftTitle); setContent(html); markChanged() }}
                             onImageFiles={uploadNoteImages}
+                            onImageUploadingChange={setUploadingImage}
                             onImageUploadError={(message) => { setEditorError(message); setSaveStatus('error') }}
                           />
                         </div>
@@ -532,6 +535,11 @@ export function NotesPage() {
           onConfirm={confirmRename}
         />
       ) : null}
+      <UnsavedChangesDialog open={navigation.open} onStay={navigation.stay} onDiscard={navigation.discard} />
+      {isDataRouter && <RouteDraftGuard dirty={isDirty || uploadingImage} onDiscard={discardDraft} render={(open, stay, discard) => <UnsavedChangesDialog open={open} onStay={stay} onDiscard={discard} />} />}
+      <ConfirmDeletionDialog name={deleteTarget?.name ?? null} pending={deleteBoard.isPending || deletePage.isPending}
+        error={deleteBoard.isError || deletePage.isError} onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget?.kind === 'board') deleteBoard.mutate(deleteTarget); else if (deleteTarget) deletePage.mutate(deleteTarget) }} />
     </>
   )
 }

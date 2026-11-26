@@ -67,7 +67,7 @@ public sealed class HealthContractTests
             new AssetStorageOptions
             {
                 Enabled = true,
-                Endpoint = "http://minio:9000",
+                Endpoint = "https://storage.example.test",
                 Bucket = "fluenta-assets",
                 AccessKey = "test-access-key",
                 SecretKey = "test-secret-key"
@@ -87,7 +87,7 @@ public sealed class HealthContractTests
         using var provider = services.BuildServiceProvider();
         var check = new AssetStorageReadinessCheck(
             provider,
-            ValidS3Options(),
+            ValidAssetStorageOptions(),
             Environment(Environments.Production));
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
@@ -104,7 +104,7 @@ public sealed class HealthContractTests
         using var provider = services.BuildServiceProvider();
         var check = new AssetStorageReadinessCheck(
             provider,
-            ValidS3Options(),
+            ValidAssetStorageOptions(),
             Environment(Environments.Production));
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
@@ -133,7 +133,7 @@ public sealed class HealthContractTests
         EnvironmentName = name
     };
 
-    private static AssetStorageOptions ValidS3Options() => new()
+    private static AssetStorageOptions ValidAssetStorageOptions() => new()
     {
         Enabled = true,
         Bucket = "fluenta-assets-test",

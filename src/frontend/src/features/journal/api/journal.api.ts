@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
+import type { DeleteResult } from '@/shared/api/deletion.contracts'
 
 export type JournalEntry = {
   id: string
@@ -46,40 +46,40 @@ export type UpdateJournalEntryInput = {
 }
 
 export async function listJournalEntries() {
-  const response = await apiClient.get<ApiEnvelope<JournalEntrySummary[]>>('/journal')
+  const response = await apiClient.get<ApiResponse<JournalEntrySummary[]>>('/journal')
   return response.data.data ?? []
 }
 
 export async function searchJournalEntries(query: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalSearchResult[]>>('/journal/search', {
+  const response = await apiClient.get<ApiResponse<JournalSearchResult[]>>('/journal/search', {
     params: { q: query },
   })
   return response.data.data ?? []
 }
 
 export async function getJournalCalendar(month: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalCalendarDay[]>>('/journal/calendar', {
+  const response = await apiClient.get<ApiResponse<JournalCalendarDay[]>>('/journal/calendar', {
     params: { month },
   })
   return response.data.data ?? []
 }
 
 export async function getJournalEntry(id: string) {
-  const response = await apiClient.get<ApiEnvelope<JournalEntry>>(`/journal/${id}`)
+  const response = await apiClient.get<ApiResponse<JournalEntry>>(`/journal/${id}`)
   return response.data.data!
 }
 
 export async function createJournalEntry(input: CreateJournalEntryInput) {
-  const response = await apiClient.post<ApiEnvelope<JournalEntry>>('/journal', input)
+  const response = await apiClient.post<ApiResponse<JournalEntry>>('/journal', input)
   return response.data.data!
 }
 
 export async function updateJournalEntry(id: string, input: UpdateJournalEntryInput) {
-  const response = await apiClient.patch<ApiEnvelope<JournalEntry>>(`/journal/${id}`, input)
+  const response = await apiClient.patch<ApiResponse<JournalEntry>>(`/journal/${id}`, input)
   return response.data.data!
 }
 
 export async function deleteJournalEntry(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/journal/${id}`)
+  const response = await apiClient.delete<ApiResponse<DeleteResult>>(`/journal/${id}`)
   return response.data.data!
 }

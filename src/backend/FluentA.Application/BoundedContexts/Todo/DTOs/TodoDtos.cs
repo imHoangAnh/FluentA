@@ -7,24 +7,11 @@ public sealed record CreateTodoItemRequest(
     string Date,
     string? Note = null,
     bool IsImportant = false,
-    string? RepeatPattern = null,
-    TodoReminderRequest? Reminder = null);
-
-public sealed record TodoReminderRequest(
-    string Time,
-    string TimeZoneId,
-    DateTime ScheduledAtUtc);
-
-public sealed record TodoReminderDto(
-    string Time,
-    string TimeZoneId,
-    DateTime ScheduledAtUtc,
-    DateTime? SentAtUtc);
+    string? RepeatPattern = null);
 
 public sealed class UpdateTodoItemRequest
 {
     private string? _repeatPattern;
-    private TodoReminderRequest? _reminder;
 
     public UpdateTodoItemRequest()
     {
@@ -66,18 +53,6 @@ public sealed class UpdateTodoItemRequest
     [JsonIgnore]
     public bool IsRepeatPatternSpecified { get; private set; }
 
-    public TodoReminderRequest? Reminder
-    {
-        get => _reminder;
-        init
-        {
-            _reminder = value;
-            IsReminderSpecified = true;
-        }
-    }
-
-    [JsonIgnore]
-    public bool IsReminderSpecified { get; private set; }
 }
 
 public sealed record TodoItemDto(
@@ -89,7 +64,6 @@ public sealed record TodoItemDto(
     bool IsCompleted,
     bool IsImportant,
     string? RepeatPattern,
-    TodoReminderDto? Reminder,
     DateTime? CompletedAt,
     DateTime CreatedAt,
     DateTime UpdatedAt,

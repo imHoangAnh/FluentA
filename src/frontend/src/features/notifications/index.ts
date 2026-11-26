@@ -1,6 +1,0 @@
-export { notificationsRoutes } from './notifications.routes'
-export { notificationApi } from './api/notification.api'
-export { notificationKeys } from './api/notification.queries'
-export type { NotificationItem } from './api/notification.api'
-export { NotificationsMenu } from './components/NotificationsMenu'
-export { useNotificationSync } from './hooks/useNotificationSync'

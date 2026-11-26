@@ -14,7 +14,7 @@ async function mockFrontendApis(page) {
     let data = null
 
     if (path.endsWith('/auth/me')) data = user
-    else if (path.endsWith('/review/dashboard')) data = { overdue: 3, dueToday: 9, newCards: 4, streakDays: 12 }
+    else if (path.endsWith('/review/dashboard')) data = { localDate: '2026-07-14', dueCount: 12 }
     else if (path.endsWith('/todos')) data = [
       { id: 'todo-1', title: 'Review vocabulary notes', isCompleted: false, createdAt: '2026-07-13T01:00:00Z', completedAt: null },
       { id: 'todo-2', title: 'Plan the next learning session', isCompleted: true, createdAt: '2026-07-13T02:00:00Z', completedAt: '2026-07-13T03:00:00Z' },

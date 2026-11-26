@@ -17,11 +17,6 @@ public sealed class CountdownEventConfiguration : IEntityTypeConfiguration<Count
         builder.Property(countdownEvent => countdownEvent.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(countdownEvent => countdownEvent.Name).HasColumnName("name").HasMaxLength(180).IsRequired();
         builder.Property(countdownEvent => countdownEvent.TargetDate).HasColumnName("target_date").HasColumnType("date").IsRequired();
-        builder.Property(countdownEvent => countdownEvent.RepeatPattern)
-            .HasColumnName("repeat_pattern")
-            .HasConversion<string>()
-            .HasMaxLength(16)
-            .IsRequired();
         builder.Property(countdownEvent => countdownEvent.CoverAssetId).HasColumnName("cover_asset_id");
         builder.Property(countdownEvent => countdownEvent.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(countdownEvent => countdownEvent.UpdatedAt).HasColumnName("updated_at").IsRequired();
@@ -30,16 +25,12 @@ public sealed class CountdownEventConfiguration : IEntityTypeConfiguration<Count
         builder.HasIndex(countdownEvent => new { countdownEvent.UserId, countdownEvent.TargetDate });
         builder.HasIndex(countdownEvent => countdownEvent.CoverAssetId)
             .IsUnique()
-            .HasFilter("\"cover_asset_id\" IS NOT NULL AND \"deleted_at\" IS NULL");
+            .HasFilter("\"cover_asset_id\" IS NOT NULL");
 
         builder.HasOne<Asset>()
             .WithMany()
             .HasForeignKey(countdownEvent => countdownEvent.CoverAssetId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasMany(countdownEvent => countdownEvent.Alerts)
-            .WithOne()
-            .HasForeignKey(alert => alert.CountdownId)
-            .OnDelete(DeleteBehavior.Restrict);
     }
 }

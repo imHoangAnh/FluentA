@@ -1,12 +1,16 @@
 using FluentA.Application.BoundedContexts.Practice;
 using FluentA.Application.BoundedContexts.Practice.DTOs;
+using FluentA.Application.BoundedContexts.Pronunciation.DTOs;
+using FluentA.Domain.BoundedContexts.Auth.Entities;
 using FluentA.Domain.BoundedContexts.Practice.Entities;
+using FluentA.Domain.BoundedContexts.Review.Entities;
 using FluentA.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace FluentA.Infrastructure.Persistence.Repositories.Practice;
 
-public sealed class EfPracticeRepository : IPracticeRepository
+public sealed partial class EfPracticeRepository : IPracticeRepository, IPracticeSessionRepository
 {
     private readonly AppDbContext _dbContext;
 
@@ -36,6 +40,7 @@ public sealed class EfPracticeRepository : IPracticeRepository
             select new
             {
                 pageEntity.Id,
+                pageEntity.Name,
                 board.UserId,
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -64,6 +69,7 @@ public sealed class EfPracticeRepository : IPracticeRepository
             summary = PracticeSessionSummary.Create(
                 page.UserId,
                 page.Id,
+                page.Name,
                 mode,
                 totalCards,
                 correctCards,
@@ -73,7 +79,7 @@ public sealed class EfPracticeRepository : IPracticeRepository
         }
         else
         {
-            summary.UpdateCompletion(mode, totalCards, correctCards, wrongCards, utcNow);
+            summary.UpdateCompletion(page.Name, mode, totalCards, correctCards, wrongCards, utcNow);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -84,11 +90,13 @@ public sealed class EfPracticeRepository : IPracticeRepository
                 summary.Id,
                 summary.UserId,
                 summary.PageId,
+                summary.PageName,
                 summary.Mode switch
                 {
                     PracticeMode.Dictation => "dictation",
                     PracticeMode.MeaningToWord => "meaningToWord",
                     PracticeMode.Pronunciation => "pronunciation",
+                    PracticeMode.FixedSequence => "fixedSequence",
                     _ => throw new InvalidOperationException("Unknown practice mode."),
                 },
                 summary.TotalCards,
@@ -97,34 +105,4 @@ public sealed class EfPracticeRepository : IPracticeRepository
                 summary.CompletedAt));
     }
 
-    public async Task<PracticeSettingsDto> GetPracticeSettingsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var settings = await _dbContext.PracticeSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
-
-        return settings is null
-            ? new PracticeSettingsDto(PracticeSettings.DefaultModeSequence)
-            : new PracticeSettingsDto(settings.ModeSequence);
-    }
-
-    public async Task<PracticeSettingsDto> UpdatePracticeSettingsAsync(
-        Guid userId,
-        IReadOnlyList<string> modeSequence,
-        CancellationToken cancellationToken = default)
-    {
-        var settings = await _dbContext.PracticeSettings.SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
-        if (settings is null)
-        {
-            settings = PracticeSettings.Create(userId, modeSequence);
-            await _dbContext.PracticeSettings.AddAsync(settings, cancellationToken);
-        }
-        else
-        {
-            settings.Update(modeSequence);
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return new PracticeSettingsDto(settings.ModeSequence);
-    }
 }

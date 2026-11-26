@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Note;
 using FluentA.Application.BoundedContexts.Note.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +26,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.ListBoardsAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<NoteBoardSummaryDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<NoteBoardSummaryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -36,7 +35,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.CreateBoardAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<NoteBoardSummaryDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<NoteBoardSummaryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -45,7 +44,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.UpdateBoardAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<NoteBoardSummaryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<NoteBoardSummaryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -54,7 +53,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -63,7 +62,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.CreatePageAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<NotePageDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<NotePageDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -72,7 +71,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.GetPageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<NotePageDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<NotePageDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -81,7 +80,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.UpdatePageAsync(CurrentUserId(), pageId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<NotePageDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<NotePageDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -90,7 +89,7 @@ public sealed class NotesController : ApiControllerBase
     {
         var result = await _notes.DeletePageAsync(CurrentUserId(), pageId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

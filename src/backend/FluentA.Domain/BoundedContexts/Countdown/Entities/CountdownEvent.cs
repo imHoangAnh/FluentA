@@ -1,19 +1,15 @@
 using FluentA.Domain.SeedWork;
-using FluentA.Domain.BoundedContexts.Countdown.Enums;
-using FluentA.Domain.BoundedContexts.Countdown.Services;
 
 namespace FluentA.Domain.BoundedContexts.Countdown.Entities;
 
 public sealed class CountdownEvent : BaseEntity, IAggregateRoot
 {
-    private readonly List<CountdownAlert> _alerts = [];
-
     private CountdownEvent()
     {
         Name = string.Empty;
     }
 
-    private CountdownEvent(Guid userId, string name, DateTime targetDate, Guid? coverAssetId, CountdownRepeatPattern repeatPattern)
+    private CountdownEvent(Guid userId, string name, DateTime targetDate, Guid? coverAssetId)
     {
         if (userId == Guid.Empty)
         {
@@ -24,105 +20,38 @@ public sealed class CountdownEvent : BaseEntity, IAggregateRoot
         Name = CleanName(name);
         TargetDate = NormalizeDate(targetDate);
         CoverAssetId = ValidateCoverAssetId(coverAssetId);
-        RepeatPattern = repeatPattern;
     }
 
     public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public DateTime TargetDate { get; private set; }
     public Guid? CoverAssetId { get; private set; }
-    public CountdownRepeatPattern RepeatPattern { get; private set; }
-    public IReadOnlyList<CountdownAlert> Alerts => _alerts.AsReadOnly();
 
     public static CountdownEvent Create(
         Guid userId,
         string name,
         DateTime targetDate,
-        Guid? coverAssetId = null,
-        CountdownRepeatPattern repeatPattern = CountdownRepeatPattern.None)
+        Guid? coverAssetId = null)
     {
-        return new CountdownEvent(userId, name, targetDate, coverAssetId, repeatPattern);
+        return new CountdownEvent(userId, name, targetDate, coverAssetId);
     }
 
-    public void AddAlert(string alertDay, string alertTime, DateTime scheduledAtUtc)
+    public void SoftDelete(DateTime? nowUtc = null)
     {
-        _alerts.Add(CountdownAlert.Create(Id, alertDay, alertTime, scheduledAtUtc));
-        Touch();
-    }
-
-    public bool IsCompletedAt(DateTime utcNow)
-    {
-        if (RepeatPattern != CountdownRepeatPattern.None)
-        {
-            return false;
-        }
-
-        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam());
-        return vietnamNow.Date > TargetDate.Date;
-    }
-
-    public bool IsVisibleAt(DateTime utcNow)
-    {
-        return true;
-    }
-
-    public bool AdvanceRecurrenceAt(DateTime utcNow)
-    {
-        if (RepeatPattern == CountdownRepeatPattern.None)
-        {
-            return false;
-        }
-
-        var vietnamToday = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam()).Date;
-        var nextTargetDate = CountdownSchedule.NextTargetDate(TargetDate, RepeatPattern, vietnamToday);
-        if (nextTargetDate == TargetDate)
-        {
-            return false;
-        }
-
-        TargetDate = nextTargetDate;
-        foreach (var alert in _alerts.Where(alert => alert.DeletedAt is null))
-        {
-            alert.Reschedule(CountdownSchedule.BuildAlertScheduledAtUtc(nextTargetDate, alert.AlertDay, alert.AlertTime));
-        }
-
-        Touch();
-        return true;
-    }
-
-    public void SoftDelete(DateTime? nowUtc = null, bool deleteAlerts = true)
-    {
-        var now = nowUtc ?? DateTime.UtcNow;
-        DeletedAt = now;
-        UpdatedAt = now;
-
-        if (!deleteAlerts)
+        if (DeletedAt.HasValue)
         {
             return;
         }
 
-        foreach (var alert in _alerts.Where(alert => alert.DeletedAt is null))
-        {
-            alert.SoftDelete(now);
-        }
-    }
-
-    public void DetachCover()
-    {
-        CoverAssetId = null;
-        Touch();
-    }
-
-    public void RestoreFromTrash(DateTime nowUtc)
-    {
-        var now = NormalizeUtc(nowUtc);
-        DeletedAt = null;
+        var now = NormalizeUtc(nowUtc ?? DateTime.UtcNow);
+        DeletedAt = now;
         UpdatedAt = now;
     }
 
-    private void Touch()
+    public bool IsCompletedAt(DateTime utcNow)
     {
-        UpdatedAt = DateTime.UtcNow;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), CountdownTimeZone.Vietnam());
+        return vietnamNow.Date > TargetDate.Date;
     }
 
     private static DateTime NormalizeDate(DateTime targetDate)

@@ -1,7 +1,6 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Note.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using FluentA.Domain.BoundedContexts.Note.Entities;
@@ -15,15 +14,13 @@ public sealed class NoteService : INoteService
     private readonly INoteContentProcessor _contentProcessor;
     private readonly IAssetRepository _assets;
     private readonly IAssetObjectStorage _storage;
-    private readonly ITrashService? _trashService;
 
-    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage, ITrashService? trashService = null)
+    public NoteService(INoteRepository repository, INoteContentProcessor contentProcessor, IAssetRepository assets, IAssetObjectStorage storage)
     {
         _repository = repository;
         _contentProcessor = contentProcessor;
         _assets = assets;
         _storage = storage;
-        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<NoteBoardSummaryDto>>> ListBoardsAsync(
@@ -78,27 +75,22 @@ public sealed class NoteService : INoteService
         return OperationResult<NoteBoardSummaryDto>.Success(NoteDtoMapper.ToBoardSummaryDto(board));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(
+    public async Task<OperationResult<bool>> DeleteBoardAsync(
         Guid userId,
         Guid boardId,
         CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null)
-        {
-            return await _trashService.TrashNoteBoardAsync(userId, boardId, cancellationToken);
-        }
-
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(NoteError.BoardNotFound());
+            return OperationResult<bool>.Failure(NoteError.BoardNotFound());
         }
 
         var nowUtc = DateTime.UtcNow;
         await _repository.SoftDeleteBoardAsync(board, nowUtc, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Note", board.Id, board.Name, "Notes", nowUtc, nowUtc.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<NotePageDto>> CreatePageAsync(
@@ -198,7 +190,7 @@ public sealed class NoteService : INoteService
             var removedAssets = await _assets.GetOwnedAsync(userId, removedAssetIds, cancellationToken);
             foreach (var removedAsset in removedAssets.Where(asset => asset.Type == AssetType.NoteImage && asset.Status == AssetStatus.Ready))
             {
-                removedAsset.Archive(DateTime.UtcNow, TimeSpan.FromDays(30));
+                removedAsset.MarkDeleted(DateTime.UtcNow);
             }
         }
 
@@ -208,27 +200,22 @@ public sealed class NoteService : INoteService
         return OperationResult<NotePageDto>.Success(await ToPageDtoAsync(userId, page, cancellationToken));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeletePageAsync(
+    public async Task<OperationResult<bool>> DeletePageAsync(
         Guid userId,
         Guid pageId,
         CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null)
-        {
-            return await _trashService.TrashNotePageAsync(userId, pageId, cancellationToken);
-        }
-
         var page = await _repository.GetPageAsync(userId, pageId, cancellationToken);
         if (page is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(NoteError.PageNotFound());
+            return OperationResult<bool>.Failure(NoteError.PageNotFound());
         }
 
         var nowUtc = DateTime.UtcNow;
         await _repository.SoftDeletePageAsync(page, nowUtc, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Note", page.Id, page.Name, "Notes", nowUtc, nowUtc.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
 
     private async Task<NotePageDto> ToPageDtoAsync(Guid userId, NotePage page, CancellationToken cancellationToken)

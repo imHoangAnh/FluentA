@@ -51,14 +51,15 @@ public sealed class AuthCryptographyTests
     }
 
     [Fact]
-    public void Jwt_IsHs256AndExpiresAfterSevenDays()
+    public void Jwt_IsHs256AndExpiresAfterFiveMinutes()
     {
         var service = new JwtService(Options);
-        var user = new UserProfileDto(Guid.NewGuid(), "learner@example.com", "Learner", true);
-        var token = new JwtSecurityTokenHandler().ReadJwtToken(service.GenerateToken(user));
+        var userId = Guid.NewGuid();
+        var issued = service.GenerateToken(userId, DateTime.UtcNow);
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
         Assert.Equal("HS256", token.Header.Alg);
-        Assert.Equal(user.Id.ToString(), token.Subject);
-        Assert.InRange(token.ValidTo - token.ValidFrom, TimeSpan.FromDays(7).Subtract(TimeSpan.FromSeconds(1)), TimeSpan.FromDays(7).Add(TimeSpan.FromSeconds(1)));
+        Assert.Equal(userId.ToString(), token.Subject);
+        Assert.InRange(token.ValidTo - token.ValidFrom, TimeSpan.FromMinutes(5).Subtract(TimeSpan.FromSeconds(1)), TimeSpan.FromMinutes(5).Add(TimeSpan.FromSeconds(1)));
         Assert.False(string.IsNullOrWhiteSpace(token.Id));
     }
 }

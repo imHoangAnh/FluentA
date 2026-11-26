@@ -1,201 +1,161 @@
-name: Deploy production
+name: Deploy Azure production
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    branches: [main]
+    types: [closed]
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: production-release
   cancel-in-progress: false
 
-env:
-  AWS_ACCOUNT_ID: "178868337284"
-  AWS_REGION: ap-southeast-1
-  AWS_DEPLOY_ROLE_ARN: arn:aws:iam::178868337284:role/FluentAGitHubProductionDeployRole
-  ECR_API_REPOSITORY: fluenta-production-api
-  ECR_MIGRATIONS_REPOSITORY: fluenta-production-migrations
-  ECR_FRONTEND_REPOSITORY: fluenta-production-web
-  EC2_INSTANCE_ID: i-058f1404876ce5edb
-  SSM_DEPLOY_DOCUMENT: FluentA-DeployBackendRelease
-  PUBLIC_READY_URL: https://api.sophion.io.vn/health/ready
-  PUBLIC_FRONTEND_URL: https://sophion.io.vn/
-  PUBLIC_FRONTEND_DEEP_LINK: https://sophion.io.vn/settings/practice
-
 jobs:
-  deploy:
-    name: Build, publish, and deploy
+  build:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 40
     environment: production
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api: ${{ steps.api.outputs.digest }}
+      migrations: ${{ steps.migrations.outputs.digest }}
+      web: ${{ steps.web.outputs.digest }}
+      prefix: ${{ steps.identity.outputs.prefix }}
     steps:
-      - name: Validate immutable release identity
-        run: |
-          set -Eeuo pipefail
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$GITHUB_REF" == "refs/heads/main" ]]
-
-      - name: Check out the release revision
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ github.sha }}
-
-      - name: Configure short-lived AWS credentials
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        with:
-          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
-          role-session-name: fluenta-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
-          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
-
-      - name: Log in to private ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
-
-      - name: Validate ECR registry
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - name: Set release identity and registry login
+        id: identity
         env:
-          ACTUAL_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          GH_TOKEN: ${{ github.token }}
+          GH_ACTOR: ${{ github.actor }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           set -Eeuo pipefail
-          expected_registry="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-          [[ "$ACTUAL_REGISTRY" == "$expected_registry" ]]
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-
-      - name: Validate public frontend configuration
-        env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-        run: |
-          set -Eeuo pipefail
-          [[ "$VITE_GOOGLE_CLIENT_ID" =~ ^[0-9A-Za-z._-]+\.apps\.googleusercontent\.com$ ]]
-
-      - name: Build and push API image
-        id: api-image
+          [[ "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9A-Za-z._-]+\.apps\.googleusercontent\.com$ ]]
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf 'prefix=%s\n' "$prefix" >> "$GITHUB_OUTPUT"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Build API
+        id: api
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: src/backend
           target: final
+          platforms: linux/amd64
           push: true
-          provenance: false
-          sbom: false
-          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_API_REPOSITORY }}:${{ github.sha }}
-          build-args: VCS_REF=${{ github.sha }}
-
-      - name: Build and push migration image
-        id: migrations-image
+          tags: ${{ steps.identity.outputs.prefix }}-api:${{ github.event.pull_request.merge_commit_sha }}
+          build-args: VCS_REF=${{ github.event.pull_request.merge_commit_sha }}
+      - name: Build migrations
+        id: migrations
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: src/backend
           target: migrations
+          platforms: linux/amd64
           push: true
-          provenance: false
-          sbom: false
-          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_MIGRATIONS_REPOSITORY }}:${{ github.sha }}
-          build-args: VCS_REF=${{ github.sha }}
-
-      - name: Build and push frontend image
-        id: frontend-image
+          tags: ${{ steps.identity.outputs.prefix }}-migrations:${{ github.event.pull_request.merge_commit_sha }}
+          build-args: VCS_REF=${{ github.event.pull_request.merge_commit_sha }}
+      - name: Build frontend
+        id: web
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: src/frontend
-          target: final
+          platforms: linux/amd64
           push: true
-          provenance: false
-          sbom: false
-          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
+          tags: ${{ steps.identity.outputs.prefix }}-web:${{ github.event.pull_request.merge_commit_sha }}
           build-args: |
-            VCS_REF=${{ github.sha }}
-            VITE_API_URL=https://api.sophion.io.vn/api/v1
-            VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
+            VCS_REF=${{ github.event.pull_request.merge_commit_sha }}
+            API_URL=/api/v1
+            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
 
-      - name: Verify published digests
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://sophion.io.vn
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VM_HOST: ${{ vars.VM_HOST }}
+      VM_USER: ${{ vars.VM_USER }}
+      VM_PORT: ${{ vars.VM_PORT || '22' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - name: Prepare runtime configuration
         env:
-          API_DIGEST: ${{ steps.api-image.outputs.digest }}
-          MIGRATIONS_DIGEST: ${{ steps.migrations-image.outputs.digest }}
-          FRONTEND_DIGEST: ${{ steps.frontend-image.outputs.digest }}
-        run: |
-          set -Eeuo pipefail
-          [[ "$API_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          [[ "$MIGRATIONS_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          [[ "$FRONTEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-
-          resolved_api="$(aws ecr describe-images \
-            --repository-name "$ECR_API_REPOSITORY" \
-            --image-ids imageTag="$GITHUB_SHA" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)"
-          resolved_migrations="$(aws ecr describe-images \
-            --repository-name "$ECR_MIGRATIONS_REPOSITORY" \
-            --image-ids imageTag="$GITHUB_SHA" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)"
-          resolved_frontend="$(aws ecr describe-images \
-            --repository-name "$ECR_FRONTEND_REPOSITORY" \
-            --image-ids imageTag="$GITHUB_SHA" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)"
-
-          [[ "$resolved_api" == "$API_DIGEST" ]]
-          [[ "$resolved_migrations" == "$MIGRATIONS_DIGEST" ]]
-          [[ "$resolved_frontend" == "$FRONTEND_DIGEST" ]]
-
-      - name: Invoke fixed SSM release document
-        id: ssm
-        run: |
-          set -Eeuo pipefail
-          parameters="$(printf '{\"CommitSha\":[\"%s\"]}' "$GITHUB_SHA")"
-          command_id="$(aws ssm send-command \
-            --document-name "$SSM_DEPLOY_DOCUMENT" \
-            --instance-ids "$EC2_INSTANCE_ID" \
-            --parameters "$parameters" \
-            --timeout-seconds 1800 \
-            --comment "FluentA production release $GITHUB_SHA" \
-            --query 'Command.CommandId' \
-            --output text)"
-          [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]]
-          printf 'command_id=%s\n' "$command_id" >>"$GITHUB_OUTPUT"
-
-      - name: Wait for SSM deployment
+          RELEASE_BUNDLE_DIR: ${{ runner.temp }}/fluenta-release
+          API_IMAGE: ${{ needs.build.outputs.prefix }}-api@${{ needs.build.outputs.api }}
+          MIGRATIONS_IMAGE: ${{ needs.build.outputs.prefix }}-migrations@${{ needs.build.outputs.migrations }}
+          WEB_IMAGE: ${{ needs.build.outputs.prefix }}-web@${{ needs.build.outputs.web }}
+          POSTGRES_CONNECTION_STRING: ${{ secrets.POSTGRES_CONNECTION_STRING }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          OTP_HASH_KEY: ${{ secrets.OTP_HASH_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          RESEND_FROM: ${{ vars.RESEND_FROM }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AZURE_SPEECH_ENABLED: ${{ vars.AZURE_SPEECH_ENABLED }}
+          AZURE_SPEECH_REGION: ${{ vars.AZURE_SPEECH_REGION }}
+        run: python3 deploy/azure/prepare-release.py
+      - name: Configure verified SSH access
         env:
-          COMMAND_ID: ${{ steps.ssm.outputs.command_id }}
+          SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ vars.VM_SSH_KNOWN_HOSTS }}
         run: |
           set -Eeuo pipefail
-          for _ in $(seq 1 180); do
-            status="$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$EC2_INSTANCE_ID" \
-              --query Status \
-              --output text)"
-            case "$status" in
-              Success)
-                printf 'Production release completed successfully.\n'
-                exit 0
-                ;;
-              Pending|InProgress|Delayed)
-                sleep 10
-                ;;
-              *)
-                printf 'Production release failed with SSM status: %s\n' "$status" >&2
-                exit 1
-                ;;
-            esac
-          done
-          printf 'Production release exceeded the workflow wait limit.\n' >&2
-          exit 1
-
-      - name: Verify public readiness
+          umask 077
+          [[ "$VM_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]
+          [[ "$VM_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$VM_PORT" =~ ^[0-9]{1,5}$ ]]
+          [[ -n "$SSH_KEY" && -n "$KNOWN_HOSTS" ]]
+          mkdir -m 700 "$RUNNER_TEMP/fluenta-ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/fluenta-ssh/id"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/fluenta-ssh/known_hosts"
+          ssh-keygen -y -P '' -f "$RUNNER_TEMP/fluenta-ssh/id" >/dev/null
+      - name: Transfer private bundle and deploy
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          REGISTRY_USER: ${{ github.actor }}
         run: |
           set -Eeuo pipefail
-          for url in \
-            "$PUBLIC_READY_URL" \
-            "$PUBLIC_FRONTEND_URL" \
-            "$PUBLIC_FRONTEND_DEEP_LINK"; do
-            curl --fail --silent --show-error \
-              --retry 12 --retry-delay 5 --retry-all-errors \
-              "$url" >/dev/null
+          umask 077
+          release="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          options=(-i "$RUNNER_TEMP/fluenta-ssh/id" -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/fluenta-ssh/known_hosts")
+          tar -czf "$RUNNER_TEMP/fluenta-bundle.tgz" -C "$RUNNER_TEMP/fluenta-release" .
+          scp "${options[@]}" -P "$VM_PORT" "$RUNNER_TEMP/fluenta-bundle.tgz" "$VM_USER@$VM_HOST:/opt/fluenta/incoming/$release.tgz"
+          ssh "${options[@]}" -p "$VM_PORT" "$VM_USER@$VM_HOST" "umask 077; mkdir /opt/fluenta/releases/$release && tar -xzf /opt/fluenta/incoming/$release.tgz -C /opt/fluenta/releases/$release && rm /opt/fluenta/incoming/$release.tgz"
+          printf '%s\n' "$REGISTRY_TOKEN" | ssh "${options[@]}" -p "$VM_PORT" "$VM_USER@$VM_HOST" "bash /opt/fluenta/releases/$release/deploy.sh '$REGISTRY_USER'"
+      - name: Check public HTTPS and SPA deep link
+        run: |
+          set -Eeuo pipefail
+          for path in /health/ready / /settings/practice; do
+            curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+              --retry 8 --retry-delay 5 --retry-all-errors "https://sophion.io.vn$path" > /dev/null
           done
+      - name: Remove runner secret files
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/fluenta-release" "$RUNNER_TEMP/fluenta-ssh" "$RUNNER_TEMP/fluenta-bundle.tgz"

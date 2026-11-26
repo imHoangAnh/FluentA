@@ -17,7 +17,7 @@ async function mockDashboardApi(page) {
       return
     }
     if (path.endsWith('/review/dashboard')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { overdue: 0, dueToday: 0, newCards: 0 } }) })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { localDate: '2026-07-14', dueCount: 0 } }) })
       return
     }
     if (path.endsWith('/todos') || path.endsWith('/habits') || path.endsWith('/countdowns')) {
@@ -28,24 +28,8 @@ async function mockDashboardApi(page) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
       return
     }
-    if (path.endsWith('/pomodoro/current')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { phase: 'Work', state: 'Idle', remainingSeconds: 0 } }) })
-      return
-    }
-    if (path.endsWith('/pomodoro/today')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { completedWorkSessions: 0 } }) })
-      return
-    }
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Deterministic Dashboard widget fixture' }) })
   })
-}
-
-async function login(page) {
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(user.email)
-  await page.getByLabel('Password').fill('SecurePass123')
-  await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
 }
 
 function widget(page, id) {
@@ -58,9 +42,9 @@ function allWidgets(page) {
 
 test('Overview widget menu enforces bounds, persists order, and stays within the viewport', async ({ page }) => {
   await mockDashboardApi(page)
-  await page.goto('/login')
+  await page.goto('/')
   await page.evaluate(() => localStorage.removeItem('dashboard-widget-layout'))
-  await login(page)
+  await page.reload()
 
   await expect(widget(page, 'review')).toBeVisible()
   await expect(widget(page, 'todo')).toBeVisible()
@@ -86,14 +70,12 @@ test('Overview widget menu enforces bounds, persists order, and stays within the
   await menu.getByRole('menuitem', { name: 'Todo' }).click()
   await menuButton.click()
   await menu.getByRole('menuitem', { name: 'Project' }).click()
-  await menuButton.click()
-  await menu.getByRole('menuitem', { name: 'Pomodoro' }).click()
-  await expect(allWidgets(page)).toHaveCount(6)
+  await expect(allWidgets(page)).toHaveCount(5)
   await expect(widget(page, 'project')).toBeVisible()
-  await expect(widget(page, 'pomodoro')).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Pomodoro' })).toHaveCount(0)
   await expect.poll(() => allWidgets(page).evaluateAll((elements) => elements.map((element) =>
-    ['col-span-7', 'col-span-5', 'col-span-5', 'col-span-7', 'col-span-7', 'col-span-5'].find((slot) => element.classList.contains(slot)),
-  ))).toEqual(['col-span-7', 'col-span-5', 'col-span-5', 'col-span-7', 'col-span-7', 'col-span-5'])
+    ['col-span-7', 'col-span-5', 'col-span-5', 'col-span-7', 'col-span-7'].find((slot) => element.classList.contains(slot)),
+  ))).toEqual(['col-span-7', 'col-span-5', 'col-span-5', 'col-span-7', 'col-span-7'])
 
   const handles = page.getByRole('button', { name: /Move .* widget/ })
   const source = await handles.nth(0).boundingBox()

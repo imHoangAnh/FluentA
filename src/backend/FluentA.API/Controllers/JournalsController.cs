@@ -4,7 +4,6 @@ using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Journal;
 using FluentA.Application.BoundedContexts.Journal.DTOs;
 using FluentA.Application.Common;
-using FluentA.Application.BoundedContexts.Trash;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,7 +27,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.ListAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<JournalEntrySummaryDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<JournalEntrySummaryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -38,7 +37,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.SearchAsync(CurrentUserId(), query, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<JournalSearchResultDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<JournalSearchResultDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -48,7 +47,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.CalendarAsync(CurrentUserId(), month, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<JournalCalendarDayDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<JournalCalendarDayDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -58,7 +57,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.GetAsync(CurrentUserId(), journalId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<JournalEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<JournalEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -68,7 +67,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.CreateAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<JournalEntryDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<JournalEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -78,7 +77,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.UpdateAsync(CurrentUserId(), journalId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<JournalEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<JournalEntryDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -88,7 +87,7 @@ public sealed class JournalsController : ApiControllerBase
     {
         var result = await _journals.DeleteAsync(CurrentUserId(), journalId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

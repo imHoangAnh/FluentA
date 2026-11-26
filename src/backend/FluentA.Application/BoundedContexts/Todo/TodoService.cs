@@ -1,28 +1,18 @@
-using System.Globalization;
 using FluentA.Application.BoundedContexts.Todo.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Todo.Entities;
 using FluentA.Domain.BoundedContexts.Todo.Enums;
-using FluentA.Domain.BoundedContexts.Todo.Services;
 
 namespace FluentA.Application.BoundedContexts.Todo;
 
 public sealed class TodoService : ITodoService
 {
-    private const string DateFormat = "yyyy-MM-dd";
     private const string RecurrenceNextRetainedWarning = "recurrence-next-retained";
-    private const string ReminderClearedAfterDateChangeWarning = "reminder-cleared-after-date-change";
-    private const string TimeFormat = "HH:mm";
     private readonly ITodoRepository _repository;
-    private readonly ITodoSyncNotifier _syncNotifier;
-    private readonly ITrashService? _trashService;
 
-    public TodoService(ITodoRepository repository, ITodoSyncNotifier? syncNotifier = null, ITrashService? trashService = null)
+    public TodoService(ITodoRepository repository)
     {
         _repository = repository;
-        _syncNotifier = syncNotifier ?? NullTodoSyncNotifier.Instance;
-        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<TodoItemDto>>> ListByDateAsync(
@@ -100,9 +90,6 @@ public sealed class TodoService : ITodoService
             request.Note,
             request.IsImportant,
             validation.RepeatPattern,
-            validation.Reminder?.Time,
-            validation.Reminder?.TimeZoneId,
-            validation.Reminder?.ScheduledAtUtc,
             sortOrder);
         await _repository.AddAsync(item, cancellationToken);
         return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(item));
@@ -121,7 +108,7 @@ public sealed class TodoService : ITodoService
         }
 
         var nowUtc = DateTime.UtcNow;
-        var validation = TodoRequestValidator.ValidateUpdate(request, item.Date, item.IsCompleted, nowUtc);
+        var validation = TodoRequestValidator.ValidateUpdate(request);
         if (validation.Errors.Count > 0)
         {
             return OperationResult<TodoItemDto>.Failure(TodoError.Validation(validation.Errors));
@@ -132,10 +119,6 @@ public sealed class TodoService : ITodoService
         var originalNote = item.Note;
         var originalImportant = item.IsImportant;
         var originalRepeat = item.RepeatPattern;
-        var originalReminderTime = item.ReminderTime;
-        var originalReminderTimeZoneId = item.ReminderTimeZoneId;
-        var originalReminderScheduledAtUtc = item.ReminderScheduledAtUtc;
-        var originalReminderSentAtUtc = item.ReminderSentAtUtc;
         var originalDate = item.Date;
         var originalSortOrder = item.SortOrder;
         string? warningCode = null;
@@ -159,47 +142,9 @@ public sealed class TodoService : ITodoService
             item.SetRepeatPattern(validation.RepeatPattern);
         }
 
-        if (request.IsReminderSpecified)
-        {
-            if (validation.Reminder is null)
-            {
-                item.ClearReminder();
-            }
-            else
-            {
-                item.SetReminder(
-                    validation.Reminder.Time,
-                    validation.Reminder.TimeZoneId,
-                    validation.Reminder.ScheduledAtUtc);
-            }
-        }
-
         if (request.Date is not null || request.SortOrder is not null)
         {
             var destinationDate = validation.Date ?? item.Date;
-            if (request.Date is not null
-                && !request.IsReminderSpecified
-                && item.ReminderTime is not null
-                && item.ReminderTimeZoneId is not null)
-            {
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(item.ReminderTimeZoneId);
-                var scheduledAtUtc = TodoReminderSchedule.ResolveUtc(destinationDate, item.ReminderTime.Value, timeZone);
-                if (scheduledAtUtc <= nowUtc)
-                {
-                    item.ClearReminder();
-                    warningCode = ReminderClearedAfterDateChangeWarning;
-                }
-                else
-                {
-                    item.SetReminder(item.ReminderTime.Value, item.ReminderTimeZoneId, scheduledAtUtc);
-                }
-            }
-
-            if ((request.IsCompleted ?? item.IsCompleted) && item.ReminderSentAtUtc is null)
-            {
-                item.CancelUnsentReminder();
-            }
-
             var destination = (await _repository.ListByDateAsync(userId, destinationDate, cancellationToken))
                 .Where(candidate => candidate.Id != item.Id)
                 .OrderBy(candidate => candidate.IsCompleted)
@@ -219,10 +164,6 @@ public sealed class TodoService : ITodoService
                 originalNote,
                 originalImportant,
                 originalRepeat,
-                originalReminderTime,
-                originalReminderTimeZoneId,
-                originalReminderScheduledAtUtc,
-                originalReminderSentAtUtc,
                 originalDate,
                 originalSortOrder);
             await _repository.UpdateRangeAsync(destination, cancellationToken);
@@ -230,8 +171,7 @@ public sealed class TodoService : ITodoService
         else if (request.Title is not null
             || request.Note is not null
             || request.IsImportant is not null
-            || request.IsRepeatPatternSpecified
-            || request.IsReminderSpecified)
+            || request.IsRepeatPatternSpecified)
         {
             MarkGeneratedOccurrenceEditedWhenChanged(
                 item,
@@ -239,10 +179,6 @@ public sealed class TodoService : ITodoService
                 originalNote,
                 originalImportant,
                 originalRepeat,
-                originalReminderTime,
-                originalReminderTimeZoneId,
-                originalReminderScheduledAtUtc,
-                originalReminderSentAtUtc,
                 originalDate,
                 originalSortOrder);
             await _repository.UpdateAsync(item, cancellationToken);
@@ -265,11 +201,6 @@ public sealed class TodoService : ITodoService
             item = completionResult.Item;
         }
 
-        if (completionBefore != item.IsCompleted)
-        {
-            await _syncNotifier.TodoItemCheckedAsync(userId, item.Id, item.IsCompleted, cancellationToken);
-        }
-
         if (completionResult?.NextOccurrenceRetained == true)
         {
             warningCode = RecurrenceNextRetainedWarning;
@@ -278,29 +209,13 @@ public sealed class TodoService : ITodoService
         return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(item, warningCode));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null)
+        if (!await _repository.SoftDeleteFutureOccurrencesAsync(userId, todoId, DateTime.UtcNow, cancellationToken))
         {
-            return await _trashService.TrashTodoAsync(userId, todoId, cancellationToken);
+            return OperationResult<bool>.Failure(TodoError.NotFound());
         }
-
-        var item = await _repository.GetAsync(userId, todoId, cancellationToken);
-        if (item is null)
-        {
-            return OperationResult<TrashEntryDto>.Failure(TodoError.NotFound());
-        }
-
-        item.SoftDelete();
-        await _repository.UpdateAsync(item, cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(
-            Guid.Empty,
-            "Todo",
-            item.Id,
-            item.Title,
-            TodoDtoMapper.FormatDate(item.Date),
-            item.DeletedAt!.Value,
-            item.DeletedAt!.Value.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<TodoItemDto>> DuplicateAsync(
@@ -322,9 +237,6 @@ public sealed class TodoService : ITodoService
             source.Note,
             source.IsImportant,
             source.RepeatPattern,
-            source.ReminderTime,
-            source.ReminderTimeZoneId,
-            source.ReminderScheduledAtUtc,
             sortOrder);
         await _repository.AddAsync(duplicate, cancellationToken);
         return OperationResult<TodoItemDto>.Success(TodoDtoMapper.ToDto(duplicate));
@@ -336,10 +248,6 @@ public sealed class TodoService : ITodoService
         string? originalNote,
         bool originalImportant,
         TodoRepeatPattern? originalRepeat,
-        TimeOnly? originalReminderTime,
-        string? originalReminderTimeZoneId,
-        DateTime? originalReminderScheduledAtUtc,
-        DateTime? originalReminderSentAtUtc,
         DateTime originalDate,
         int originalSortOrder)
     {
@@ -347,10 +255,6 @@ public sealed class TodoService : ITodoService
             || item.Note != originalNote
             || item.IsImportant != originalImportant
             || item.RepeatPattern != originalRepeat
-            || item.ReminderTime != originalReminderTime
-            || item.ReminderTimeZoneId != originalReminderTimeZoneId
-            || item.ReminderScheduledAtUtc != originalReminderScheduledAtUtc
-            || item.ReminderSentAtUtc != originalReminderSentAtUtc
             || item.Date != originalDate
             || item.SortOrder != originalSortOrder)
         {

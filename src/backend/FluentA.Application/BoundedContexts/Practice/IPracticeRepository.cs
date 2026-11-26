@@ -16,10 +16,4 @@ public interface IPracticeRepository
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
-    Task<PracticeSettingsDto> GetPracticeSettingsAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    Task<PracticeSettingsDto> UpdatePracticeSettingsAsync(
-        Guid userId,
-        IReadOnlyList<string> modeSequence,
-        CancellationToken cancellationToken = default);
 }

@@ -7,22 +7,20 @@
 ## 2. Mô tả dự án
 
 FluentA Backend là backend ASP.NET Core trên .NET 10 của hệ thống FluentA. Dự
-án cung cấp REST API dưới prefix `/api/v1`, SignalR hub tại `/hubs/sync`, xử lý
-xác thực và thực thi reminder cùng background job định kỳ bằng Quartz.
+án cung cấp REST API dưới prefix `/api/v1`, xử lý
+xác thực. Các background job dọn dẹp đã được bỏ.
 
 Backend được tổ chức theo modular monolith với bốn lớp chính: API,
 Application, Domain và Infrastructure. PostgreSQL lưu dữ liệu nghiệp vụ cùng
-challenge OTP/reset của auth, process-local runtime state giữ trạng thái
-Pomodoro ngắn hạn, còn
-object storage private lưu asset qua một adapter S3-compatible: Development cấu
-hình MinIO, còn Production dùng AWS S3.
+challenge OTP/reset của auth;
+object storage private lưu asset qua một adapter S3-compatible: mọi môi trường dùng R2 hoặc AWS S3 theo cấu hình.
 
 Mỗi bounded context trong Application giữ một service facade và các port/DTO
 của nó. Những phần dễ phình to được tách thành collaborator nội bộ theo trách
 nhiệm, chẳng hạn validator, DTO mapper, statistics calculator và query/provider
 parser. API dùng `ApiControllerBase` cho identity và error mapping dùng chung;
 Infrastructure giữ EF adapter, provider, job facade và composition extension.
-Thiết kế này giữ bốn project, route, payload và SignalR contract;
+Thiết kế này giữ bốn project, route và payload của các feature giữ lại;
 không dùng CQRS, MediatR hoặc một handler cho từng endpoint.
 
 ## 3. Mục lục
@@ -39,16 +37,13 @@ không dùng CQRS, MediatR hoặc một handler cho từng endpoint.
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
-Để chạy toàn bộ frontend, API/Quartz, migration, PostgreSQL mới và MinIO chỉ
-bằng Docker, dùng `deploy/local/start.ps1` theo
-[local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
-chạy backend trực tiếp trên host khi phát triển source.
+Dự án có hai môi trường: Development và Production. Development chạy API trực tiếp trên máy lập trình viên, tự cấu hình qua user-secrets hoặc biến môi trường. Tài liệu này hướng dẫn chạy Development; deployment Production đang được cập nhật. API từ chối tên môi trường khác.
 
 ### 4.1. Yêu cầu
 
 - .NET 10 SDK.
-- Docker Desktop hoặc Docker Engine có Docker Compose.
-- PostgreSQL và MinIO theo cấu hình local của repository.
+- Docker Compose là tùy chọn nếu muốn chạy PostgreSQL trong container; cũng có thể dùng PostgreSQL đã cài trên máy.
+- PostgreSQL và một bucket private trên R2 hoặc AWS S3.
 
 ### 4.2. Khôi phục dependency và chạy hạ tầng
 
@@ -82,25 +77,20 @@ có tại `https://localhost:7000/openapi/v1.json`.
 
 Các secret `Jwt:Key`, `Authentication:OtpHashKey`, `Resend:ApiKey` và cấu hình
 Google/Resend phải được cung cấp bằng .NET user-secrets hoặc biến môi trường.
-Không ghi secret vào file được theo dõi bởi Git. Xem cấu hình mẫu và lệnh cụ
-thể tại `docs/product/authentication.md`.
+Không ghi secret vào file được theo dõi bởi Git. Xem lệnh cấu hình đầy đủ tại
+[hướng dẫn localhost](../../docs/local-development.md).
 
-Object storage không có trường `Provider` và không branch theo MinIO/AWS trong
+Object storage không có trường `Provider` và không branch theo môi trường hoặc nhà cung cấp trong
 asset code. Cấu hình `AssetStorage` gồm:
 
 - `Endpoint`: S3-compatible URL dùng cho backend operations; bỏ trống để AWS
-  SDK dùng regional endpoint;
+  SDK dùng regional endpoint. R2 dùng endpoint account; S3 có thể dùng regional endpoint;
 - `PublicEndpoint`: URL browser-reachable dùng để ký PUT/GET; bỏ trống để dùng
   cùng client với operations;
 - `Bucket`, `Region`, `UsePathStyle`;
 - `AccessKey` và `SecretKey`: cặp optional, phải cùng có hoặc cùng vắng mặt.
 
-Host Development dùng `http://127.0.0.1:9000` cho operations và
-`https://localhost:5173` cho presigned URL; Vite proxy giữ nguyên signed host và
-path tới object storage. `ASSET_STORAGE_BUCKET` và
-`ASSET_STORAGE_PROXY_TARGET` trong frontend `.env.local` phải khớp với backend.
-Production bỏ cả hai endpoint và static credential để dùng EC2 role/default AWS
-credential chain.
+Development và Production dùng cùng cấu hình AssetStorage. Xem [hướng dẫn R2](../../docs/product/asset-storage-r2.md) để cấu hình user-secrets hoặc biến môi trường. Khi chưa cấu hình, development tắt asset storage; bật Enabled sau khi điền bucket và credentials.
 
 ## 5. Cách sử dụng dự án
 
@@ -108,71 +98,86 @@ credential chain.
 
 - Dùng OpenAPI JSON tại `/openapi/v1.json` để xem schema và endpoint hiện có.
 - Các endpoint nghiệp vụ dùng prefix `/api/v1`, ví dụ `/api/v1/auth`,
-  `/api/v1/boards`, `/api/v1/flashcards`, `/api/v1/todos` và
-  `/api/v1/settings`.
-- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; API đặt JWT vào
-  HttpOnly cookie `access_token` và không trả token trong JSON.
+  `/api/v1/vocabs`, `/api/v1/practice`, `/api/v1/review`, `/api/v1/todos` và
+  `/api/v1/profile`.
+- Đăng ký hoặc đăng nhập qua nhóm endpoint `/api/v1/auth`; đăng nhập đặt JWT
+  truy cập 5 phút và refresh token cố định 7 ngày vào hai HttpOnly cookie
+  `access_token` và `refresh_token`. Token không xuất hiện trong JSON.
+- `POST /api/v1/auth/refresh` giữ nguyên refresh token và chỉ cấp lại cookie
+  truy cập. `POST /api/v1/auth/logout` thu hồi refresh token của lần đăng nhập
+  hiện tại rồi xóa cả hai cookie. JWT truy cập đã sao chép còn hiệu lực tối đa
+  năm phút.
+- Các yêu cầu `POST /login`, `/google`, `/refresh` và `/logout` phải gửi header
+  `Origin` khớp với `Frontend:Origins` hoặc `Frontend:BaseUrl`.
+- `GET /api/v1/auth/me` trả về hồ sơ tối thiểu `id`, `fullName`, `avatarUrl`;
+  `GET /api/v1/profile` trả về hồ sơ đầy đủ; `PUT /api/v1/profile` cập nhật hồ sơ.
 - Với endpoint được bảo vệ, client HTTPS gửi cookie bằng `withCredentials`;
   không tạo header Bearer trong JavaScript.
-- Response body dùng envelope gồm `success`, `data` và `error`; contract đầy
+- Response body dùng envelope gồm `success`, `data` và `errors`; contract đầy
   đủ được mô tả trong phần tiếp theo.
 
-### 5.2. Realtime
+### 5.2. Cập nhật dữ liệu
 
-Client đã xác thực kết nối tới SignalR hub `/hubs/sync`. Hub thông báo các thay
-đổi cần đồng bộ cho flashcard, todo, habit, Project và Pomodoro giữa các phiên
-trình duyệt.
+Pomodoro và SignalR đã được gỡ. Không còn hub `/hubs/sync`.
+Các mutation cập nhật trang hiện tại qua query refresh.
 
 ### 5.3. Background job
 
-Quartz chạy cùng API, lưu lịch trong PostgreSQL và dùng trigger theo từng mốc
-reminder. Job bảo trì dùng cron. PostgreSQL cần sẵn sàng trước khi chạy API.
-Quy tắc giờ Việt Nam, chạy bù và chuyển môi trường được mô tả tại
-[Scheduling](SCHEDULING.md).
+Không còn Quartz hoặc background job dọn asset, Trash và database.
+Delete cập nhật `deleted_at`; bản ghi và object trên R2 được giữ lại.
+`AssetStorageStartupService` chỉ kiểm tra storage khi API khởi động.
 
 ## 6. API Response Contract
 
-Các REST endpoint trả về cấu trúc `ApiEnvelope<T>`. Phản hồi thành công đặt dữ
+Các REST endpoint trả về cấu trúc `ApiResponse<T>`. Phản hồi thành công đặt dữ
 liệu endpoint trong `data`:
 
 ```json
 {
   "success": true,
+  "message": null,
   "data": {
     "id": "7f6e2c7d-7bb7-4d10-b450-02a4e727dbb1",
     "title": "Learn English"
   },
-  "error": null
+  "errors": [],
+  "traceId": "request-trace-id"
 }
 ```
 
-Phản hồi thất bại đặt `data` là `null` và trả về mã lỗi ổn định, thông báo cùng
-chi tiết validation khi có:
+Phản hồi thất bại đặt `data` là `null`. Mỗi lỗi có mã ổn định và có `field`
+khi là lỗi validation:
 
 ```json
 {
   "success": false,
+  "message": "The request contains invalid values.",
   "data": null,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "The request contains invalid values.",
-    "details": {
-      "title": ["Title is required."]
-    }
-  }
+  "errors": [
+    { "code": "VALIDATION_ERROR", "message": "Title is required.", "field": "title" }
+  ],
+  "traceId": "request-trace-id"
 }
 ```
 
-Envelope được sử dụng cùng HTTP status code, không thay thế status code. Định
-nghĩa nằm tại `FluentA.API/Contracts/ApiEnvelope.cs`; type tương ứng phía
-frontend nằm tại `../frontend/src/shared/types/api.ts`.
+Response được sử dụng cùng HTTP status code, không thay thế status code.
+Validation trả 400; các exception nghiệp vụ ánh xạ 400/401/403/404/409;
+lỗi không xác định trả 500 với thông báo an toàn. Định nghĩa nằm tại
+`FluentA.API/Contracts/ApiResponse.cs`; type phía frontend nằm tại
+`../frontend/src/shared/api/contracts.ts`.
+
+Request validation dùng ASP.NET Core model binding cho dữ liệu sai định dạng
+và các validator trong Application cho quy tắc trường, nghiệp vụ và uniqueness.
+Upload asset kiểm tra MIME, dung lượng và chữ ký nội dung sau khi upload;
+Practice giới hạn `pageSize` từ 1 đến 100. Các query hiện tại không nhận tên
+trường sort tùy ý. Mọi lỗi validation của REST API trả 400 theo cùng contract.
 
 ## 7. Cấu trúc solution
 
 ```text
 src/backend/
-  FluentA.API/                    Controller, middleware, health checks, SignalR và composition root
-    Extensions/                   Auth, CORS, rate limiting, OpenAPI, health và realtime composition
+  FluentA.API/                    Controller, middleware, health checks và composition root
+    Extensions/                   Auth, CORS, rate limiting, OpenAPI, health composition
     HealthChecks/                  PostgreSQL, object storage và health response contract
   FluentA.Application/            Bounded context, service facade, DTO, port và collaborator nội bộ
     Common/Results/                OperationResult và application error contract
@@ -243,34 +248,9 @@ docker build `
   src/backend
 ```
 
-Hai image chạy non-root. API chỉ nghe cổng container 8080; production Caddy sẽ
-terminate TLS và proxy qua private Docker network. Cấu hình production và secret
-được inject khi chạy container, không được truyền bằng Docker build arguments.
+Hai image chạy non-root. API nghe cổng container 8080. Các lệnh Compose
+Production cũ không còn trong worktree; cần chốt deployment layout mới trước
+khi đưa image lên server. Không truyền secret bằng Docker build arguments.
 
-Production topology nằm tại `deploy/production`. Trước khi dùng, copy
-`env.example` thành file `.env` chỉ tồn tại trên EC2 và thay toàn bộ placeholder.
-Không điền AWS access key/secret key: API lấy temporary credential từ EC2
-instance role.
-
-```powershell
-docker compose `
-  --env-file deploy/production/env.example `
-  --file deploy/production/compose.yml `
-  config --quiet
-
-# Trên EC2, sau khi thay env.example bằng file owner-only .env:
-docker compose --env-file deploy/production/.env `
-  --file deploy/production/compose.yml `
-  --profile tools run --rm migrations
-
-docker compose --env-file deploy/production/.env `
-  --file deploy/production/compose.yml `
-  up --detach postgres api caddy
-```
-
-Chỉ Caddy publish 80/443. API, PostgreSQL và migration không publish host port;
-production Compose không chạy MinIO. Các lệnh trên là runtime contract, chưa là
-release/rollback automation và không thay thế Group 3 live AWS/EC2 proof.
-
-Xem [README của root project](../../README.md) để chạy toàn bộ hệ thống và
+Xem [hướng dẫn localhost](../../docs/local-development.md) để chạy toàn bộ hệ thống và
 [Frontend README](../frontend/README.md) để chạy giao diện.

@@ -1,15 +1,16 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 import type { Asset, AssetType, PresignedAssetUpload } from './assets.contracts'
 
 const uploadErrorMessages: Record<AssetType, string> = {
   avatar: 'Avatar upload could not be completed.',
   'countdown-cover': 'Countdown cover upload could not be completed.',
   'note-image': 'Note image upload could not be completed.',
+  'journal-image': 'Journal image upload could not be completed.',
 }
 
 export async function uploadAsset(file: File, assetType: AssetType) {
-  const presigned = await apiClient.post<ApiEnvelope<PresignedAssetUpload>>('/assets/presign', {
+  const presigned = await apiClient.post<ApiResponse<PresignedAssetUpload>>('/assets/presign', {
     assetType,
     contentType: file.type,
     originalName: file.name,
@@ -26,7 +27,7 @@ export async function uploadAsset(file: File, assetType: AssetType) {
     throw new Error(uploadErrorMessages[assetType])
   }
 
-  const finalized = await apiClient.post<ApiEnvelope<Asset>>('/assets/finalize', {
+  const finalized = await apiClient.post<ApiResponse<Asset>>('/assets/finalize', {
     assetId: target.asset.id,
   })
   return finalized.data.data!

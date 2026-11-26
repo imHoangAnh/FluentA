@@ -37,15 +37,14 @@ const pages = [
 
 const preferences = {
   hiddenColumns: [],
-  columnOrder: ['word', 'meaningVn', 'ipaPronunciation', 'definition', 'class', 'example', 'note', 'synonyms', 'antonyms'],
+  columnOrder: ['word', 'meaning', 'ipaPronunciation', 'context', 'type', 'example', 'synonyms', 'antonyms'],
   columnWidths: {
     word: 220,
-    meaningVn: 260,
+    meaning: 260,
     ipaPronunciation: 200,
-    definition: 360,
-    class: 160,
+    context: 360,
+    type: 160,
     example: 380,
-    note: 300,
     synonyms: 280,
     antonyms: 280,
   },
@@ -56,12 +55,11 @@ const words = Array.from({ length: 30 }, (_, index) => ({
   id: `word-${index + 1}`,
   pageId: page.id,
   word: `vocabulary-${index + 1}`,
-  meaningVn: `Nghĩa tiếng Việt ${index + 1}`,
+  meaning: `Nghĩa tiếng Việt ${index + 1}`,
   ipaPronunciation: '/vəˈkæbjəˌleri/',
-  definition: 'A deliberately long definition that wraps across multiple lines without scrolling inside the vocabulary cell. '.repeat(4),
-  class: 'noun',
+  context: 'A deliberately long usage context that wraps across multiple lines without scrolling inside the vocabulary cell. '.repeat(4),
+  type: 'noun',
   example: 'This example remains readable while the surrounding list scrolls. '.repeat(5),
-  note: '',
   synonyms: 'term, expression',
   antonyms: 'silence',
   createdAt: '2026-07-13T00:00:00Z',
@@ -74,9 +72,9 @@ async function mockWorkspaceApis(pageInstance) {
     let data = []
 
     if (path.endsWith('/auth/me')) data = user
-    else if (path.endsWith('/boards')) data = [board]
-    else if (path.endsWith(`/boards/${board.id}`)) data = { ...board, pages, preferences }
-    else if (path.includes(`/boards/${board.id}/pages/`) && path.endsWith('/words')) data = words
+    else if (path.endsWith('/vocabs/boards')) data = [board]
+    else if (path.endsWith(`/vocabs/boards/${board.id}`)) data = { ...board, pages, preferences }
+    else if (path.endsWith(`/vocabs/pages/${page.id}/words`)) data = words
 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) })
   })
@@ -86,37 +84,36 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
   await mockWorkspaceApis(browserPage)
 
   for (const viewport of [
-    { name: 'desktop', width: 1440, height: 1000, sidebarWidth: 184 },
-    { name: 'tablet', width: 1024, height: 900, sidebarWidth: 84 },
+    { name: 'desktop', width: 1440, height: 1000 },
+    { name: 'tablet', width: 1024, height: 900 },
   ]) {
     await browserPage.setViewportSize({ width: viewport.width, height: viewport.height })
     await browserPage.goto('/vocabulary')
 
     await expect(browserPage.getByRole('heading', { name: 'Long content page' })).toBeVisible()
-    await expect(browserPage.getByRole('button', { name: 'Search' })).toBeDisabled()
-    await expect(browserPage.getByRole('button', { name: 'Filter' })).toBeDisabled()
-    await expect(browserPage.getByText('Coming soon')).toBeAttached()
-    await expect(browserPage.getByRole('button', { name: 'Setting Columns' })).toBeVisible()
+    await expect(browserPage.getByRole('textbox', { name: 'Filter boards' })).toBeVisible()
+    await expect(browserPage.getByRole('textbox', { name: 'Filter pages' })).toBeVisible()
+    await expect(browserPage.getByRole('textbox', { name: 'Search vocabulary' })).toBeVisible()
 
     const shell = await browserPage.evaluate(() => {
       const sidebar = document.querySelector('aside[aria-label="Primary navigation"]')
-      const rail = document.querySelector('[data-testid="vocabulary-rail-scroll"]')
+      const pageTabs = document.querySelector('[data-testid="vocabulary-page-scroll"]')
       const table = document.querySelector('[data-testid="vocab-table-scroll"]')
       return {
         documentScrollHeight: document.documentElement.scrollHeight,
         viewportHeight: window.innerHeight,
         sidebarWidth: Math.round(sidebar.getBoundingClientRect().width),
         headerCount: document.querySelectorAll('header').length,
-        railOwnsVerticalOverflow: rail.scrollHeight > rail.clientHeight,
+        pageTabsOwnHorizontalOverflow: pageTabs.scrollWidth > pageTabs.clientWidth,
         tableOwnsVerticalOverflow: table.scrollHeight > table.clientHeight,
         tableOwnsHorizontalOverflow: table.scrollWidth > table.clientWidth,
       }
     })
 
     expect(shell.documentScrollHeight).toBe(shell.viewportHeight)
-    expect(shell.sidebarWidth).toBe(viewport.sidebarWidth)
+    expect(shell.sidebarWidth).toBe(Math.round(viewport.width / 9))
     expect(shell.headerCount).toBe(0)
-    expect(shell.railOwnsVerticalOverflow).toBe(true)
+    expect(shell.pageTabsOwnHorizontalOverflow).toBe(true)
     expect(shell.tableOwnsVerticalOverflow).toBe(true)
     expect(shell.tableOwnsHorizontalOverflow).toBe(true)
 
@@ -129,17 +126,23 @@ test('keeps the compact AppShell and dense vocabulary workspace stable at deskto
     const after = await stickyHeader.boundingBox()
     expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1)
 
-    const deleteActions = browserPage.getByTestId('sticky-word-actions').first()
+    const wordActions = browserPage.getByTestId('sticky-word-actions').first()
+    const wordBefore = await wordActions.boundingBox()
+    await table.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+    const wordAfter = await wordActions.boundingBox()
+    expect(Math.abs(wordBefore.x - wordAfter.x)).toBeLessThanOrEqual(1)
+
+    await table.evaluate((element) => { element.scrollTop = 0; element.scrollLeft = 0 })
+    await browserPage.getByRole('button', { name: 'Click to add a new vocabulary row...' }).click()
     const createActions = browserPage.getByTestId('sticky-create-actions')
-    const deleteBefore = await deleteActions.boundingBox()
     const createBefore = await createActions.boundingBox()
     await table.evaluate((element) => { element.scrollLeft = element.scrollWidth })
-    const deleteAfter = await deleteActions.boundingBox()
     const createAfter = await createActions.boundingBox()
-    expect(Math.abs(deleteBefore.x - deleteAfter.x)).toBeLessThanOrEqual(1)
     expect(Math.abs(createBefore.x - createAfter.x)).toBeLessThanOrEqual(1)
+    await browserPage.getByRole('button', { name: 'Cancel adding word' }).click()
 
-    const longCell = browserPage.getByRole('textbox', { name: 'Definition for vocabulary-1', exact: true })
+    await browserPage.getByRole('button', { name: 'Edit vocabulary-1', exact: true }).click()
+    const longCell = browserPage.getByRole('textbox', { name: 'Context for word', exact: true })
     const cellMetrics = await longCell.evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,
@@ -172,7 +175,7 @@ test('confirms the exact Board on right-click, cancels safely, then deletes and 
       const boardId = path.split('/').at(-1)
       deletedBoards.push(boardId)
       details.delete(boardId)
-      return route.fulfill({ status: 204 })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { deleted: true } }) })
     }
     const boardId = path.split('/').at(-1)
     if (method === 'GET' && details.has(boardId)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: details.get(boardId) }) })
@@ -181,10 +184,19 @@ test('confirms the exact Board on right-click, cancels safely, then deletes and 
   })
 
   await browserPage.goto('/vocabulary')
-  const boardButton = browserPage.getByRole('button', { name: /Newest board/ })
-  await expect(boardButton).toBeVisible()
-  await boardButton.click({ button: 'right' })
+  const boardTab = browserPage.getByRole('tab', { name: 'Newest board' })
+  await expect(boardTab).toBeVisible()
+  await boardTab.click({ button: 'right' })
   await browserPage.getByRole('menuitem', { name: 'Delete Board' }).click()
+  await expect(browserPage.getByRole('alertdialog', { name: 'Confirm deletion' })).toContainText('Delete "Newest board"?')
+  expect(deletedBoards).toEqual([])
+  await browserPage.getByRole('alertdialog', { name: 'Confirm deletion' }).getByRole('button', { name: 'Cancel' }).click()
+  await expect(boardTab).toBeVisible()
+  expect(deletedBoards).toEqual([])
+
+  await boardTab.click({ button: 'right' })
+  await browserPage.getByRole('menuitem', { name: 'Delete Board' }).click()
+  await browserPage.getByRole('alertdialog', { name: 'Confirm deletion' }).getByRole('button', { name: 'Delete' }).click()
   await expect.poll(() => deletedBoards).toEqual(['board-new'])
   await expect(browserPage.getByRole('heading', { name: 'Older page' })).toBeVisible()
 })

@@ -9,14 +9,12 @@ internal static class HabitRequestValidator
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string MonthFormat = "yyyy-MM";
-    private const string TimeFormat = "HH:mm";
     public static (
         Dictionary<string, string[]> Errors,
         HabitIcon Icon,
         HabitFrequency Frequency,
         IReadOnlyList<DayOfWeek> CustomDays,
         DateTime StartDate,
-        TimeOnly ReminderTime,
         TimeZoneInfo? TimeZone) ValidateCreate(CreateHabitRequest request)
     {
         var errors = ValidateNameAndDescription(request.Name, request.Description);
@@ -36,8 +34,7 @@ internal static class HabitRequestValidator
             errors["goalDays"] = ["Goal days must be a positive whole number or null for Forever."];
         }
 
-        var reminderTime = ValidateTime(request.ReminderTime, errors, required: true);
-        return (errors, icon, schedule.Frequency, schedule.CustomDays, startDate, reminderTime, timeZone);
+        return (errors, icon, schedule.Frequency, schedule.CustomDays, startDate, timeZone);
     }
 
     public static (
@@ -49,7 +46,6 @@ internal static class HabitRequestValidator
         IReadOnlyList<DayOfWeek> CustomDays,
         DateTime StartDate,
         int? GoalDays,
-        TimeOnly ReminderTime,
         TimeZoneInfo? TimeZone) ValidateUpdate(HabitEntity habit, int entryCount, UpdateHabitRequest request)
     {
         var name = request.Name ?? habit.Name;
@@ -88,10 +84,6 @@ internal static class HabitRequestValidator
             errors["goalDays"] = ["A changed finite goal must be greater than the current check-in count."];
         }
 
-        var reminderTime = request.ReminderTime is null
-            ? habit.ReminderTime
-            : ValidateTime(request.ReminderTime, errors, required: true);
-
         return (
             errors,
             name,
@@ -101,7 +93,6 @@ internal static class HabitRequestValidator
             schedule.CustomDays,
             startDate,
             goalDays,
-            reminderTime,
             timeZone);
     }
 
@@ -230,21 +221,6 @@ internal static class HabitRequestValidator
         return DateTime.SpecifyKind(DateTime.MinValue.Date, DateTimeKind.Utc);
     }
 
-    private static TimeOnly ValidateTime(string? value, Dictionary<string, string[]> errors, bool required)
-    {
-        if (!string.IsNullOrWhiteSpace(value)
-            && TimeOnly.TryParseExact(value, TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
-        {
-            return time;
-        }
-
-        if (required)
-        {
-            errors["reminderTime"] = ["Reminder time must be in 24-hour HH:mm format."];
-        }
-
-        return new TimeOnly(20, 0);
-    }
 
     public static bool TryFindTimeZone(string? timeZoneId, out TimeZoneInfo? timeZone)
     {

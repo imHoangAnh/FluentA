@@ -1,8 +1,6 @@
-import type { FlashcardCard } from '@/features/flashcards'
-import type { PracticeReviewLevel } from '../../api/practice.api'
-import { formatIpa, formatWordClass, hasText } from './practiceFormatters'
-
-type PracticeReviewStatus = 'added' | 'alreadyInReview'
+import { ArrowRight, Volume2 } from 'lucide-react'
+import type { PracticeReviewLevel, PracticeReviewStatus, PracticeSessionItem } from '../../api/practice.api'
+import { formatIpa, formatWordType, hasText } from './practiceFormatters'
 
 const reviewLevels: ReadonlyArray<{ level: PracticeReviewLevel; label: string }> = [
   { level: 0, label: 'New' },
@@ -14,89 +12,142 @@ const reviewLevels: ReadonlyArray<{ level: PracticeReviewLevel; label: string }>
 ]
 
 type PracticeRecapProps = {
-  card: FlashcardCard
+  item: PracticeSessionItem
+  isLastItem: boolean
   reviewStatus: PracticeReviewStatus | null
-  isAddingToReview: boolean
   isSaving: boolean
-  addError: boolean
   saveError: boolean
-  isLastCard: boolean
-  canGoPrevious: boolean
-  onPrevious: () => void
-  onSelectLevel: (initialLevel: PracticeReviewLevel) => void
+  selectedLevel: PracticeReviewLevel | null
+  onPlayAudio: () => void
+  onSelectLevel: (level: PracticeReviewLevel) => void
+  onConfirmNext: () => void
   onSkip: () => void
 }
 
-export function PracticeRecap({ card, reviewStatus, isAddingToReview, isSaving, addError, saveError, isLastCard, canGoPrevious, onPrevious, onSelectLevel, onSkip }: PracticeRecapProps) {
-  const controlsDisabled = isAddingToReview || isSaving
-  const levelsDisabled = controlsDisabled || reviewStatus !== null
+export function PracticeRecap({
+  item,
+  isLastItem,
+  reviewStatus,
+  isSaving,
+  saveError,
+  selectedLevel,
+  onPlayAudio,
+  onSelectLevel,
+  onConfirmNext,
+  onSkip,
+}: PracticeRecapProps) {
+  const activeInReview = reviewStatus === 'alreadyInReview' || item.alreadyInReview
+  const levelsDisabled = isSaving || activeInReview || reviewStatus === 'added'
+  const currentSelection = selectedLevel ?? item.selectedLevel
+  const wordType = hasText(item.type) ? formatWordType(item.type) : ''
+  const ipa = hasText(item.ipaPronunciation) ? formatIpa(item.ipaPronunciation) : ''
 
   return (
-    <div className="review-recap practice-recap" data-testid="practice-answer-reveal">
-      <header className="review-recap__header">
-        <h2>
-          {card.word}
-          {hasText(card.wordClass) ? <span> ({formatWordClass(card.wordClass)})</span> : null}
-        </h2>
-        {hasText(card.ipaPronunciation) ? <p>{formatIpa(card.ipaPronunciation)}</p> : null}
-      </header>
-
-      {hasText(card.meaningEn) || hasText(card.meaningVn) || hasText(card.example) || hasText(card.synonyms) || hasText(card.antonyms) ? (
-        <div className="review-recap__details practice-recap__details">
-          {hasText(card.meaningEn) ? <p><strong><em>Definition:</em></strong> {card.meaningEn}</p> : null}
-          {hasText(card.meaningVn) ? <p><strong><em>Meaning:</em></strong> {card.meaningVn}</p> : null}
-          {hasText(card.example) ? <p><strong><em>Example:</em></strong> {card.example}</p> : null}
-          {hasText(card.synonyms) ? <p><strong><em>Synonyms:</em></strong> {card.synonyms}</p> : null}
-          {hasText(card.antonyms) ? <p><strong><em>Antonyms:</em></strong> {card.antonyms}</p> : null}
-        </div>
-      ) : null}
-
-      {reviewStatus === 'alreadyInReview' ? <p className="practice-recap-status" role="status">Already in Review</p> : null}
-      {reviewStatus === 'added' ? <p className="practice-recap-status" role="status">Added to Review</p> : null}
-      {isAddingToReview ? <p className="practice-recap-status" role="status" aria-live="polite">Adding to Review...</p> : null}
-
-      <div className="practice-recap-actions" data-testid="practice-recap-actions" aria-busy={controlsDisabled}>
-        <button
-          className="practice-recap__nav-button practice-recap__nav-button--previous"
-          type="button"
-          onClick={onPrevious}
-          disabled={!canGoPrevious || controlsDisabled}
-          aria-label="Previous"
-          title="Previous practice step"
-        >
-          <span aria-hidden="true">&lt;</span>
-        </button>
-
-        <div className="practice-recap__levels" role="group" aria-label="Choose initial review level">
-          {reviewLevels.map(({ level, label }) => (
-            <button
-              key={level}
-              className="practice-recap__level-button"
-              type="button"
-              onClick={() => onSelectLevel(level)}
-              disabled={levelsDisabled}
-              data-testid={`practice-review-level-${level}`}
-              title={`Add to Review as ${label}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <button
-          className="practice-recap__nav-button practice-recap__nav-button--next"
-          type="button"
-          onClick={onSkip}
-          disabled={controlsDisabled}
-          aria-label="Skip"
-          title={isLastCard ? 'Skip and finish practice' : 'Skip to the next card'}
-        >
-          <span aria-hidden="true">&gt;</span>
-        </button>
+    <div className="practice-recap">
+      <div className="practice-prompt-stack">
+        <span className="practice-eyebrow practice-eyebrow--teal">WORD RECAP</span>
       </div>
 
-      {addError ? <p className="flashcard-status flashcard-status--error" role="alert">Unable to add this word to Review. Try again.</p> : null}
-      {saveError ? <p className="flashcard-status flashcard-status--error" role="alert">Unable to save this practice result. Try again.</p> : null}
+      <div className="practice-recap-summary">
+        <header className="practice-recap-summary__header">
+          <div className="practice-recap-summary__word">
+            <h3>{item.word}</h3>
+            {wordType ? <span className="practice-pos-badge">{wordType}</span> : null}
+            {ipa ? <span className="practice-ipa">{ipa}</span> : null}
+          </div>
+
+          <button
+            className="practice-pill-btn practice-pill-btn--listen-compact"
+            type="button"
+            aria-label="Listen to pronunciation"
+            aria-keyshortcuts="Tab"
+            onClick={onPlayAudio}
+          >
+            <Volume2 size={15} aria-hidden="true" />
+            <span>Listen</span>
+          </button>
+        </header>
+
+        <div className="practice-stage-divider" aria-hidden="true" />
+
+        <div className="practice-recap-details">
+          {hasText(item.meaning) ? (
+            <div className="practice-recap-details__row">
+              <span className="practice-detail-label">MEANING</span>
+              <p className="practice-recap-meaning">{item.meaning}</p>
+            </div>
+          ) : null}
+          {hasText(item.context) ? (
+            <div className="practice-recap-details__row">
+              <span className="practice-detail-label">USAGE CONTEXT</span>
+              <p className="practice-recap-context">{item.context}</p>
+            </div>
+          ) : null}
+          {hasText(item.example) ? (
+            <div className="practice-recap-details__row">
+              <span className="practice-detail-label">EXAMPLE</span>
+              <p className="practice-recap-example">{item.example}</p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="practice-recap-levels-section" aria-label="Choose a review level">
+        <p className="practice-recap-question">How well did you recall this word?</p>
+        <div className="practice-recap-levels" role="group" aria-label="Choose initial review level">
+          {reviewLevels.map(({ level, label }) => {
+            const isSelected = currentSelection === level
+            return (
+              <button
+                key={level}
+                className={`practice-level-btn${isSelected ? ' practice-level-btn--selected' : ''}`}
+                type="button"
+                onClick={() => onSelectLevel(level)}
+                disabled={levelsDisabled}
+                aria-pressed={isSelected}
+                aria-keyshortcuts={String(level)}
+                data-level={level}
+                data-testid={`practice-review-level-${level}`}
+                title={`Select level ${level}: ${label}`}
+              >
+                <span className="practice-level-num">{level}</span>
+                <span className="practice-level-label">{label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {activeInReview ? (
+          <p className="practice-recap-status" role="status">
+            <span aria-hidden="true" className="practice-recap-status__dot" />
+            Already in review
+          </p>
+        ) : null}
+        {reviewStatus === 'added' ? <p className="practice-recap-status" role="status">Added to Review</p> : null}
+        {isSaving ? <p className="practice-recap-status" role="status" aria-live="polite">Saving practice progress…</p> : null}
+        {saveError ? <p className="practice-recap-error" role="alert">Unable to save this practice result. Try again.</p> : null}
+      </section>
+
+      <div className="practice-action-row" data-testid="practice-recap-actions" aria-busy={isSaving}>
+        <button
+          className="practice-btn-secondary"
+          type="button"
+          onClick={onSkip}
+          disabled={isSaving}
+          aria-label="Skip recap"
+        >
+          Skip
+        </button>
+        <button
+          className="practice-btn-primary"
+          type="button"
+          onClick={onConfirmNext}
+          disabled={isSaving || (!activeInReview && currentSelection == null)}
+        >
+          <span>{isLastItem ? 'Finish Practice' : 'Next Word'}</span>
+          <ArrowRight size={15} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   )
 }

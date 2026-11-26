@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   source-contract:
-    name: Require dev to main
+    name: Require develop to main
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -28,7 +28,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -Eeuo pipefail
-          [[ "$HEAD_REF" == "dev" ]]
+          [[ "$HEAD_REF" == "develop" ]]
           [[ "$BASE_REF" == "main" ]]
 
   backend:
@@ -128,8 +128,8 @@ jobs:
           tags: fluenta-frontend:pr-ci
           build-args: |
             VCS_REF=${{ github.sha }}
-            VITE_API_URL=https://api.sophion.io.vn/api/v1
-            VITE_GOOGLE_CLIENT_ID=ci-validation.apps.googleusercontent.com
+            API_URL=/api/v1
+            GOOGLE_CLIENT_ID=ci-validation.apps.googleusercontent.com
 
       - name: Verify image revisions and runtime identities
         env:
@@ -153,12 +153,16 @@ jobs:
       - name: Validate production Compose
         run: >-
           docker compose
-          --env-file deploy/production/env.example
-          --file deploy/production/compose.yml
+          --env-file deploy/azure/release.env.example
+          --file deploy/azure/compose.yml
           config --quiet
 
-  delivery-policy:
-    name: Delivery policy
+      - name: Check Caddy API routing and React deep links
+        shell: pwsh
+        run: ./deploy/azure/tests/smoke-containers.ps1 -WebImage fluenta-frontend:pr-ci
+
+  deployment-syntax:
+    name: Azure deployment scripts
     needs: source-contract
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -166,17 +170,10 @@ jobs:
       - name: Check out the pull request revision
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Reject mutable production images and public data ports
-        run: bash deploy/production/bin/validate-delivery-policy.sh
-
-      - name: Test the fixed host release boundary
+      - name: Validate runtime bundle and shell syntax
         run: |
           set -Eeuo pipefail
-          for test_script in \
-            deploy-release.test.sh \
-            install-deployment-artifacts.test.sh; do
-            docker run --rm \
-              --volume "$PWD:/repo:ro" \
-              mcr.microsoft.com/dotnet/sdk:10.0@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 \
-              bash "/repo/deploy/production/tests/${test_script}"
-          done
+          bash -n deploy/azure/deploy.sh
+          docker run --rm --env FLUENTA_DISPOSABLE_TEST_CONTAINER=1 \
+            --volume "$PWD:/repo:ro" --workdir /repo \
+            python:3.13-slim python -B -m unittest discover -s deploy/azure/tests -v

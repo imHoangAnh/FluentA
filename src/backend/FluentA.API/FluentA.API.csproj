@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluentA.Application\FluentA.Application.csproj" />
+    <ProjectReference Include="..\FluentA.Domain\FluentA.Domain.csproj" />
     <ProjectReference Include="..\FluentA.Infrastructure\FluentA.Infrastructure.csproj" />
   </ItemGroup>
 

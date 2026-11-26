@@ -1,6 +1,7 @@
 using FluentA.Application.BoundedContexts.Assets;
 using FluentA.Application.BoundedContexts.Countdown;
 using FluentA.Application.BoundedContexts.Countdown.DTOs;
+using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Assets.Entities;
 using FluentA.Domain.BoundedContexts.Assets.Enums;
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
@@ -17,14 +18,10 @@ public sealed class CountdownServiceTests
         var userId = Guid.NewGuid();
         var target = DateTime.UtcNow.AddDays(12).ToString("yyyy-MM-dd");
 
-        var result = await service.CreateAsync(userId, new CreateCountdownEventRequest(
-            " IELTS Exam ",
-            target,
-            [new CreateCountdownAlertRequest("7DaysBefore", "09:00"), new CreateCountdownAlertRequest("OnTargetDay", "07:30")]));
+        var result = await service.CreateAsync(userId, new CreateCountdownEventRequest(" IELTS Exam ", target));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("IELTS Exam", result.Value!.Name);
-        Assert.Equal(2, result.Value.Alerts.Count);
         Assert.Single(repository.Events);
         Assert.Equal(userId, repository.Events[0].UserId);
     }
@@ -34,43 +31,38 @@ public sealed class CountdownServiceTests
     {
         var service = new CountdownService(new FakeCountdownRepository());
 
-        var result = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest("", "not-a-date", []));
+        var result = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest("", "not-a-date"));
 
         Assert.False(result.IsSuccess);
         var error = Assert.IsType<CountdownError>(result.Error);
         Assert.Equal("VALIDATION_ERROR", error.Code);
-        Assert.Equal(422, error.StatusCode);
+        Assert.Equal(400, error.StatusCode);
     }
 
     [Fact]
-    public async Task CreateAsync_ValidatesRepeatAndUsesTheFiftyCharacterNewNameLimit()
+    public async Task CreateAsync_UsesTheFiftyCharacterNewNameLimit()
     {
         var service = new CountdownService(new FakeCountdownRepository());
         var target = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd");
 
-        var missingOnTarget = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
-            "Weekly reminder", target, [new CreateCountdownAlertRequest("1DayBefore", "09:00")], null, "Weekly"));
         var tooLong = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
-            new string('x', 51), target, [new CreateCountdownAlertRequest("OnTargetDay", "09:00")]));
+            new string('x', 51), target));
         var valid = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
-            "Weekly reminder", target, [new CreateCountdownAlertRequest("OnTargetDay", "09:00")], null, "Weekly"));
+            "Exam", target));
 
-        Assert.False(missingOnTarget.IsSuccess);
         Assert.False(tooLong.IsSuccess);
         Assert.True(valid.IsSuccess);
-        Assert.Equal("Weekly", valid.Value!.RepeatPattern);
-        Assert.False(valid.Value.IsCompleted);
+        Assert.False(valid.Value!.IsCompleted);
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsDuplicateAlertsAndInvalidCover()
+    public async Task CreateAsync_RejectsInvalidCover()
     {
         var service = new CountdownService(new FakeCountdownRepository(), new FakeAssetRepository());
 
         var result = await service.CreateAsync(Guid.NewGuid(), new CreateCountdownEventRequest(
             "Exam",
             DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
-            [new CreateCountdownAlertRequest("OnTargetDay", "09:00"), new CreateCountdownAlertRequest("OnTargetDay", "09:00")],
             Guid.NewGuid()));
 
         Assert.False(result.IsSuccess);
@@ -78,14 +70,12 @@ public sealed class CountdownServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_ReturnsUpcomingThenCompletedInsideVisibleWindow()
+    public async Task ListAsync_ReturnsUpcomingThenCompletedWithoutExpiry()
     {
         var repository = new FakeCountdownRepository();
         var userId = Guid.NewGuid();
         var upcoming = CountdownEventEntity.Create(userId, "Later", DateTime.UtcNow.Date.AddDays(2));
-        upcoming.AddAlert("OnTargetDay", "09:00", DateTime.UtcNow.AddDays(2));
         var completed = CountdownEventEntity.Create(userId, "Past", DateTime.UtcNow.Date.AddDays(-2));
-        completed.AddAlert("OnTargetDay", "09:00", DateTime.UtcNow.AddDays(-2));
         repository.Events.Add(upcoming);
         repository.Events.Add(completed);
         var service = new CountdownService(repository);
@@ -99,7 +89,7 @@ public sealed class CountdownServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_SoftDeletesOwnedCountdownAndArchivesItsCover()
+    public async Task DeleteAsync_HidesOwnedCountdownAndRetainsCover()
     {
         var repository = new FakeCountdownRepository();
         var assets = new FakeAssetRepository();
@@ -109,17 +99,60 @@ public sealed class CountdownServiceTests
         asset.FinalizeUpload(asset.ContentType, 1024);
         assets.Assets.Add(asset);
         var countdownEvent = CountdownEventEntity.Create(userId, "Exam", DateTime.UtcNow.AddDays(1), asset.Id);
-        countdownEvent.AddAlert("OnTargetDay", "09:00", DateTime.UtcNow.AddHours(2));
         repository.Events.Add(countdownEvent);
         var service = new CountdownService(repository, assets, storage);
 
         var result = await service.DeleteAsync(userId, countdownEvent.Id);
+        var listed = await service.ListAsync(userId);
+        var repeated = await service.DeleteAsync(userId, countdownEvent.Id);
 
         Assert.True(result.IsSuccess);
+        Assert.Contains(countdownEvent, repository.Events);
         Assert.NotNull(countdownEvent.DeletedAt);
-        Assert.Null(countdownEvent.CoverAssetId);
-        Assert.Equal(AssetStatus.Archived, asset.Status);
+        Assert.Equal(countdownEvent.DeletedAt, countdownEvent.UpdatedAt);
+        Assert.Empty(listed.Value!);
+        Assert.False(repeated.IsSuccess);
+        Assert.Equal("COUNTDOWN_NOT_FOUND", repeated.Error!.Code);
+        Assert.Equal(AssetStatus.Ready, asset.Status);
         Assert.Null(storage.DeletedObjectKey);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DoesNotCallUnavailableStorage()
+    {
+        var repository = new FakeCountdownRepository();
+        var assets = new FakeAssetRepository();
+        var storage = new FakeAssetObjectStorage { FailDelete = true };
+        var userId = Guid.NewGuid();
+        var asset = Asset.CreatePending(Guid.NewGuid(), userId, AssetType.CountdownCover, "countdown-covers/cover.png", "image/png", 0, DateTime.UtcNow.AddHours(1));
+        asset.FinalizeUpload(asset.ContentType, 1024);
+        assets.Assets.Add(asset);
+        var countdown = CountdownEventEntity.Create(userId, "Exam", DateTime.UtcNow.AddDays(1), asset.Id);
+        repository.Events.Add(countdown);
+        var service = new CountdownService(repository, assets, storage);
+
+        var result = await service.DeleteAsync(userId, countdown.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(countdown, repository.Events);
+        Assert.NotNull(countdown.DeletedAt);
+        Assert.Equal(AssetStatus.Ready, asset.Status);
+        Assert.Null(storage.DeletedObjectKey);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ForeignCountdownReturnsNotFound()
+    {
+        var repository = new FakeCountdownRepository();
+        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", DateTime.UtcNow.AddDays(1));
+        repository.Events.Add(countdown);
+        var service = new CountdownService(repository);
+
+        var result = await service.DeleteAsync(Guid.NewGuid(), countdown.Id);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("COUNTDOWN_NOT_FOUND", Assert.IsType<CountdownError>(result.Error).Code);
+        Assert.Contains(countdown, repository.Events);
     }
 
     [Fact]
@@ -133,7 +166,7 @@ public sealed class CountdownServiceTests
         asset.FinalizeUpload(asset.ContentType, 1024);
         assets.Assets.Add(asset);
         var service = new CountdownService(repository, assets, storage);
-        var request = new CreateCountdownEventRequest("Exam", DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"), [new CreateCountdownAlertRequest("OnTargetDay", "09:00")], asset.Id);
+        var request = new CreateCountdownEventRequest("Exam", DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"), asset.Id);
 
         var created = await service.CreateAsync(userId, request);
         var duplicate = await service.CreateAsync(userId, request with { Name = "Duplicate" });
@@ -169,17 +202,9 @@ public sealed class CountdownServiceTests
                 && countdownEvent.DeletedAt is null));
         }
 
-        public Task<CountdownEventEntity?> GetTrashedAsync(Guid userId, Guid countdownId, DateTime trashedAt, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(Events.FirstOrDefault(countdownEvent =>
-                countdownEvent.UserId == userId
-                && countdownEvent.Id == countdownId
-                && countdownEvent.DeletedAt == trashedAt));
-        }
-
         public Task<bool> IsCoverAssetAttachedAsync(Guid coverAssetId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(Events.Any(countdownEvent => countdownEvent.CoverAssetId == coverAssetId && countdownEvent.DeletedAt is null));
+            return Task.FromResult(Events.Any(countdownEvent => countdownEvent.CoverAssetId == coverAssetId));
         }
 
         public Task AddAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
@@ -188,16 +213,7 @@ public sealed class CountdownServiceTests
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task RemoveAsync(CountdownEventEntity countdownEvent, CancellationToken cancellationToken = default)
-        {
-            Events.Remove(countdownEvent);
-            return Task.CompletedTask;
-        }
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeAssetRepository : IAssetRepository
@@ -217,14 +233,12 @@ public sealed class CountdownServiceTests
                 .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
 
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Asset>>([]);
-
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeAssetObjectStorage : IAssetObjectStorage
     {
+        public bool FailDelete { get; init; }
         public string? DeletedObjectKey { get; private set; }
 
         public AssetPresignedUpload CreatePresignedUpload(AssetUploadRequest request) => throw new NotSupportedException();
@@ -234,6 +248,7 @@ public sealed class CountdownServiceTests
         public Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            if (FailDelete) throw new AssetStorageUnavailableException("Storage unavailable.");
             DeletedObjectKey = objectKey;
             return Task.CompletedTask;
         }

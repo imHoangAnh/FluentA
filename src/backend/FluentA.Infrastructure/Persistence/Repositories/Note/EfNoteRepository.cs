@@ -14,13 +14,20 @@ public sealed class EfNoteRepository : INoteRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<NoteBoard>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NoteBoardListItem>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.NoteBoards
-            .Include(board => board.Pages)
+            .AsNoTracking()
             .Where(board => board.UserId == userId && board.DeletedAt == null)
             .OrderByDescending(board => board.CreatedAt)
             .ThenByDescending(board => board.Id)
+            .Select(board => new NoteBoardListItem(
+                board.Id, board.Name,
+                board.Pages.Where(page => page.DeletedAt == null)
+                    .OrderByDescending(page => page.CreatedAt).ThenByDescending(page => page.Id)
+                    .Select(page => new NotePageListItem(page.Id, page.BoardId, page.Name, page.Date, page.CreatedAt, page.UpdatedAt))
+                    .ToList(),
+                board.CreatedAt, board.UpdatedAt))
             .ToListAsync(cancellationToken);
     }
 
@@ -44,46 +51,10 @@ public sealed class EfNoteRepository : INoteRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<NoteBoard?> GetTrashedBoardAsync(Guid userId, Guid boardId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.NoteBoards
-            .Include(board => board.Pages)
-            .FirstOrDefaultAsync(board => board.Id == boardId
-                && board.UserId == userId
-                && board.DeletedAt == trashedAt, cancellationToken);
-    }
-
-    public Task<NotePage?> GetTrashedPageAsync(Guid userId, Guid pageId, DateTime trashedAt, CancellationToken cancellationToken = default)
-    {
-        return (
-            from page in _dbContext.NotePages
-            join board in _dbContext.NoteBoards on page.BoardId equals board.Id
-            where page.Id == pageId
-                && page.DeletedAt == trashedAt
-                && board.UserId == userId
-                && board.DeletedAt == null
-            select page)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(Guid pageId, CancellationToken cancellationToken = default)
     {
         return (await _dbContext.NotePageAssets
                 .Where(link => link.NotePageId == pageId && link.DeletedAt == null)
-                .Select(link => link.AssetId)
-                .ToListAsync(cancellationToken))
-            .ToHashSet();
-    }
-
-    public async Task<IReadOnlySet<Guid>> GetPageAssetIdsAsync(IReadOnlyCollection<Guid> pageIds, CancellationToken cancellationToken = default)
-    {
-        if (pageIds.Count == 0)
-        {
-            return new HashSet<Guid>();
-        }
-
-        return (await _dbContext.NotePageAssets
-                .Where(link => pageIds.Contains(link.NotePageId) && link.DeletedAt == null)
                 .Select(link => link.AssetId)
                 .ToListAsync(cancellationToken))
             .ToHashSet();
@@ -108,7 +79,10 @@ public sealed class EfNoteRepository : INoteRepository
             .ToListAsync(cancellationToken);
         var currentAssetIds = currentLinks.Select(link => link.AssetId).ToHashSet();
 
-        _dbContext.NotePageAssets.RemoveRange(currentLinks.Where(link => !assetIds.Contains(link.AssetId)));
+        foreach (var link in currentLinks.Where(link => !assetIds.Contains(link.AssetId)))
+        {
+            link.SoftDelete(DateTime.UtcNow);
+        }
         var additions = assetIds
             .Where(assetId => !currentAssetIds.Contains(assetId))
             .Select(assetId => NotePageAsset.Create(pageId, assetId));
@@ -127,13 +101,15 @@ public sealed class EfNoteRepository : INoteRepository
 
     public Task UpdateBoardAsync(NoteBoard board, CancellationToken cancellationToken = default)
     {
-        _dbContext.NoteBoards.Update(board);
+        if (_dbContext.Entry(board).State == EntityState.Detached)
+            _dbContext.NoteBoards.Update(board);
         return Task.CompletedTask;
     }
 
     public Task UpdatePageAsync(NotePage page, CancellationToken cancellationToken = default)
     {
-        _dbContext.NotePages.Update(page);
+        if (_dbContext.Entry(page).State == EntityState.Detached)
+            _dbContext.NotePages.Update(page);
         return Task.CompletedTask;
     }
 
@@ -154,18 +130,6 @@ public sealed class EfNoteRepository : INoteRepository
     public Task SoftDeletePageAsync(NotePage page, DateTime trashedAt, CancellationToken cancellationToken = default)
     {
         page.SoftDelete(trashedAt);
-        return Task.CompletedTask;
-    }
-
-    public Task RemoveBoardAsync(NoteBoard board, CancellationToken cancellationToken = default)
-    {
-        _dbContext.NoteBoards.Remove(board);
-        return Task.CompletedTask;
-    }
-
-    public Task RemovePageAsync(NotePage page, CancellationToken cancellationToken = default)
-    {
-        _dbContext.NotePages.Remove(page);
         return Task.CompletedTask;
     }
 

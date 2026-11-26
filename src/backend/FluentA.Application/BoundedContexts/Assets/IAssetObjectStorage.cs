@@ -7,5 +7,4 @@ public interface IAssetObjectStorage
     Task<AssetObjectMetadata?> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default);
     Task<byte[]?> GetObjectPrefixAsync(string objectKey, int maxBytes, CancellationToken cancellationToken = default);
     Task VerifyBucketAccessAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken = default);
 }

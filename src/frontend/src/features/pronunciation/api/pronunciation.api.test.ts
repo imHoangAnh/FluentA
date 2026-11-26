@@ -7,7 +7,8 @@ describe('getPronunciationAssessmentErrorMessage', () => {
       response: {
         data: {
           success: false,
-          error: { code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'Server message' },
+          message: 'Server message',
+          errors: [{ code: 'PRONUNCIATION_NOT_RECOGNIZED', message: 'Server message' }],
         },
       },
     }

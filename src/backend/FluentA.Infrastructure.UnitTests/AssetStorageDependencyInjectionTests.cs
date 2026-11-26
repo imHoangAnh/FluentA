@@ -10,6 +10,30 @@ namespace FluentA.Infrastructure.UnitTests;
 public sealed class AssetStorageDependencyInjectionTests
 {
     [Fact]
+    public void Custom_endpoint_configuration_signs_direct_cloud_urls_with_auto_region()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["AssetStorage:Enabled"] = "true",
+            ["AssetStorage:Endpoint"] = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com",
+            ["AssetStorage:Bucket"] = "fluenta-assets-test",
+            ["AssetStorage:AccessKey"] = "TESTACCESSKEY",
+            ["AssetStorage:SecretKey"] = "test-secret-key",
+            ["AssetStorage:Region"] = "auto"
+        });
+        var clients = provider.GetRequiredService<AssetStorageClients>();
+        Assert.Same(clients.Operations, clients.Presigning);
+        var storage = provider.GetRequiredService<IAssetObjectStorage>();
+        var upload = storage.CreatePresignedUpload(new AssetUploadRequest(
+            "integration/image.png", "image/png", TimeSpan.FromMinutes(5)));
+        var url = new Uri(upload.Url);
+        Assert.Equal("https", url.Scheme);
+        Assert.EndsWith(".r2.cloudflarestorage.com", url.Host, StringComparison.Ordinal);
+        Assert.Contains("/auto/s3/aws4_request", Uri.UnescapeDataString(url.Query), StringComparison.Ordinal);
+        Assert.Contains("X-Amz-Signature=", url.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Regional_registration_reuses_one_virtual_hosted_client()
     {
         var provider = BuildProvider(new Dictionary<string, string?>
@@ -28,7 +52,7 @@ public sealed class AssetStorageDependencyInjectionTests
             Assert.Equal(RegionEndpoint.APSoutheast1.SystemName, clientConfig.RegionEndpoint.SystemName);
             Assert.False(clientConfig.ForcePathStyle);
             Assert.Null(clientConfig.ServiceURL);
-            Assert.IsType<S3CompatibleAssetObjectStorage>(provider.GetRequiredService<IAssetObjectStorage>());
+            Assert.IsType<AssetObjectStorage>(provider.GetRequiredService<IAssetObjectStorage>());
             Assert.IsType<AssetStorageReadinessProbe>(provider.GetRequiredService<IAssetStorageReadinessProbe>());
         }
     }
@@ -39,8 +63,8 @@ public sealed class AssetStorageDependencyInjectionTests
         var provider = BuildProvider(new Dictionary<string, string?>
         {
             ["AssetStorage:Enabled"] = "true",
-            ["AssetStorage:Endpoint"] = "http://minio:59000",
-            ["AssetStorage:PublicEndpoint"] = "https://localhost:7443",
+            ["AssetStorage:Endpoint"] = "https://storage.example.test",
+            ["AssetStorage:PublicEndpoint"] = "https://storage-browser.example.test",
             ["AssetStorage:Bucket"] = "fluenta-assets-test",
             ["AssetStorage:AccessKey"] = "test-access-key",
             ["AssetStorage:SecretKey"] = "test-secret-key",
@@ -55,8 +79,8 @@ public sealed class AssetStorageDependencyInjectionTests
             var presigningConfig = Assert.IsType<AmazonS3Config>(clients.Presigning.Config);
 
             Assert.NotSame(clients.Operations, clients.Presigning);
-            Assert.Equal("http://minio:59000/", operationsConfig.ServiceURL);
-            Assert.Equal("https://localhost:7443/", presigningConfig.ServiceURL);
+            Assert.Equal("https://storage.example.test/", operationsConfig.ServiceURL);
+            Assert.Equal("https://storage-browser.example.test/", presigningConfig.ServiceURL);
             Assert.True(operationsConfig.ForcePathStyle);
             Assert.True(presigningConfig.ForcePathStyle);
         }

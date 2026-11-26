@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 const publicRoutes = [
   ['/login', 'Welcome back'],
   ['/register', 'Create your account'],
-  ['/verify-email?email=responsive%40fluenta.local', 'Verify your email'],
+  ['/verify-email?email=responsive%40fluenta.local', 'Welcome back'],
   ['/forgot-password', 'Reset your password'],
   ['/reset-password?token=responsive-token', 'Choose a new password'],
 ]

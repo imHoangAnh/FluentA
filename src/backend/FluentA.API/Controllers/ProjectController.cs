@@ -3,7 +3,6 @@ using FluentA.API.Common;
 using FluentA.API.Contracts;
 using FluentA.Application.BoundedContexts.Project;
 using FluentA.Application.BoundedContexts.Project.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +27,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.ListBoardsAsync(CurrentUserId(), cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<IReadOnlyList<ProjectBoardSummaryDto>>.Ok(result.Value!))
+            ? Ok(ApiResponse<IReadOnlyList<ProjectBoardSummaryDto>>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -38,7 +37,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.CreateBoardAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<ProjectBoardDetailDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectBoardDetailDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -48,7 +47,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.GetBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ProjectBoardDetailDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ProjectBoardDetailDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -58,7 +57,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.UpdateBoardAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ProjectBoardDetailDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ProjectBoardDetailDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -68,7 +67,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteBoardAsync(CurrentUserId(), boardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -78,7 +77,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.CreateColumnAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<ProjectColumnDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectColumnDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -88,7 +87,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.UpdateColumnAsync(CurrentUserId(), boardId, columnId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ProjectColumnDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ProjectColumnDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -98,7 +97,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteColumnAsync(CurrentUserId(), boardId, columnId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 
@@ -108,7 +107,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.CreateCardAsync(CurrentUserId(), boardId, request, cancellationToken);
         return result.IsSuccess
-            ? StatusCode(StatusCodes.Status201Created, ApiEnvelope<ProjectCardDto>.Ok(result.Value!))
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectCardDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -118,7 +117,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.UpdateCardAsync(CurrentUserId(), cardId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ProjectCardDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ProjectCardDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -128,7 +127,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.MoveCardAsync(CurrentUserId(), cardId, request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<ProjectCardDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<ProjectCardDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -138,7 +137,7 @@ public sealed class ProjectController : ApiControllerBase
     {
         var result = await _project.DeleteCardAsync(CurrentUserId(), cardId, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<TrashEntryDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<object>.Ok(new { deleted = result.Value }))
             : ToErrorResult(result);
     }
 

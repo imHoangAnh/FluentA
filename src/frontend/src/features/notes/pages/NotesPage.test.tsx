@@ -1,3 +1,4 @@
+import '@/test/rich-text-dom'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
@@ -59,20 +60,13 @@ describe('NotesPage', () => {
       status: 'authenticated',
       user: {
         id: 'user-1',
-        email: 'learner@example.com',
         fullName: 'FluentA Learner',
-        isEmailVerified: true,
+        avatarUrl: null,
       },
     })
     vi.mocked(noteApi.listBoards).mockResolvedValue([])
-    vi.mocked(noteApi.deleteBoard).mockResolvedValue({
-      id: 'trash-board-1', entityKind: 'Note', entityId: 'board-1', displayName: 'Learning Notes', originalLocation: 'Notes',
-      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
-    })
-    vi.mocked(noteApi.deletePage).mockResolvedValue({
-      id: 'trash-page-1', entityKind: 'Note', entityId: 'page-1', displayName: 'Week 1 reflections', originalLocation: 'Notes',
-      trashedAt: '2026-07-09T10:00:00Z', purgeAfterAt: '2026-08-08T10:00:00Z',
-    })
+    vi.mocked(noteApi.deleteBoard).mockResolvedValue({ deleted: true })
+    vi.mocked(noteApi.deletePage).mockResolvedValue({ deleted: true })
     vi.mocked(noteApi.updatePage).mockResolvedValue({
       id: 'page-1',
       boardId: 'board-1',
@@ -250,7 +244,7 @@ describe('NotesPage', () => {
     const toolbar = await screen.findByRole('toolbar', { name: 'Note formatting tools' })
     const toolbarHost = screen.getByTestId('note-toolbar-host')
     const editor = screen.getByLabelText('Journal rich text editor')
-    const editorShell = editor.parentElement
+    const editorShell = editor.closest('.journal-rich-text-shell')
 
     expect(header.compareDocumentPosition(toolbarHost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(toolbarHost).toContainElement(toolbar)
@@ -259,12 +253,12 @@ describe('NotesPage', () => {
     expect(editorShell).toHaveClass('border-0', 'focus-within:ring-0')
 
     await user.click(screen.getByRole('button', { name: 'Bold' }))
-    expect(execCommand).toHaveBeenCalledWith('bold', false, undefined)
-    expect(screen.getByTestId('note-save-status')).toHaveTextContent('Unsaved changes')
+    expect(screen.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true')
+    expect(execCommand).not.toHaveBeenCalled()
     Reflect.deleteProperty(document, 'execCommand')
   })
 
-  it('saves the current draft on blur', async () => {
+  it('auto-saves the current draft after two seconds', async () => {
     const user = userEvent.setup()
 
     vi.mocked(noteApi.listBoards).mockResolvedValue([{
@@ -314,11 +308,11 @@ describe('NotesPage', () => {
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledWith('page-1', {
       name: 'Updated reflections',
       content: '<p>Saved content</p>',
-    }))
+    }), { timeout: 4000 })
     expect(await screen.findByTestId('note-save-status')).toHaveTextContent('Saved')
   })
 
-  it('saves before switching pages and keeps the draft when save fails', async () => {
+  it('keeps failed drafts until a user confirms discarding before switching pages', async () => {
     const user = userEvent.setup()
 
     vi.mocked(noteApi.listBoards).mockResolvedValue([{
@@ -359,13 +353,12 @@ describe('NotesPage', () => {
         response: {
           data: {
             success: false,
-            error: {
+            message: 'The request did not pass validation.',
+            errors: [{
               code: 'VALIDATION_ERROR',
-              message: 'The request did not pass validation.',
-              details: {
-                content: ['Content must be at most 100000 characters after formatting cleanup.'],
-              },
-            },
+              message: 'Content must be at most 100000 characters after formatting cleanup.',
+              field: 'content',
+            }],
           },
         },
       })
@@ -387,23 +380,19 @@ describe('NotesPage', () => {
     const titleInput = await screen.findByLabelText('Note title')
     await user.clear(titleInput)
     await user.type(titleInput, 'Edited page one')
-    await user.click(screen.getByRole('button', { name: 'Practice recap' }))
-
-    await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledTimes(1))
-    expect(screen.getByLabelText('Note title')).toHaveValue('Edited page one')
-    expect(screen.getByTestId('note-save-status')).toHaveTextContent('Save failed')
+    await waitFor(() => expect(screen.getByTestId('note-save-status')).toHaveTextContent('Save failed'), { timeout: 4000 })
     expect(screen.getByText('Content must be at most 100000 characters after formatting cleanup.')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('Practice recap')).not.toBeInTheDocument()
-
     await user.click(screen.getByRole('button', { name: 'Practice recap' }))
-
-    await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('may be lost')
+    await user.click(screen.getByRole('button', { name: 'Stay' }))
+    expect(screen.getByLabelText('Note title')).toHaveValue('Edited page one')
+    await user.click(screen.getByRole('button', { name: 'Practice recap' }))
+    await user.click(screen.getByRole('button', { name: 'Discard and continue' }))
     expect(await screen.findByDisplayValue('Practice recap')).toBeInTheDocument()
-    expect(screen.queryByText('Content must be at most 100000 characters after formatting cleanup.')).not.toBeInTheDocument()
+    expect(noteApi.updatePage).toHaveBeenCalledTimes(1)
   })
 
   it('uploads a dropped note image and persists a durable asset reference on save', async () => {
-    const user = userEvent.setup()
     const file = new File(['png'], 'diagram.png', { type: 'image/png' })
 
     vi.mocked(noteApi.listBoards).mockResolvedValue([{
@@ -451,12 +440,12 @@ describe('NotesPage', () => {
     await waitFor(() => expect(assetsApi.uploadAsset).toHaveBeenCalledWith(file, 'note-image'))
     expect(screen.getByTestId('note-save-status')).toHaveTextContent('Unsaved changes')
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
 
     await waitFor(() => expect(noteApi.updatePage).toHaveBeenCalledWith('page-1', {
       name: 'Week 1 reflections',
-      content: expect.stringMatching(/<img src="blob:[^"]+" alt="diagram.png" data-note-asset-id="asset-1">/),
-    }))
+      content: expect.stringContaining('data-asset-id="asset-1"'),
+    }), { timeout: 4000 })
     expect(await screen.findByTestId('note-save-status')).toHaveTextContent('Saved')
   })
 
@@ -530,10 +519,12 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedBoard).toHaveFocus())
     fireEvent.contextMenu(renamedBoard)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Board' }))
+    expect(noteApi.deleteBoard).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deleteBoard).toHaveBeenCalledWith('board-1'))
     expect(await screen.findByText('No note boards yet')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 
@@ -584,10 +575,12 @@ describe('NotesPage', () => {
     await waitFor(() => expect(renamedPage).toHaveFocus())
     fireEvent.contextMenu(renamedPage)
     await user.click(await screen.findByRole('menuitem', { name: 'Delete Page' }))
+    expect(noteApi.deletePage).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(noteApi.deletePage).toHaveBeenCalledWith('page-1'))
     expect(await screen.findByText('This board has no pages')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('notes-rail-scroll')).toHaveFocus())
   })
 })

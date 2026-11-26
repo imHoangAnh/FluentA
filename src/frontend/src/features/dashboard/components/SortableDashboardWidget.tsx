@@ -29,9 +29,9 @@ export function SortableDashboardWidget({ id, index, title, description, icon, o
       className={cn('min-h-0 min-w-0', dashboardWidgetSlotClass(index), isDragging && 'relative z-10 opacity-70')}
       data-testid={`dashboard-widget-${id}`}
     >
-      <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden shadow-[0_1px_2px_rgba(16,32,29,0.04)]">
-        <CardHeader className="shrink-0 flex-row items-start gap-2 p-3 sm:p-4">
-          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-secondary text-secondary-foreground" aria-hidden="true">{icon}</span>
+      <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden transition-colors duration-150 hover:border-primary/25">
+        <CardHeader className="shrink-0 flex-row items-start gap-2.5 border-b border-border/60 p-3 sm:p-4">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-primary" aria-hidden="true">{icon}</span>
           <div className="min-w-0 flex-1">
             <CardTitle className="truncate text-sm sm:text-base">{title}</CardTitle>
             <CardDescription className="mt-0.5 line-clamp-2 text-xs leading-5 sm:text-sm">{description}</CardDescription>

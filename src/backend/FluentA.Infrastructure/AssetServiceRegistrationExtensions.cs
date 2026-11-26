@@ -13,13 +13,12 @@ internal static class AssetServiceRegistrationExtensions
     {
         services.AddScoped<IAssetRepository, EfAssetRepository>();
         services.AddScoped<IAssetService, AssetService>();
-        services.AddMemoryCache();
         services.AddSingleton(assetStorageOptions);
         services.AddHostedService<AssetStorageStartupService>();
         if (assetStorageOptions.Enabled)
         {
             services.AddSingleton(_ => DependencyInjection.CreateAssetStorageClients(assetStorageOptions));
-            services.AddSingleton<IAssetObjectStorage, S3CompatibleAssetObjectStorage>();
+            services.AddSingleton<IAssetObjectStorage, AssetObjectStorage>();
             services.AddSingleton<IAssetStorageReadinessProbe, AssetStorageReadinessProbe>();
         }
         else

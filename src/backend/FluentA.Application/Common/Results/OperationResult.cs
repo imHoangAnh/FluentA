@@ -2,7 +2,7 @@ namespace FluentA.Application.Common;
 
 public sealed class OperationResult<T>
 {
-    private OperationResult(T? value, object? error, bool isSuccess)
+    private OperationResult(T? value, IApplicationError? error, bool isSuccess)
     {
         Value = value;
         Error = error;
@@ -11,9 +11,10 @@ public sealed class OperationResult<T>
 
     public bool IsSuccess { get; }
     public T? Value { get; }
-    public object? Error { get; }
+    public IApplicationError? Error { get; }
 
     public static OperationResult<T> Success(T value) => new(value, null, true);
 
-    public static OperationResult<T> Failure(object error) => new(default, error, false);
+    public static OperationResult<T> Failure(IApplicationError error) =>
+        new(default, error ?? throw new ArgumentNullException(nameof(error)), false);
 }

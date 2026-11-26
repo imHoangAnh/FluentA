@@ -7,131 +7,115 @@ const user = {
   isEmailVerified: true,
 }
 
-const words = [{
-  id: 'card-1',
-  wordId: 'word-1',
-  word: 'mitigate',
-  wordClass: 'verb',
-  ipaPronunciation: '/ˈmɪt.ɪ.ɡeɪt/',
-  meaningVn: 'giam nhe',
-  meaningEn: 'make less severe',
-  example: 'We mitigate risk.',
-  isInReview: false,
-  reviewLevel: null,
-  nextReviewDate: null,
-  lapseCount: 0,
-}]
+const board = {
+  id: 'board-1',
+  name: 'Practice board',
+  language: 'en',
+  pageCount: 12,
+  createdAt: '2026-07-20T08:00:00Z',
+  updatedAt: '2026-07-20T08:00:00Z',
+}
 
-const pages = Array.from({ length: 12 }, (_, index) => ({
+const decks = Array.from({ length: 12 }, (_, index) => ({
   pageId: `page-${index + 1}`,
   pageName: `Practice deck ${index + 1}`,
-  words: index === 11 ? [] : words.map((word) => ({ ...word, id: `card-${index + 1}`, wordId: `word-${index + 1}` })),
-  isPracticed: false,
+  boardId: board.id,
+  boardName: board.name,
+  wordCount: index === 11 ? 0 : 1,
 }))
+
+const session = {
+  sessionId: 'practice-session-1',
+  pageId: 'page-1',
+  pageName: 'Practice deck 1',
+  boardId: board.id,
+  boardName: board.name,
+  boardLanguage: 'en',
+  status: 'active',
+  currentItemIndex: 0,
+  items: [{
+    itemId: 'item-1',
+    wordId: 'word-1',
+    position: 0,
+    word: 'mitigate',
+    meaning: 'make less severe',
+    ipaPronunciation: '/ˈmɪt.ɪ.ɡeɪt/',
+    type: 'verb',
+    context: null,
+    example: 'We mitigate risk.',
+    synonyms: null,
+    antonyms: null,
+    currentStep: 'dictation',
+    alreadyInReview: false,
+    answerSlots: [],
+    selectedLevel: null,
+    isCompleted: false,
+  }],
+  startedAt: '2026-07-20T08:00:00Z',
+  completedAt: null,
+}
 
 async function mockPracticeLibraryApis(page) {
   await page.route('**/api/v1/**', async (route) => {
-    const path = new URL(route.request().url()).pathname
+    const request = route.request()
+    const path = new URL(request.url()).pathname
     const json = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ data }) })
 
     if (path.endsWith('/auth/me')) return json(user)
-    if (path.endsWith('/flashcards/pages')) return json([{ boardId: 'board-1', boardName: 'Practice board', boardLanguage: 'en', pages }])
-    if (path.endsWith('/practice/settings')) return json({ modeSequence: ['dictation', 'meaningToWord', 'pronunciation'] })
-    if (path.endsWith('/flashcards/pages/page-1/words')) return json({ pageId: 'page-1', boardId: 'board-1', pageName: 'Practice deck 1', boardLanguage: 'en', words })
-    if (path.endsWith('/practice/sessions')) return json({ id: 'practice-summary-1' })
-    return json({ message: 'Unexpected E29 request' }, 503)
+    if (path.endsWith('/vocabs/boards')) return json([board])
+    if (path.endsWith('/practice/decks')) {
+      const url = new URL(request.url())
+      const search = (url.searchParams.get('search') ?? '').toLocaleLowerCase()
+      const filtered = decks.filter((deck) => deck.pageName.toLocaleLowerCase().includes(search))
+      return json({ items: filtered, page: Number(url.searchParams.get('page') ?? 1), pageSize: 20, totalCount: filtered.length })
+    }
+    if (path.endsWith('/practice/sessions') && request.method() === 'POST') return json(session)
+    if (path.endsWith('/practice/sessions/practice-session-1')) return json(session)
+    return json({ message: 'Unexpected Practice request' }, 503)
   })
 }
 
-test('E29 uses one shared surface rhythm across Dictation, Meaning, Pronunciation, and recap', async ({ page }) => {
+test('Practice searches deck titles and launches the fixed learning flow', async ({ page }) => {
   await mockPracticeLibraryApis(page)
-  await page.goto('/practice/page-1?order=sequential')
+  await page.goto('/practice')
 
-  const card = page.getByTestId('active-practice-card')
-  await expect(card).toHaveClass(/review-card--dictation/)
-  await expect(page.getByText('Listen carefully, then type the word you hear')).toBeVisible()
-  await page.getByTestId('practice-answer-input').fill('wrong')
-  await page.getByRole('button', { name: 'Submit Answer', exact: true }).click()
-  await expect(page.getByText('Wrong, please try again', { exact: true })).toBeVisible()
-  await page.getByTestId('practice-answer-input').fill('mitigate')
-  await page.getByRole('button', { name: 'Submit Answer', exact: true }).click()
+  const firstDeck = page.getByTestId('practice-deck-page-1')
+  const emptyDeck = page.getByTestId('practice-deck-page-12')
+  await expect(firstDeck).toBeEnabled()
+  await expect(emptyDeck).toBeDisabled()
 
-  await expect(card).toHaveClass(/review-card--meaningToWord/)
-  await expect(page.getByText('What word matches this meaning?')).toBeVisible()
-  await page.getByTestId('practice-answer-input').fill('mitigate')
-  await page.getByRole('button', { name: 'Submit', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Search deck titles' }).fill('deck 3')
+  await expect(page.getByTestId('practice-deck-page-3')).toBeVisible()
+  await expect(firstDeck).toHaveCount(0)
 
-  await expect(card).toHaveClass(/review-card--pronunciation/)
-  await expect(page.getByText('Say the word naturally')).toBeVisible()
-  await expect(page.getByText('/ˈmɪt.ɪ.ɡeɪt/')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible()
-  await page.getByRole('button', { name: 'Skip' }).click()
-  await expect(page.getByText('Wrong', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Continue' }).click()
-
-  const recap = page.getByTestId('practice-answer-reveal')
-  await expect(recap).toBeVisible()
-  await expect(recap.getByText('Correct', { exact: true })).toHaveCount(0)
-  await expect(recap.getByText('Wrong', { exact: true })).toHaveCount(0)
-  await expect(recap.getByRole('button', { name: 'Add to Review' })).toBeVisible()
-  await expect(recap.getByRole('button', { name: 'Previous' })).toBeVisible()
-  await expect(recap.getByRole('button', { name: 'Finish' })).toBeVisible()
-  await recap.getByRole('button', { name: 'Finish' }).click()
-  await expect(page).toHaveURL(/\/practice$/)
-})
-
-test('E29 opens a query-selected deck, preserves Shuffle in the session URL, and removes legacy routes', async ({ page }) => {
-  await mockPracticeLibraryApis(page)
-  await page.goto('/practice?deck=page-1')
-
+  await page.getByTestId('practice-deck-page-3').click()
   await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible()
-  await expect(page.getByText('Dictation')).toBeVisible()
-  await expect(page.getByText('Meaning → Word')).toBeVisible()
-  await expect(page.getByText('Pronunciation')).toBeVisible()
-  await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page).toHaveURL('/practice')
-
-  await page.goto('/practice?deck=page-1')
-  await expect(page.getByRole('heading', { name: 'Start practice' })).toBeVisible()
-  await page.getByRole('button', { name: 'Shuffle' }).click()
+  await expect(page.getByText('Dictation', { exact: true })).toBeVisible()
+  await expect(page.getByText('Word to meaning', { exact: true })).toBeVisible()
+  await expect(page.getByText('Pronunciation', { exact: true })).toBeVisible()
+  await expect(page.getByText('Recap', { exact: true })).toBeVisible()
+  await expect(page.getByText('Shuffle', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Start practice' }).click()
-  await expect(page).toHaveURL(/\/practice\/page-1\?order=shuffle$/)
-  await expect(page.getByTestId('active-practice-card')).toBeVisible()
-
-  await page.reload()
-  await expect(page).toHaveURL(/\/practice\/page-1\?order=shuffle$/)
-  await expect(page.getByTestId('active-practice-card')).toBeVisible()
-
-  await page.goto('/flashcards/practice')
-  await expect(page).toHaveURL('/')
-  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
+  await expect(page).toHaveURL('/practice/practice-session-1')
+  await expect(page.getByTestId('active-practice-card')).toHaveClass(/review-card--dictation/)
+  await expect(page.getByText('Listen carefully, then type the word you hear')).toBeVisible()
 })
 
-for (const route of ['/flashcards', '/practice']) {
-  for (const [width, expectedFirstRow, expectedSecondRow] of [
-    [1440, 10, true],
-    [1024, 7, true],
-    [375, 2, true],
-    [320, 1, true],
-  ]) {
-    test(`E29 renders ${expectedFirstRow} compact ${route} deck cards per first row at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 })
-      await mockPracticeLibraryApis(page)
-      await page.goto(route)
+for (const [width, expectedColumns] of [[1440, 3], [1024, 3], [375, 1], [320, 1]]) {
+  test(`Practice deck dashboard stays within ${width}px and uses ${expectedColumns} columns`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mockPracticeLibraryApis(page)
+    await page.goto('/practice')
 
-      const cards = page.locator('[data-testid^="flashcard-page-"]')
-      await expect(cards).toHaveCount(12)
-      await expect(cards.nth(11)).toHaveAttribute('aria-disabled', 'true')
-      const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
-        const box = element.getBoundingClientRect()
-        return { x: box.x, y: box.y, width: box.width, height: box.height }
-      }))
-
-      expect(boxes.slice(0, expectedFirstRow).every((box) => Math.abs(box.y - boxes[0].y) < 2)).toBe(true)
-      if (expectedSecondRow) expect(boxes[expectedFirstRow].y).toBeGreaterThan(boxes[0].y)
-      expect(boxes.every((box) => box.height >= 90 && box.height <= 110)).toBe(true)
-      expect(await cards.first().evaluate((element) => getComputedStyle(element).textAlign)).toBe('center')
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-    })
-  }
+    const cards = page.locator('[data-testid^="practice-deck-"]')
+    await expect(cards).toHaveCount(12)
+    await expect(cards.nth(11)).toBeDisabled()
+    const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
+      const box = element.getBoundingClientRect()
+      return { x: box.x, y: box.y, height: box.height }
+    }))
+    expect(boxes.slice(0, expectedColumns).every((box) => Math.abs(box.y - boxes[0].y) < 2)).toBe(true)
+    expect(boxes[expectedColumns].y).toBeGreaterThan(boxes[0].y)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
 }

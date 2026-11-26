@@ -1,30 +1,33 @@
+import { CheckCircle2 } from 'lucide-react'
+
 type ReviewCompletionProps = {
-  orderLabel: string
   totalWords: number
-  boardName: string
   correctCount: number
   wrongCount: number
-  elapsedSeconds: number
   onDone: () => void
 }
 
-export function ReviewCompletion({ orderLabel, totalWords, boardName, correctCount, wrongCount, elapsedSeconds, onDone }: ReviewCompletionProps) {
+export function ReviewCompletion({ totalWords, correctCount, wrongCount, onDone }: ReviewCompletionProps) {
   return (
-    <section className="review-session learning-session--focused review-complete-session">
-      <div className="review-progress">
-        <div className="review-progress-header"><span className="review-progress-order">{orderLabel}</span><strong className="review-progress-count">{totalWords} of {totalWords}</strong></div>
-        <progress value={totalWords} max={totalWords} />
-      </div>
-      <article className="review-card learning-card--focused review-summary-card">
-        <div className="review-summary review-summary--focused" data-testid="review-summary">
-          <header className="review-summary__header"><h1>{boardName}</h1><p>{correctCount} correct and {wrongCount} wrong across {correctCount + wrongCount} reviewed words.</p></header>
-          <div className="practice-summary-stats-grid" aria-label="Review results">
-            <div className="practice-stat-card practice-stat-card--correct"><span className="practice-stat-value">{correctCount}</span><span className="practice-stat-label">Correct</span></div>
-            <div className="practice-stat-card practice-stat-card--wrong"><span className="practice-stat-value">{wrongCount}</span><span className="practice-stat-label">Wrong</span></div>
-          </div>
-          <footer className="review-summary__footer"><p className="text-sm text-muted-foreground">Session time: {elapsedSeconds} seconds.</p><button className="primary-button review-summary__done" type="button" onClick={onDone}>Done</button></footer>
+    <section className="review-figma-session__card review-figma-session__completion" data-testid="review-summary">
+      <div className="review-figma-session__completion-content">
+        <CheckCircle2 className="review-figma-session__completion-icon" aria-hidden="true" />
+        <div className="review-figma-session__completion-copy">
+          <h1>Review complete</h1>
+          <p>You reviewed {totalWords} {totalWords === 1 ? 'word' : 'words'}.</p>
         </div>
-      </article>
+        <div className="review-figma-session__results" aria-label="Review results">
+          <div className="review-figma-session__result review-figma-session__result--correct">
+            <strong>{correctCount}</strong>
+            <span>Correct</span>
+          </div>
+          <div className="review-figma-session__result review-figma-session__result--wrong">
+            <strong>{wrongCount}</strong>
+            <span>Wrong</span>
+          </div>
+        </div>
+        <button className="review-figma-session__done-button" type="button" onClick={onDone}>Done</button>
+      </div>
     </section>
   )
 }

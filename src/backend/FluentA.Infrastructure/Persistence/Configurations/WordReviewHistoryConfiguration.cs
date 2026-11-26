@@ -1,6 +1,4 @@
-using FluentA.Domain.BoundedContexts.Practice.Entities;
 using FluentA.Domain.BoundedContexts.Review.Entities;
-using FluentA.Domain.BoundedContexts.Vocabulary.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -18,6 +16,7 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
         builder.Property(history => history.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(history => history.WordId).HasColumnName("word_id").IsRequired();
         builder.Property(history => history.SessionId).HasColumnName("session_id").IsRequired();
+        builder.Property(history => history.ReviewSessionItemId).HasColumnName("review_session_item_id");
         builder.Property(history => history.TimeSpentSeconds).HasColumnName("time_spent_seconds").IsRequired();
         builder.Property(history => history.ReviewedAt).HasColumnName("reviewed_at").IsRequired();
         builder.Property(history => history.Result).HasColumnName("result").HasConversion<string>().HasMaxLength(20).IsRequired();
@@ -25,10 +24,10 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
         builder.Property(history => history.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(history => history.DeletedAt).HasColumnName("deleted_at");
 
-        builder.HasOne<VocabWord>()
+        builder.HasOne<ReviewSessionItem>()
             .WithMany()
-            .HasForeignKey(history => history.WordId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(history => history.ReviewSessionItemId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(history => new { history.UserId, history.SessionId })
             .HasFilter("deleted_at IS NULL");
@@ -36,5 +35,6 @@ public sealed class WordReviewHistoryConfiguration : IEntityTypeConfiguration<Wo
             .HasDatabaseName("IX_word_review_histories_user_id_reviewed_at_active")
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(history => new { history.WordId, history.ReviewedAt });
+        builder.HasIndex(history => history.ReviewSessionItemId);
     }
 }

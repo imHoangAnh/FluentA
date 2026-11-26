@@ -1,6 +1,5 @@
 import { apiClient } from '@/shared/api/client'
-import type { ApiEnvelope } from '@/shared/api/contracts'
-import type { TrashEntry } from '@/shared/api/deletion.contracts'
+import type { ApiResponse } from '@/shared/api/contracts'
 
 export type CountdownEvent = {
   id: string
@@ -9,45 +8,27 @@ export type CountdownEvent = {
   coverAssetId?: string | null
   coverDownloadUrl?: string | null
   coverDownloadUrlExpiresAt?: string | null
-  repeatPattern: CountdownRepeatPattern
   isCompleted: boolean
-  alerts: CountdownAlert[]
   createdAt: string
   updatedAt: string
-}
-
-export type CountdownRepeatPattern = 'None' | 'Weekly' | 'Monthly' | 'Yearly'
-
-export type CountdownAlert = {
-  id: string
-  alertDay: string
-  alertTime: string
-  scheduledAtUtc: string
-  firedAtUtc?: string | null
 }
 
 export type CreateCountdownInput = {
   name: string
   targetDate: string
-  alerts: Array<{
-    alertDay: string
-    alertTime: string
-  }>
   coverAssetId?: string | null
-  repeatPattern?: CountdownRepeatPattern
 }
 
 export async function listCountdowns() {
-  const response = await apiClient.get<ApiEnvelope<CountdownEvent[]>>('/countdowns')
+  const response = await apiClient.get<ApiResponse<CountdownEvent[]>>('/countdowns')
   return response.data.data ?? []
 }
 
 export async function createCountdown(input: CreateCountdownInput) {
-  const response = await apiClient.post<ApiEnvelope<CountdownEvent>>('/countdowns', input)
+  const response = await apiClient.post<ApiResponse<CountdownEvent>>('/countdowns', input)
   return response.data.data!
 }
 
 export async function deleteCountdown(id: string) {
-  const response = await apiClient.delete<ApiEnvelope<TrashEntry>>(`/countdowns/${id}`)
-  return response.data.data!
+  await apiClient.delete<ApiResponse<{ deleted: boolean }>>(`/countdowns/${id}`)
 }

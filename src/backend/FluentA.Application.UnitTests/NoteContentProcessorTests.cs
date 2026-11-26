@@ -34,7 +34,7 @@ public sealed class NoteContentProcessorTests
             userId,
             $"<p><img src=\"https://wrong.example.com/1.png\" data-note-asset-id=\"{asset.Id}\" alt=\"Diagram\"></p>");
 
-        Assert.Contains($"data-note-asset-id=\"{asset.Id}\"", result.Html);
+        Assert.Contains($"data-asset-id=\"{asset.Id}\"", result.Html);
         Assert.DoesNotContain("src=", result.Html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("wrong.example.com", result.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(asset.Id, result.ReferencedAssetIds);
@@ -95,11 +95,6 @@ public sealed class NoteContentProcessorTests
             return Task.FromResult<IReadOnlyList<Asset>>(_assets
                 .Where(asset => asset.UploadedByUserId == userId && asset.DeletedAt is null && assetIds.Contains(asset.Id))
                 .ToList());
-        }
-
-        public Task<IReadOnlyList<Asset>> ListPendingCleanupCandidatesAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<Asset>>([]);
         }
 
         public Task UpdateAsync(Asset asset, CancellationToken cancellationToken = default) => Task.CompletedTask;

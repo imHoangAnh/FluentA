@@ -1,6 +1,5 @@
 using System.Globalization;
 using FluentA.Application.BoundedContexts.Project.DTOs;
-using FluentA.Application.BoundedContexts.Trash;
 using FluentA.Application.Common;
 using FluentA.Domain.BoundedContexts.Project.Entities;
 using FluentA.Domain.BoundedContexts.Project.Enums;
@@ -11,20 +10,16 @@ public sealed class ProjectService : IProjectService
 {
     private const string DateFormat = "yyyy-MM-dd";
     private readonly IProjectRepository _repository;
-    private readonly IProjectSyncNotifier _syncNotifier;
-    private readonly ITrashService? _trashService;
 
-    public ProjectService(IProjectRepository repository, IProjectSyncNotifier? syncNotifier = null, ITrashService? trashService = null)
+    public ProjectService(IProjectRepository repository)
     {
         _repository = repository;
-        _syncNotifier = syncNotifier ?? NullProjectSyncNotifier.Instance;
-        _trashService = trashService;
     }
 
     public async Task<OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>> ListBoardsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var boards = await _repository.ListBoardsAsync(userId, cancellationToken);
-        return OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>.Success(boards.Select(ProjectDtoMapper.ToSummary).ToList());
+        return OperationResult<IReadOnlyList<ProjectBoardSummaryDto>>.Success(boards);
     }
 
     public async Task<OperationResult<ProjectBoardDetailDto>> CreateBoardAsync(Guid userId, CreateProjectBoardRequest request, CancellationToken cancellationToken = default)
@@ -71,19 +66,18 @@ public sealed class ProjectService : IProjectService
         return OperationResult<ProjectBoardDetailDto>.Success(ProjectDtoMapper.ToDetail(board));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null) return await _trashService.TrashProjectAsync(userId, boardId, cancellationToken);
         var board = await _repository.GetBoardAsync(userId, boardId, cancellationToken);
         if (board is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(ProjectError.NotFound());
+            return OperationResult<bool>.Failure(ProjectError.NotFound());
         }
 
         var nowUtc = DateTime.UtcNow;
         board.SoftDelete(nowUtc);
         await _repository.UpdateBoardAsync(board, cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Project", board.Id, board.Name, "Project board", nowUtc, nowUtc.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<ProjectColumnDto>> CreateColumnAsync(
@@ -156,24 +150,23 @@ public sealed class ProjectService : IProjectService
         return OperationResult<ProjectColumnDto>.Success(ProjectDtoMapper.ToColumnDto(column));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteColumnAsync(Guid userId, Guid boardId, Guid columnId, CancellationToken cancellationToken = default)
     {
         var column = await _repository.GetColumnAsync(userId, boardId, columnId, cancellationToken);
         if (column is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(ProjectError.NotFound());
+            return OperationResult<bool>.Failure(ProjectError.NotFound());
         }
 
         if (column.HasActiveCards())
         {
-            return OperationResult<TrashEntryDto>.Failure(ProjectError.ColumnNotEmpty());
+            return OperationResult<bool>.Failure(ProjectError.ColumnNotEmpty());
         }
 
-        if (_trashService is not null) return await _trashService.TrashProjectAsync(userId, columnId, cancellationToken);
         var nowUtc = DateTime.UtcNow;
         column.SoftDelete(nowUtc);
         await _repository.UpdateColumnAsync(column, cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Project", column.Id, column.Name, "Project column", nowUtc, nowUtc.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
 
     public async Task<OperationResult<ProjectCardDto>> CreateCardAsync(
@@ -244,27 +237,22 @@ public sealed class ProjectService : IProjectService
             return OperationResult<ProjectCardDto>.Failure(ProjectError.NotFound());
         }
 
-        var fromColumnId = card.ColumnId;
         card.MoveToColumn(request.ColumnId, request.SortOrder);
         await _repository.UpdateCardAsync(card, cancellationToken);
-        await _syncNotifier.CardMovedAsync(userId, targetColumn.BoardId, card.Id, fromColumnId, request.ColumnId, request.SortOrder, cancellationToken);
         return OperationResult<ProjectCardDto>.Success(ProjectDtoMapper.ToCardDto(card));
     }
 
-    public async Task<OperationResult<TrashEntryDto>> DeleteCardAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeleteCardAsync(Guid userId, Guid cardId, CancellationToken cancellationToken = default)
     {
-        if (_trashService is not null) return await _trashService.TrashProjectAsync(userId, cardId, cancellationToken);
         var card = await _repository.GetCardAsync(userId, cardId, cancellationToken);
         if (card is null)
         {
-            return OperationResult<TrashEntryDto>.Failure(ProjectError.NotFound());
+            return OperationResult<bool>.Failure(ProjectError.NotFound());
         }
 
         var nowUtc = DateTime.UtcNow;
         card.SoftDelete(nowUtc);
         await _repository.UpdateCardAsync(card, cancellationToken);
-        return OperationResult<TrashEntryDto>.Success(new TrashEntryDto(Guid.Empty, "Project", card.Id, card.Title, "Project card", nowUtc, nowUtc.AddDays(30)));
+        return OperationResult<bool>.Success(true);
     }
-
-
 }

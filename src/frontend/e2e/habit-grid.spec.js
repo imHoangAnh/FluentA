@@ -36,7 +36,7 @@ test('semantic icon and selected-week Habit layout work on desktop and tablet', 
   await expect(page.getByTestId('habit-start-date-input')).toHaveValue(todayInput());
   await page.getByTestId('habit-goal-days-select').click();
   await page.getByRole('option', { name: '21 days', exact: true }).click();
-  await page.getByTestId('habit-reminder-time-input').fill('07:30');
+  await expect(page.getByTestId('habit-reminder-time-input')).toHaveCount(0);
   await page.getByRole('button', { name: 'Habit icon' }).click();
   const iconOptions = page.getByRole('listbox').getByRole('option');
   await expect(iconOptions).toHaveCount(8);

@@ -19,7 +19,7 @@ public sealed class ArchitectureBoundaryTests
         AssertFluentAReferences(DomainAssembly);
         AssertFluentAReferences(ApplicationAssembly, "FluentA.Domain");
         AssertFluentAReferences(InfrastructureAssembly, "FluentA.Application", "FluentA.Domain");
-        AssertFluentAReferences(ApiAssembly, "FluentA.Application", "FluentA.Infrastructure");
+        AssertFluentAReferences(ApiAssembly, "FluentA.Application", "FluentA.Domain", "FluentA.Infrastructure");
     }
 
     [Fact]

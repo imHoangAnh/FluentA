@@ -7,13 +7,11 @@ public interface ITodoRepository
     Task<IReadOnlyList<TodoItem>> ListByDateAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TodoItem>> ListByRangeAsync(Guid userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<TodoItem?> GetAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
-    Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<bool> SoftDeleteFutureOccurrencesAsync(Guid userId, Guid todoId, DateTime nowUtc, CancellationToken cancellationToken = default);
     Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default);
     Task AddAsync(TodoItem item, CancellationToken cancellationToken = default);
     Task UpdateAsync(TodoItem item, CancellationToken cancellationToken = default);
     Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default);
-    Task RemoveRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default);
     Task<TodoCompletionMutationResult?> SetCompletionAsync(
         Guid userId,
         Guid todoId,

@@ -1,117 +1,56 @@
 using CountdownEventEntity = FluentA.Domain.BoundedContexts.Countdown.Entities.CountdownEvent;
-using FluentA.Domain.BoundedContexts.Countdown.Enums;
 
 namespace FluentA.Domain.UnitTests;
 
 public sealed class CountdownEventTests
 {
     [Fact]
-    public void CountdownEvent_NormalizesFieldsAndTracksAlerts()
+    public void Create_NormalizesNameAndTargetDate()
     {
         var userId = Guid.NewGuid();
         var target = new DateTime(2026, 7, 2, 9, 0, 0, DateTimeKind.Utc);
 
-        var countdownEvent = CountdownEventEntity.Create(userId, " IELTS Exam ", target);
-        countdownEvent.AddAlert("7DaysBefore", "09:00", target.AddDays(-7));
-        countdownEvent.AddAlert("OnTargetDay", "07:30", target);
+        var countdown = CountdownEventEntity.Create(userId, " IELTS Exam ", target);
 
-        Assert.Equal(userId, countdownEvent.UserId);
-        Assert.Equal("IELTS Exam", countdownEvent.Name);
-        Assert.Equal(DateTimeKind.Utc, countdownEvent.TargetDate.Kind);
-        Assert.Equal(new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
-        Assert.Equal(2, countdownEvent.Alerts.Count);
+        Assert.Equal(userId, countdown.UserId);
+        Assert.Equal("IELTS Exam", countdown.Name);
+        Assert.Equal(new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc), countdown.TargetDate);
     }
 
     [Fact]
-    public void CountdownEvent_ValidatesRequiredFields()
+    public void Create_ValidatesRequiredFields()
     {
         var target = DateTime.UtcNow.AddDays(1);
 
         Assert.Throws<ArgumentException>(() => CountdownEventEntity.Create(Guid.Empty, "Exam", target));
         Assert.Throws<ArgumentException>(() => CountdownEventEntity.Create(Guid.NewGuid(), "", target));
         Assert.Throws<ArgumentException>(() => CountdownEventEntity.Create(Guid.NewGuid(), new string('x', 181), target));
+        Assert.Throws<ArgumentException>(() => CountdownEventEntity.Create(Guid.NewGuid(), "Exam", target, Guid.Empty));
     }
 
     [Fact]
-    public void CountdownEvent_ComputesCompletedVisibilityAndSoftDeletes()
+    public void IsCompletedAt_MovesToCompleteAtVietnamMidnightAfterTargetDate()
     {
-        var now = DateTime.UtcNow;
-        var countdownEvent = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", now.Date.AddDays(-2));
-        countdownEvent.AddAlert("OnTargetDay", "09:00", now.AddDays(-2));
+        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", new DateTime(2026, 7, 2));
 
-        Assert.True(countdownEvent.IsCompletedAt(now));
-        Assert.True(countdownEvent.IsVisibleAt(now));
-        Assert.True(countdownEvent.IsVisibleAt(now.AddDays(30)));
-
-        countdownEvent.SoftDelete();
-
-        Assert.NotNull(countdownEvent.DeletedAt);
-        Assert.All(countdownEvent.Alerts, alert => Assert.NotNull(alert.DeletedAt));
+        Assert.False(countdown.IsCompletedAt(new DateTime(2026, 7, 2, 16, 59, 59, DateTimeKind.Utc)));
+        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 7, 2, 17, 0, 0, DateTimeKind.Utc)));
+        Assert.True(countdown.IsCompletedAt(new DateTime(2026, 8, 2, 17, 0, 0, DateTimeKind.Utc)));
     }
 
     [Fact]
-    public void CountdownEvent_RecurringMonthlyPreservesDayAndSkipsInvalidMonths()
+    public void SoftDelete_SetsUtcTimestampOnceAndPreservesCover()
     {
-        var countdownEvent = CountdownEventEntity.Create(
-            Guid.NewGuid(),
-            "Month end",
-            new DateTime(2026, 1, 31),
-            repeatPattern: CountdownRepeatPattern.Monthly);
-        countdownEvent.AddAlert("OnTargetDay", "09:00", new DateTime(2026, 1, 31, 2, 0, 0, DateTimeKind.Utc));
-        countdownEvent.Alerts[0].MarkFired(new DateTime(2026, 1, 31, 2, 0, 0, DateTimeKind.Utc));
+        var coverId = Guid.NewGuid();
+        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Exam", new DateTime(2026, 11, 1), coverId);
+        var deletedAt = new DateTime(2026, 10, 8, 7, 0, 0, DateTimeKind.Utc);
 
-        var advanced = countdownEvent.AdvanceRecurrenceAt(new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Null(countdown.DeletedAt);
+        countdown.SoftDelete(deletedAt);
+        countdown.SoftDelete(deletedAt.AddHours(1));
 
-        Assert.True(advanced);
-        Assert.Equal(new DateTime(2026, 3, 31, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
-        Assert.Null(countdownEvent.Alerts[0].FiredAtUtc);
-        Assert.Equal(new DateTime(2026, 3, 31, 2, 0, 0, DateTimeKind.Utc), countdownEvent.Alerts[0].ScheduledAtUtc);
-        Assert.False(countdownEvent.IsCompletedAt(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)));
-    }
-
-    [Fact]
-    public void CountdownEvent_RecurringYearlySkipsNonLeapYears()
-    {
-        var countdownEvent = CountdownEventEntity.Create(
-            Guid.NewGuid(),
-            "Leap day",
-            new DateTime(2024, 2, 29),
-            repeatPattern: CountdownRepeatPattern.Yearly);
-
-        var advanced = countdownEvent.AdvanceRecurrenceAt(new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc));
-
-        Assert.True(advanced);
-        Assert.Equal(new DateTime(2028, 2, 29, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
-    }
-
-    [Fact]
-    public void CountdownEvent_RecurringWeeklyKeepsTodayAsTheMissedCurrentOccurrence()
-    {
-        var countdownEvent = CountdownEventEntity.Create(
-            Guid.NewGuid(),
-            "Weekly",
-            new DateTime(2026, 8, 2),
-            repeatPattern: CountdownRepeatPattern.Weekly);
-        countdownEvent.AddAlert("OnTargetDay", "09:00", new DateTime(2026, 8, 2, 2, 0, 0, DateTimeKind.Utc));
-
-        Assert.True(countdownEvent.AdvanceRecurrenceAt(new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc)));
-        Assert.Equal(new DateTime(2026, 8, 9, 0, 0, 0, DateTimeKind.Utc), countdownEvent.TargetDate);
-        Assert.Equal(
-            new DateTime(2026, 8, 9, 2, 0, 0, DateTimeKind.Utc),
-            countdownEvent.Alerts[0].ScheduledAtUtc);
-        Assert.Null(countdownEvent.Alerts[0].FiredAtUtc);
-    }
-
-    [Theory]
-    [InlineData(CountdownRepeatPattern.Monthly, 2026, 8, 17)]
-    [InlineData(CountdownRepeatPattern.Yearly, 2025, 9, 17)]
-    public void RecurrenceRecoveryKeepsAnOccurrenceOnToday(CountdownRepeatPattern pattern, int year, int month, int day)
-    {
-        var countdown = CountdownEventEntity.Create(Guid.NewGuid(), "Recovery", new DateTime(year, month, day), repeatPattern: pattern);
-        var now = new DateTime(2026, 9, 17, 2, 0, 0, DateTimeKind.Utc);
-
-        Assert.True(countdown.AdvanceRecurrenceAt(now));
-        Assert.Equal(new DateTime(2026, 9, 17, 0, 0, 0, DateTimeKind.Utc), countdown.TargetDate);
-        Assert.False(countdown.AdvanceRecurrenceAt(now));
+        Assert.Equal(deletedAt, countdown.DeletedAt);
+        Assert.Equal(deletedAt, countdown.UpdatedAt);
+        Assert.Equal(coverId, countdown.CoverAssetId);
     }
 }

@@ -45,6 +45,33 @@ public sealed class PronunciationService : IPronunciationService
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.WordNotFound());
         }
 
+        return await AssessTargetAsync(target, wavAudio, cancellationToken);
+    }
+
+    public Task<OperationResult<PronunciationAssessmentDto>> AssessFromSessionAsync(
+        Guid userId,
+        PronunciationTarget target,
+        ReadOnlyMemory<byte> wavAudio,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty
+            || target is null
+            || string.IsNullOrWhiteSpace(target.Word)
+            || string.IsNullOrWhiteSpace(target.Language)
+            || !PronunciationAudioValidator.IsValidPcmWav(wavAudio.Span))
+        {
+            return Task.FromResult(
+                OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.InvalidAudio()));
+        }
+
+        return AssessTargetAsync(target, wavAudio, cancellationToken);
+    }
+
+    private async Task<OperationResult<PronunciationAssessmentDto>> AssessTargetAsync(
+        PronunciationTarget target,
+        ReadOnlyMemory<byte> wavAudio,
+        CancellationToken cancellationToken)
+    {
         if (!_options.IsConfigured || !Locales.TryGetValue(target.Language, out var locale))
         {
             return OperationResult<PronunciationAssessmentDto>.Failure(PronunciationError.ProviderUnavailable());
@@ -62,18 +89,24 @@ public sealed class PronunciationService : IPronunciationService
                 && assessment.Words.All(word => word.AccuracyScore >= _options.WordAccuracyThreshold)
                 && assessment.Words.All(word => !IsMiscue(word.ErrorType));
             var correct = assessment.AccuracyScore >= _options.AccuracyThreshold && hasCompletePhrase;
-            var feedbackMode = string.Equals(target.Language, "en", StringComparison.OrdinalIgnoreCase)
-                && assessment.Words.All(word => word.Units.Count > 0)
-                ? "phoneme"
-                : "word";
+            var isEnglish = string.Equals(target.Language, "en", StringComparison.OrdinalIgnoreCase);
+            var feedbackMode = isEnglish && assessment.Words.All(word => word.Syllables is { Count: > 0 })
+                ? "syllable"
+                : isEnglish && assessment.Words.All(word => word.Units.Count > 0) ? "phoneme" : "word";
             var words = assessment.Words
                 .Select(word => new PronunciationWordFeedbackDto(
                     word.Text,
                     word.AccuracyScore,
                     word.ErrorType,
-                    feedbackMode == "phoneme"
-                        ? word.Units.Select(unit => new PronunciationUnitFeedbackDto(unit.Text, unit.AccuracyScore >= _options.WordAccuracyThreshold)).ToArray()
-                        : new[] { new PronunciationUnitFeedbackDto(word.Text, word.AccuracyScore >= _options.WordAccuracyThreshold && !IsMiscue(word.ErrorType)) }))
+                    feedbackMode != "word"
+                        ? word.Units.Select(ToUnitFeedback).ToArray()
+                        : new[] { new PronunciationUnitFeedbackDto(word.Text, word.AccuracyScore >= _options.WordAccuracyThreshold && !IsMiscue(word.ErrorType), word.AccuracyScore) },
+                    isEnglish
+                        ? word.Syllables?.Select(syllable => new PronunciationSyllableFeedbackDto(
+                            syllable.Text,
+                            syllable.AccuracyScore,
+                            syllable.Phonemes.Select(ToUnitFeedback).ToArray())).ToArray()
+                        : null))
                 .ToArray();
             return OperationResult<PronunciationAssessmentDto>.Success(
                 new PronunciationAssessmentDto(
@@ -100,4 +133,7 @@ public sealed class PronunciationService : IPronunciationService
     private static bool IsMiscue(string? errorType) =>
         !string.IsNullOrWhiteSpace(errorType)
         && !string.Equals(errorType, "None", StringComparison.OrdinalIgnoreCase);
+
+    private PronunciationUnitFeedbackDto ToUnitFeedback(PronunciationUnitAssessment unit) =>
+        new(unit.Text, unit.AccuracyScore >= _options.WordAccuracyThreshold, unit.AccuracyScore);
 }

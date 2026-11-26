@@ -4,7 +4,9 @@ import App from '@/app/App'
 import { AppProviders } from '@/app/providers'
 import '@fontsource-variable/geist/wght.css'
 import '@fontsource-variable/nunito/wght.css'
+import '@fontsource-variable/inter/wght.css'
 import './styles/design-system.css'
+import './styles/learning-figma.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

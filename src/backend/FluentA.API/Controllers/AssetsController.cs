@@ -26,7 +26,7 @@ public sealed class AssetsController : ApiControllerBase
     {
         var result = await _assets.PresignAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<PresignedAssetUploadDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<PresignedAssetUploadDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 
@@ -36,7 +36,7 @@ public sealed class AssetsController : ApiControllerBase
     {
         var result = await _assets.FinalizeAsync(CurrentUserId(), request, cancellationToken);
         return result.IsSuccess
-            ? Ok(ApiEnvelope<AssetDto>.Ok(result.Value!))
+            ? Ok(ApiResponse<AssetDto>.Ok(result.Value!))
             : ToErrorResult(result);
     }
 

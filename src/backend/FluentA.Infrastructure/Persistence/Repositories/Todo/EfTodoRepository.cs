@@ -47,20 +47,46 @@ public sealed class EfTodoRepository : ITodoRepository
             .FirstOrDefaultAsync(item => item.Id == todoId && item.UserId == userId && item.DeletedAt == null, cancellationToken);
     }
 
-    public Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+    public async Task<bool> SoftDeleteFutureOccurrencesAsync(
+        Guid userId, Guid todoId, DateTime nowUtc, CancellationToken cancellationToken = default)
     {
-        return _dbContext.TodoItems
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockUserTodoMutationsAsync(userId, cancellationToken);
+        var root = await _dbContext.TodoItems
             .FromSqlInterpolated($"SELECT * FROM todo_items WHERE id = {todoId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
-    }
+        if (root is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
 
-    public async Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.TodoItems
-            .Where(item => item.UserId == userId)
-            .OrderBy(item => item.Date)
-            .ThenBy(item => item.CreatedAt)
+        var candidates = await _dbContext.TodoItems
+            .Where(item => item.UserId == userId && item.DeletedAt == null)
             .ToListAsync(cancellationToken);
+        var childrenByParent = candidates
+            .Where(item => item.GeneratedFromTodoId.HasValue)
+            .GroupBy(item => item.GeneratedFromTodoId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var pending = new Queue<TodoItem>();
+        var visited = new HashSet<Guid> { root.Id };
+        pending.Enqueue(root);
+        while (pending.TryDequeue(out var item))
+        {
+            if (item.Id == root.Id || item.Date >= root.Date)
+            {
+                item.SoftDelete(nowUtc);
+            }
+            if (!childrenByParent.TryGetValue(item.Id, out var children)) continue;
+            foreach (var child in children.Where(child => visited.Add(child.Id)))
+            {
+                pending.Enqueue(child);
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task AddAsync(TodoItem item, CancellationToken cancellationToken = default)
@@ -91,12 +117,6 @@ public sealed class EfTodoRepository : ITodoRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
-    {
-        _dbContext.TodoItems.RemoveRange(items);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task<TodoCompletionMutationResult?> SetCompletionAsync(
         Guid userId,
         Guid todoId,
@@ -105,6 +125,7 @@ public sealed class EfTodoRepository : ITodoRepository
         CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await LockUserTodoMutationsAsync(userId, cancellationToken);
         var item = await _dbContext.TodoItems
             .FromSqlInterpolated($"SELECT * FROM todo_items WHERE id = {todoId} AND user_id = {userId} AND deleted_at IS NULL FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
@@ -124,11 +145,8 @@ public sealed class EfTodoRepository : ITodoRepository
         var nextOccurrenceRetained = false;
         if (isCompleted)
         {
-            var reminderTime = item.ReminderTime;
-            var reminderTimeZoneId = item.ReminderTimeZoneId;
             item.MarkGeneratedOccurrenceEdited();
             item.SetCompleted(true, nowUtc);
-            item.CancelUnsentReminder();
 
             if (item.RepeatPattern is not null)
             {
@@ -143,15 +161,6 @@ public sealed class EfTodoRepository : ITodoRepository
                     var nextDate = TodoRepeatSchedule.NextDate(item.Date, item.RepeatPattern.Value);
                     var sortOrder = await NextSortOrderAsync(userId, nextDate, cancellationToken);
                     var child = TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder);
-                    if (reminderTime is not null && reminderTimeZoneId is not null)
-                    {
-                        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(reminderTimeZoneId);
-                        child.SetReminder(
-                            reminderTime.Value,
-                            reminderTimeZoneId,
-                            TodoReminderSchedule.ResolveUtc(nextDate, reminderTime.Value, timeZone));
-                    }
-
                     await _dbContext.TodoItems.AddAsync(child, cancellationToken);
                 }
             }
@@ -184,6 +193,11 @@ public sealed class EfTodoRepository : ITodoRepository
         await transaction.CommitAsync(cancellationToken);
         return new TodoCompletionMutationResult(item, nextOccurrenceRetained);
     }
+
+    private Task LockUserTodoMutationsAsync(Guid userId, CancellationToken cancellationToken) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({userId.ToString()}, 0))",
+            cancellationToken);
 
     private static DateTime NormalizeDate(DateTime date)
     {

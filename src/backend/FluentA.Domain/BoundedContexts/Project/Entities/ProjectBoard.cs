@@ -61,19 +61,6 @@ public sealed class ProjectBoard : BaseEntity, IAggregateRoot
         }
     }
 
-    public void RestoreFromTrash(DateTime nowUtc)
-    {
-        var trashedAt = DeletedAt;
-        DeletedAt = null;
-        UpdatedAt = nowUtc;
-
-        if (trashedAt is null) return;
-        foreach (var column in _columns.Where(column => column.DeletedAt == trashedAt))
-        {
-            column.RestoreFromTrash(nowUtc, trashedAt.Value);
-        }
-    }
-
     private void Touch()
     {
         UpdatedAt = DateTime.UtcNow;

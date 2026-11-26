@@ -1,15 +1,15 @@
 import { cva } from 'class-variance-authority'
 
 export const buttonVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-[color,background-color,border-color,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/75',
-        outline: 'border border-input bg-card text-foreground hover:bg-accent hover:text-accent-foreground',
-        ghost: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        default: 'bg-primary text-primary-foreground shadow-[var(--ds-shadow-xs)] hover:bg-[#0d5e58] active:bg-[#0b504b]',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        outline: 'border border-input bg-card text-foreground shadow-[var(--ds-shadow-xs)] hover:border-primary/35 hover:bg-accent/60 hover:text-accent-foreground',
+        ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        destructive: 'bg-destructive text-destructive-foreground shadow-[var(--ds-shadow-xs)] hover:bg-destructive/90',
       },
       size: {
         sm: 'h-8 px-3 text-xs [&_svg]:size-3.5',

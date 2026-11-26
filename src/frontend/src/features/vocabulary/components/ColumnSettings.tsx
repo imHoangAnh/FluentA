@@ -7,8 +7,7 @@ import { cn } from '@/shared/lib/utils'
 import type { BoardPreferences } from '../api/vocabulary.api'
 
 const optionalColumns = [
-  { key: 'definition', name: 'Definition' },
-  { key: 'note', name: 'Note' },
+  { key: 'context', name: 'Context' },
   { key: 'synonyms', name: 'Synonyms' },
   { key: 'antonyms', name: 'Antonyms' },
 ] as const

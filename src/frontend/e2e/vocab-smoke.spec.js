@@ -16,25 +16,25 @@ test('board, page, and vocabulary word CRUD smoke', async ({ page }) => {
   await page.getByTestId('create-page-button').click();
   await expect(page.getByRole('button', { name: 'Unit 1 - Education', exact: true })).toBeVisible();
 
-  await page.getByLabel('New word', { exact: true }).fill('mitigate');
-  await page.getByLabel('New Vietnamese meaning', { exact: true }).fill('giảm nhẹ');
-  await page.getByLabel('New IPA pronunciation', { exact: true }).fill('/ˈmɪt.ɪ.ɡeɪt/');
-  await page.getByLabel('New definition', { exact: true }).fill('make less severe');
-  await page.getByLabel('New word class', { exact: true }).click();
+  await page.getByLabel('Word for new word').fill('mitigate');
+  await page.getByLabel('Meaning for new word').fill('giảm nhẹ');
+  await page.getByLabel('IPA for new word').fill('/ˈmɪt.ɪ.ɡeɪt/');
+  await page.getByLabel('Context for new word').fill('used to describe making something less severe');
+  await page.getByLabel('Type for new word').click();
   await page.getByRole('option', { name: 'Verb', exact: true }).click();
-  await page.getByLabel('New example', { exact: true }).fill('Mitigate the risk.');
+  await page.getByLabel('Example for new word').fill('Mitigate the risk.');
   await page.getByTestId('create-word-button').click();
-  await expect(page.getByLabel('Word for mitigate')).toBeVisible();
+  await expect(page.getByLabel('Word for word')).toBeVisible();
 
-  await page.getByLabel('Word for mitigate').fill('mitigation');
-  await page.getByLabel('Word for mitigate').press('Tab');
-  await expect(page.getByLabel('Word for mitigation')).toBeVisible();
-  await page.getByLabel('Class for mitigation').click();
+  await page.getByLabel('Word for word').fill('mitigation');
+  await page.getByLabel('Word for word').press('Tab');
+  await expect(page.getByLabel('Word for word')).toBeVisible();
+  await page.getByLabel('Type for word').click();
   await page.getByRole('option', { name: 'Noun', exact: true }).click();
-  await page.getByLabel('Class for mitigation').press('Tab');
+  await page.getByLabel('Type for word').press('Tab');
 
   await page.getByLabel('Delete mitigation').click();
-  await expect(page.getByLabel('Word for mitigation')).toBeHidden();
+  await expect(page.getByLabel('Word for word')).toBeHidden();
 
   await page.getByRole('button', { name: 'Unit 1 - Education', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete Page' }).click();

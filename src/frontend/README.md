@@ -9,7 +9,7 @@
 FluentA Frontend là ứng dụng SPA cung cấp giao diện học ngoại ngữ và quản lý
 năng suất của FluentA. Ứng dụng được xây dựng bằng React 19, TypeScript và Vite;
 React Router quản lý điều hướng, TanStack Query quản lý server state, Zustand
-quản lý client state và SignalR nhận dữ liệu realtime từ backend.
+quản lý client state. Mutation refresh query ở trang hiện tại; không dùng SignalR.
 
 ## 3. Mục lục
 
@@ -24,16 +24,16 @@ quản lý client state và SignalR nhận dữ liệu realtime từ backend.
 
 ## 4. Hướng dẫn cài đặt và chạy dự án
 
-Để chạy toàn bộ frontend, API/Quartz, migration, PostgreSQL mới và MinIO chỉ
-bằng Docker, dùng `deploy/local/start.ps1` theo
-[local Docker runbook](../../deploy/local/README.md). Phần dưới dành cho luồng
-chạy Vite trực tiếp trên host khi phát triển giao diện.
+Development chạy Vite trực tiếp trên máy lập trình viên và kết nối backend đã cấu hình riêng. Deployment Production đang được cập nhật.
+
+Để chạy đủ Auth, ảnh R2 và Pronunciation cùng API trên localhost, dùng
+[hướng dẫn local](../../docs/local-development.md).
 
 ### 4.1. Yêu cầu
 
 - Node.js và npm.
 - FluentA Backend đang chạy tại `https://localhost:7000`.
-- PostgreSQL và MinIO đã được khởi động theo
+- PostgreSQL và bucket R2/S3 đã được cấu hình theo
   [README của root project](../../README.md).
 
 ### 4.2. Cài dependency
@@ -42,17 +42,19 @@ Từ thư mục `src/frontend`:
 
 ```powershell
 npm install
-Copy-Item .env.example .env.local
+if (-not (Test-Path .env)) {
+  Copy-Item .env.example .env
+}
 ```
 
-File `.env.local` sử dụng các biến sau:
+File `.env` dùng cho cấu hình local và sử dụng các biến sau:
 
 | Biến | Mục đích |
 | --- | --- |
-| `VITE_API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
-| `ASSET_STORAGE_BUCKET` | Bucket path mà Vite proxy tới S3-compatible local storage |
-| `ASSET_STORAGE_PROXY_TARGET` | Internal target của Vite proxy, mặc định `http://127.0.0.1:9000` |
-| `VITE_GOOGLE_CLIENT_ID` | Google Identity Services web client ID; có thể để trống nếu không dùng Google login |
+| `API_URL` | Base URL của REST API, mặc định local là `https://localhost:7000/api/v1` |
+| `GOOGLE_CLIENT_ID` | Google Identity Services Web Client ID; để chạy đủ chức năng, dùng cùng giá trị `Authentication:Google:ClientId` của API |
+
+Frontend dùng URL ký sẵn do backend trả về và upload trực tiếp lên R2. Cấu hình CORS trên bucket theo [hướng dẫn storage](../../docs/product/asset-storage-r2.md). Credentials chỉ thuộc backend.
 
 Không commit thông tin cấu hình bí mật của môi trường vào Git.
 
@@ -81,18 +83,16 @@ Output production được tạo trong thư mục `dist/`.
 2. Sau khi đăng nhập, trang `/` hiển thị dashboard tổng quan.
 3. Sử dụng các route chính:
    - `/vocabulary`: quản lý vocabulary board, page và từ vựng.
-   - `/flashcards`, `/practice`, `/review`: học và ôn tập.
+   - `/practice`, `/review`: luyện tập và ôn tập từ vựng.
    - `/todo`, `/habits`, `/countdowns`: quản lý kế hoạch cá nhân.
-   - `/project`, `/pomodoro`: quản lý luồng công việc và thời gian tập trung.
+   - `/project`: quản lý project.
    - `/journal`, `/notes`: lưu nhật ký và ghi chú.
-   - `/notifications`: xem thông báo.
-   - `/settings`: cập nhật hồ sơ và thiết lập học tập.
-   - `/trash`: khôi phục hoặc xoá vĩnh viễn dữ liệu đã đưa vào Trash.
+   - `/profile`: xem và cập nhật hồ sơ.
 4. Khi phát triển giao diện, đặt code theo feature trong `src/features` và chỉ
    đặt thành phần dùng chung thực sự trong `src/shared`.
 
 Các route được bảo vệ sẽ chuyển người dùng chưa xác thực về `/login`. REST API
-được gọi qua base URL trong `VITE_API_URL`; REST và SignalR đều dùng HttpOnly
+được gọi qua base URL trong `API_URL`; REST dùng HttpOnly
 cookie, không dùng access token trong JavaScript.
 
 ## 6. Các lệnh thường dùng
@@ -145,6 +145,5 @@ npm run test:run
 npm run build
 ```
 
-Xem [Frontend Architecture](ARCHITECTURE.md) để biết ownership của route, API,
-query key, page, component, realtime, CSS và test cũng như quy trình thêm code
-mới.
+Code frontend nằm theo feature trong `src/features`; các component và API
+dùng chung nằm trong `src/shared`.

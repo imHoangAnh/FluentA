@@ -18,8 +18,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays,
         DateTime startDate,
-        int? goalDays,
-        TimeOnly reminderTime)
+        int? goalDays)
     {
         if (userId == Guid.Empty)
         {
@@ -29,7 +28,6 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         UserId = userId;
         StartDate = NormalizeDate(startDate);
         GoalDays = ValidateGoalDays(goalDays);
-        ReminderTime = reminderTime;
         ApplyDetails(name, description, icon, frequency, customDays);
     }
 
@@ -41,9 +39,6 @@ public sealed class Habit : BaseEntity, IAggregateRoot
     public string? CustomDays { get; private set; }
     public DateTime StartDate { get; private set; }
     public int? GoalDays { get; private set; }
-    public bool ReminderEnabled { get; private set; } = true;
-    public TimeOnly ReminderTime { get; private set; } = new(20, 0);
-    public DateTime? LastReminderSentOn { get; private set; }
 
     public IReadOnlyList<DayOfWeek> ScheduledCustomDays => ParseCustomDays(CustomDays);
 
@@ -55,8 +50,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         HabitFrequency frequency,
         IReadOnlyCollection<DayOfWeek>? customDays,
         DateTime? startDate = null,
-        int? goalDays = null,
-        TimeOnly? reminderTime = null)
+        int? goalDays = null)
     {
         return new Habit(
             userId,
@@ -66,8 +60,7 @@ public sealed class Habit : BaseEntity, IAggregateRoot
             frequency,
             customDays,
             startDate ?? DateTime.UtcNow.Date,
-            goalDays,
-            reminderTime ?? new TimeOnly(20, 0));
+            goalDays);
     }
 
     public void Update(
@@ -78,7 +71,6 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         IReadOnlyCollection<DayOfWeek>? customDays,
         DateTime startDate,
         int? goalDays,
-        TimeOnly reminderTime,
         int entryCount)
     {
         if (entryCount < 0)
@@ -101,7 +93,6 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         ApplyDetails(name, description, icon, frequency, customDays);
         StartDate = normalizedStartDate;
         GoalDays = validatedGoalDays;
-        ReminderTime = reminderTime;
         Touch();
     }
 
@@ -120,32 +111,10 @@ public sealed class Habit : BaseEntity, IAggregateRoot
         return IsStartedOn(localDate) && IsScheduledOn(localDate);
     }
 
-    public void MarkReminderSent(DateTime date)
+    public void SoftDelete(DateTime nowUtc)
     {
-        LastReminderSentOn = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-        Touch();
-    }
-
-    public void SetReminderEnabled(bool enabled)
-    {
-        ReminderEnabled = enabled;
-        Touch();
-    }
-
-    public void MoveToTrash(DateTime nowUtc)
-    {
+        if (DeletedAt is not null) return;
         DeletedAt = nowUtc;
-        ReminderEnabled = false;
-        LastReminderSentOn = null;
-        UpdatedAt = nowUtc;
-    }
-
-    public void RestoreFromTrash(DateTime nowUtc)
-    {
-        DeletedAt = null;
-        // Reminder settings deliberately stay disabled after Restore.
-        ReminderEnabled = false;
-        LastReminderSentOn = null;
         UpdatedAt = nowUtc;
     }
 

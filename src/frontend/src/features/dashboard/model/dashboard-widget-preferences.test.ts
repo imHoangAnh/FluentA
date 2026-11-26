@@ -20,7 +20,7 @@ describe('dashboard widget preferences', () => {
     const minimum = ['review', 'todo', 'countdown'] as const
     expect(toggleDashboardWidget(minimum, 'review')).toEqual(minimum)
 
-    const maximum = ['review', 'todo', 'countdown', 'habits', 'project', 'pomodoro'] as const
+    const maximum = ['review', 'todo', 'countdown', 'habits', 'project'] as const
     expect(toggleDashboardWidget(maximum, 'review')).toEqual(maximum.slice(1))
     expect(toggleDashboardWidget(minimum, 'habits')).toEqual([...minimum, 'habits'])
   })
@@ -37,6 +37,15 @@ describe('dashboard widget preferences', () => {
 
   it('compacts reorder operations without creating interior gaps', () => {
     expect(reorderDashboardWidgets(['review', 'todo', 'countdown', 'habits'], 'habits', 'review')).toEqual(['habits', 'review', 'todo', 'countdown'])
+  })
+
+  it('removes retired Pomodoro widgets while retaining valid order and restoring the minimum', () => {
+    window.localStorage.setItem(DASHBOARD_WIDGET_STORAGE_KEY, JSON.stringify({ version: 1, order: ['project', 'pomodoro', 'habits', 'todo'] }))
+    expect(readDashboardWidgetOrder()).toEqual(['project', 'habits', 'todo'])
+    expect(normalizeDashboardWidgetOrder(['pomodoro', 'habits'])).toEqual(['habits', 'review', 'todo'])
+    window.localStorage.removeItem(DASHBOARD_WIDGET_STORAGE_KEY)
+    window.localStorage.setItem(LEGACY_DASHBOARD_WIDGET_STORAGE_KEY, JSON.stringify({ pomodoro: true, project: true, habits: true }))
+    expect(readDashboardWidgetOrder()).toEqual(['habits', 'project', 'review'])
   })
 
   it('keeps the approved row and slot sequence', () => {

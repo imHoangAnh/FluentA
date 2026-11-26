@@ -14,8 +14,7 @@ public sealed class TodoServiceTests
     public async Task CreateListUpdateAndDelete_UseOwnedItems()
     {
         var repository = new FakeTodoRepository();
-        var notifier = new RecordingTodoSyncNotifier();
-        var service = new TodoService(repository, notifier);
+        var service = new TodoService(repository);
         var userId = Guid.NewGuid();
         var date = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
@@ -33,9 +32,7 @@ public sealed class TodoServiceTests
         Assert.Single(listed.Value!);
         Assert.True(updated.Value!.IsCompleted);
         Assert.NotNull(updated.Value.CompletedAt);
-        Assert.Single(notifier.CheckedItems);
-        Assert.Equal(created.Value.Id, notifier.CheckedItems[0].TodoId);
-        Assert.Equal(created.Value.Id, deleted.Value!.EntityId);
+        Assert.True(deleted.Value);
         Assert.Empty(afterDelete.Value!);
         Assert.False(deletedById.IsSuccess);
         Assert.Equal("TODO_NOT_FOUND", ((TodoError)deletedById.Error!).Code);
@@ -159,16 +156,14 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
-    public async Task InvalidInputs_ReturnValidationErrorsAndDoNotNotify()
+    public async Task InvalidInputs_ReturnValidationErrors()
     {
-        var notifier = new RecordingTodoSyncNotifier();
-        var service = new TodoService(new FakeTodoRepository(), notifier);
+        var service = new TodoService(new FakeTodoRepository());
 
         var created = await service.CreateAsync(Guid.NewGuid(), new CreateTodoItemRequest("", "not-a-date"));
 
         Assert.False(created.IsSuccess);
         Assert.Equal("VALIDATION_ERROR", ((TodoError)created.Error!).Code);
-        Assert.Empty(notifier.CheckedItems);
     }
 
     [Fact]
@@ -203,166 +198,6 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
-    public void UpdateRequest_DistinguishesOmittedReminderFromExplicitNull()
-    {
-        var omitted = JsonSerializer.Deserialize<UpdateTodoItemRequest>("{\"isImportant\":true}", WebJson)!;
-        var cleared = JsonSerializer.Deserialize<UpdateTodoItemRequest>("{\"reminder\":null}", WebJson)!;
-
-        Assert.False(omitted.IsReminderSpecified);
-        Assert.True(cleared.IsReminderSpecified);
-        Assert.Null(cleared.Reminder);
-    }
-
-    [Fact]
-    public async Task Reminder_CreateGetUpdateAndClear_RoundTripsExactOwnedTuple()
-    {
-        var repository = new FakeTodoRepository();
-        var service = new TodoService(repository);
-        var ownerId = Guid.NewGuid();
-        var scheduledAtUtc = new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc);
-
-        var created = await service.CreateAsync(ownerId, new CreateTodoItemRequest(
-            "Timed task",
-            "2035-07-22",
-            Reminder: new TodoReminderRequest("09:30", "America/New_York", scheduledAtUtc)));
-        var owned = await service.GetAsync(ownerId, created.Value!.Id);
-        var foreign = await service.GetAsync(Guid.NewGuid(), created.Value.Id);
-        var updated = await service.UpdateAsync(ownerId, created.Value.Id, new UpdateTodoItemRequest
-        {
-            Reminder = new TodoReminderRequest(
-                "10:15",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 14, 15, 0, DateTimeKind.Utc)),
-        });
-        var cleared = await service.UpdateAsync(ownerId, created.Value.Id, new UpdateTodoItemRequest { Reminder = null });
-
-        Assert.True(created.IsSuccess);
-        Assert.Equal("09:30", owned.Value!.Reminder!.Time);
-        Assert.Equal("America/New_York", owned.Value.Reminder.TimeZoneId);
-        Assert.Equal(scheduledAtUtc, owned.Value.Reminder.ScheduledAtUtc);
-        Assert.False(foreign.IsSuccess);
-        Assert.Equal("TODO_NOT_FOUND", ((TodoError)foreign.Error!).Code);
-        Assert.Equal("10:15", updated.Value!.Reminder!.Time);
-        Assert.Null(cleared.Value!.Reminder);
-    }
-
-    [Theory]
-    [InlineData("09:31", "America/New_York", "2035-07-22T13:30:00Z", "reminder.scheduledAtUtc")]
-    [InlineData("09:30", "Invalid/Timezone", "2035-07-22T13:30:00Z", "reminder.timeZoneId")]
-    [InlineData("9:30", "America/New_York", "2035-07-22T13:30:00Z", "reminder.time")]
-    [InlineData("09:30", "America/New_York", "2020-07-22T13:30:00Z", "reminder.scheduledAtUtc")]
-    public async Task Reminder_RejectsMismatchedInvalidOrPastTuples(
-        string time,
-        string timeZoneId,
-        string scheduledAtUtc,
-        string expectedField)
-    {
-        var service = new TodoService(new FakeTodoRepository());
-        var request = new TodoReminderRequest(
-            time,
-            timeZoneId,
-            DateTime.Parse(scheduledAtUtc, null, System.Globalization.DateTimeStyles.AdjustToUniversal));
-
-        var result = await service.CreateAsync(
-            Guid.NewGuid(),
-            new CreateTodoItemRequest("Invalid reminder", time.StartsWith("09") && scheduledAtUtc.StartsWith("2020") ? "2020-07-22" : "2035-07-22", Reminder: request));
-
-        Assert.False(result.IsSuccess);
-        var details = Assert.IsType<Dictionary<string, string[]>>(((TodoError)result.Error!).Details);
-        Assert.Contains(expectedField, details.Keys);
-    }
-
-    [Fact]
-    public async Task Reminder_RejectsAnInstantWithoutUtcKind()
-    {
-        var service = new TodoService(new FakeTodoRepository());
-
-        var result = await service.CreateAsync(Guid.NewGuid(), new CreateTodoItemRequest(
-            "Unspecified reminder",
-            "2035-07-22",
-            Reminder: new TodoReminderRequest(
-                "09:30",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Unspecified))));
-
-        Assert.False(result.IsSuccess);
-        var details = Assert.IsType<Dictionary<string, string[]>>(((TodoError)result.Error!).Details);
-        Assert.Contains("reminder.scheduledAtUtc", details.Keys);
-    }
-
-    [Fact]
-    public async Task Reminder_DateMoveRecomputesFutureInstantAndClearsPastWithWarning()
-    {
-        var service = new TodoService(new FakeTodoRepository());
-        var userId = Guid.NewGuid();
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest(
-            "Move reminder",
-            "2035-07-22",
-            Reminder: new TodoReminderRequest(
-                "09:30",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc))));
-
-        var movedFuture = await service.UpdateAsync(
-            userId,
-            created.Value!.Id,
-            new UpdateTodoItemRequest(Date: "2035-07-23"));
-        var movedPast = await service.UpdateAsync(
-            userId,
-            created.Value.Id,
-            new UpdateTodoItemRequest(Date: "2020-07-23"));
-
-        Assert.Equal(new DateTime(2035, 7, 23, 13, 30, 0, DateTimeKind.Utc), movedFuture.Value!.Reminder!.ScheduledAtUtc);
-        Assert.Null(movedPast.Value!.Reminder);
-        Assert.Equal("reminder-cleared-after-date-change", movedPast.Value.WarningCode);
-    }
-
-    [Fact]
-    public async Task Reminder_CompletionCancelsSourceAndRecurringChildReceivesNewSchedule()
-    {
-        var repository = new FakeTodoRepository();
-        var service = new TodoService(repository);
-        var userId = Guid.NewGuid();
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest(
-            "Daily reminder",
-            "2035-07-22",
-            RepeatPattern: "Daily",
-            Reminder: new TodoReminderRequest(
-                "09:30",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc))));
-
-        var completed = await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
-        var nextDay = await service.ListByDateAsync(userId, "2035-07-23");
-
-        Assert.Null(completed.Value!.Reminder);
-        var child = Assert.Single(nextDay.Value!);
-        Assert.Equal("09:30", child.Reminder!.Time);
-        Assert.Equal(new DateTime(2035, 7, 23, 13, 30, 0, DateTimeKind.Utc), child.Reminder.ScheduledAtUtc);
-    }
-
-    [Fact]
-    public async Task Reminder_CannotBeSetWhileTaskRemainsCompleted()
-    {
-        var service = new TodoService(new FakeTodoRepository());
-        var userId = Guid.NewGuid();
-        var created = await service.CreateAsync(userId, new CreateTodoItemRequest("Completed task", "2035-07-22"));
-        await service.UpdateAsync(userId, created.Value!.Id, new UpdateTodoItemRequest(IsCompleted: true));
-
-        var result = await service.UpdateAsync(userId, created.Value.Id, new UpdateTodoItemRequest
-        {
-            Reminder = new TodoReminderRequest(
-                "09:30",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc)),
-        });
-
-        Assert.False(result.IsSuccess);
-        var details = Assert.IsType<Dictionary<string, string[]>>(((TodoError)result.Error!).Details);
-        Assert.Contains("reminder", details.Keys);
-    }
-
-    [Fact]
     public async Task Duplicate_CopiesAllApprovedFieldsOnTheSameDayUnderANewIncompleteIdentity()
     {
         var repository = new FakeTodoRepository();
@@ -373,11 +208,7 @@ public sealed class TodoServiceTests
             "2035-07-22",
             "Hidden note",
             IsImportant: true,
-            RepeatPattern: "Weekly",
-            Reminder: new TodoReminderRequest(
-                "09:30",
-                "America/New_York",
-                new DateTime(2035, 7, 22, 13, 30, 0, DateTimeKind.Utc))));
+            RepeatPattern: "Weekly"));
 
         var duplicate = await service.DuplicateAsync(userId, source.Value!.Id);
         var day = await service.ListByDateAsync(userId, source.Value.Date);
@@ -389,9 +220,6 @@ public sealed class TodoServiceTests
         Assert.Equal("Hidden note", duplicate.Value.Note);
         Assert.True(duplicate.Value.IsImportant);
         Assert.Equal("Weekly", duplicate.Value.RepeatPattern);
-        Assert.Equal("09:30", duplicate.Value.Reminder!.Time);
-        Assert.Equal(source.Value.Reminder!.ScheduledAtUtc, duplicate.Value.Reminder.ScheduledAtUtc);
-        Assert.Null(duplicate.Value.Reminder.SentAtUtc);
         Assert.False(duplicate.Value.IsCompleted);
         Assert.Equal(1, duplicate.Value.SortOrder);
         Assert.Equal(2, day.Value!.Count);
@@ -493,7 +321,7 @@ public sealed class TodoServiceTests
     }
 
     [Fact]
-    public async Task DeleteSourceOccurrence_DoesNotCascadeToGeneratedChild()
+    public async Task DeleteSourceOccurrence_SoftDeletesFutureGeneratedChild()
     {
         var repository = new FakeTodoRepository();
         var service = new TodoService(repository);
@@ -506,7 +334,7 @@ public sealed class TodoServiceTests
         var generatedDay = await service.ListByDateAsync(userId, "2026-07-23");
 
         Assert.Empty(sourceDay.Value!);
-        Assert.Single(generatedDay.Value!);
+        Assert.Empty(generatedDay.Value!);
     }
 
     private sealed class FakeTodoRepository : ITodoRepository
@@ -539,14 +367,19 @@ public sealed class TodoServiceTests
             return Task.FromResult(_items.FirstOrDefault(item => item.UserId == userId && item.Id == todoId && item.DeletedAt is null));
         }
 
-        public Task<TodoItem?> GetActiveForTrashAsync(Guid userId, Guid todoId, CancellationToken cancellationToken = default)
+        public Task<bool> SoftDeleteFutureOccurrencesAsync(Guid userId, Guid todoId, DateTime nowUtc, CancellationToken cancellationToken = default)
         {
-            return GetAsync(userId, todoId, cancellationToken);
-        }
-
-        public Task<IReadOnlyList<TodoItem>> ListOwnedIncludingDeletedAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<TodoItem>>(_items.Where(item => item.UserId == userId).ToList());
+            var root = _items.FirstOrDefault(item => item.UserId == userId && item.Id == todoId && item.DeletedAt is null);
+            if (root is null) return Task.FromResult(false);
+            var pending = new Queue<TodoItem>();
+            pending.Enqueue(root);
+            while (pending.TryDequeue(out var current))
+            {
+                if (current.Id == root.Id || current.Date >= root.Date) current.SoftDelete(nowUtc);
+                foreach (var child in _items.Where(item => item.UserId == userId && item.GeneratedFromTodoId == current.Id && item.DeletedAt is null))
+                    pending.Enqueue(child);
+            }
+            return Task.FromResult(true);
         }
 
         public Task<int> NextSortOrderAsync(Guid userId, DateTime date, CancellationToken cancellationToken = default)
@@ -567,12 +400,6 @@ public sealed class TodoServiceTests
         }
 
         public Task UpdateRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task RemoveRangeAsync(IReadOnlyList<TodoItem> items, CancellationToken cancellationToken = default)
-        {
-            _items.RemoveAll(item => items.Contains(item));
-            return Task.CompletedTask;
-        }
 
         public Task<TodoCompletionMutationResult?> SetCompletionAsync(
             Guid userId,
@@ -595,11 +422,8 @@ public sealed class TodoServiceTests
             var retained = false;
             if (isCompleted)
             {
-                var reminderTime = item.ReminderTime;
-                var reminderTimeZoneId = item.ReminderTimeZoneId;
                 item.MarkGeneratedOccurrenceEdited();
                 item.SetCompleted(true, nowUtc);
-                item.CancelUnsentReminder();
                 if (item.RepeatPattern is not null
                     && !_items.Any(candidate => candidate.GeneratedFromTodoId == item.Id && candidate.DeletedAt is null))
                 {
@@ -610,15 +434,6 @@ public sealed class TodoServiceTests
                         .DefaultIfEmpty(-1)
                         .Max() + 1;
                     var child = TodoItem.CreateGeneratedOccurrence(item, nextDate, sortOrder);
-                    if (reminderTime is not null && reminderTimeZoneId is not null)
-                    {
-                        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(reminderTimeZoneId);
-                        child.SetReminder(
-                            reminderTime.Value,
-                            reminderTimeZoneId,
-                            TodoReminderSchedule.ResolveUtc(nextDate, reminderTime.Value, timeZone));
-                    }
-
                     _items.Add(child);
                 }
             }
@@ -641,17 +456,6 @@ public sealed class TodoServiceTests
             }
 
             return Task.FromResult<TodoCompletionMutationResult?>(new TodoCompletionMutationResult(item, retained));
-        }
-    }
-
-    private sealed class RecordingTodoSyncNotifier : ITodoSyncNotifier
-    {
-        public List<(Guid UserId, Guid TodoId, bool IsCompleted)> CheckedItems { get; } = [];
-
-        public Task TodoItemCheckedAsync(Guid userId, Guid todoId, bool isCompleted, CancellationToken cancellationToken = default)
-        {
-            CheckedItems.Add((userId, todoId, isCompleted));
-            return Task.CompletedTask;
         }
     }
 }

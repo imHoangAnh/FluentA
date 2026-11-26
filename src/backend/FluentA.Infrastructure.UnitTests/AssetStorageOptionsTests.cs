@@ -6,13 +6,22 @@ namespace FluentA.Infrastructure.UnitTests;
 public sealed class AssetStorageOptionsTests
 {
     [Fact]
-    public void FromConfiguration_accepts_custom_s3_compatible_endpoints_and_static_credentials()
+    public void Auto_region_requires_an_explicit_endpoint()
+    {
+        var values = ValidConfiguration();
+        values["AssetStorage:Region"] = "auto";
+        var options = AssetStorageOptions.FromConfiguration(Configuration(values));
+        Assert.Throws<InvalidOperationException>(options.Validate);
+    }
+
+    [Fact]
+    public void FromConfiguration_accepts_custom_endpoints_and_static_credentials()
     {
         var options = AssetStorageOptions.FromConfiguration(Configuration(new()
         {
             ["AssetStorage:Enabled"] = "true",
-            ["AssetStorage:Endpoint"] = "http://minio:9000",
-            ["AssetStorage:PublicEndpoint"] = "https://localhost:7443",
+            ["AssetStorage:Endpoint"] = "https://storage.example.test",
+            ["AssetStorage:PublicEndpoint"] = "https://storage-browser.example.test",
             ["AssetStorage:Bucket"] = "fluenta-assets-test",
             ["AssetStorage:AccessKey"] = "test-access-key",
             ["AssetStorage:SecretKey"] = "test-secret-key",
@@ -21,8 +30,8 @@ public sealed class AssetStorageOptionsTests
 
         options.Validate();
 
-        Assert.Equal("http://minio:9000", options.Endpoint);
-        Assert.Equal("https://localhost:7443", options.PresigningEndpoint);
+        Assert.Equal("https://storage.example.test", options.Endpoint);
+        Assert.Equal("https://storage-browser.example.test", options.PresigningEndpoint);
         Assert.True(options.HasStaticCredentials);
         Assert.True(options.UsePathStyle);
     }

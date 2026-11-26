@@ -3,7 +3,7 @@ namespace FluentA.Application.BoundedContexts.Assets;
 public sealed record AssetError(string Code, string Message, int StatusCode, object? Details = null) : IApplicationError
 {
     public static AssetError Validation(object details) =>
-        new("VALIDATION_ERROR", "One or more validation errors occurred.", 422, details);
+        new("VALIDATION_ERROR", "One or more validation errors occurred.", 400, details);
 
     public static AssetError NotFound() =>
         new("ASSET_NOT_FOUND", "The requested asset could not be found.", 404);

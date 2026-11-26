@@ -1,4 +1,4 @@
-export const DASHBOARD_WIDGET_IDS = ['review', 'todo', 'countdown', 'habits', 'project', 'pomodoro'] as const
+export const DASHBOARD_WIDGET_IDS = ['review', 'todo', 'countdown', 'habits', 'project'] as const
 
 export type DashboardWidgetId = typeof DASHBOARD_WIDGET_IDS[number]
 
@@ -13,7 +13,6 @@ export const DASHBOARD_WIDGET_CATALOG: readonly DashboardWidgetDefinition[] = [
   { id: 'countdown', label: 'Countdowns' },
   { id: 'habits', label: 'Habit tracker' },
   { id: 'project', label: 'Project' },
-  { id: 'pomodoro', label: 'Pomodoro' },
 ]
 
 export const DEFAULT_DASHBOARD_WIDGETS: readonly DashboardWidgetId[] = ['review', 'todo', 'countdown']

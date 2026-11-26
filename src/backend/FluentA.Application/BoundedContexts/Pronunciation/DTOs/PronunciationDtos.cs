@@ -11,10 +11,17 @@ public sealed record PronunciationWordFeedbackDto(
     string Text,
     double AccuracyScore,
     string? ErrorType,
-    IReadOnlyList<PronunciationUnitFeedbackDto> Units);
+    IReadOnlyList<PronunciationUnitFeedbackDto> Units,
+    IReadOnlyList<PronunciationSyllableFeedbackDto>? Syllables = null);
+
+public sealed record PronunciationSyllableFeedbackDto(
+    string Text,
+    double AccuracyScore,
+    IReadOnlyList<PronunciationUnitFeedbackDto> Phonemes);
 
 public sealed record PronunciationUnitFeedbackDto(
     string Text,
-    bool Correct);
+    bool Correct,
+    double? AccuracyScore = null);
 
 public sealed record PronunciationTarget(string Word, string Language);

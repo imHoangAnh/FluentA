@@ -12,9 +12,12 @@ export type ShellAccount = {
 export type ShellNavigationItem = {
   to: string
   label: string
+  description?: string
   icon?: LucideIcon
   end?: boolean
   isActive?: (pathname: string) => boolean
+  dialogQueryParam?: string
+  renderDialog?: (open: boolean, onOpenChange: (open: boolean) => void) => ReactNode
 }
 
 export type ShellNavigationSection = {
@@ -26,9 +29,6 @@ export type ShellEnvironmentValue = {
   account: ShellAccount | null
   logout: () => Promise<void>
   navigationSections: ShellNavigationSection[]
-  settingsNavigation: ShellNavigationItem
-  notificationsPath: string
-  notificationsMenu?: (active: boolean) => ReactNode
 }
 
 const ShellEnvironmentContext = createContext<ShellEnvironmentValue | null>(null)

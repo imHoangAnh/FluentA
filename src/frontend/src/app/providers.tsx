@@ -1,11 +1,10 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { type ReactNode, useMemo } from 'react'
 import { useAuthStore } from '@/features/auth'
-import { NotificationsMenu } from '@/features/notifications'
 import { ShellEnvironmentProvider } from '@/shared/components/layout/ShellEnvironment'
 import { Toaster } from '@/shared/components/ui/toaster'
-import { shellNavigationSections, shellNotificationsPath, shellSettingsNavigation } from './navigation'
-import { queryClient as productionQueryClient } from './query-client'
+import { shellNavigationSections } from './navigation'
+import { queryClient as productionQueryClient } from '@/shared/api/query-client'
 
 type AppProvidersProps = {
   children: ReactNode
@@ -19,9 +18,6 @@ export function AppProviders({ children, queryClient = productionQueryClient }: 
     account,
     logout,
     navigationSections: shellNavigationSections,
-    settingsNavigation: shellSettingsNavigation,
-    notificationsPath: shellNotificationsPath,
-    notificationsMenu: (active: boolean) => <NotificationsMenu notificationsPath={shellNotificationsPath} active={active} />,
   }), [account, logout])
 
   return (

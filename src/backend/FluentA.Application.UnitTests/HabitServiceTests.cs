@@ -8,6 +8,64 @@ namespace FluentA.Application.UnitTests;
 
 public sealed class HabitServiceTests
 {
+    [Theory]
+    [InlineData(0, false, false)]
+    [InlineData(1, true, false)]
+    [InlineData(2, true, true)]
+    [InlineData(3, false, true)]
+    public async Task List_OptimizedLongestStreakMatchesCalendarWalkWithGapsAndGoals(int seed, bool custom, bool finite)
+    {
+        var repository = new FakeHabitRepository();
+        var today = DateTime.UtcNow.Date;
+        var owner = Guid.NewGuid();
+        var habit = HabitEntity.Create(owner, "History", null, HabitIcon.Book,
+            custom ? HabitFrequency.Custom : HabitFrequency.Daily,
+            custom ? [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday] : null,
+            today.AddYears(-4), finite ? 23 : null);
+        repository.SeedHabit(habit);
+        var completed = new HashSet<DateTime>();
+        var random = new Random(seed);
+        for (var date = habit.StartDate; date <= today; date = date.AddDays(1))
+            if (random.Next(5) != 0)
+            {
+                // Include legacy check-ins on now-unscheduled weekdays too.
+                completed.Add(date);
+                repository.SeedEntry(habit.Id, date);
+            }
+        var goalDate = finite && completed.Count >= 23 ? completed.Order().ElementAt(22) : (DateTime?)null;
+        var asOf = goalDate.HasValue && goalDate < today ? goalDate.Value : today;
+        var longest = 0;
+        var run = 0;
+        for (var date = habit.StartDate; date <= asOf; date = date.AddDays(1))
+        {
+            if (!habit.IsScheduledOn(date)) continue;
+            run = completed.Contains(date) ? run + 1 : 0;
+            longest = Math.Max(longest, run);
+        }
+        var result = await new HabitService(repository).ListAsync(owner, "UTC");
+        var item = Assert.Single(result.Value!);
+        Assert.Equal(longest, item.LongestStreak);
+        Assert.Equal(completed.Count, item.TotalCheckIns);
+        Assert.Equal(goalDate?.ToString("yyyy-MM-dd"), item.GoalCompletedOn);
+    }
+
+    [Fact]
+    public async Task List_SparseHistorySinceYearOneKeepsStatisticsWithoutWalkingEveryHistoricalDay()
+    {
+        var repository = new FakeHabitRepository();
+        var today = DateTime.UtcNow.Date;
+        var owner = Guid.NewGuid();
+        var habit = HabitEntity.Create(owner, "Sparse history", null, HabitIcon.Book, HabitFrequency.Daily,
+            null, new DateTime(1, 1, 1), null);
+        repository.SeedHabit(habit);
+        repository.SeedEntry(habit.Id, today.AddDays(-1));
+        repository.SeedEntry(habit.Id, today);
+        var item = Assert.Single((await new HabitService(repository).ListAsync(owner, "UTC")).Value!);
+        Assert.Equal(2, item.LongestStreak);
+        Assert.Equal(2, item.CurrentStreak);
+        Assert.Equal(2, item.TotalCheckIns);
+    }
+
     [Fact]
     public async Task CreateListUpdateAndDelete_UseOwnedHabits()
     {
@@ -27,22 +85,20 @@ public sealed class HabitServiceTests
         Assert.True(created.IsSuccess);
         Assert.Equal("Read", created.Value.Name);
         Assert.Equal("Book", created.Value.Icon);
-        Assert.Equal(new TimeOnly(20, 0).ToString("HH:mm"), created.Value.ReminderTime);
         Assert.Single(listed.Value!);
         Assert.Equal("Read English", updated.Value!.Name);
-        Assert.Equal(created.Value.Id, deleted.Value!.EntityId);
+        Assert.True(deleted.Value);
         Assert.Empty(afterDelete.Value!);
     }
 
     [Fact]
-    public async Task Create_RejectsPastStartInvalidGoalAndReminderTime()
+    public async Task Create_RejectsPastStartAndInvalidGoal()
     {
         var service = new HabitService(new FakeHabitRepository());
         var request = CreateRequest(
             "Read",
             startDate: DateTime.UtcNow.Date.AddDays(-1).ToString("yyyy-MM-dd"),
-            goalDays: 0,
-            reminderTime: "25:90");
+            goalDays: 0);
 
         var result = await service.CreateAsync(Guid.NewGuid(), request);
 
@@ -50,7 +106,6 @@ public sealed class HabitServiceTests
         var details = Assert.IsType<Dictionary<string, string[]>>(Assert.IsType<HabitError>(result.Error).Details);
         Assert.Contains("startDate", details.Keys);
         Assert.Contains("goalDays", details.Keys);
-        Assert.Contains("reminderTime", details.Keys);
     }
 
     [Fact]
@@ -93,8 +148,7 @@ public sealed class HabitServiceTests
     public async Task ToggleEntry_CreatesAndRemovesOneEntry()
     {
         var repository = new FakeHabitRepository();
-        var notifier = new RecordingHabitSyncNotifier();
-        var service = new HabitService(repository, notifier);
+        var service = new HabitService(repository);
         var userId = Guid.NewGuid();
         var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
         var habit = await service.CreateAsync(userId, CreateRequest("Read"));
@@ -110,7 +164,6 @@ public sealed class HabitServiceTests
         Assert.False(uncheckedResult.Value!.IsCompleted);
         Assert.Equal(0, uncheckedResult.Value.TotalCheckIns);
         Assert.Empty(entriesAfterUncheck.Value!);
-        Assert.Equal(2, notifier.CheckedItems.Count);
     }
 
     [Fact]
@@ -129,8 +182,7 @@ public sealed class HabitServiceTests
             HabitFrequency.Daily,
             null,
             yesterday,
-            goalDays: 1,
-            reminderTime: new TimeOnly(20, 0));
+            goalDays: 1);
         repository.SeedHabit(habit);
         repository.SeedEntry(habit.Id, yesterday);
 
@@ -170,8 +222,7 @@ public sealed class HabitServiceTests
             HabitFrequency.Daily,
             null,
             today.AddDays(-5),
-            goalDays: 3,
-            reminderTime: new TimeOnly(7, 30));
+            goalDays: 3);
         repository.SeedHabit(habit);
         repository.SeedEntry(habit.Id, today.AddDays(-3));
         repository.SeedEntry(habit.Id, today.AddDays(-1));
@@ -204,8 +255,7 @@ public sealed class HabitServiceTests
             HabitFrequency.Daily,
             null,
             today,
-            goalDays: 7,
-            reminderTime: new TimeOnly(20, 0));
+            goalDays: 7);
         repository.SeedHabit(habit);
         repository.SeedEntry(habit.Id, today);
 
@@ -274,6 +324,31 @@ public sealed class HabitServiceTests
         Assert.Equal("Default", defaulted.Value!.Icon);
     }
 
+    [Fact]
+    public async Task Delete_RetainsCheckIns_RejectsForeignAndRepeatedDeletes_AndBlocksAccess()
+    {
+        var repository = new FakeHabitRepository();
+        var service = new HabitService(repository);
+        var owner = Guid.NewGuid();
+        var today = DateTime.UtcNow.Date;
+        var created = await service.CreateAsync(owner, CreateRequest("Read"));
+        var id = created.Value!.Id;
+        await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"));
+
+        var foreign = await service.DeleteAsync(Guid.NewGuid(), id);
+        Assert.False(foreign.IsSuccess);
+        Assert.Single((await service.ListAsync(owner, "UTC")).Value!);
+        Assert.True((await service.DeleteAsync(owner, id)).IsSuccess);
+        Assert.Equal(1, await repository.CountEntriesAsync(id));
+        Assert.Empty((await service.ListAsync(owner, "UTC")).Value!);
+
+        Assert.False((await service.DeleteAsync(owner, id)).IsSuccess);
+        Assert.False((await service.UpdateAsync(owner, id, new UpdateHabitRequest { Name = "Renamed" })).IsSuccess);
+        Assert.False((await service.ListEntriesAsync(owner, id, today.ToString("yyyy-MM"), "UTC")).IsSuccess);
+        Assert.False((await service.ToggleEntryAsync(owner, id, new ToggleHabitEntryRequest(today.ToString("yyyy-MM-dd"), "UTC"))).IsSuccess);
+        Assert.Equal(1, await repository.CountEntriesAsync(id));
+    }
+
     private static CreateHabitRequest CreateRequest(
         string name,
         string? description = null,
@@ -281,8 +356,7 @@ public sealed class HabitServiceTests
         string frequency = "Daily",
         IReadOnlyList<string>? customDays = null,
         string? startDate = null,
-        int? goalDays = null,
-        string reminderTime = "20:00")
+        int? goalDays = null)
     {
         return new CreateHabitRequest(
             name,
@@ -290,10 +364,8 @@ public sealed class HabitServiceTests
             icon,
             frequency,
             customDays,
-            ReminderEnabled: true,
             StartDate: startDate ?? DateTime.UtcNow.Date.ToString("yyyy-MM-dd"),
             GoalDays: goalDays,
-            ReminderTime: reminderTime,
             TimeZoneId: "UTC");
     }
 
@@ -314,12 +386,6 @@ public sealed class HabitServiceTests
         {
             return Task.FromResult(_habits.FirstOrDefault(habit =>
                 habit.Id == habitId && habit.UserId == userId && habit.DeletedAt is null));
-        }
-
-        public Task<HabitEntity?> GetTrashedAsync(Guid userId, Guid habitId, DateTime trashedAt, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(_habits.FirstOrDefault(habit =>
-                habit.Id == habitId && habit.UserId == userId && habit.DeletedAt == trashedAt));
         }
 
         public Task<IReadOnlyList<HabitEntry>> ListEntriesAsync(
@@ -357,6 +423,12 @@ public sealed class HabitServiceTests
             return Task.FromResult(_entries.Count(entry => entry.HabitId == habitId && entry.DeletedAt is null));
         }
 
+        public Task<IReadOnlyList<HabitCheckInDate>> ListCheckInDatesAsync(
+            IReadOnlyCollection<Guid> habitIds, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<HabitCheckInDate>>(_entries
+                .Where(entry => habitIds.Contains(entry.HabitId) && entry.DeletedAt is null && entry.Date >= startDate && entry.Date <= endDate)
+                .Select(entry => new HabitCheckInDate(entry.HabitId, entry.Date)).ToList());
+
         public Task AddAsync(HabitEntity habit, CancellationToken cancellationToken = default)
         {
             _habits.Add(habit);
@@ -368,11 +440,12 @@ public sealed class HabitServiceTests
             return Task.CompletedTask;
         }
 
-        public Task RemoveAsync(HabitEntity habit, CancellationToken cancellationToken = default)
+        public async Task<bool> SoftDeleteAsync(Guid userId, Guid habitId, DateTime nowUtc, CancellationToken cancellationToken = default)
         {
-            _habits.Remove(habit);
-            _entries.RemoveAll(entry => entry.HabitId == habit.Id);
-            return Task.CompletedTask;
+            var habit = await GetAsync(userId, habitId, cancellationToken);
+            if (habit is null) return false;
+            habit.SoftDelete(nowUtc);
+            return true;
         }
 
         public Task<HabitEntryMutationResult> ToggleEntryAsync(
@@ -426,19 +499,4 @@ public sealed class HabitServiceTests
         public void SeedEntry(Guid habitId, DateTime date) => _entries.Add(HabitEntry.Create(habitId, date));
     }
 
-    private sealed class RecordingHabitSyncNotifier : IHabitSyncNotifier
-    {
-        public List<(Guid UserId, Guid HabitId, string Date, bool IsCompleted)> CheckedItems { get; } = [];
-
-        public Task HabitCheckedAsync(
-            Guid userId,
-            Guid habitId,
-            string date,
-            bool isCompleted,
-            CancellationToken cancellationToken = default)
-        {
-            CheckedItems.Add((userId, habitId, date, isCompleted));
-            return Task.CompletedTask;
-        }
-    }
 }
